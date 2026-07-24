@@ -15,6 +15,7 @@ ASSETS = {
     "/": WEB_ROOT / "index.html",
     "/index.html": WEB_ROOT / "index.html",
     "/app.js": WEB_ROOT / "app.js",
+    "/capture-processor.js": WEB_ROOT / "capture-processor.js",
     "/styles.css": WEB_ROOT / "styles.css",
 }
 
@@ -101,6 +102,15 @@ class ReviewerHandler(BaseHTTPRequestHandler):
                 remaining -= len(block)
 
     def do_GET(self) -> None:
+        if unquote(urlsplit(self.path).path) == "/api/config":
+            body = b'{"mode":"review"}\n'
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         path = self._resolve_request()
         if path is None:
             self.send_error(HTTPStatus.NOT_FOUND)

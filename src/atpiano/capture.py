@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import threading
 import time
 from pathlib import Path
@@ -12,6 +13,8 @@ import soundfile
 
 from atpiano.fixture import INPUT_SCHEMA
 from atpiano.util import sha256_file, utc_now, write_json, write_jsonl
+
+BROWSER_CAPTURE_SCHEMA = "atpiano.browser-capture.v1"
 
 
 def _sounddevice() -> Any:
@@ -95,6 +98,92 @@ def write_capture_artifacts(
         },
     }
     write_json(manifest_path, manifest)
+    return manifest
+
+
+def write_browser_capture_artifacts(
+    output_directory: Path,
+    source_wav: Path,
+    *,
+    client_metadata: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate a browser-produced PCM WAV and write an unaligned input manifest."""
+    if client_metadata.get("schema_version") != BROWSER_CAPTURE_SCHEMA:
+        raise ValueError("unsupported browser capture metadata schema")
+    output_directory = output_directory.resolve()
+    source_wav = source_wav.resolve()
+    output_directory.mkdir(parents=True, exist_ok=True)
+    ensure_capture_target(output_directory)
+
+    info = soundfile.info(source_wav)
+    if info.format != "WAV" or info.subtype != "PCM_16":
+        raise ValueError("browser upload must be a 16-bit PCM WAV")
+    if info.channels != 1:
+        raise ValueError("browser upload must contain exactly one channel")
+    if info.samplerate <= 0 or info.frames <= 0:
+        raise ValueError("browser upload must contain audio samples")
+
+    expected_sample_rate = client_metadata.get("sample_rate_hz")
+    expected_frames = client_metadata.get("frame_count")
+    chunk_count = client_metadata.get("chunk_count")
+    capture_elapsed_s = client_metadata.get("capture_elapsed_s")
+    if expected_sample_rate != info.samplerate:
+        raise ValueError("browser metadata sample rate does not match WAV")
+    if expected_frames != info.frames:
+        raise ValueError("browser metadata frame count does not match WAV")
+    if not isinstance(chunk_count, int) or isinstance(chunk_count, bool) or chunk_count <= 0:
+        raise ValueError("browser metadata chunk count must be a positive integer")
+    if (
+        not isinstance(capture_elapsed_s, (int, float))
+        or isinstance(capture_elapsed_s, bool)
+        or capture_elapsed_s <= 0
+    ):
+        raise ValueError("browser metadata capture duration must be positive")
+
+    audio_path = output_directory / "recording.wav"
+    metadata_path = output_directory / "browser-capture.json"
+    shutil.copyfile(source_wav, audio_path)
+    capture_document = {
+        "schema_version": BROWSER_CAPTURE_SCHEMA,
+        "sample_rate_hz": info.samplerate,
+        "frame_count": info.frames,
+        "chunk_count": chunk_count,
+        "capture_elapsed_s": float(capture_elapsed_s),
+        "started_at": client_metadata.get("started_at"),
+        "requested_constraints": client_metadata.get("requested_constraints"),
+        "source_timeline": "AudioWorklet sample index",
+        "transport": "same-origin HTTP PCM WAV upload",
+        "received_at": utc_now(),
+    }
+    write_json(metadata_path, capture_document)
+
+    audio_hash = sha256_file(audio_path)
+    manifest = {
+        "schema_version": INPUT_SCHEMA,
+        "input_id": f"browser-microphone-{audio_hash[:16]}",
+        "created_at": utc_now(),
+        "license": "user-provided local recording; rights not asserted by atpiano",
+        "audio": {
+            "path": audio_path.name,
+            "sha256": audio_hash,
+            "format": "wav-pcm-s16le",
+            "sample_rate_hz": info.samplerate,
+            "channels": 1,
+            "first_sample_index": 0,
+            "frame_count": info.frames,
+            "duration_s": info.frames / info.samplerate,
+        },
+        "reference": None,
+        "capture": {
+            "adapter": "web-audio-worklet-file-v1",
+            "metadata_path": metadata_path.name,
+            "metadata_sha256": sha256_file(metadata_path),
+            "source_timeline": "audio sample index",
+            "host_clock_mapping": None,
+            "latency_claim": None,
+        },
+    }
+    write_json(output_directory / "input.json", manifest)
     return manifest
 
 

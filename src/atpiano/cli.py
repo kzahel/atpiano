@@ -64,6 +64,22 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="do not open the reviewer in the default browser",
     )
+    workbench_parser = subparsers.add_parser(
+        "workbench",
+        help="record, transcribe, and review from one local browser page",
+    )
+    workbench_parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=Path("results/workbench"),
+        help="generated artifact directory (default: results/workbench)",
+    )
+    workbench_parser.add_argument("--port", type=int, default=8000)
+    workbench_parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="do not open the workbench in the default browser",
+    )
     subparsers.add_parser(
         "devices",
         help="list audio devices available for microphone capture",
@@ -121,6 +137,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         serve_review(
             args.run_directory,
             bind=args.bind,
+            port=args.port,
+            open_browser=not args.no_open,
+        )
+        return 0
+    if args.command == "workbench":
+        from atpiano.workbench import serve_workbench
+
+        serve_workbench(
+            args.workspace,
             port=args.port,
             open_browser=not args.no_open,
         )

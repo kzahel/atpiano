@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark">
-    <title>Atpiano Run Review</title>
+    <title>Atpiano Workbench</title>
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
@@ -12,102 +12,173 @@
       <header class="masthead">
         <div>
           <p class="eyebrow">Acoustic transcription evidence</p>
-          <h1>Atpiano <span>run review</span></h1>
+          <h1>Atpiano <span id="page-kind">workbench</span></h1>
         </div>
         <div class="run-meta" aria-live="polite">
-          <span id="mode-badge" class="badge">Loading run</span>
-          <span id="model-name">—</span>
+          <span id="mode-badge" class="badge">Starting</span>
+          <span id="model-name">Basic Pitch</span>
         </div>
       </header>
 
-      <section class="hero" aria-labelledby="roll-title">
+      <section id="recorder" class="recorder" aria-labelledby="recorder-title" hidden>
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Listen against the evidence</p>
-            <h2 id="roll-title">Reference and recovered performance</h2>
+            <p class="eyebrow">One local workflow</p>
+            <h2 id="recorder-title">Record your piano</h2>
           </div>
-          <div class="legend" aria-label="Piano roll legend">
-            <label><input id="show-reference" type="checkbox" checked> Reference</label>
-            <label><input id="show-prediction" type="checkbox" checked> Prediction</label>
-          </div>
+          <p class="section-note">
+            Your microphone audio stays on this Mac in the local workbench workspace.
+          </p>
         </div>
 
-        <audio id="audio" controls preload="metadata">
-          Your browser does not support audio playback.
-        </audio>
+        <div class="capture-grid">
+          <article class="capture-panel">
+            <div class="capture-status">
+              <span id="capture-indicator" class="capture-indicator" aria-hidden="true"></span>
+              <span id="capture-status" aria-live="polite">Ready for a new take</span>
+              <strong id="capture-time">0:00.0</strong>
+            </div>
+            <div class="level-track" aria-label="Microphone input level">
+              <span id="level-fill"></span>
+            </div>
+            <p class="capture-copy">
+              Start with a few seconds of room silence, then play isolated notes,
+              repeated notes, chords, bass, treble, legato, and pedal.
+            </p>
+            <div class="button-row">
+              <button id="start-recording" class="button primary" type="button">
+                Start recording
+              </button>
+              <button id="stop-recording" class="button" type="button" disabled>
+                Stop
+              </button>
+            </div>
+          </article>
 
-        <div class="roll-controls">
-          <label for="zoom">Timeline scale</label>
-          <input id="zoom" type="range" min="60" max="240" value="110">
-          <output id="zoom-value" for="zoom">110 px/s</output>
+          <article id="take-panel" class="take-panel" hidden>
+            <div class="take-heading">
+              <div>
+                <p class="eyebrow">Captured waveform</p>
+                <h2>Listen before transcribing</h2>
+              </div>
+              <span id="take-meta" class="badge">—</span>
+            </div>
+            <audio id="recording-preview" controls preload="metadata">
+              Your browser does not support audio playback.
+            </audio>
+            <canvas id="recording-waveform" height="128" aria-label="Recorded audio waveform"></canvas>
+            <div class="button-row">
+              <button id="discard-recording" class="button" type="button">Discard</button>
+              <button id="transcribe-recording" class="button primary" type="button">
+                Transcribe recording
+              </button>
+            </div>
+          </article>
         </div>
 
-        <div id="roll-scroller" class="roll-scroller" tabindex="0">
-          <canvas id="piano-roll" height="600" aria-label="Reference and predicted piano roll"></canvas>
-        </div>
-      </section>
-
-      <section class="metrics" aria-labelledby="quality-title">
-        <div class="section-heading">
+        <div id="job-panel" class="job-panel" aria-live="polite" hidden>
+          <span class="spinner" aria-hidden="true"></span>
           <div>
-            <p class="eyebrow">Quality / latency frontier</p>
-            <h2 id="quality-title">What this run actually achieved</h2>
+            <strong id="job-title">Uploading recording</strong>
+            <p id="job-detail">Preparing a versioned local input.</p>
           </div>
         </div>
-        <div id="metric-grid" class="metric-grid" aria-live="polite"></div>
       </section>
 
-      <section class="details">
-        <article>
-          <div class="section-heading compact">
+      <div id="review" hidden>
+        <section class="hero" aria-labelledby="roll-title">
+          <div class="section-heading">
             <div>
-              <p class="eyebrow">Revisable tail</p>
-              <h2>Event lifecycle</h2>
+              <p class="eyebrow">Listen against the evidence</p>
+              <h2 id="roll-title">Reference and recovered performance</h2>
+            </div>
+            <div class="legend" aria-label="Piano roll legend">
+              <label><input id="show-reference" type="checkbox" checked> Reference</label>
+              <label><input id="show-prediction" type="checkbox" checked> Prediction</label>
             </div>
           </div>
-          <div id="lifecycle" class="lifecycle"></div>
-        </article>
 
-        <article>
-          <div class="section-heading compact">
+          <audio id="result-audio" controls preload="metadata">
+            Your browser does not support audio playback.
+          </audio>
+
+          <div class="roll-controls">
+            <label for="zoom">Timeline scale</label>
+            <input id="zoom" type="range" min="60" max="240" value="110">
+            <output id="zoom-value" for="zoom">110 px/s</output>
+          </div>
+
+          <div id="roll-scroller" class="roll-scroller" tabindex="0">
+            <canvas
+              id="piano-roll"
+              height="600"
+              aria-label="Reference and predicted piano roll"
+            ></canvas>
+          </div>
+        </section>
+
+        <section class="metrics" aria-labelledby="quality-title">
+          <div class="section-heading">
             <div>
-              <p class="eyebrow">Run identity</p>
-              <h2>Provenance</h2>
+              <p class="eyebrow">Quality / latency frontier</p>
+              <h2 id="quality-title">What this run actually achieved</h2>
             </div>
           </div>
-          <dl id="provenance"></dl>
-        </article>
-      </section>
+          <div id="metric-grid" class="metric-grid" aria-live="polite"></div>
+        </section>
 
-      <section class="event-log" aria-labelledby="events-title">
-        <div class="section-heading compact">
-          <div>
-            <p class="eyebrow">Normalized boundary</p>
-            <h2 id="events-title">Emitted event revisions</h2>
+        <section class="details">
+          <article>
+            <div class="section-heading compact">
+              <div>
+                <p class="eyebrow">Revisable tail</p>
+                <h2>Event lifecycle</h2>
+              </div>
+            </div>
+            <div id="lifecycle" class="lifecycle"></div>
+          </article>
+
+          <article>
+            <div class="section-heading compact">
+              <div>
+                <p class="eyebrow">Run identity</p>
+                <h2>Provenance</h2>
+              </div>
+            </div>
+            <dl id="provenance"></dl>
+          </article>
+        </section>
+
+        <section class="event-log" aria-labelledby="events-title">
+          <div class="section-heading compact">
+            <div>
+              <p class="eyebrow">Normalized boundary</p>
+              <h2 id="events-title">Emitted event revisions</h2>
+            </div>
+            <span id="event-count" class="badge">0 events</span>
           </div>
-          <span id="event-count" class="badge">0 events</span>
-        </div>
-        <div class="table-scroller">
-          <table>
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Pitch</th>
-                <th>State</th>
-                <th>Revision</th>
-                <th>Velocity</th>
-                <th>Latency</th>
-              </tr>
-            </thead>
-            <tbody id="event-body"></tbody>
-          </table>
-        </div>
-      </section>
+          <div class="table-scroller">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Pitch</th>
+                  <th>State</th>
+                  <th>Revision</th>
+                  <th>Velocity</th>
+                  <th>Latency</th>
+                </tr>
+              </thead>
+              <tbody id="event-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </main>
 
     <template id="error-template">
-      <div class="error">
-        <strong>Run could not be loaded.</strong>
+      <div class="error" role="alert">
+        <strong>Something went wrong.</strong>
         <span></span>
       </div>
     </template>
