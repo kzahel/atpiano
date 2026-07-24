@@ -169,7 +169,7 @@ class WorkbenchHandler(ReviewerHandler):
         job_id = _new_job_id()
         job_root = self.server.workspace_directory / job_id
         input_directory = job_root / "input"
-        run_directory = job_root / "run"
+        run_directory = job_root / f"run-{job_id}"
         input_directory.mkdir(parents=True)
         upload_path = input_directory / ".upload.wav"
         try:
@@ -321,7 +321,16 @@ def _load_completed_jobs(workspace_directory: Path) -> dict[str, dict[str, Any]]
     for job_root in workspace_directory.iterdir():
         if not job_root.is_dir() or not JOB_ID_PATTERN.fullmatch(job_root.name):
             continue
-        run_directory = job_root / "run"
+        run_directories = (
+            job_root / f"run-{job_root.name}",
+            job_root / "run",
+        )
+        run_directory = next(
+            (path for path in run_directories if (path / "run.json").is_file()),
+            None,
+        )
+        if run_directory is None:
+            continue
         run_manifest = run_directory / "run.json"
         input_manifest = job_root / "input" / "input.json"
         if not run_manifest.is_file() or not input_manifest.is_file():

@@ -68,7 +68,7 @@ def _fake_transcriber(
     shutil.copyfile(input_manifest.parent / manifest["audio"]["path"], run_directory / "input.wav")
     run = {
         "schema_version": "atpiano.run.v1",
-        "run_id": run_directory.parent.name,
+        "run_id": run_directory.name,
         "status": "complete",
         "started_at": "2026-07-24T12:00:01+00:00",
         "completed_at": "2026-07-24T12:00:02+00:00",
@@ -187,7 +187,7 @@ def test_workbench_upload_job_and_reloadable_artifacts(tmp_path: Path) -> None:
 
         artifact_url = f"{base_url}/api/runs/{job_id}/artifacts/run.json"
         with urllib.request.urlopen(artifact_url, timeout=2) as response:
-            assert json.load(response)["run_id"] == job_id
+            assert json.load(response)["run_id"] == f"run-{job_id}"
         with pytest.raises(urllib.error.HTTPError) as traversal_error:
             urllib.request.urlopen(
                 f"{base_url}/api/runs/{job_id}/artifacts/%2e%2e/input/input.json",
