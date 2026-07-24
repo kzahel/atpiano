@@ -6,7 +6,8 @@ Status: prototype. No permanent model or runtime is selected. The first
 deterministic live-replay benchmark is complete with a Basic Pitch 0.4.0 Core
 ML reference, normalized revisable events, timing/quality artifacts, a local
 run reviewer, native file-producing microphone adapter, and a local browser
-live-transcription/reconciliation workbench.
+live-transcription/reconciliation workbench. The live lane now uses a measured
+strict-onset decoder while the full-file reference remains untouched.
 
 ## Scope
 
@@ -205,10 +206,49 @@ useful take also falls from 133 to 92 notes. Therefore strict decoding is a
 promising experiment, not an established improvement: no aligned reference
 currently distinguishes removed overtones from removed true notes.
 
-Next compare decoder policies and onset thresholds from retained outputs before
-running new inference. Test any active-note suppression on repeated strikes
-and true harmonic intervals; do not suppress octaves or fifths merely because
-they are harmonically related.
+The bounded comparison below tests those decoder paths and thresholds from
+retained output before integrating a live policy. Any later active-note
+suppression still must preserve repeated strikes and true harmonic intervals;
+octaves and fifths are not duplicates merely because they are related.
+
+### Selected strict-onset live baseline
+
+Tactical
+[`005-strict-onset-decoder-spike.md`](../tactical/005-strict-onset-decoder-spike.md)
+adds a reusable decoder study over retained Basic Pitch arrays. It records
+each candidate's explicit onset confidence and whether the official decoder
+created it from an onset-head peak, frame-derived inference, or melodia
+fallback.
+
+The selected live policy disables inferred onsets and melodia and raises the
+onset threshold from 0.5 to 0.6. It recovers all 19 deterministic fixture
+onsets with no extras at both 25 and 50 ms. Threshold 0.7 also scores perfectly
+on that fixture, but 0.6 is the lowest perfect threshold and is less likely to
+delete unaligned acoustic notes. Threshold 0.8 misses one fixture note.
+
+On the unaligned target-room evidence, stock-to-strict note counts and
+sub-second same-pitch restarts change as follows:
+
+| Case | Stock | Strict 0.6 |
+|---|---:|---:|
+| Earlier useful take | 133 / 37 | 81 / 15 |
+| Held-chord A | 214 / 62 | 149 / 38 |
+| Held-chord B | 137 / 38 | 52 / 10 |
+
+These are decoder-busyness measures, not accuracy scores. No fixed same-pitch
+refractory or source attack-novelty threshold was selected: the fixture
+protects E4 reattacks 450 ms apart, and the unaligned acoustic examples do not
+distinguish every apparent restart from a true strike. A 3 dB source novelty
+threshold preserves the fixture but deletes 23 of 81 strict notes from the
+earlier subjectively useful take.
+
+The actual rolling Core ML path produces 83 committed identities on that
+34.688-second take, close to the 81-note full-file strict decode and below the
+previous stock rolling result of 140. The rolling fixture has 18 of 19 onset
+matches plus one false estimate; its missing reference begins at 0.5 seconds
+and is intentionally suppressed by the live room-calibration period. This
+validates the implementation boundary while leaving target-piano accuracy for
+controlled or aligned acoustic evidence.
 
 ## Accepted Pipeline Boundary
 
@@ -494,11 +534,20 @@ The first target-piano take now supplies the initial subjective evidence.
 is complete: the workbench can render a traceable local score and import
 separate Ivory WAV and atpiano-MIDI MusicXML results. Its target-piano score
 failed subjective readability review, while the Ivory preview was readily
-playable. The next acoustic slice,
-[`003-live-browser-transcription-spike.md`](../tactical/003-live-browser-transcription-spike.md),
-is accepted and will prioritize onset, pitch-set, and broad chord-shape
-feedback while the performance remains in the user's short-term memory. The
-model-comparison work above remains valid.
+playable.
+
+[`003-live-browser-transcription-spike.md`](../tactical/003-live-browser-transcription-spike.md)
+is complete and established the sample-indexed browser stream, rolling model,
+event lifecycle, and exact-final backfill. The model-comparison work above
+remains valid.
+
+[`005-strict-onset-decoder-spike.md`](../tactical/005-strict-onset-decoder-spike.md)
+is complete. It establishes strict onset 0.6 as the current live Basic Pitch
+baseline, preserves decoder-origin evidence, and rejects an ungrounded
+refractory or source-attack filter. Next collect a controlled held-chord and
+reattack clip, review the live behavior, and move to a piano-specific onset
+lane if the learned Basic Pitch onset head still produces false held-note
+starts.
 
 ## Open Questions
 

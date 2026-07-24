@@ -2,10 +2,10 @@
 
 Topic: live-acoustic-transcription
 
-Status: second subjective review complete. The room gate and onset-only display
-are more legible, but stock Basic Pitch onset semantics are rejected for held
-chords: sustained frame energy and overtones repeatedly become new notes. A
-strict-onset decoder comparison is the recommended next bounded experiment.
+Status: strict-onset live decoder implemented and ready for subjective review.
+The live lane now requires an explicit Basic Pitch onset-head peak at 0.6;
+frame-inferred and melodia fallback starts remain available only in the
+untouched exact-final lane.
 
 ## Scope And Relationship
 
@@ -206,6 +206,45 @@ from 38 to 14 repeated starts. The earlier target take also falls from 133 to
 Some repeated starts remain, showing that the learned onset head itself can
 respond to sustained acoustic modulation or resonance.
 
+### Strict-onset decoder result
+
+Tactical
+[`005-strict-onset-decoder-spike.md`](../tactical/005-strict-onset-decoder-spike.md)
+turns the exploratory comparison into a reproducible decoder study. Each
+candidate retains its native onset and frame confidence plus whether it came
+from the explicit onset head, inferred frame change, or melodia fallback.
+
+The aligned 19-note fixture selects a live onset threshold of 0.6:
+
+```text
+policy                    notes    25/50 ms onset F1
+stock                       23          0.905
+strict onset 0.5             20          0.974
+strict onset 0.6             19          1.000
+strict onset 0.7             19          1.000
+strict onset 0.8             18          0.973
+```
+
+The lower perfect threshold avoids unsupported deletion from the unaligned
+piano takes. Relative to stock, strict 0.6 changes the earlier useful take from
+133 to 81 notes, held-chord A from 214 to 149, and held-chord B from 137 to 52.
+Sub-second same-pitch restarts fall from 37 to 15, 62 to 38, and 38 to 10.
+These reductions establish a less busy decoder, not acoustic precision.
+
+No additional refractory or source-attack gate was selected. The fixture's
+two E4 strikes 450 ms apart must both survive, and apparent repeated notes in
+the retained acoustic takes often have strong separate source attacks. A 3 dB
+attack-novelty threshold preserves the fixture but removes 23 of the 81
+strict-decoded target notes without aligned evidence that they are false.
+
+Real rolling Core ML validation on the 34.688-second target take produced 83
+committed identities over 132 windows, close to the 81 full-file strict notes
+and materially below the earlier stock rolling result of 140. The rolling
+fixture produced 19 identities and matched 18 reference onsets; its missing
+0.5-second bass note is intentionally inside the one-second room-calibration
+period. After excluding that calibration-period reference, onset recall is
+1.000, precision 0.947, and F1 0.973.
+
 ## Implemented Live Architecture
 
 ```text
@@ -219,6 +258,9 @@ binary WebSocket transport ----> gap / backpressure evidence
 host ring buffer + source/host clock mapping
           |
           +----> rolling preview scheduler
+          |             |
+          |             v
+          |       strict onset decoder
           |             |
           |             v
           |       room/onset energy gate
@@ -247,8 +289,9 @@ The selected model window is Basic Pitch's unchanged 43,844 samples at
 22,050 Hz, or 1.988 seconds. The scheduler runs every 250 ms, with 116 ms and
 232 ms edge guards and a one-second commit horizon. This is one first measured
 configuration, not the promised optimum. The model is warmed and cached before
-the worklet begins, and every native probability window and timing sample is
-preserved.
+the worklet begins. Live decoding requires an explicit learned onset-head peak
+at 0.6 and disables frame-inferred onsets and the melodia fallback. Every
+native probability window, candidate origin, and timing sample is preserved.
 
 The first source second calibrates room noise as the median RMS of 50 ms
 frames. A candidate's 140 ms onset-local window must clear a threshold eight
@@ -365,29 +408,24 @@ Do not tune the absolute-volume gate or add a generic harmonic filter for this
 failure. The former cannot distinguish a new strike from loud resonance; the
 latter would erase legitimate piano octaves and fifths.
 
-Use retained native probabilities for a bounded decoder experiment before
-rerunning the model:
+First repeat the held-chord interaction with the selected strict 0.6 live
+decoder. The workbench identifies that policy in the live status area. Judge
+whether a chord held without restrikes remains visually stable and whether
+ordinary repeated notes still appear.
 
-1. compare stock, `melodia_trick=False`, and strict
-   `infer_onsets=False`/`melodia_trick=False` results on the deterministic
-   fixture, earlier target take, and both held-chord sessions;
-2. sweep only onset threshold and a short same-pitch refractory/active-state
-   policy, preserving every raw activation and decision;
-3. score the deterministic fixture and compare live-to-exact disagreement,
-   repeated-start rate, total notes, and subjective held-chord behavior;
-4. add a controlled local clip with isolated notes, repeated strikes, held
-   chords, true octaves/fifths, and pedal so suppression does not reward
-   under-transcription; and
-5. retain Basic Pitch only if its explicit onset head can provide a useful
-   portable baseline.
+Then record a short controlled local clip with silence, isolated soft and loud
+notes, a held chord, repeated strikes at several gaps, true octaves/fifths,
+bass, treble, and pedal. Retain or manually annotate enough onset truth to
+separate false resonance starts from real reattacks.
 
 If strict decoding still confuses sustained harmonics with new attacks, keep
 the proven transport, clock, artifact, keyboard, and staff boundaries and open
 the causal/piano-onset model bakeoff. An onset-specific or piano-specific lane
-is then more justified than additional stock-decoder heuristics.
+is more justified than adding a refractory period or harmonic filter without
+ground truth.
 
-The reviewed implementation record is
-[`004-noise-gated-onset-display.md`](../tactical/004-noise-gated-onset-display.md).
+The current implementation record is
+[`005-strict-onset-decoder-spike.md`](../tactical/005-strict-onset-decoder-spike.md).
 
 ## Required Measurements
 
@@ -411,10 +449,10 @@ The reviewed implementation record is
 - Does the automatic gate suppress pre-piano notes without losing soft attacks?
 - Does the implemented 180 ms recent-onset grouping make rolled chords legible
   without merging melodic runs into one pitch set?
-- What strict-onset threshold and active-note policy suppress held-chord
-  re-onsets without losing repeated strikes?
-- Does Basic Pitch's learned onset head retain enough target-piano recall once
-  frame-derived and melodia notes are removed?
+- Does strict onset 0.6 subjectively stabilize a held chord on the target
+  piano while retaining ordinary repeated strikes?
+- Which remaining learned-onset responses in a controlled held-only clip are
+  false, and do they justify a source-attack or active-note policy?
 - Is the current named live-versus-final summary sufficient to explain changes
   to rolling-committed notes?
 - What hop and commit horizon best preserve the current target-piano quality?
