@@ -1,0 +1,12 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+
+# Large or generated research material
+artifacts/
+checkpoints/
+datasets/
+models/
+recordings/
+results/
