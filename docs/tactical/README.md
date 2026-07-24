@@ -11,3 +11,4 @@ execution record; continuing status and direction belong in the relevant
 | Doc | Status | Purpose |
 |---|---|---|
 | [`000-live-replay-benchmark.md`](000-live-replay-benchmark.md) | Complete | Deterministic MIDI/audio smoke test, Basic Pitch reference, live replay, scoring, artifact review, and file-producing microphone adapter |
+| [`001-browser-capture-workbench.md`](001-browser-capture-workbench.md) | Active | Local browser microphone recording, file submission, background transcription, and automatic run review |
