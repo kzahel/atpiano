@@ -14,10 +14,16 @@ import wave
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pytest
 
 from atpiano.capture import BROWSER_CAPTURE_SCHEMA, write_browser_capture_artifacts
-from atpiano.live import LIVE_STREAM_SCHEMA, PcmBlock, pack_pcm_block
+from atpiano.live import (
+    LIVE_STREAM_SCHEMA,
+    LiveModelOutput,
+    PcmBlock,
+    pack_pcm_block,
+)
 from atpiano.util import read_json, write_json
 from atpiano.workbench import create_workbench_server
 
@@ -153,6 +159,26 @@ def _fake_transcriber(
         encoding="utf-8",
     )
     return run
+
+
+class _FakeLiveModel:
+    sample_rate_hz = 22_050
+    window_samples = 8
+    fft_hop_samples = 1
+    overlapping_frames = 4
+    left_guard_samples = 1
+    right_guard_samples = 3
+
+    def predict(self, audio: np.ndarray) -> LiveModelOutput:
+        return LiveModelOutput(
+            candidates=[],
+            raw={"onset": np.zeros((1, 88), dtype=np.float32)},
+            inference_s=0.001,
+            decode_s=0.001,
+        )
+
+    def provenance(self) -> dict[str, object]:
+        return {"name": "test-live-model"}
 
 
 def test_browser_capture_writer_preserves_validated_pcm_wav(tmp_path: Path) -> None:
@@ -319,7 +345,12 @@ def test_workbench_upload_job_and_reloadable_artifacts(tmp_path: Path) -> None:
 
 
 def test_workbench_live_websocket_preserves_sample_stream(tmp_path: Path) -> None:
-    server = create_workbench_server(tmp_path, port=0, transcriber=_fake_transcriber)
+    server = create_workbench_server(
+        tmp_path,
+        port=0,
+        transcriber=_fake_transcriber,
+        live_model_factory=_FakeLiveModel,
+    )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     port = server.server_address[1]
@@ -370,7 +401,11 @@ def test_workbench_live_websocket_preserves_sample_stream(tmp_path: Path) -> Non
                 _client_websocket_frame(pack_pcm_block(block), opcode=0x2)
             )
             _, payload = _server_websocket_frame(stream)
-            assert json.loads(payload)["type"] == "block_ack"
+            acknowledgement = json.loads(payload)
+            assert acknowledgement["type"] == "block_ack"
+            if acknowledgement["window_count"]:
+                _, payload = _server_websocket_frame(stream)
+                assert json.loads(payload)["type"] == "events"
 
         _send_live_json(
             connection,

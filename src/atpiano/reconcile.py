@@ -32,6 +32,12 @@ class NoteTrack:
     first_window_index: int
 
 
+@dataclass
+class StreamingNoteTrack(NoteTrack):
+    observation_count: int
+    last_seen_head_sample: int
+
+
 class Reconciler:
     def __init__(
         self,
@@ -190,6 +196,202 @@ class Reconciler:
         return records
 
     def final_tracks(self) -> list[NoteTrack]:
+        return sorted(
+            (track for track in self.tracks if track.lifecycle == "committed"),
+            key=lambda track: track.note,
+        )
+
+
+class StreamingReconciler:
+    """Reconcile heavily overlapping live windows into stable note identities."""
+
+    def __init__(
+        self,
+        *,
+        session_id: str,
+        sample_rate_hz: int,
+        session_origin_ns: int,
+        onset_match_tolerance_s: float = 0.08,
+        commit_horizon_s: float = 1.0,
+        retraction_horizon_s: float = 0.75,
+    ) -> None:
+        self.session_id = session_id
+        self.sample_rate_hz = sample_rate_hz
+        self.session_origin_ns = session_origin_ns
+        self.onset_match_tolerance_s = onset_match_tolerance_s
+        self.commit_horizon_s = commit_horizon_s
+        self.retraction_horizon_s = retraction_horizon_s
+        self.tracks: list[StreamingNoteTrack] = []
+        self._ordinal = 0
+
+    def _new_id(self, note: MidiNote, window_index: int) -> str:
+        value = (
+            f"{self.session_id}:live:{window_index}:{note.pitch}:"
+            f"{note.onset_s:.9f}:{self._ordinal}"
+        ).encode("ascii")
+        self._ordinal += 1
+        return hashlib.sha256(value).hexdigest()[:20]
+
+    def _record(
+        self,
+        track: StreamingNoteTrack,
+        *,
+        emitted_ns: int,
+        window_index: int,
+    ) -> dict[str, Any]:
+        onset_sample = round(track.note.onset_s * self.sample_rate_hz)
+        offset_sample = round(track.note.offset_s * self.sample_rate_hz)
+        emitted_elapsed_s = (emitted_ns - self.session_origin_ns) / 1_000_000_000.0
+        return {
+            "schema_version": "atpiano.note-event.v1",
+            "session_id": self.session_id,
+            "event_id": track.event_id,
+            "revision": track.revision,
+            "source": "acoustic",
+            "lifecycle": track.lifecycle,
+            "pitch": track.note.pitch,
+            "onset_sample": onset_sample,
+            "offset_sample": offset_sample,
+            "velocity": track.note.velocity,
+            "confidence": track.confidence,
+            "pedal_relationship": None,
+            "emitted_at_monotonic_ns": emitted_ns,
+            "emitted_elapsed_s": emitted_elapsed_s,
+            "source_to_emission_latency_s": (
+                emitted_elapsed_s - onset_sample / self.sample_rate_hz
+            ),
+            "window_index": window_index,
+            "observation_count": track.observation_count,
+        }
+
+    def _matches(
+        self,
+        candidates: list[tuple[MidiNote, float]],
+    ) -> tuple[dict[int, int], set[int]]:
+        pairs: list[tuple[float, int, int]] = []
+        for track_index, track in enumerate(self.tracks):
+            if track.lifecycle == "retracted":
+                continue
+            for candidate_index, (candidate, _) in enumerate(candidates):
+                if track.note.pitch != candidate.pitch:
+                    continue
+                distance = abs(track.note.onset_s - candidate.onset_s)
+                if distance <= self.onset_match_tolerance_s:
+                    pairs.append((distance, track_index, candidate_index))
+        matches: dict[int, int] = {}
+        used_candidates: set[int] = set()
+        for _, track_index, candidate_index in sorted(pairs):
+            if track_index in matches or candidate_index in used_candidates:
+                continue
+            matches[track_index] = candidate_index
+            used_candidates.add(candidate_index)
+        return matches, used_candidates
+
+    @staticmethod
+    def _material_change(previous: MidiNote, current: MidiNote) -> bool:
+        return (
+            abs(previous.onset_s - current.onset_s) >= 0.01
+            or abs(previous.offset_s - current.offset_s) >= 0.05
+            or abs(previous.velocity - current.velocity) >= 3
+        )
+
+    def process(
+        self,
+        candidates: list[tuple[MidiNote, float]],
+        region: WindowRegion,
+        *,
+        emitted_ns: int,
+        audio_head_sample: int,
+        total_source_samples: int,
+    ) -> list[dict[str, Any]]:
+        reliable_start = (
+            max(0, region.source_start_sample)
+            if region.is_first
+            else region.source_start_sample + region.left_guard_samples
+        )
+        reliable_end = region.source_end_sample - region.right_guard_samples
+        filtered = [
+            (note, confidence)
+            for note, confidence in candidates
+            if reliable_start
+            <= round(note.onset_s * self.sample_rate_hz)
+            < min(reliable_end, total_source_samples)
+        ]
+        matches, used_candidates = self._matches(filtered)
+        records: list[dict[str, Any]] = []
+
+        for track_index, track in enumerate(self.tracks):
+            if track.lifecycle != "provisional":
+                continue
+            changed = False
+            matched = track_index in matches
+            if matched:
+                candidate, confidence = filtered[matches[track_index]]
+                changed = self._material_change(track.note, candidate) or (
+                    abs(track.confidence - confidence) >= 0.05
+                )
+                track.note = candidate
+                track.confidence = confidence
+                track.observation_count += 1
+                track.last_seen_head_sample = audio_head_sample
+
+            onset_sample = round(track.note.onset_s * self.sample_rate_hz)
+            age_s = (audio_head_sample - onset_sample) / self.sample_rate_hz
+            missing_s = (
+                audio_head_sample - track.last_seen_head_sample
+            ) / self.sample_rate_hz
+            next_lifecycle: str | None = None
+            if matched and age_s >= self.commit_horizon_s and track.observation_count >= 2:
+                next_lifecycle = "committed"
+                track.committed_emitted_ns = emitted_ns
+            elif not matched and missing_s >= self.retraction_horizon_s:
+                next_lifecycle = "retracted"
+            if next_lifecycle is not None:
+                track.lifecycle = next_lifecycle
+                track.revision += 1
+                records.append(
+                    self._record(
+                        track,
+                        emitted_ns=emitted_ns,
+                        window_index=region.index,
+                    )
+                )
+            elif matched and changed:
+                track.revision += 1
+                records.append(
+                    self._record(
+                        track,
+                        emitted_ns=emitted_ns,
+                        window_index=region.index,
+                    )
+                )
+
+        for candidate_index, (note, confidence) in enumerate(filtered):
+            if candidate_index in used_candidates:
+                continue
+            track = StreamingNoteTrack(
+                event_id=self._new_id(note, region.index),
+                note=note,
+                revision=1,
+                lifecycle="provisional",
+                first_emitted_ns=emitted_ns,
+                committed_emitted_ns=None,
+                confidence=confidence,
+                first_window_index=region.index,
+                observation_count=1,
+                last_seen_head_sample=audio_head_sample,
+            )
+            self.tracks.append(track)
+            records.append(
+                self._record(
+                    track,
+                    emitted_ns=emitted_ns,
+                    window_index=region.index,
+                )
+            )
+        return records
+
+    def final_tracks(self) -> list[StreamingNoteTrack]:
         return sorted(
             (track for track in self.tracks if track.lifecycle == "committed"),
             key=lambda track: track.note,

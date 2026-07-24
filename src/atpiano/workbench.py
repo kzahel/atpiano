@@ -22,8 +22,12 @@ from urllib.parse import unquote, urlsplit
 from atpiano.capture import write_browser_capture_artifacts
 from atpiano.live import (
     LIVE_STREAM_SCHEMA,
+    BasicPitchLiveModel,
     LiveCaptureSession,
+    LiveRecognitionProcessor,
+    LiveWindowModel,
     decode_live_message,
+    finalize_live_run,
     parse_pcm_block,
 )
 from atpiano.notation import (
@@ -43,6 +47,7 @@ MAX_METADATA_BYTES = 16 * 1024
 MAX_NOTATION_OPTIONS_BYTES = 16 * 1024
 JOB_ID_PATTERN = re.compile(r"[0-9]{8}T[0-9]{6}-[0-9a-f]{12}")
 Transcriber = Callable[..., dict[str, Any]]
+LiveModelFactory = Callable[[], LiveWindowModel]
 
 
 class WorkbenchHandler(ReviewerHandler):
@@ -210,6 +215,8 @@ class WorkbenchHandler(ReviewerHandler):
         if not self._upgrade_websocket():
             return
         capture: LiveCaptureSession | None = None
+        recognition: LiveRecognitionProcessor | None = None
+        live_model: LiveWindowModel | None = None
         job_id: str | None = None
         finalized = False
         try:
@@ -221,12 +228,30 @@ class WorkbenchHandler(ReviewerHandler):
                     self.connection.sendall(encode_frame(frame.payload, opcode=0xA))
                     continue
                 if frame.opcode == 0x2:
-                    if capture is None:
+                    if capture is None or live_model is None:
                         raise ValueError("live PCM arrived before the start message")
                     block = parse_pcm_block(frame.payload)
+                    received_ns = time.perf_counter_ns()
                     row = capture.accept_block(
                         block,
-                        received_ns=time.perf_counter_ns(),
+                        received_ns=received_ns,
+                    )
+                    if recognition is None:
+                        estimated_origin_ns = received_ns - round(
+                            (block.first_sample + block.frame_count)
+                            / block.sample_rate_hz
+                            * 1_000_000_000
+                        )
+                        recognition = LiveRecognitionProcessor(
+                            capture.live_directory / "recognition",
+                            session_id=job_id or capture.job_id,
+                            source_sample_rate_hz=block.sample_rate_hz,
+                            session_origin_ns=estimated_origin_ns,
+                            model=live_model,
+                        )
+                    recognition_batch = recognition.accept_block(
+                        block,
+                        received_ns=received_ns,
                     )
                     self._send_websocket_json(
                         {
@@ -236,8 +261,30 @@ class WorkbenchHandler(ReviewerHandler):
                             "source_first_sample": row["source_first_sample"],
                             "source_frame_count": row["source_frame_count"],
                             "received_source_frames": capture.next_sample,
+                            "window_count": recognition_batch["window_count"],
                         }
                     )
+                    if (
+                        recognition_batch["windows_processed"]
+                        or recognition_batch["events"]
+                    ):
+                        self._send_websocket_json(
+                            {
+                                "schema_version": LIVE_STREAM_SCHEMA,
+                                "type": "events",
+                                "batch_id": (
+                                    f"{job_id}-{recognition_batch['window_count']}"
+                                ),
+                                "audio_head_sample": recognition_batch[
+                                    "audio_head_sample"
+                                ],
+                                "windows_processed": recognition_batch[
+                                    "windows_processed"
+                                ],
+                                "events": recognition_batch["events"],
+                                "host_sent_monotonic_ns": time.perf_counter_ns(),
+                            }
+                        )
                     continue
                 if frame.opcode != 0x1:
                     raise ValueError("unsupported WebSocket message kind")
@@ -264,6 +311,7 @@ class WorkbenchHandler(ReviewerHandler):
                         sample_rate_hz=sample_rate_hz,
                         client_metadata=metadata,
                     )
+                    live_model = self.server.get_live_model()
                     job = {
                         "schema_version": "atpiano.transcription-job.v1",
                         "job_id": job_id,
@@ -285,7 +333,15 @@ class WorkbenchHandler(ReviewerHandler):
                             "job_id": job_id,
                             "sample_rate_hz": sample_rate_hz,
                             "host_monotonic_ns": time.perf_counter_ns(),
-                            "model": "transport-only",
+                            "model": live_model.provenance(),
+                            "window": {
+                                "duration_s": (
+                                    live_model.window_samples
+                                    / live_model.sample_rate_hz
+                                ),
+                                "hop_s": 0.25,
+                                "commit_horizon_s": 1.0,
+                            },
                         }
                     )
                 elif message["type"] == "stop":
@@ -303,6 +359,9 @@ class WorkbenchHandler(ReviewerHandler):
                         or isinstance(elapsed_s, bool)
                     ):
                         raise ValueError("live Stop metadata is invalid")
+                    recognition_manifest = (
+                        recognition.finalize() if recognition is not None else None
+                    )
                     capture.finalize(
                         expected_frame_count=frame_count,
                         expected_block_count=block_count,
@@ -320,6 +379,7 @@ class WorkbenchHandler(ReviewerHandler):
                             "job_id": job_id,
                             "received_source_frames": capture.next_sample,
                             "block_count": capture.next_sequence,
+                            "recognition": recognition_manifest,
                         }
                     )
                     self._send_websocket_close()
@@ -551,6 +611,7 @@ class WorkbenchServer(ThreadingHTTPServer):
         *,
         port: int,
         transcriber: Transcriber,
+        live_model_factory: LiveModelFactory,
     ) -> None:
         self.workspace_directory = workspace_directory.resolve()
         self.workspace_directory.mkdir(parents=True, exist_ok=True)
@@ -559,11 +620,20 @@ class WorkbenchServer(ThreadingHTTPServer):
         self.live_lock = threading.Lock()
         self.active_live_job_id: str | None = None
         self.transcriber = transcriber
+        self.live_model_factory = live_model_factory
+        self._live_model: LiveWindowModel | None = None
+        self._live_model_lock = threading.Lock()
         self.executor = ThreadPoolExecutor(
             max_workers=1,
             thread_name_prefix="atpiano-transcription",
         )
         super().__init__(("127.0.0.1", port), WorkbenchHandler)
+
+    def get_live_model(self) -> LiveWindowModel:
+        with self._live_model_lock:
+            if self._live_model is None:
+                self._live_model = self.live_model_factory()
+            return self._live_model
 
     def claim_live_job(self) -> str:
         with self.live_lock:
@@ -593,12 +663,18 @@ class WorkbenchServer(ThreadingHTTPServer):
             job["started_at"] = utc_now()
             input_manifest = Path(job["input_manifest"])
             run_directory = Path(job["run_directory"])
+            live_directory = (
+                Path(job["live_directory"]) if job.get("live_directory") else None
+            )
         try:
             self.transcriber(
                 input_manifest,
                 run_directory,
                 command=["atpiano", "workbench", "browser-upload", job_id],
             )
+            if live_directory is not None and live_directory.is_dir():
+                shutil.copytree(live_directory, run_directory / "live")
+                finalize_live_run(run_directory)
         except Exception as error:
             with self.jobs_lock:
                 job["status"] = "failed"
@@ -663,11 +739,13 @@ def create_workbench_server(
     *,
     port: int = 8000,
     transcriber: Transcriber = run_offline,
+    live_model_factory: LiveModelFactory = BasicPitchLiveModel,
 ) -> WorkbenchServer:
     return WorkbenchServer(
         workspace_directory,
         port=port,
         transcriber=transcriber,
+        live_model_factory=live_model_factory,
     )
 
 

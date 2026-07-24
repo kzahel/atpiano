@@ -13,6 +13,7 @@ dependencies = [
     { name = "partitura" },
     { name = "pretty-midi" },
     { name = "scikit-learn" },
+    { name = "scipy" },
     { name = "setuptools" },
     { name = "soundfile" },
 ]
@@ -36,6 +37,7 @@ requires-dist = [
     { name = "partitura", specifier = "==1.9.0" },
     { name = "pretty-midi", specifier = ">=0.2.10,<1" },
     { name = "scikit-learn", specifier = ">=1.5,<1.5.2" },
+    { name = "scipy", specifier = ">=1.12,<2" },
     { name = "setuptools", specifier = ">=75,<81" },
     { name = "sounddevice", marker = "extra == 'capture'", specifier = ">=0.5,<1" },
     { name = "soundfile", specifier = ">=0.12,<1" },
