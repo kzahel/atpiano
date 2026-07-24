@@ -37,8 +37,9 @@ prototype stack, not permanent selections. A deterministic MIDI-derived
 fixture, untouched offline reference, wall-clock replay benchmark, and local
 browser capture/transcription workbench are runnable on Apple Silicon.
 
-Current direction and research questions live in
-[`docs/topics/acoustic-transcription-latency-quality.md`](docs/topics/acoustic-transcription-latency-quality.md).
+Current direction and research questions live in [`docs/topics/`](docs/topics/README.md).
+Acoustic-model benchmarking, live browser transcription, and downstream
+performance-to-notation conversion have separate owners there.
 
 ## Browser Workbench
 

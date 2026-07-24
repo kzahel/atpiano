@@ -15,8 +15,14 @@ normally reuse the document slug in its `Topic:` trailers.
 ## Current Topics
 
 - [`acoustic-transcription-latency-quality.md`](acoustic-transcription-latency-quality.md):
-  discovery-stage investigation of models, streaming adaptations, the
-  latency/quality measurement contract, and the first reproducible benchmark.
+  discovery-stage investigation of acoustic models, streaming adaptations,
+  the latency/quality measurement contract, and reproducible benchmarks.
+- [`live-acoustic-transcription.md`](live-acoustic-transcription.md):
+  proposed browser audio transport, rolling feedback, event revision, latency
+  measurement, and final full-file backfill.
+- [`performance-to-notation.md`](performance-to-notation.md):
+  proposed downstream conversion from performance notes or direct MIDI to
+  inspectable, readable sheet music.
 
 ## Update Policy
 

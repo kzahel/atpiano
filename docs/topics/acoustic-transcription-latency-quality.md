@@ -21,7 +21,15 @@ This topic owns the acoustic-piano audio-to-note investigation:
 
 It does not own piano-roll rendering, harmonic or chord analysis, score
 generation, or MIDI-device capture. Those belong in a separate consumer
-program that can accept either atpiano events or direct MIDI.
+program that can accept either atpiano events or direct MIDI. Continuing
+performance-to-score research is now owned by
+[`performance-to-notation.md`](performance-to-notation.md).
+
+Browser transport, session behavior, live display delivery, and final-pass
+backfill are refined in
+[`live-acoustic-transcription.md`](live-acoustic-transcription.md). This topic
+continues to own the shared model, event, quality, and latency contracts used
+by that live path.
 
 ## Product Question
 
@@ -86,6 +94,40 @@ full-file Basic Pitch adapter, and inspect the completed piano roll. The
 deterministic fixture completed through the real HTTP/job/model path with an
 identical audio hash and 23 estimates. This establishes usability plumbing,
 not acoustic-piano quality or live transcription latency.
+
+### First target-piano workbench take
+
+The user exercised the workbench on the target acoustic piano on 2026-07-24
+and judged the result as pretty good. The downloaded WAV is byte-identical to
+workbench job `20260724T104057-1c108a0915e3`, so a duplicate model run was not
+needed:
+
+```text
+audio SHA-256:
+3d747d653d8f7a30c2e3261c85b8b9207959a7e00e8b009aac5fd969247f6f47
+format: mono PCM16 WAV, 48,000 Hz, 34.688 s
+peak: -4.25 dBFS
+RMS: -21.94 dBFS
+clipped samples: 0
+Basic Pitch estimates: 133
+pitch range: 45–76
+velocity range: 39–109
+model inference: 0.497 s
+artifact completion: 0.973 s
+```
+
+This is the first subjective target-piano evidence. It is technically healthy
+audio with no obvious clipping, but it has no aligned MIDI and remains
+unscored. A duration-and-velocity-weighted pitch-class profile ranked A major
+first with correlation 0.907. Tempo evidence was ambiguous: `pretty_midi`
+estimated 165.6 BPM while onset-grid candidates were spread across tempo
+octaves and phases. Those are analysis hypotheses, not ground truth.
+
+The browser also reset one artifact response while the server was writing its
+body, producing a `ConnectionResetError` traceback. The run and artifacts
+completed. This is a benign client-disconnect handling gap, not evidence of a
+capture or model failure; the proposed maintenance fix is recorded in the
+live-transcription topic.
 
 ## Accepted Pipeline Boundary
 
@@ -364,9 +406,15 @@ Recommended next work is to review a controlled recording from the target
 acoustic piano through this workbench, compare its browser and native-capture
 audio, acquire a checksummed MAESTRO v3 diagnostic subset for real-audio
 aligned scoring, repeat cold and warm timing trials, and then add one
-piano-specific offline adapter with pedal output. Live browser streaming
-should remain a separate tactical after the file path has produced subjective
-evidence.
+piano-specific offline adapter with pedal output.
+
+The first target-piano take now supplies the initial subjective evidence.
+Before more implementation, the user will review two proposed sibling slices:
+[`002-performance-notation-spikes.md`](../tactical/002-performance-notation-spikes.md)
+and
+[`003-live-browser-transcription-spike.md`](../tactical/003-live-browser-transcription-spike.md).
+The model-comparison work above remains valid regardless of which slice is
+selected.
 
 ## Open Questions
 

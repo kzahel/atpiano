@@ -2,3 +2,7 @@
 
 - `acoustic-transcription-latency-quality` — model, streaming, latency, and
   quality investigation
+- `performance-to-notation` — beat, meter, key, quantization, score semantics,
+  and sheet-music rendering
+- `live-acoustic-transcription` — browser audio streaming, revisable live note
+  feedback, measured delivery, and final backfill

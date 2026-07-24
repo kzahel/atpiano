@@ -12,3 +12,5 @@ execution record; continuing status and direction belong in the relevant
 |---|---|---|
 | [`000-live-replay-benchmark.md`](000-live-replay-benchmark.md) | Complete | Deterministic MIDI/audio smoke test, Basic Pitch reference, live replay, scoring, artifact review, and file-producing microphone adapter |
 | [`001-browser-capture-workbench.md`](001-browser-capture-workbench.md) | Complete | Local browser microphone recording, file submission, background transcription, and automatic run review |
+| [`002-performance-notation-spikes.md`](002-performance-notation-spikes.md) | Proposed | Compare MusicXML renderers, transparent performance-to-score baselines, and hypothesis/override UX |
+| [`003-live-browser-transcription-spike.md`](003-live-browser-transcription-spike.md) | Proposed | Prove sample-indexed browser transport, rolling Basic Pitch feedback, and exact full-file backfill |
