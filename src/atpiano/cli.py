@@ -98,6 +98,17 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="replace capture files in the target directory",
     )
+    study_parser = subparsers.add_parser(
+        "decoder-study",
+        help="compare decoder policies over retained Basic Pitch output",
+    )
+    study_parser.add_argument("output_directory", type=Path)
+    study_parser.add_argument(
+        "cases",
+        metavar="LABEL=RUN_DIRECTORY",
+        nargs="+",
+        help="labeled completed run with raw/basic_pitch.npz and input.wav",
+    )
     return parser
 
 
@@ -187,6 +198,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             "onset F1 @ 50 ms: "
             f"{format_score(read_score(args.run_directory, 'onset', '50_ms', 'f1'))}"
         )
+        return 0
+    if args.command == "decoder-study":
+        from atpiano.decoder_study import run_decoder_study
+
+        cases = []
+        for case in args.cases:
+            label, separator, run_directory = case.partition("=")
+            if not separator or not label or not run_directory:
+                parser.error(
+                    "decoder-study cases must use LABEL=RUN_DIRECTORY"
+                )
+            cases.append((label, Path(run_directory)))
+        run_decoder_study(args.output_directory, cases)
+        print(args.output_directory / "report.md")
+        print(args.output_directory / "decoder-study.json")
         return 0
     if not args.version:
         parser.print_help()
