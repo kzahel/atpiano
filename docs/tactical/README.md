@@ -14,3 +14,4 @@ execution record; continuing status and direction belong in the relevant
 | [`001-browser-capture-workbench.md`](001-browser-capture-workbench.md) | Complete | Local browser microphone recording, file submission, background transcription, and automatic run review |
 | [`002-performance-notation-spikes.md`](002-performance-notation-spikes.md) | Complete | Traceable Partitura/MusicXML score, editable OSMD view, and two-phase Ivory oracle import |
 | [`003-live-browser-transcription-spike.md`](003-live-browser-transcription-spike.md) | Review | Sample-indexed browser transport, onset-first Basic Pitch feedback, and exact full-file backfill are implemented; subjective target-piano review remains |
+| [`004-noise-gated-onset-display.md`](004-noise-gated-onset-display.md) | Active | Suppress room-noise candidates and replace the inaccurate duration roll with a physical keyboard and sequential grand-staff onsets |
