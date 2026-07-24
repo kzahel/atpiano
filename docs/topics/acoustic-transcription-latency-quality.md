@@ -183,6 +183,33 @@ Candidate counts contain repeats across windows, and none of these microphone
 sessions has aligned MIDI. The exact full-file adapter remains untouched so
 live-gate misses and final additions remain observable.
 
+### Held-chord decoder failure
+
+The second subjective pass finds the onset-only view more legible but rejects
+stock Basic Pitch as a literal onset source. A held chord produces many new
+notes and overtone pitches without new attacks. The absolute-energy gate
+correctly admits them because sustained resonance remains far above the room
+floor.
+
+The behavior exists in both rolling and untouched full-file outputs. The two
+latest exact-final results contain 62 and 38 same-pitch re-onsets less than one
+second apart. Basic Pitch's stock decoder enables two non-strict paths:
+`infer_onsets=True` derives onsets from frame-activation changes, and
+`melodia_trick=True` turns remaining frame energy into notes without onset
+peaks.
+
+Re-decoding preserved full-file probabilities with both paths disabled reduces
+the two held-chord results from 214 to 155 and 137 to 70 notes. Sub-second
+same-pitch re-onsets fall from 62 to 39 and 38 to 14. The earlier subjectively
+useful take also falls from 133 to 92 notes. Therefore strict decoding is a
+promising experiment, not an established improvement: no aligned reference
+currently distinguishes removed overtones from removed true notes.
+
+Next compare decoder policies and onset thresholds from retained outputs before
+running new inference. Test any active-note suppression on repeated strikes
+and true harmonic intervals; do not suppress octaves or fifths merely because
+they are harmonically related.
+
 ## Accepted Pipeline Boundary
 
 ```text

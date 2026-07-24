@@ -102,6 +102,13 @@ limited to two minutes and the server accepts at most 64 MiB per upload. A
 recording has no aligned MIDI, so its quality metrics are explicitly unscored;
 the piano roll is for listening and subjective inspection.
 
+The two-minute limit is a prototype resource bound, not a Basic Pitch or audio
+API limit. The browser and live processor retain session PCM, and the benchmark
+preserves every overlapping native model window before copying it into the
+final run. The two latest two-minute evidence jobs each occupy about 274 MiB,
+including roughly 117 MiB of live native windows. Raise or remove the limit
+only after choosing a longer-session retention and compaction policy.
+
 Live recognition uses sample-indexed PCM16 blocks over a same-origin loopback
 WebSocket. The first local target-recording replay measured 0.43-second median
 and 1.65-second p95 source-onset-to-server-emission latency. Those are

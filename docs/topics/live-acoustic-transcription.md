@@ -2,11 +2,10 @@
 
 Topic: live-acoustic-transcription
 
-Status: revised prototype awaiting a second subjective target-piano review.
-The first pass detected a played note but rejected the noise behavior and
-duration-oriented evaluator. Live candidates are now room-gated and displayed
-as grouped onsets on a physical keyboard and grand staff. No permanent model
-or streaming policy is selected.
+Status: second subjective review complete. The room gate and onset-only display
+are more legible, but stock Basic Pitch onset semantics are rejected for held
+chords: sustained frame energy and overtones repeatedly become new notes. A
+strict-onset decoder comparison is the recommended next bounded experiment.
 
 ## Scope And Relationship
 
@@ -175,6 +174,38 @@ minutes with one AudioWorklet block in flight, and the server rejected that
 block. The page now initiates Stop from the block path and the server permits
 one bounded final block.
 
+### Second subjective microphone review
+
+The physical 52/36-key keyboard and sequential grand staff are more legible.
+The user then isolated a more fundamental recognition failure: holding a chord
+causes many new noteheads, including overtone pitches, without new key attacks.
+
+The two completed two-minute runs show that this is not merely UI relighting.
+The first exact-final result contains 214 notes and 62 same-pitch re-onsets less
+than one second apart; pitches 55, 60, 67, and 48 occur 30, 29, 28, and 27
+times. The second has 137 notes and 38 sub-second same-pitch re-onsets. Similar
+new starts are present in the rolling committed identities and the untouched
+exact-final output.
+
+The current gate cannot distinguish this from a real onset. It asks whether a
+candidate's local signal is loud relative to the room, and a resonating chord
+is loud. It does not measure a new attack or per-pitch activation transition.
+
+The stock Basic Pitch decoder explains much of the behavior:
+
+- `infer_onsets=True` creates onset candidates from changes in frame
+  activation; and
+- `melodia_trick=True` converts remaining frame energy into notes without an
+  explicit onset peak.
+
+Re-decoding retained full-file probabilities with both behaviors disabled
+reduces the first held-chord run from 214 to 155 notes and sub-second
+same-pitch re-onsets from 62 to 39. The second falls from 137 to 70 notes and
+from 38 to 14 repeated starts. The earlier target take also falls from 133 to
+92 notes, so the removed set cannot be called false without aligned MIDI.
+Some repeated starts remain, showing that the learned onset head itself can
+respond to sustained acoustic modulation or resonance.
+
 ## Implemented Live Architecture
 
 ```text
@@ -330,32 +361,32 @@ A focused test covers the behavior.
 
 ## Recommended Direction
 
-The revised implementation is ready for a second target-piano pass. Remain
-quiet for the declared one-second calibration, then first test silence and
-very soft isolated notes. Continue with intervals, block and rolled chords,
-repeated notes, bass, treble, dense harmony, and sustain. Judge the physical
-keyboard and grouped grand staff before Stop, then inspect the named
-live-versus-final reconciliation.
+Do not tune the absolute-volume gate or add a generic harmonic filter for this
+failure. The former cannot distinguish a new strike from loud resonance; the
+latter would erase legitimate piano octaves and fifths.
 
-If the pitch/onset feedback is already useful, retain this model as the
-portable reference and prioritize:
+Use retained native probabilities for a bounded decoder experiment before
+rerunning the model:
 
-1. tune or expose the gate only if the retest shows a concrete noise/soft-note
-   failure;
-2. add an aligned real-piano replay subset for quality-at-deadline scoring;
-3. sweep only nearby hop, guard, and commit values justified by those failures;
-4. test throttling and temporarily slower-than-real-time inference explicitly;
-   and
-5. define the downstream event consumer without merging it into this service.
+1. compare stock, `melodia_trick=False`, and strict
+   `infer_onsets=False`/`melodia_trick=False` results on the deterministic
+   fixture, earlier target take, and both held-chord sessions;
+2. sweep only onset threshold and a short same-pitch refractory/active-state
+   policy, preserving every raw activation and decision;
+3. score the deterministic fixture and compare live-to-exact disagreement,
+   repeated-start rate, total notes, and subjective held-chord behavior;
+4. add a controlled local clip with isolated notes, repeated strikes, held
+   chords, true octaves/fifths, and pedal so suppression does not reward
+   under-transcription; and
+5. retain Basic Pitch only if its explicit onset head can provide a useful
+   portable baseline.
 
-If the play test fails because pitches appear too late or are missing live,
-keep the now-tested transport, clocks, artifacts, and revision boundary and
-open a separate causal-model bakeoff. A new lane must beat this measured
-baseline and expose its true future context. Pedal-aware and piano-specific
-models are especially valuable, but only when code, checkpoint, license, and
-runtime behavior are reproducible.
+If strict decoding still confuses sustained harmonics with new attacks, keep
+the proven transport, clock, artifact, keyboard, and staff boundaries and open
+the causal/piano-onset model bakeoff. An onset-specific or piano-specific lane
+is then more justified than additional stock-decoder heuristics.
 
-The bounded implementation record is
+The reviewed implementation record is
 [`004-noise-gated-onset-display.md`](../tactical/004-noise-gated-onset-display.md).
 
 ## Required Measurements
@@ -380,7 +411,10 @@ The bounded implementation record is
 - Does the automatic gate suppress pre-piano notes without losing soft attacks?
 - Does the implemented 180 ms recent-onset grouping make rolled chords legible
   without merging melodic runs into one pitch set?
-- Is the grand-staff onset stream more useful than pitch names alone?
+- What strict-onset threshold and active-note policy suppress held-chord
+  re-onsets without losing repeated strikes?
+- Does Basic Pitch's learned onset head retain enough target-piano recall once
+  frame-derived and melodia notes are removed?
 - Is the current named live-versus-final summary sufficient to explain changes
   to rolling-committed notes?
 - What hop and commit horizon best preserve the current target-piano quality?

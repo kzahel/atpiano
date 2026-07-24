@@ -2,7 +2,9 @@
 
 Topic: live-acoustic-transcription
 
-Status: implemented on 2026-07-24; second subjective live-piano review remains.
+Status: completed and reviewed on 2026-07-24. The revised display is more
+legible and the room gate removes quiet candidates, but the review rejects the
+stock Basic Pitch decoder as an onset source for sustained chords.
 
 ## Observation
 
@@ -158,3 +160,66 @@ audible-onset acceptance, decision artifacts, transport exposure, and existing
 capture/final-pass behavior. The built wheel contains the live processor and
 all revised web assets. The second subjective microphone pass remains the
 decision check.
+
+## Second Subjective Review
+
+The user found the physical keyboard and grouped grand staff clearly more
+legible. The onset semantics still failed: holding a chord caused many new
+notes, especially overtone pitches, even though no new keys were struck.
+
+Two automatic two-minute runs completed cleanly, confirming the capture-limit
+race fix:
+
+| Job | Live committed | Exact final | Live/final matches | Gate rejected/native |
+|---|---:|---:|---:|---:|
+| `20260724T140255-dd5a880a8d60` | 193 | 214 | 185 | 245 / 2,111 |
+| `20260724T140555-b5d3ffa2e2f3` | 108 | 137 | 86 | 349 / 1,478 |
+
+The absolute-energy gate cannot solve this case. A held piano chord remains
+well above the room threshold, so newly decoded harmonics pass even though
+there is no new broadband attack.
+
+The artifacts confirm repeated decoder starts. In the first run, pitches 55,
+60, 67, and 48 appeared 30, 29, 28, and 27 times in the exact full-file result.
+There were 62 same-pitch re-onsets less than one second apart. The second run
+had 38. Many occurred at roughly 0.8–0.9 second intervals while a pitch was
+already resonating. The untouched exact-final path also contains the pattern,
+so rolling reconciliation is not its sole cause.
+
+### Decoder diagnosis
+
+Basic Pitch has a learned onset output, but its stock decoder does not require
+that output for every note:
+
+- `infer_onsets=True` converts changes in sustained frame activation into
+  additional onsets; and
+- `melodia_trick=True` turns remaining frame energy into notes even without an
+  onset peak.
+
+Atpiano currently inherits both stock settings. Re-decoding the preserved
+full-file native outputs gives:
+
+| Input | Decoder | Notes | Same-pitch re-onsets under 1 s |
+|---|---|---:|---:|
+| Earlier target take | stock | 133 | 37 |
+| Earlier target take | no melodia | 94 | 21 |
+| Earlier target take | strict onset | 92 | 21 |
+| First held-chord run | stock | 214 | 62 |
+| First held-chord run | no melodia | 162 | 41 |
+| First held-chord run | strict onset | 155 | 39 |
+| Second held-chord run | stock | 137 | 38 |
+| Second held-chord run | no melodia | 81 | 14 |
+| Second held-chord run | strict onset | 70 | 14 |
+
+“Strict onset” sets both `infer_onsets=False` and `melodia_trick=False`; all
+other thresholds remain stock. It removes substantial clutter without model
+inference, but it also removes 41 of 133 notes from the earlier take and leaves
+some repeated starts. Without aligned MIDI, removed false positives cannot yet
+be separated from removed true notes.
+
+This tactical therefore validates the revised display but closes with a model
+decoder failure. The next bounded experiment should compare stock, no-melodia,
+and strict-onset decoding from retained probabilities before changing the live
+path. A same-pitch active-note state can then suppress repeated starts, but
+harmonic-interval suppression should not be added naively because real piano
+octaves and fifths are legitimate harmony.
