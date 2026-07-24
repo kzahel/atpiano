@@ -843,7 +843,10 @@ class LiveCaptureSession:
                 f"live source sample gap: expected {self.next_sample}, "
                 f"received {block.first_sample}"
             )
-        if block.first_sample + block.frame_count > self.sample_rate_hz * MAX_LIVE_SECONDS:
+        maximum_frames = (
+            self.sample_rate_hz * MAX_LIVE_SECONDS + MAX_PCM_BLOCK_FRAMES
+        )
+        if block.first_sample + block.frame_count > maximum_frames:
             raise ValueError(f"live capture exceeds {MAX_LIVE_SECONDS} seconds")
         self._pcm.write(block.pcm_s16le)
         row = {

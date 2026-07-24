@@ -12,6 +12,7 @@
   --reference-soft: rgba(83, 216, 208, 0.25);
   --provisional: #f6c453;
   --retracted: #9b83d5;
+  --live-note: #e36f3d;
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: var(--paper);
   color: var(--ink);
@@ -134,7 +135,7 @@ section,
 
 .capture-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 0.8fr) minmax(360px, 1.2fr);
+  grid-template-columns: minmax(260px, 0.58fr) minmax(560px, 1.42fr);
   gap: 16px;
 }
 
@@ -202,57 +203,94 @@ section,
   white-space: nowrap;
 }
 
-#live-roll {
+#live-score {
   display: block;
   width: 100%;
-  height: 360px;
-  border-right: 1px solid var(--line);
-  border-left: 1px solid var(--line);
-  background: #0c0d0d;
+  height: 320px;
+  border: 1px solid #c5bdaa;
+  background: #f8f4e9;
 }
 
 .live-keyboard {
-  display: grid;
-  grid-template-columns: repeat(88, minmax(2px, 1fr));
-  height: 34px;
+  position: relative;
+  height: 116px;
   overflow: hidden;
-  border: 1px solid #555a55;
-  border-radius: 0 0 4px 4px;
-  background: #ddd9cf;
+  border: 1px solid #575750;
+  border-top: 5px solid #111312;
+  border-radius: 0 0 7px 7px;
+  background: #eeeae0;
+  box-shadow:
+    inset 0 -5px 10px rgba(40, 37, 30, 0.18),
+    0 8px 22px rgba(0, 0, 0, 0.18);
+}
+
+.live-white-keys {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(52, minmax(0, 1fr));
 }
 
 .live-key {
   position: relative;
   min-width: 0;
-  border-right: 1px solid rgba(20, 20, 20, 0.35);
-  background: #e5e1d7;
   transition:
     background 90ms linear,
     box-shadow 90ms linear;
 }
 
+.live-key.white {
+  height: 100%;
+  border-right: 1px solid #77766e;
+  background:
+    linear-gradient(90deg, #f7f4eb 0, #eeeae0 72%, #ded9ce 100%);
+  box-shadow: inset 0 -8px 8px rgba(83, 75, 59, 0.08);
+}
+
+.live-key.white:first-child {
+  border-left: 1px solid #77766e;
+}
+
 .live-key.black {
-  height: 62%;
-  z-index: 1;
-  border-color: #070807;
-  background: #151716;
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  height: 64%;
+  border: 1px solid #050605;
+  border-radius: 0 0 3px 3px;
+  background:
+    linear-gradient(90deg, #080908 0, #242623 68%, #090a09 100%);
+  box-shadow:
+    inset 0 -7px 4px rgba(255, 255, 255, 0.06),
+    1px 4px 4px rgba(0, 0, 0, 0.4);
 }
 
 .live-key.active {
-  background: var(--prediction);
-  box-shadow: 0 0 12px rgba(255, 122, 69, 0.75);
+  background: linear-gradient(180deg, #ffb27e 0, var(--live-note) 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 237, 211, 0.42),
+    0 0 15px rgba(227, 111, 61, 0.7);
 }
 
-.live-key.committed {
-  background: var(--reference);
-  box-shadow: 0 0 10px rgba(83, 216, 208, 0.62);
+.live-key.black.active {
+  background: linear-gradient(90deg, #8b351d 0, var(--live-note) 64%, #7c2c18 100%);
+  box-shadow:
+    inset 0 -6px 5px rgba(255, 221, 195, 0.18),
+    0 0 16px rgba(227, 111, 61, 0.82);
+}
+
+.keyboard-caption {
+  margin: 8px 2px 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-align: right;
 }
 
 .live-telemetry {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1px;
-  margin-top: 12px;
+  margin-top: 10px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 4px;
@@ -277,41 +315,6 @@ section,
   margin-top: 5px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.78rem;
-}
-
-.live-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin-top: 11px;
-  color: var(--muted);
-  font-size: 0.68rem;
-}
-
-.live-legend span {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.live-legend i {
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
-  background: var(--line);
-}
-
-.live-legend i.provisional {
-  background: var(--provisional);
-}
-
-.live-legend i.committed {
-  background: var(--reference);
-}
-
-.live-legend i.retracted {
-  border: 1px solid var(--retracted);
-  background: transparent;
 }
 
 .capture-status {

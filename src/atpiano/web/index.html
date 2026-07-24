@@ -24,7 +24,7 @@
         <div class="section-heading">
           <div>
             <p class="eyebrow">One local workflow</p>
-            <h2 id="recorder-title">Record your piano</h2>
+            <h2 id="recorder-title">Play and watch the notes</h2>
           </div>
           <p class="section-note">
             Your microphone audio stays on this Mac in the local workbench workspace.
@@ -42,9 +42,9 @@
               <span id="level-fill"></span>
             </div>
             <p class="capture-copy">
-              Play isolated notes, intervals, chords, rolls, repeated notes, bass,
-              and treble. Provisional onsets should appear while the sound is still
-              in your memory.
+              After Start, keep the room quiet for one second while the input
+              calibrates. Then play isolated notes, intervals, chords, rolls,
+              repeated notes, bass, and treble.
             </p>
             <div class="button-row">
               <button id="start-recording" class="button primary" type="button">
@@ -59,35 +59,30 @@
           <article id="live-panel" class="live-panel" aria-labelledby="live-title">
             <div class="live-heading">
               <div>
-                <p class="eyebrow">Onset-first evaluator</p>
-                <h2 id="live-title">Notes as the model sees them</h2>
+                <p class="eyebrow">Duration-free onset view</p>
+                <h2 id="live-title">What the model hears</h2>
               </div>
               <span id="live-status" class="badge">Not connected</span>
             </div>
 
             <div class="live-pitch-readout">
-              <span>Recent pitch set</span>
+              <span>Latest onset group</span>
               <strong id="live-pitch-set">Play to reveal pitches</strong>
             </div>
 
             <canvas
-              id="live-roll"
-              height="360"
-              aria-label="Live provisional and committed piano roll"
+              id="live-score"
+              height="320"
+              aria-label="Sequential accepted onsets on a grand staff"
             ></canvas>
             <div id="live-keyboard" class="live-keyboard" aria-label="Detected piano keys"></div>
+            <p class="keyboard-caption">Lit keys are accepted recent onsets.</p>
 
             <div class="live-telemetry" aria-live="polite">
-              <div><span>Audio head</span><strong id="live-audio-head">0.0 s</strong></div>
-              <div><span>Windows</span><strong id="live-window-count">0</strong></div>
-              <div><span>First-visible</span><strong id="live-latency">—</strong></div>
-              <div><span>Transport</span><strong id="live-transport">idle</strong></div>
-            </div>
-
-            <div class="live-legend" aria-label="Live event legend">
-              <span><i class="provisional"></i> provisional onset</span>
-              <span><i class="committed"></i> committed</span>
-              <span><i class="retracted"></i> retracted</span>
+              <div><span>Room floor</span><strong id="live-noise-floor">calibrating</strong></div>
+              <div><span>Onset gate</span><strong id="live-gate">—</strong></div>
+              <div><span>First note</span><strong id="live-latency">—</strong></div>
+              <div><span>Connection</span><strong id="live-transport">idle</strong></div>
             </div>
           </article>
 

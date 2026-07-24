@@ -236,7 +236,10 @@ def test_workbench_upload_job_and_reloadable_artifacts(tmp_path: Path) -> None:
         with urllib.request.urlopen(f"{base_url}/capture-processor.js", timeout=2) as response:
             assert b"registerProcessor" in response.read()
         with urllib.request.urlopen(base_url, timeout=2) as response:
-            assert b'id="live-roll"' in response.read()
+            page = response.read()
+        assert b'id="live-score"' in page
+        assert b'class="live-keyboard"' in page
+        assert b"provisional onset" not in page
 
         invalid_request = urllib.request.Request(
             f"{base_url}/api/transcriptions",
@@ -394,6 +397,7 @@ def test_workbench_live_websocket_preserves_sample_stream(tmp_path: Path) -> Non
         ready = json.loads(payload)
         assert opcode == 0x1
         assert ready["type"] == "ready"
+        assert ready["noise_gate"]["calibration_s"] == 1.0
         job_id = ready["job_id"]
         _send_live_json(
             connection,
@@ -430,6 +434,7 @@ def test_workbench_live_websocket_preserves_sample_stream(tmp_path: Path) -> Non
             _, payload = _server_websocket_frame(stream)
             acknowledgement = json.loads(payload)
             assert acknowledgement["type"] == "block_ack"
+            assert "noise_gate" in acknowledgement
             if acknowledgement["window_count"]:
                 _, payload = _server_websocket_frame(stream)
                 event_batch = json.loads(payload)

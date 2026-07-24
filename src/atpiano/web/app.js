@@ -4,7 +4,23 @@ const MAX_CAPTURE_SECONDS = 120;
 const LIVE_STREAM_SCHEMA = "atpiano.live-stream.v1";
 const LIVE_BLOCK_HEADER_BYTES = 48;
 const MAX_WEBSOCKET_BUFFER_BYTES = 4 * 1024 * 1024;
-const LIVE_VIEW_SECONDS = 10;
+const LIVE_ONSET_GROUP_SECONDS = 0.18;
+const LIVE_KEY_HIGHLIGHT_MS = 1800;
+const BLACK_PITCH_CLASSES = new Set([1, 3, 6, 8, 10]);
+const STAFF_SPELLINGS = [
+  { letter: 0, accidental: "" },
+  { letter: 0, accidental: "♯" },
+  { letter: 1, accidental: "" },
+  { letter: 2, accidental: "♭" },
+  { letter: 2, accidental: "" },
+  { letter: 3, accidental: "" },
+  { letter: 3, accidental: "♯" },
+  { letter: 4, accidental: "" },
+  { letter: 5, accidental: "♭" },
+  { letter: 5, accidental: "" },
+  { letter: 6, accidental: "♭" },
+  { letter: 6, accidental: "" },
+];
 const CAPTURE_CONSTRAINTS = {
   channelCount: 1,
   echoCancellation: false,
@@ -41,6 +57,7 @@ const state = {
     recentPitches: [],
     highlightedPitches: new Map(),
     animation: null,
+    noiseGate: null,
   },
 };
 
@@ -659,24 +676,44 @@ function resetLiveEvaluator() {
   state.live.windowCount = 0;
   state.live.recentPitches = [];
   state.live.highlightedPitches.clear();
+  state.live.noiseGate = null;
   document.querySelector("#live-status").textContent = "Connecting";
   document.querySelector("#live-pitch-set").textContent = "Play to reveal pitches";
-  document.querySelector("#live-audio-head").textContent = "0.0 s";
-  document.querySelector("#live-window-count").textContent = "0";
+  document.querySelector("#live-noise-floor").textContent = "calibrating";
+  document.querySelector("#live-gate").textContent = "—";
   document.querySelector("#live-latency").textContent = "—";
   document.querySelector("#live-transport").textContent = "warming model";
   renderLiveKeyboard();
-  drawLiveRoll();
+  drawLiveStaff();
 }
 
 function buildLiveKeyboard() {
   const keyboard = document.querySelector("#live-keyboard");
   keyboard.replaceChildren();
+  const whitePitches = [];
   for (let pitch = 21; pitch <= 108; pitch += 1) {
+    if (!BLACK_PITCH_CLASSES.has(pitch % 12)) whitePitches.push(pitch);
+  }
+  const whiteKeys = document.createElement("div");
+  whiteKeys.className = "live-white-keys";
+  for (const pitch of whitePitches) {
     const key = document.createElement("span");
-    key.className = `live-key${[1, 3, 6, 8, 10].includes(pitch % 12) ? " black" : ""}`;
+    key.className = "live-key white";
     key.dataset.pitch = String(pitch);
     key.title = `${pitchName(pitch)} · MIDI ${pitch}`;
+    whiteKeys.appendChild(key);
+  }
+  keyboard.appendChild(whiteKeys);
+  const blackWidth = (0.62 / whitePitches.length) * 100;
+  for (let pitch = 21; pitch <= 108; pitch += 1) {
+    if (!BLACK_PITCH_CLASSES.has(pitch % 12)) continue;
+    const whiteKeysBefore = whitePitches.filter((whitePitch) => whitePitch < pitch).length;
+    const key = document.createElement("span");
+    key.className = "live-key black";
+    key.dataset.pitch = String(pitch);
+    key.title = `${pitchName(pitch)} · MIDI ${pitch}`;
+    key.style.left = `${(whiteKeysBefore / whitePitches.length) * 100 - blackWidth / 2}%`;
+    key.style.width = `${blackWidth}%`;
     keyboard.appendChild(key);
   }
 }
@@ -685,127 +722,233 @@ function renderLiveKeyboard() {
   const now = performance.now();
   document.querySelectorAll(".live-key").forEach((key) => {
     const highlight = state.live.highlightedPitches.get(Number(key.dataset.pitch));
-    const visible = highlight && now - highlight.at < 1500;
+    const visible = highlight && now - highlight.at < LIVE_KEY_HIGHLIGHT_MS;
     key.classList.toggle("active", Boolean(visible));
-    key.classList.toggle("committed", Boolean(visible && highlight.lifecycle === "committed"));
   });
 }
 
-function drawLiveRoll() {
-  const canvas = document.querySelector("#live-roll");
+function liveOnsetGroups() {
+  if (!state.live.sampleRate) return [];
+  const events = [...state.live.events.values()]
+    .filter(
+      (event) =>
+        event.lifecycle !== "retracted" &&
+        event.pitch >= 21 &&
+        event.pitch <= 108
+    )
+    .sort((left, right) => left.onset_sample - right.onset_sample || left.pitch - right.pitch);
+  const groups = [];
+  for (const event of events) {
+    let group = groups[groups.length - 1];
+    if (
+      !group ||
+      (event.onset_sample - group.onsetSample) / state.live.sampleRate >
+        LIVE_ONSET_GROUP_SECONDS
+    ) {
+      group = { onsetSample: event.onset_sample, pitches: [] };
+      groups.push(group);
+    }
+    if (!group.pitches.includes(event.pitch)) group.pitches.push(event.pitch);
+  }
+  return groups;
+}
+
+function staffPitch(pitch) {
+  const spelling = STAFF_SPELLINGS[pitch % 12];
+  const octave = Math.floor(pitch / 12) - 1;
+  return {
+    step: octave * 7 + spelling.letter,
+    accidental: spelling.accidental,
+  };
+}
+
+function drawLedgerLines(context, x, step, staff) {
+  context.strokeStyle = "#34312b";
+  context.lineWidth = 1.15;
+  if (step < staff.bottomStep) {
+    for (let lineStep = staff.bottomStep - 2; lineStep >= step; lineStep -= 2) {
+      const y = staff.bottomY - (lineStep - staff.bottomStep) * 5;
+      context.beginPath();
+      context.moveTo(x - 10, y);
+      context.lineTo(x + 10, y);
+      context.stroke();
+    }
+  } else if (step > staff.bottomStep + 8) {
+    for (let lineStep = staff.bottomStep + 10; lineStep <= step; lineStep += 2) {
+      const y = staff.bottomY - (lineStep - staff.bottomStep) * 5;
+      context.beginPath();
+      context.moveTo(x - 10, y);
+      context.lineTo(x + 10, y);
+      context.stroke();
+    }
+  }
+}
+
+function drawStaffChord(context, pitches, x, staff) {
+  const positions = pitches
+    .map((pitch) => ({ pitch, ...staffPitch(pitch) }))
+    .sort((left, right) => left.step - right.step)
+    .map((note, index, notes) => ({
+      ...note,
+      x:
+        index > 0 && note.step - notes[index - 1].step === 1
+          ? x + (index % 2 ? 6 : 0)
+          : x,
+      y: staff.bottomY - (note.step - staff.bottomStep) * 5,
+    }));
+  if (!positions.length) return;
+  context.fillStyle = "#1d1b18";
+  context.strokeStyle = "#1d1b18";
+  for (const note of positions) {
+    drawLedgerLines(context, note.x, note.step, staff);
+    if (note.accidental) {
+      context.font = '16px Georgia, "Times New Roman", serif';
+      context.textAlign = "center";
+      context.fillText(note.accidental, note.x - 14, note.y + 5);
+    }
+    context.save();
+    context.translate(note.x, note.y);
+    context.rotate(-0.2);
+    context.beginPath();
+    context.ellipse(0, 0, 7.2, 4.8, 0, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+  }
+  const highestY = Math.min(...positions.map((note) => note.y));
+  const lowestY = Math.max(...positions.map((note) => note.y));
+  const stemUp = (highestY + lowestY) / 2 >= staff.bottomY - 20;
+  context.lineWidth = 1.4;
+  context.beginPath();
+  if (stemUp) {
+    context.moveTo(x + 7, lowestY);
+    context.lineTo(x + 7, highestY - 29);
+  } else {
+    context.moveTo(x - 7, highestY);
+    context.lineTo(x - 7, lowestY + 29);
+  }
+  context.stroke();
+}
+
+function drawLiveStaff() {
+  const canvas = document.querySelector("#live-score");
   if (!canvas) return;
   const dpr = window.devicePixelRatio || 1;
   const width = Math.max(320, canvas.clientWidth);
-  const height = 360;
+  const height = 320;
   if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(height * dpr);
   }
   const context = canvas.getContext("2d");
   context.setTransform(dpr, 0, 0, dpr, 0, 0);
-  context.fillStyle = "#0c0d0d";
+  context.fillStyle = "#f8f4e9";
   context.fillRect(0, 0, width, height);
-
-  const viewEnd = Math.max(LIVE_VIEW_SECONDS, state.live.audioHeadS + 0.25);
-  const viewStart = viewEnd - LIVE_VIEW_SECONDS;
-  const timeX = (seconds) => ((seconds - viewStart) / LIVE_VIEW_SECONDS) * width;
-  const pitchY = (pitch) => ((108 - pitch) / 88) * height;
-  const rowHeight = height / 88;
-
-  for (let second = Math.ceil(viewStart); second <= viewEnd; second += 1) {
-    const x = timeX(second);
-    context.strokeStyle = second % 5 === 0 ? "#383d39" : "#202321";
-    context.lineWidth = 1;
-    context.beginPath();
-    context.moveTo(x + 0.5, 0);
-    context.lineTo(x + 0.5, height);
-    context.stroke();
-  }
-  for (let pitch = 24; pitch <= 108; pitch += 12) {
-    const y = pitchY(pitch);
-    context.strokeStyle = "#292d2a";
-    context.beginPath();
-    context.moveTo(0, y);
-    context.lineTo(width, y);
-    context.stroke();
-  }
-
-  const events = [...state.live.events.values()].sort(
-    (left, right) => left.onset_sample - right.onset_sample
-  );
-  for (const event of events) {
-    const onset = event.onset_sample / state.live.sampleRate;
-    const detectedOffset = event.offset_sample / state.live.sampleRate;
-    const offset =
-      event.lifecycle === "provisional"
-        ? Math.max(onset + 0.06, state.live.audioHeadS)
-        : Math.max(onset + 0.04, detectedOffset);
-    if (offset < viewStart || onset > viewEnd || event.pitch < 21 || event.pitch > 108) continue;
-    const x = timeX(Math.max(viewStart, onset));
-    const endX = timeX(Math.min(viewEnd, offset));
-    const y = pitchY(event.pitch);
-    if (event.lifecycle === "retracted") {
-      context.strokeStyle = "#9b83d5";
-      context.strokeRect(x, y, Math.max(3, endX - x), Math.max(2, rowHeight - 1));
-    } else {
-      context.fillStyle = event.lifecycle === "committed" ? "#53d8d0" : "#f6c453";
-      context.globalAlpha = event.lifecycle === "committed" ? 0.86 : 0.74;
-      context.fillRect(x, y, Math.max(3, endX - x), Math.max(2, rowHeight - 1));
-      context.globalAlpha = 1;
+  const treble = { bottomY: 145, bottomStep: 30 };
+  const bass = { bottomY: 235, bottomStep: 18 };
+  const staffStart = 64;
+  context.strokeStyle = "#4a463e";
+  context.lineWidth = 1;
+  for (const staff of [treble, bass]) {
+    for (let line = 0; line < 5; line += 1) {
+      const y = staff.bottomY - line * 10;
+      context.beginPath();
+      context.moveTo(staffStart, y + 0.5);
+      context.lineTo(width - 18, y + 0.5);
+      context.stroke();
     }
   }
-
-  const headX = timeX(state.live.audioHeadS);
-  context.strokeStyle = "#f4efe4";
-  context.lineWidth = 1.5;
   context.beginPath();
-  context.moveTo(headX, 0);
-  context.lineTo(headX, height);
+  context.moveTo(staffStart, treble.bottomY - 40);
+  context.lineTo(staffStart, bass.bottomY);
   context.stroke();
+  context.fillStyle = "#1d1b18";
+  context.textAlign = "left";
+  context.font = '56px "Apple Symbols", "Noto Music", serif';
+  context.fillText("𝄞", 14, 151);
+  context.font = '43px "Apple Symbols", "Noto Music", serif';
+  context.fillText("𝄢", 18, 236);
+
+  const capacity = Math.max(4, Math.floor((width - 104) / 52));
+  const groups = liveOnsetGroups().slice(-capacity);
+  if (!groups.length) {
+    context.fillStyle = "#8b8478";
+    context.font = '15px Georgia, "Times New Roman", serif';
+    context.textAlign = "left";
+    context.fillText("Accepted onsets will appear here", 88, 175);
+  } else {
+    const stepX = (width - 110) / capacity;
+    groups.forEach((group, index) => {
+      const x = 88 + index * stepX;
+      drawStaffChord(
+        context,
+        group.pitches.filter((pitch) => pitch >= 60),
+        x,
+        treble
+      );
+      drawStaffChord(
+        context,
+        group.pitches.filter((pitch) => pitch < 60),
+        x,
+        bass
+      );
+    });
+  }
   renderLiveKeyboard();
 }
 
 function animateLiveEvaluator() {
-  drawLiveRoll();
+  renderLiveKeyboard();
   const capture = state.capture;
   if (capture && !capture.stopped) {
     state.live.animation = requestAnimationFrame(animateLiveEvaluator);
   }
 }
 
+function updateNoiseGate(gate) {
+  if (!gate) return;
+  state.live.noiseGate = gate;
+  document.querySelector("#live-noise-floor").textContent =
+    gate.noise_floor_dbfs == null ? "calibrating" : `${gate.noise_floor_dbfs.toFixed(1)} dBFS`;
+  document.querySelector("#live-gate").textContent =
+    gate.threshold_dbfs == null ? "—" : `${gate.threshold_dbfs.toFixed(1)} dBFS`;
+  if (gate.calibrated) {
+    document.querySelector("#live-status").textContent = "Listening";
+    if (state.capture && !state.capture.stopped) {
+      document.querySelector("#capture-status").textContent = "Listening for piano onsets";
+    }
+  }
+}
+
 function applyLiveEvents(message, socket) {
   state.live.audioHeadS = message.audio_head_sample / state.live.sampleRate;
-  document.querySelector("#live-audio-head").textContent = `${state.live.audioHeadS.toFixed(1)} s`;
   state.live.windowCount += message.windows_processed;
-  document.querySelector("#live-window-count").textContent = String(state.live.windowCount);
+  updateNoiseGate(message.noise_gate);
   const firstEvents = [];
   for (const event of message.events) {
     state.live.events.set(event.event_id, event);
-    if (event.lifecycle !== "retracted") {
+    if (event.revision === 1 && event.lifecycle !== "retracted") {
       state.live.highlightedPitches.set(event.pitch, {
         at: performance.now(),
-        lifecycle: event.lifecycle,
+        eventId: event.event_id,
       });
+    } else if (
+      event.lifecycle === "retracted" &&
+      state.live.highlightedPitches.get(event.pitch)?.eventId === event.event_id
+    ) {
+      state.live.highlightedPitches.delete(event.pitch);
     }
     if (event.revision === 1 && event.lifecycle === "provisional") firstEvents.push(event);
   }
   if (firstEvents.length) {
-    const newestOnset = Math.max(...firstEvents.map((event) => event.onset_sample));
-    const cluster = [...state.live.events.values()]
-      .filter(
-        (event) =>
-          event.lifecycle !== "retracted" &&
-          Math.abs(event.onset_sample - newestOnset) / state.live.sampleRate <= 0.18
-      )
-      .map((event) => event.pitch);
-    state.live.recentPitches = [...new Set(cluster)].sort((left, right) => left - right);
+    const groups = liveOnsetGroups();
+    state.live.recentPitches = groups.at(-1)?.pitches || [];
     document.querySelector("#live-pitch-set").textContent =
       state.live.recentPitches.map(pitchName).join(" · ") || "—";
     const latency = firstEvents[firstEvents.length - 1].source_to_emission_latency_s;
     document.querySelector("#live-latency").textContent =
       latency == null ? "—" : `${latency.toFixed(2)} s`;
   }
-  drawLiveRoll();
+  drawLiveStaff();
   requestAnimationFrame(() => {
     liveSend(socket, "paint", {
       batch_id: message.batch_id,
@@ -835,10 +978,11 @@ function openLiveSocket(sampleRate, metadata) {
       const message = JSON.parse(event.data);
       if (message.type === "ready") {
         ready = true;
-        document.querySelector("#live-status").textContent = "Listening";
+        document.querySelector("#live-status").textContent = "Calibrating";
         document.querySelector("#live-transport").textContent = "continuous";
         resolve({ socket, ready: message });
       } else if (message.type === "block_ack") {
+        updateNoiseGate(message.noise_gate);
         if (state.capture) {
           state.capture.acknowledgedBlocks = message.sequence + 1;
           state.capture.serverFrames = message.received_source_frames;
@@ -1045,6 +1189,9 @@ async function startRecording() {
         capture.frameCount += samples.length;
         capture.chunkCount += 1;
         updateCaptureMeter(samples);
+        if (capture.frameCount >= MAX_CAPTURE_SECONDS * audioContext.sampleRate) {
+          window.setTimeout(() => stopRecording(), 0);
+        }
       } else if (event.data.type === "stopped") {
         capture.stopFrameCount = event.data.frameCount;
         if (capture.stopResolver) capture.stopResolver(true);
@@ -1075,7 +1222,8 @@ async function startRecording() {
     source.connect(captureNode);
     captureNode.connect(mutedOutput);
     mutedOutput.connect(audioContext.destination);
-    document.querySelector("#capture-status").textContent = "Recognizing mono PCM live";
+    document.querySelector("#capture-status").textContent =
+      "Calibrating room — stay quiet for one second";
     const tick = () => {
       if (state.capture !== capture || capture.stopped) return;
       const elapsed = capture.frameCount / audioContext.sampleRate;
@@ -1281,7 +1429,8 @@ function wireRecorder() {
   document.querySelector("#stop-recording").addEventListener("click", stopRecording);
   document.querySelector("#discard-recording").addEventListener("click", discardRecording);
   buildLiveKeyboard();
-  drawLiveRoll();
+  drawLiveStaff();
+  window.addEventListener("resize", drawLiveStaff);
 }
 
 async function init() {
