@@ -13,7 +13,7 @@ import numpy as np
 import soundfile
 
 from atpiano.fixture import FIXTURE_SCHEMA
-from atpiano.midi import MidiNote, load_notes, write_notes
+from atpiano.midi import MidiNote, load_notes, note_set_document, write_notes
 from atpiano.quality import match_note_indices, score_notes
 from atpiano.reconcile import NoteTrack, Reconciler, WindowRegion
 from atpiano.util import (
@@ -442,6 +442,8 @@ def run_replay(
     prediction_notes = [track.note for track in final_tracks]
     prediction_path = run_directory / "prediction.mid"
     write_notes(prediction_path, prediction_notes)
+    write_json(run_directory / "reference.json", note_set_document(reference_path))
+    write_json(run_directory / "prediction.json", note_set_document(prediction_path))
     write_jsonl(run_directory / "events.jsonl", all_events)
     write_jsonl(run_directory / "timing.jsonl", timing_rows)
     write_jsonl(run_directory / "raw" / "windows.jsonl", raw_index)
@@ -555,6 +557,8 @@ def run_replay(
         "artifacts": {
             "prediction_midi": prediction_path.name,
             "prediction_sha256": sha256_file(prediction_path),
+            "reference_notes": "reference.json",
+            "prediction_notes": "prediction.json",
             "raw_window_index": "raw/windows.jsonl",
             "events": "events.jsonl",
             "scores": "scores.json",

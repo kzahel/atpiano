@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 import pretty_midi
 
@@ -81,3 +82,11 @@ def write_notes(path: Path, notes: list[MidiNote]) -> None:
     ]
     midi.instruments.append(instrument)
     midi.write(str(path))
+
+
+def note_set_document(path: Path) -> dict[str, Any]:
+    return {
+        "schema_version": "atpiano.note-set.v1",
+        "notes": [asdict(note) for note in load_notes(path)],
+        "pedals": [asdict(pedal) for pedal in load_pedal_intervals(path)],
+    }

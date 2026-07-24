@@ -233,3 +233,34 @@ Wall-clock replay produced:
 The host easily keeps up by throughput, but Basic Pitch's future context and
 window commit policy dominate event latency. This is concrete evidence for
 reporting algorithmic wait separately from inference time.
+
+### 2026-07-24: local artifact reviewer
+
+The reviewer is a dependency-free HTML, CSS, and Canvas application served by
+the Python package:
+
+```text
+uv run atpiano review results/replay-review-final
+```
+
+It reads only completed run artifacts. It provides synchronized audio,
+reference and prediction piano rolls, quality and latency cards, lifecycle
+counts, provenance, and the complete normalized revision log. Reference and
+prediction notes are exported as versioned JSON alongside MIDI so the browser
+does not need a MIDI parser or model dependency.
+
+Validation:
+
+```text
+uv run pytest -q
+node --check src/atpiano/web/app.js
+curl http://127.0.0.1:8765/artifacts/run.json
+curl -I -H 'Range: bytes=0-99' \
+  http://127.0.0.1:8765/artifacts/fixture.wav
+```
+
+The server test covers packaged UI assets, artifact delivery, and path
+traversal rejection. Manual HTTP validation confirmed byte-range audio
+responses. Browser visual inspection was not part of this tactical's automated
+validation; the user-facing command opens the local reviewer for subjective
+audition.

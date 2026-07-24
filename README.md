@@ -32,11 +32,53 @@ input adapters to the same pipeline.
 
 ## Project Status
 
-The project is in discovery. No model, implementation language, transport, or
-deployment runtime has been selected.
+The project is in discovery. Python and Spotify Basic Pitch are the first
+prototype stack, not permanent selections. A deterministic MIDI-derived
+fixture, untouched offline reference, wall-clock replay benchmark, and local
+artifact reviewer are runnable on Apple Silicon.
 
 Current direction and research questions live in
 [`docs/topics/acoustic-transcription-latency-quality.md`](docs/topics/acoustic-transcription-latency-quality.md).
+
+## Prototype Quick Start
+
+Use the pinned Python 3.10 environment:
+
+```text
+uv sync
+```
+
+Generate a deterministic MIDI-derived WAV and aligned reference:
+
+```text
+uv run atpiano fixture ../atpiano-artifacts/smoke-input
+```
+
+Run the untouched Basic Pitch file path:
+
+```text
+uv run atpiano offline \
+  ../atpiano-artifacts/smoke-input/input.json \
+  ../atpiano-artifacts/offline
+```
+
+Or replay the same samples at real wall-clock cadence:
+
+```text
+uv run atpiano replay \
+  ../atpiano-artifacts/smoke-input/input.json \
+  ../atpiano-artifacts/replay
+```
+
+Review a completed run in the local browser UI:
+
+```text
+uv run atpiano review ../atpiano-artifacts/replay
+```
+
+Generated inputs, checkpoints, recordings, and run results do not belong in
+Git. Each run records hashes, runtime/model versions, parameters, stage timing,
+native outputs, normalized event revisions, scores, and a compact report.
 
 ## Project Map
 

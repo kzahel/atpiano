@@ -52,6 +52,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="exercise replay without wall-clock waits; latency is not reported",
     )
+    review_parser = subparsers.add_parser(
+        "review",
+        help="serve a local browser reviewer for a completed run",
+    )
+    review_parser.add_argument("run_directory", type=Path)
+    review_parser.add_argument("--bind", default="127.0.0.1")
+    review_parser.add_argument("--port", type=int, default=8000)
+    review_parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="do not open the reviewer in the default browser",
+    )
     return parser
 
 
@@ -83,6 +95,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(
             "onset F1 @ 50 ms: "
             f"{read_score(args.run_directory, 'onset', '50_ms', 'f1'):.3f}"
+        )
+        return 0
+    if args.command == "review":
+        from atpiano.reviewer import serve_review
+
+        serve_review(
+            args.run_directory,
+            bind=args.bind,
+            port=args.port,
+            open_browser=not args.no_open,
         )
         return 0
     if args.command == "replay":

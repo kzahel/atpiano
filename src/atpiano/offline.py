@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 
 from atpiano.fixture import FIXTURE_SCHEMA
-from atpiano.midi import MidiNote, load_notes
+from atpiano.midi import MidiNote, load_notes, note_set_document
 from atpiano.quality import score_notes
 from atpiano.util import (
     read_json,
@@ -165,6 +165,8 @@ def run_offline(
 
     prediction_path = run_directory / "prediction.mid"
     midi_data.write(str(prediction_path))
+    write_json(run_directory / "reference.json", note_set_document(reference_path))
+    write_json(run_directory / "prediction.json", note_set_document(prediction_path))
     raw_directory = run_directory / "raw"
     raw_directory.mkdir(parents=True, exist_ok=True)
     raw_path = raw_directory / "basic_pitch.npz"
@@ -275,6 +277,8 @@ def run_offline(
         "artifacts": {
             "prediction_midi": prediction_path.name,
             "prediction_sha256": sha256_file(prediction_path),
+            "reference_notes": "reference.json",
+            "prediction_notes": "prediction.json",
             "raw_model_output": str(raw_path.relative_to(run_directory)),
             "raw_model_output_sha256": sha256_file(raw_path),
             "events": "events.jsonl",
