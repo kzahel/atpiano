@@ -17,10 +17,15 @@ normally reuse the document slug in its `Topic:` trailers.
 - [`acoustic-transcription-latency-quality.md`](acoustic-transcription-latency-quality.md):
   discovery-stage investigation of acoustic models, streaming adaptations,
   the latency/quality measurement contract, and reproducible benchmarks.
+- [`browser-only-wasm-deployment.md`](browser-only-wasm-deployment.md):
+  candidate static, offline-capable deployment that moves capture,
+  transcription, persistence, and export into the browser; the exact ONNX
+  artifact executes under a web WASM runtime, while real-browser parity and
+  end-to-end behavior remain unvalidated.
 - [`live-acoustic-transcription.md`](live-acoustic-transcription.md):
-  browser prototype whose transport, room gate, physical keyboard, and
-  grand-staff stream are validated, but whose stock Basic Pitch decoder fails
-  held-chord onset semantics; a strict-onset decoder experiment is next.
+  browser prototype whose strict-onset decoder, room gate, physical keyboard,
+  grand-staff stream, confidence controls, and source-timing guides are
+  validated for initial subjective use; target-piano octave overtones remain.
 - [`performance-to-notation.md`](performance-to-notation.md):
   evaluated downstream conversion prototype whose artifacts are inspectable
   but whose first target-piano score failed the readability goal.

@@ -6,3 +6,5 @@
   and sheet-music rendering
 - `live-acoustic-transcription` — browser audio streaming, revisable live note
   feedback, measured delivery, and final backfill
+- `browser-only-wasm-deployment` — static browser execution, local
+  persistence, offline packaging, and serverless deployment
