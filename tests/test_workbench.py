@@ -60,10 +60,12 @@ def _capture_metadata(
             "echoCancellation": False,
         },
         "display_settings": {
-            "schema_version": "atpiano.live-display-settings.v1",
+            "schema_version": "atpiano.live-display-settings.v2",
             "mode": "grouped",
             "groupWindowMs": 80,
             "showConfidence": True,
+            "timingMode": "both",
+            "rhythmBpm": 100,
         },
     }
 
@@ -208,6 +210,8 @@ def test_browser_capture_writer_preserves_validated_pcm_wav(tmp_path: Path) -> N
     assert capture["source_timeline"] == "AudioWorklet sample index"
     assert capture["display_settings"]["groupWindowMs"] == 80
     assert capture["display_settings"]["showConfidence"] is True
+    assert capture["display_settings"]["timingMode"] == "both"
+    assert capture["display_settings"]["rhythmBpm"] == 100
 
 
 def test_browser_capture_writer_rejects_metadata_mismatch(tmp_path: Path) -> None:
@@ -222,6 +226,38 @@ def test_browser_capture_writer_rejects_metadata_mismatch(tmp_path: Path) -> Non
             source,
             client_metadata=metadata,
         )
+
+    metadata = _capture_metadata()
+    metadata["display_settings"]["rhythmBpm"] = 90
+    with pytest.raises(ValueError, match="supported preset"):
+        write_browser_capture_artifacts(
+            tmp_path / "invalid-display",
+            source,
+            client_metadata=metadata,
+        )
+
+
+def test_browser_capture_writer_accepts_v1_display_settings(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.wav"
+    source.write_bytes(_wav_bytes())
+    metadata = _capture_metadata()
+    metadata["display_settings"] = {
+        "schema_version": "atpiano.live-display-settings.v1",
+        "mode": "raw",
+        "groupWindowMs": 40,
+        "showConfidence": False,
+    }
+
+    write_browser_capture_artifacts(
+        tmp_path / "legacy-display",
+        source,
+        client_metadata=metadata,
+    )
+
+    capture = read_json(tmp_path / "legacy-display" / "browser-capture.json")
+    assert capture["display_settings"] == metadata["display_settings"]
 
 
 def test_workbench_upload_job_and_reloadable_artifacts(tmp_path: Path) -> None:
@@ -252,7 +288,11 @@ def test_workbench_upload_job_and_reloadable_artifacts(tmp_path: Path) -> None:
         assert b'id="live-display-mode"' in page
         assert b'id="live-group-window"' in page
         assert b'id="live-show-confidence"' in page
+        assert b'id="live-timing-mode"' in page
+        assert b'id="live-rhythm-bpm"' in page
         assert b"not calibrated probabilities" in page
+        assert b"approximately 11.6 ms model-frame grid" in page
+        assert b"not detected" in page
         assert b"provisional onset" not in page
 
         invalid_request = urllib.request.Request(

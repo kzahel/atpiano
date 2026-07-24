@@ -205,7 +205,7 @@ section,
 
 .live-view-controls {
   display: grid;
-  grid-template-columns: minmax(150px, 0.9fr) minmax(210px, 1.2fr) auto;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
   align-items: end;
   gap: 14px;
   padding: 12px 14px;
@@ -283,7 +283,7 @@ section,
   opacity: 0.42;
 }
 
-.live-confidence-help {
+.live-display-help {
   margin: 0;
   padding: 8px 14px;
   color: #d5a07f;
@@ -292,6 +292,15 @@ section,
   background: #f8f4e9;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.66rem;
+}
+
+.live-display-help + .live-display-help {
+  border-top: 1px solid #ddd4c3;
+}
+
+.live-display-help strong {
+  color: #8b351d;
+  font-weight: 700;
 }
 
 #live-score {
@@ -414,7 +423,7 @@ section,
   }
 
   .live-debug-toggle {
-    grid-column: 1 / -1;
+    justify-content: center;
   }
 }
 

@@ -199,9 +199,13 @@ def write_browser_capture_artifacts(
 def _browser_display_settings(value: Any) -> dict[str, Any] | None:
     if value is None:
         return None
-    if not isinstance(value, dict) or value.get("schema_version") != (
-        "atpiano.live-display-settings.v1"
-    ):
+    if not isinstance(value, dict):
+        raise ValueError("unsupported live display settings")
+    schema_version = value.get("schema_version")
+    if schema_version not in {
+        "atpiano.live-display-settings.v1",
+        "atpiano.live-display-settings.v2",
+    }:
         raise ValueError("unsupported live display settings")
     mode = value.get("mode")
     group_window_ms = value.get("groupWindowMs")
@@ -216,11 +220,27 @@ def _browser_display_settings(value: Any) -> dict[str, Any] | None:
         raise ValueError("live display group window must be 0 through 250 ms")
     if not isinstance(show_confidence, bool):
         raise ValueError("live display confidence setting must be boolean")
-    return {
-        "schema_version": "atpiano.live-display-settings.v1",
+    settings = {
+        "schema_version": schema_version,
         "mode": mode,
         "groupWindowMs": group_window_ms,
         "showConfidence": show_confidence,
+    }
+    if schema_version == "atpiano.live-display-settings.v1":
+        return settings
+    timing_mode = value.get("timingMode")
+    rhythm_bpm = value.get("rhythmBpm")
+    if timing_mode not in {"off", "relative", "absolute", "both"}:
+        raise ValueError("live display timing mode is invalid")
+    if (
+        not isinstance(rhythm_bpm, int)
+        or isinstance(rhythm_bpm, bool)
+        or rhythm_bpm not in {0, 60, 80, 100, 120, 140, 160}
+    ):
+        raise ValueError("live display rhythm tempo is not a supported preset")
+    return settings | {
+        "timingMode": timing_mode,
+        "rhythmBpm": rhythm_bpm,
     }
 
 

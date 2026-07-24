@@ -96,9 +96,39 @@
                 <input id="live-show-confidence" type="checkbox">
                 <span>Show onset scores</span>
               </label>
+              <label>
+                <span>Timing labels</span>
+                <select id="live-timing-mode">
+                  <option value="relative">Previous-onset gaps</option>
+                  <option value="absolute">Absolute source time</option>
+                  <option value="both">Absolute and gaps</option>
+                  <option value="off">Off</option>
+                </select>
+              </label>
+              <label>
+                <span>Rough rhythm</span>
+                <select id="live-rhythm-bpm">
+                  <option value="0">Neutral quarter marks</option>
+                  <option value="60">60 BPM preset</option>
+                  <option value="80">80 BPM preset</option>
+                  <option value="100">100 BPM preset</option>
+                  <option value="120" selected>120 BPM preset</option>
+                  <option value="140">140 BPM preset</option>
+                  <option value="160">160 BPM preset</option>
+                </select>
+              </label>
             </div>
-            <p id="live-confidence-help" class="live-confidence-help" hidden>
+            <p id="live-confidence-help" class="live-display-help" hidden>
               Labels are Basic Pitch onset scores from 0–1, not calibrated probabilities.
+            </p>
+            <p id="live-timing-help" class="live-display-help" hidden>
+              Times use the recording sample clock. Basic Pitch onset positions
+              land on an approximately 11.6 ms model-frame grid.
+            </p>
+            <p id="live-rhythm-help" class="live-display-help" hidden>
+              Rough glyphs use the gap to the next onset at
+              <strong id="live-rhythm-bpm-help">120 BPM</strong>, not detected
+              key duration. The newest mark stays pending until another onset.
             </p>
 
             <canvas

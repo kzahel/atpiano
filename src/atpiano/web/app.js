@@ -672,7 +672,9 @@ function liveSend(socket, type, values = {}) {
 
 function loadLiveDisplaySettings() {
   try {
-    const stored = window.localStorage.getItem(LIVE_VIEW.STORAGE_KEY);
+    const stored =
+      window.localStorage.getItem(LIVE_VIEW.STORAGE_KEY) ||
+      window.localStorage.getItem(LIVE_VIEW.LEGACY_STORAGE_KEY);
     state.live.display = LIVE_VIEW.normalizedSettings(
       stored ? JSON.parse(stored) : LIVE_VIEW.DEFAULT_SETTINGS
     );
@@ -711,13 +713,21 @@ function syncLiveDisplayControls() {
   const groupWindowValue = document.querySelector("#live-group-window-value");
   const groupWindowControl = document.querySelector("#live-group-window-control");
   const confidence = document.querySelector("#live-show-confidence");
+  const timingMode = document.querySelector("#live-timing-mode");
+  const rhythmBpm = document.querySelector("#live-rhythm-bpm");
   mode.value = settings.mode;
   groupWindow.value = String(settings.groupWindowMs);
   groupWindow.disabled = settings.mode === "raw";
   groupWindowValue.value = `${settings.groupWindowMs} ms`;
   groupWindowControl.classList.toggle("is-disabled", settings.mode === "raw");
   confidence.checked = settings.showConfidence;
+  timingMode.value = settings.timingMode;
+  rhythmBpm.value = String(settings.rhythmBpm);
   document.querySelector("#live-confidence-help").hidden = !settings.showConfidence;
+  document.querySelector("#live-timing-help").hidden = settings.timingMode === "off";
+  document.querySelector("#live-rhythm-help").hidden = settings.rhythmBpm === 0;
+  document.querySelector("#live-rhythm-bpm-help").textContent =
+    `${settings.rhythmBpm} BPM`;
   document.querySelector("#live-pitch-label").textContent =
     settings.mode === "raw" ? "Latest raw onset" : "Latest onset group";
 }
@@ -743,6 +753,12 @@ function wireLiveDisplayControls() {
   });
   document.querySelector("#live-show-confidence").addEventListener("change", (event) => {
     applyLiveDisplaySettings({ showConfidence: event.target.checked });
+  });
+  document.querySelector("#live-timing-mode").addEventListener("change", (event) => {
+    applyLiveDisplaySettings({ timingMode: event.target.value });
+  });
+  document.querySelector("#live-rhythm-bpm").addEventListener("change", (event) => {
+    applyLiveDisplaySettings({ rhythmBpm: Number(event.target.value) });
   });
 }
 
@@ -805,8 +821,13 @@ function renderLiveKeyboard() {
 }
 
 function liveOnsetGroups() {
-  return LIVE_VIEW.groupEvents(
+  const groups = LIVE_VIEW.groupEvents(
     state.live.events.values(),
+    state.live.sampleRate,
+    state.live.display
+  );
+  return LIVE_VIEW.decorateGroups(
+    groups,
     state.live.sampleRate,
     state.live.display
   );
@@ -843,7 +864,38 @@ function drawLedgerLines(context, x, step, staff) {
   }
 }
 
-function drawStaffChord(context, notes, x, staff) {
+function drawStaffFlag(context, x, y, stemUp, flagIndex) {
+  const offset = flagIndex * 6;
+  context.save();
+  context.lineWidth = 2.2;
+  context.lineCap = "round";
+  context.beginPath();
+  if (stemUp) {
+    context.moveTo(x, y + offset);
+    context.bezierCurveTo(
+      x + 11,
+      y + 3 + offset,
+      x + 14,
+      y + 12 + offset,
+      x + 8,
+      y + 18 + offset
+    );
+  } else {
+    context.moveTo(x, y - offset);
+    context.bezierCurveTo(
+      x - 11,
+      y - 3 - offset,
+      x - 14,
+      y - 12 - offset,
+      x - 8,
+      y - 18 - offset
+    );
+  }
+  context.stroke();
+  context.restore();
+}
+
+function drawStaffChord(context, notes, x, staff, rhythmValue) {
   const positions = notes
     .map((note) => ({ ...note, ...staffPitch(note.pitch) }))
     .sort((left, right) => left.step - right.step)
@@ -856,8 +908,9 @@ function drawStaffChord(context, notes, x, staff) {
       y: staff.bottomY - (note.step - staff.bottomStep) * 5,
     }));
   if (!positions.length) return;
-  context.fillStyle = "#1d1b18";
   context.strokeStyle = "#1d1b18";
+  const rhythmName = rhythmValue?.name || "quarter";
+  const hollow = rhythmName === "half" || rhythmName === "whole";
   for (const note of positions) {
     drawLedgerLines(context, note.x, note.step, staff);
     if (note.accidental) {
@@ -869,23 +922,44 @@ function drawStaffChord(context, notes, x, staff) {
     context.translate(note.x, note.y);
     context.rotate(-0.2);
     context.beginPath();
-    context.ellipse(0, 0, 7.2, 4.8, 0, 0, Math.PI * 2);
+    context.ellipse(
+      0,
+      0,
+      rhythmName === "whole" ? 8.2 : 7.2,
+      rhythmName === "whole" ? 5.2 : 4.8,
+      0,
+      0,
+      Math.PI * 2
+    );
+    context.fillStyle = hollow ? "#f8f4e9" : "#1d1b18";
     context.fill();
+    if (hollow) {
+      context.lineWidth = 1.6;
+      context.stroke();
+    }
     context.restore();
   }
   const highestY = Math.min(...positions.map((note) => note.y));
   const lowestY = Math.max(...positions.map((note) => note.y));
   const stemUp = (highestY + lowestY) / 2 >= staff.bottomY - 20;
-  context.lineWidth = 1.4;
-  context.beginPath();
-  if (stemUp) {
-    context.moveTo(x + 7, lowestY);
-    context.lineTo(x + 7, highestY - 29);
-  } else {
-    context.moveTo(x - 7, highestY);
-    context.lineTo(x - 7, lowestY + 29);
+  if (rhythmName !== "whole") {
+    const stemX = stemUp ? x + 7 : x - 7;
+    const stemEndY = stemUp ? highestY - 29 : lowestY + 29;
+    context.lineWidth = 1.4;
+    context.beginPath();
+    if (stemUp) {
+      context.moveTo(stemX, lowestY);
+    } else {
+      context.moveTo(stemX, highestY);
+    }
+    context.lineTo(stemX, stemEndY);
+    context.stroke();
+    const flagCount =
+      rhythmName === "sixteenth" ? 2 : rhythmName === "eighth" ? 1 : 0;
+    for (let flagIndex = 0; flagIndex < flagCount; flagIndex += 1) {
+      drawStaffFlag(context, stemX, stemEndY, stemUp, flagIndex);
+    }
   }
-  context.stroke();
   if (state.live.display.showConfidence) {
     context.fillStyle = "#8b351d";
     context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
@@ -895,6 +969,34 @@ function drawStaffChord(context, notes, x, staff) {
       context.fillText(note.confidence.toFixed(2), note.x + 10, note.y - 5);
     }
   }
+}
+
+function formatSourceOnset(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds - minutes * 60;
+  return `${minutes}:${remainder.toFixed(3).padStart(6, "0")}`;
+}
+
+function drawStaffTiming(context, group, x) {
+  const mode = state.live.display.timingMode;
+  if (mode === "off") return;
+  const labels = [];
+  if (mode === "absolute" || mode === "both") {
+    labels.push(`t ${formatSourceOnset(group.onsetSeconds)}`);
+  }
+  if (mode === "relative" || mode === "both") {
+    labels.push(
+      group.previousDeltaMs == null
+        ? "start"
+        : `+${Math.round(group.previousDeltaMs)} ms`
+    );
+  }
+  context.fillStyle = "#655f55";
+  context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+  context.textAlign = "center";
+  labels.forEach((label, index) => {
+    context.fillText(label, x, 26 + index * 12);
+  });
 }
 
 function drawLiveStaff() {
@@ -947,17 +1049,20 @@ function drawLiveStaff() {
     const stepX = (width - 110) / capacity;
     groups.forEach((group, index) => {
       const x = 88 + index * stepX;
+      drawStaffTiming(context, group, x);
       drawStaffChord(
         context,
         group.notes.filter((note) => note.pitch >= 60),
         x,
-        treble
+        treble,
+        group.rhythmValue
       );
       drawStaffChord(
         context,
         group.notes.filter((note) => note.pitch < 60),
         x,
-        bass
+        bass,
+        group.rhythmValue
       );
     });
   }
