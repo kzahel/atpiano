@@ -19,12 +19,20 @@ from typing import Any
 from urllib.parse import unquote, urlsplit
 
 from atpiano.capture import write_browser_capture_artifacts
+from atpiano.notation import (
+    MUSICXML_MAX_BYTES,
+    current_notation,
+    generate_notation_artifacts,
+    import_oracle_musicxml,
+    oracle_status,
+)
 from atpiano.offline import run_offline
 from atpiano.reviewer import ASSETS, ReviewerHandler
 from atpiano.util import read_json, utc_now
 
 MAX_UPLOAD_BYTES = 64 * 1024 * 1024
 MAX_METADATA_BYTES = 16 * 1024
+MAX_NOTATION_OPTIONS_BYTES = 16 * 1024
 JOB_ID_PATTERN = re.compile(r"[0-9]{8}T[0-9]{6}-[0-9a-f]{12}")
 Transcriber = Callable[..., dict[str, Any]]
 
@@ -55,7 +63,7 @@ class WorkbenchHandler(ReviewerHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        self.wfile.write(body)
+        self._write_body(body)
 
     def _job(self, job_id: str) -> dict[str, Any] | None:
         if not JOB_ID_PATTERN.fullmatch(job_id):
@@ -80,6 +88,12 @@ class WorkbenchHandler(ReviewerHandler):
         if not candidate.is_relative_to(run_directory):
             return None
         return candidate
+
+    def _complete_run_directory(self, job_id: str) -> Path | None:
+        job = self._job(job_id)
+        if job is None or job["status"] != "complete":
+            return None
+        return Path(job["run_directory"]).resolve()
 
     def _static_asset(self, request_path: str) -> Path | None:
         return ASSETS.get(request_path)
@@ -109,6 +123,28 @@ class WorkbenchHandler(ReviewerHandler):
             else:
                 self._send_json(_public_job(job))
             return
+        notation_match = re.fullmatch(r"/api/runs/([^/]+)/notation", request_path)
+        if notation_match:
+            run_directory = self._complete_run_directory(notation_match.group(1))
+            if run_directory is None:
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            try:
+                self._send_json(current_notation(run_directory))
+            except (OSError, RuntimeError, ValueError) as error:
+                self._send_json(
+                    {"error": f"notation generation failed: {error}"},
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        oracle_match = re.fullmatch(r"/api/runs/([^/]+)/oracle", request_path)
+        if oracle_match:
+            run_directory = self._complete_run_directory(oracle_match.group(1))
+            if run_directory is None:
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            self._send_json(oracle_status(run_directory))
+            return
         artifact_path = self._run_artifact(request_path)
         if artifact_path is not None:
             self._send_file(artifact_path, include_body=True)
@@ -132,7 +168,19 @@ class WorkbenchHandler(ReviewerHandler):
     def do_POST(self) -> None:
         if not self._require_local_host():
             return
-        if urlsplit(self.path).path != "/api/transcriptions":
+        request_path = unquote(urlsplit(self.path).path)
+        notation_match = re.fullmatch(r"/api/runs/([^/]+)/notation", request_path)
+        if notation_match:
+            self._post_notation(notation_match.group(1))
+            return
+        oracle_match = re.fullmatch(
+            r"/api/runs/([^/]+)/oracle/(audio|midi)",
+            request_path,
+        )
+        if oracle_match:
+            self._post_oracle(oracle_match.group(1), oracle_match.group(2))
+            return
+        if request_path != "/api/transcriptions":
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         content_type = self.headers.get_content_type()
@@ -208,6 +256,93 @@ class WorkbenchHandler(ReviewerHandler):
             self.server.jobs[job_id] = job
         self.server.executor.submit(self.server.run_job, job_id)
         self._send_json(_public_job(job), HTTPStatus.ACCEPTED)
+
+    def _content_length(self, *, maximum: int, label: str) -> int | None:
+        try:
+            content_length = int(self.headers.get("Content-Length", ""))
+        except ValueError:
+            content_length = -1
+        if content_length <= 0:
+            self._send_json(
+                {"error": f"a positive Content-Length is required for {label}"},
+                HTTPStatus.LENGTH_REQUIRED,
+            )
+            return None
+        if content_length > maximum:
+            self._send_json(
+                {"error": f"{label} exceeds its upload limit"},
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+            )
+            return None
+        return content_length
+
+    def _read_body(self, content_length: int) -> bytes:
+        body = self.rfile.read(content_length)
+        if len(body) != content_length:
+            raise ValueError("request body ended early")
+        return body
+
+    def _post_notation(self, job_id: str) -> None:
+        run_directory = self._complete_run_directory(job_id)
+        if run_directory is None:
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        if self.headers.get_content_type() != "application/json":
+            self._send_json(
+                {"error": "notation options must be application/json"},
+                HTTPStatus.UNSUPPORTED_MEDIA_TYPE,
+            )
+            return
+        content_length = self._content_length(
+            maximum=MAX_NOTATION_OPTIONS_BYTES,
+            label="notation options",
+        )
+        if content_length is None:
+            return
+        try:
+            value = json.loads(self._read_body(content_length))
+            if not isinstance(value, dict):
+                raise ValueError("notation options must be an object")
+            manifest = generate_notation_artifacts(run_directory, overrides=value)
+        except (json.JSONDecodeError, OSError, RuntimeError, ValueError) as error:
+            self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+            return
+        self._send_json(manifest)
+
+    def _post_oracle(self, job_id: str, lane: str) -> None:
+        run_directory = self._complete_run_directory(job_id)
+        if run_directory is None:
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        if self.headers.get_content_type() not in {
+            "application/octet-stream",
+            "application/vnd.recordare.musicxml+xml",
+            "application/xml",
+            "text/xml",
+        }:
+            self._send_json(
+                {"error": "oracle result must be an uncompressed MusicXML file"},
+                HTTPStatus.UNSUPPORTED_MEDIA_TYPE,
+            )
+            return
+        content_length = self._content_length(
+            maximum=MUSICXML_MAX_BYTES,
+            label="MusicXML",
+        )
+        if content_length is None:
+            return
+        filename = self.headers.get("X-Atpiano-Filename", "oracle.musicxml")
+        try:
+            manifest = import_oracle_musicxml(
+                run_directory,
+                lane=lane,
+                data=self._read_body(content_length),
+                original_filename=filename,
+            )
+        except (OSError, RuntimeError, ValueError) as error:
+            self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+            return
+        self._send_json(manifest)
 
 
 class WorkbenchServer(ThreadingHTTPServer):

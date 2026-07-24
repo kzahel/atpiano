@@ -21,6 +21,11 @@ const state = {
   showReference: true,
   showPrediction: true,
   reviewWired: false,
+  notationWired: false,
+  notation: null,
+  oracle: null,
+  activeOracleLane: "audio",
+  scoreRenderers: {},
   capture: null,
   take: null,
   recordingUrl: null,
@@ -33,6 +38,11 @@ function artifact(name) {
     return `/api/runs/${encodeURIComponent(state.runId)}/artifacts/${encodeURIComponent(name)}`;
   }
   return `/artifacts/${encodeURIComponent(name)}`;
+}
+
+function runApi(name) {
+  if (!state.runId) throw new Error("This action requires the local workbench.");
+  return `/api/runs/${encodeURIComponent(state.runId)}/${name}`;
 }
 
 async function fetchJson(name) {
@@ -163,6 +173,227 @@ function renderEvents() {
     .join("");
 }
 
+function summaryPills(summary) {
+  if (!summary) return '<span class="muted">No score imported yet.</span>';
+  const values = [
+    `${summary.measures ?? "—"} measures`,
+    `${summary.pitched_note_elements ?? "—"} note elements`,
+    `${summary.parts ?? "—"} parts`,
+    `${summary.arpeggiate_marks ?? 0} arpeggio marks`,
+  ];
+  if (summary.time_signatures?.length) values.push(summary.time_signatures.join(", "));
+  return values.map((value) => `<span>${escapeHtml(value)}</span>`).join("");
+}
+
+async function renderMusicXml(targetId, relativePath, rendererKey) {
+  const target = document.querySelector(`#${targetId}`);
+  if (!relativePath) {
+    target.classList.add("placeholder");
+    target.textContent =
+      "Import Ivory MusicXML above to render this lane beside the local score.";
+    return;
+  }
+  target.classList.remove("placeholder");
+  target.textContent = "Rendering score…";
+  if (!window.opensheetmusicdisplay?.OpenSheetMusicDisplay) {
+    target.innerHTML =
+      '<p class="score-error">The pinned score renderer could not load. ' +
+      "The MusicXML download is still available.</p>";
+    return;
+  }
+  try {
+    const response = await fetch(artifact(relativePath), { cache: "no-store" });
+    if (!response.ok) throw new Error(`MusicXML: HTTP ${response.status}`);
+    const musicxml = await response.text();
+    target.replaceChildren();
+    const renderer = new window.opensheetmusicdisplay.OpenSheetMusicDisplay(target, {
+      autoResize: true,
+      backend: "svg",
+      drawTitle: true,
+      drawPartNames: true,
+      drawingParameters: "compacttight",
+    });
+    state.scoreRenderers[rendererKey] = renderer;
+    await renderer.load(musicxml);
+    renderer.render();
+  } catch (error) {
+    target.innerHTML = `<p class="score-error">${escapeHtml(
+      error.message || String(error)
+    )}</p>`;
+  }
+}
+
+function populateNotationOptions() {
+  const selected = state.notation?.selected;
+  if (!selected) return;
+  document.querySelector("#notation-tempo").value = selected.tempo_bpm;
+  document.querySelector(
+    "#notation-meter"
+  ).value = `${selected.meter_numerator}/${selected.meter_denominator}`;
+  document.querySelector("#notation-first-beat").value = selected.first_beat_s;
+  document.querySelector("#notation-key").value = selected.key;
+  document.querySelector("#notation-quantization").value = selected.quantization;
+  document.querySelector("#notation-split").value = selected.staff_split_pitch;
+}
+
+function renderHypotheses() {
+  const hypotheses = state.notation?.hypotheses;
+  if (!hypotheses) return;
+  const rankedKeys = (hypotheses.key?.ranked_profiles || [])
+    .slice(0, 3)
+    .map((candidate) => `${candidate.key} ${candidate.correlation.toFixed(2)}`)
+    .join(" · ");
+  const tempo = hypotheses.tempo;
+  const partituraMeter = tempo.partitura?.meter_numerator;
+  document.querySelector("#notation-hypotheses").innerHTML = [
+    `<div><span>Selected key</span><strong>${escapeHtml(
+      state.notation.selected.key
+    )}</strong><small>${escapeHtml(rankedKeys)}</small></div>`,
+    `<div><span>Selected tempo</span><strong>${state.notation.selected.tempo_bpm.toFixed(
+      1
+    )} BPM</strong><small>raw onset estimate ${tempo.pretty_midi_raw_bpm.toFixed(
+      1
+    )}; half-time normalized</small></div>`,
+    `<div><span>Meter confidence</span><strong>Manual default</strong><small>4/4 until confirmed${
+      partituraMeter ? `; rejected Partitura candidate ${partituraMeter}/4` : ""
+    }</small></div>`,
+  ].join("");
+}
+
+async function renderNotationComparison() {
+  if (!state.notation) return;
+  populateNotationOptions();
+  renderHypotheses();
+  document.querySelector("#notation-status").textContent =
+    `${state.notation.selected.key} · ${state.notation.selected.tempo_bpm.toFixed(1)} BPM · ` +
+    `${state.notation.selected.meter_numerator}/${state.notation.selected.meter_denominator}`;
+  document.querySelector("#local-score-summary").innerHTML = summaryPills(
+    state.notation.summary
+  );
+  const localPath = state.notation.artifacts.musicxml;
+  const localDownload = document.querySelector("#download-local-musicxml");
+  localDownload.href = artifact(localPath);
+  localDownload.download = `atpiano-${state.notation.variant_id}.musicxml`;
+  await renderMusicXml("local-score", localPath, `local-${state.notation.variant_id}`);
+
+  const lane = state.oracle?.lanes?.[state.activeOracleLane] || null;
+  document.querySelector("#oracle-lane-title").textContent =
+    state.activeOracleLane === "audio" ? "from WAV" : "from MIDI";
+  document.querySelectorAll("[data-oracle-lane]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.oracleLane === state.activeOracleLane);
+  });
+  document.querySelector("#oracle-score-summary").innerHTML = summaryPills(lane?.summary);
+  await renderMusicXml(
+    "oracle-score",
+    lane?.artifact || null,
+    `oracle-${state.activeOracleLane}-${lane?.sha256 || "empty"}`
+  );
+  drawRoll();
+}
+
+async function loadNotation() {
+  try {
+    if (state.mode === "workbench") {
+      const [notationResponse, oracleResponse] = await Promise.all([
+        fetch(runApi("notation"), { cache: "no-store" }),
+        fetch(runApi("oracle"), { cache: "no-store" }),
+      ]);
+      const notation = await notationResponse.json();
+      const oracle = await oracleResponse.json();
+      if (!notationResponse.ok) {
+        throw new Error(notation.error || `Notation: HTTP ${notationResponse.status}`);
+      }
+      if (!oracleResponse.ok) {
+        throw new Error(oracle.error || `Oracle: HTTP ${oracleResponse.status}`);
+      }
+      state.notation = notation;
+      state.oracle = oracle;
+    } else {
+      state.notation = await fetchJson("notation/current.json");
+      state.oracle = { lanes: {} };
+    }
+    await renderNotationComparison();
+  } catch (error) {
+    document.querySelector("#notation-status").textContent = "Score unavailable";
+    document.querySelector("#local-score").innerHTML =
+      `<p class="score-error">${escapeHtml(error.message || String(error))}</p>`;
+  }
+}
+
+async function regenerateNotation(event) {
+  event.preventDefault();
+  if (!state.runId || state.mode !== "workbench") return;
+  const meter = document.querySelector("#notation-meter").value.split("/").map(Number);
+  const options = {
+    tempo_bpm: Number(document.querySelector("#notation-tempo").value),
+    meter_numerator: meter[0],
+    meter_denominator: meter[1],
+    first_beat_s: Number(document.querySelector("#notation-first-beat").value),
+    key: document.querySelector("#notation-key").value.trim(),
+    quantization: document.querySelector("#notation-quantization").value,
+    staff_split_pitch: Number(document.querySelector("#notation-split").value),
+  };
+  const button = document.querySelector("#regenerate-notation");
+  button.disabled = true;
+  document.querySelector("#notation-status").textContent = "Regenerating score";
+  try {
+    const response = await fetch(runApi("notation"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(options),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || `Notation: HTTP ${response.status}`);
+    state.notation = result;
+    await renderNotationComparison();
+  } catch (error) {
+    showError(error);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function importOracle(lane, file) {
+  if (!file || !state.runId) return;
+  const safeFilename = file.name.replace(/[^\x20-\x7E]/g, "_");
+  document.querySelector("#notation-status").textContent = `Importing Ivory ${lane} score`;
+  try {
+    const response = await fetch(runApi(`oracle/${lane}`), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/vnd.recordare.musicxml+xml",
+        "X-Atpiano-Filename": safeFilename,
+      },
+      body: file,
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || `Oracle import: HTTP ${response.status}`);
+    state.oracle = result;
+    state.activeOracleLane = lane;
+    await renderNotationComparison();
+  } catch (error) {
+    showError(error);
+  }
+}
+
+function wireNotationInteractions() {
+  if (state.notationWired) return;
+  state.notationWired = true;
+  document.querySelector("#notation-options").addEventListener("submit", regenerateNotation);
+  document.querySelector("#import-oracle-audio").addEventListener("change", (event) => {
+    importOracle("audio", event.target.files?.[0]);
+  });
+  document.querySelector("#import-oracle-midi").addEventListener("change", (event) => {
+    importOracle("midi", event.target.files?.[0]);
+  });
+  document.querySelectorAll("[data-oracle-lane]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      state.activeOracleLane = button.dataset.oracleLane;
+      await renderNotationComparison();
+    });
+  });
+}
+
 function drawRoll() {
   if (!state.run) return;
   const canvas = document.querySelector("#piano-roll");
@@ -211,6 +442,36 @@ function drawRoll() {
     context.lineTo(x, cssHeight);
     context.stroke();
     context.fillText(`${second}s`, x + 4, 12);
+  }
+
+  if (state.notation?.selected) {
+    const selected = state.notation.selected;
+    const beatDuration = 60 / selected.tempo_bpm;
+    const measureBeats =
+      selected.meter_numerator * (4 / selected.meter_denominator);
+    let beatIndex = 0;
+    for (
+      let beatTime = selected.first_beat_s;
+      beatTime <= state.duration;
+      beatTime += beatDuration
+    ) {
+      const measurePosition = beatIndex % Math.max(1, Math.round(measureBeats));
+      const isDownbeat = measurePosition === 0;
+      const x = labelWidth + beatTime * state.zoom;
+      context.strokeStyle = isDownbeat
+        ? "rgba(83, 216, 208, 0.50)"
+        : "rgba(83, 216, 208, 0.16)";
+      context.lineWidth = isDownbeat ? 1.4 : 0.7;
+      context.beginPath();
+      context.moveTo(x, 0);
+      context.lineTo(x, cssHeight);
+      context.stroke();
+      if (isDownbeat) {
+        context.fillStyle = "#53d8d0";
+        context.fillText(`m${Math.floor(beatIndex / measureBeats) + 1}`, x + 4, 26);
+      }
+      beatIndex += 1;
+    }
   }
 
   function drawNotes(notes, fill, stroke, inset) {
@@ -310,6 +571,14 @@ async function loadRun() {
   document.querySelector("#mode-badge").textContent = run.mode;
   document.querySelector("#model-name").textContent = `Basic Pitch ${run.model?.package_version || ""}`;
   document.querySelector("#result-audio").src = artifact(run.input.audio);
+  document.querySelector("#download-oracle-audio").href = artifact(run.input.audio);
+  document.querySelector("#download-oracle-audio").download =
+    `${run.input?.input_id || "atpiano"}-original.wav`;
+  document.querySelector("#download-oracle-midi").href = artifact(
+    run.artifacts?.prediction_midi || "prediction.mid"
+  );
+  document.querySelector("#download-oracle-midi").download =
+    `${run.input?.input_id || "atpiano"}-prediction.mid`;
   const referenceToggle = document.querySelector("#show-reference");
   referenceToggle.disabled = state.reference.length === 0;
   referenceToggle.checked = state.reference.length > 0;
@@ -319,7 +588,18 @@ async function loadRun() {
   renderProvenance();
   renderEvents();
   wireReviewInteractions();
+  wireNotationInteractions();
+  if (state.mode !== "workbench") {
+    document.querySelector(".oracle-workflow").hidden = true;
+    document.querySelectorAll("#notation-options input, #notation-options select").forEach(
+      (input) => {
+        input.disabled = true;
+      }
+    );
+    document.querySelector("#regenerate-notation").hidden = true;
+  }
   drawRoll();
+  await loadNotation();
 }
 
 function setCaptureUi(recording) {

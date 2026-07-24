@@ -50,6 +50,13 @@ class ReviewerHandler(BaseHTTPRequestHandler):
             return None
         return candidate
 
+    def _write_body(self, body: bytes) -> bool:
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            return False
+        return True
+
     def _send_file(self, path: Path, *, include_body: bool) -> None:
         if not path.is_file():
             self.send_error(HTTPStatus.NOT_FOUND)
@@ -98,7 +105,8 @@ class ReviewerHandler(BaseHTTPRequestHandler):
                 block = handle.read(min(64 * 1024, remaining))
                 if not block:
                     break
-                self.wfile.write(block)
+                if not self._write_body(block):
+                    return
                 remaining -= len(block)
 
     def do_GET(self) -> None:
@@ -109,7 +117,7 @@ class ReviewerHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
-            self.wfile.write(body)
+            self._write_body(body)
             return
         path = self._resolve_request()
         if path is None:

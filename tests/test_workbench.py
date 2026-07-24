@@ -87,14 +87,34 @@ def _fake_transcriber(
         "scores.json": {
             "schema_version": "atpiano.scores.v1",
             "quality_available": False,
-            "estimated_note_count": 0,
+            "estimated_note_count": 1,
         },
         "reference.json": {"schema_version": "atpiano.note-set.v1", "notes": []},
-        "prediction.json": {"schema_version": "atpiano.note-set.v1", "notes": []},
+        "prediction.json": {
+            "schema_version": "atpiano.note-set.v1",
+            "notes": [
+                {
+                    "onset_s": 0.0,
+                    "offset_s": 0.5,
+                    "pitch": 60,
+                    "velocity": 80,
+                }
+            ],
+        },
     }
     for name, value in documents.items():
         write_json(run_directory / name, value)
-    (run_directory / "events.jsonl").write_text("", encoding="utf-8")
+    (run_directory / "events.jsonl").write_text(
+        json.dumps(
+            {
+                "event_id": "fake-event",
+                "lifecycle": "committed",
+                "pitch": 60,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return run
 
 
@@ -188,6 +208,52 @@ def test_workbench_upload_job_and_reloadable_artifacts(tmp_path: Path) -> None:
         artifact_url = f"{base_url}/api/runs/{job_id}/artifacts/run.json"
         with urllib.request.urlopen(artifact_url, timeout=2) as response:
             assert json.load(response)["run_id"] == f"run-{job_id}"
+        with urllib.request.urlopen(
+            f"{base_url}/api/runs/{job_id}/notation",
+            timeout=2,
+        ) as response:
+            notation = json.load(response)
+        assert notation["selected"]["meter_numerator"] == 4
+        notation_request = urllib.request.Request(
+            f"{base_url}/api/runs/{job_id}/notation",
+            data=json.dumps({"tempo_bpm": 90, "key": "G"}).encode(),
+            method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(notation_request, timeout=2) as response:
+            notation = json.load(response)
+        assert notation["selected"]["tempo_bpm"] == 90
+        assert notation["selected"]["key"] == "G"
+        with urllib.request.urlopen(
+            f"{base_url}/api/runs/{job_id}/artifacts/"
+            f"{notation['artifacts']['musicxml']}",
+            timeout=2,
+        ) as response:
+            assert b"<score-partwise" in response.read()
+
+        oracle_musicxml = b"""<score-partwise version="4.0">
+<part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+<part id="P1"><measure number="1"><note><rest/><duration>1</duration></note>
+</measure></part></score-partwise>"""
+        oracle_request = urllib.request.Request(
+            f"{base_url}/api/runs/{job_id}/oracle/audio",
+            data=oracle_musicxml,
+            method="POST",
+            headers={
+                "Content-Type": "application/vnd.recordare.musicxml+xml",
+                "X-Atpiano-Filename": "ivory-audio.musicxml",
+            },
+        )
+        with urllib.request.urlopen(oracle_request, timeout=2) as response:
+            oracle = json.load(response)
+        assert oracle["lanes"]["audio"]["original_filename"] == (
+            "ivory-audio.musicxml"
+        )
+        with urllib.request.urlopen(
+            f"{base_url}/api/runs/{job_id}/oracle",
+            timeout=2,
+        ) as response:
+            assert "audio" in json.load(response)["lanes"]
         with pytest.raises(urllib.error.HTTPError) as traversal_error:
             urllib.request.urlopen(
                 f"{base_url}/api/runs/{job_id}/artifacts/%2e%2e/input/input.json",

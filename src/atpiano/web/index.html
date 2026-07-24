@@ -127,6 +127,133 @@
           <div id="metric-grid" class="metric-grid" aria-live="polite"></div>
         </section>
 
+        <section id="notation-panel" class="notation-panel" aria-labelledby="notation-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Performance → notation</p>
+              <h2 id="notation-title">Compare readable score interpretations</h2>
+            </div>
+            <span id="notation-status" class="badge">Preparing score</span>
+          </div>
+
+          <form id="notation-options" class="notation-options">
+            <label>
+              Tempo
+              <span><input id="notation-tempo" name="tempo_bpm" type="number" min="30" max="300" step="0.1"> BPM</span>
+            </label>
+            <label>
+              Time signature
+              <select id="notation-meter" name="meter">
+                <option value="2/4">2/4</option>
+                <option value="3/4">3/4</option>
+                <option value="4/4">4/4</option>
+                <option value="5/4">5/4</option>
+                <option value="6/8">6/8</option>
+                <option value="9/8">9/8</option>
+                <option value="12/8">12/8</option>
+              </select>
+            </label>
+            <label>
+              First beat in audio
+              <span><input id="notation-first-beat" name="first_beat_s" type="number" min="0" step="0.01"> s</span>
+            </label>
+            <label>
+              Key signature
+              <input id="notation-key" name="key" type="text" maxlength="3" list="notation-keys">
+              <datalist id="notation-keys">
+                <option value="C"><option value="G"><option value="D"><option value="A">
+                <option value="E"><option value="B"><option value="F#"><option value="C#">
+                <option value="F"><option value="Bb"><option value="Eb"><option value="Ab">
+                <option value="Am"><option value="Em"><option value="Bm"><option value="F#m">
+                <option value="C#m"><option value="G#m"><option value="Dm"><option value="Gm">
+                <option value="Cm"><option value="Fm">
+              </datalist>
+            </label>
+            <label>
+              Smallest grid
+              <select id="notation-quantization" name="quantization">
+                <option value="eighth">Eighth note</option>
+                <option value="eighth-triplet">Eighth-note triplet</option>
+                <option value="sixteenth">Sixteenth note</option>
+                <option value="thirty-second">Thirty-second note</option>
+              </select>
+            </label>
+            <label>
+              Hand split
+              <span>MIDI <input id="notation-split" name="staff_split_pitch" type="number" min="36" max="84" step="1"></span>
+            </label>
+            <button id="regenerate-notation" class="button primary" type="submit">
+              Regenerate score
+            </button>
+          </form>
+
+          <div id="notation-hypotheses" class="hypothesis-strip" aria-live="polite"></div>
+
+          <div class="oracle-workflow">
+            <div class="oracle-intro">
+              <p class="eyebrow">Paid-service oracle</p>
+              <h3>Run the same performance through Ivory twice</h3>
+              <p>
+                WAV tests Ivory end to end. MIDI gives Ivory our detected notes and
+                isolates its rhythm, hand, and engraving decisions. Atpiano never
+                sends your files automatically.
+              </p>
+            </div>
+            <ol>
+              <li><a id="download-oracle-audio" class="text-link" download>Download original WAV</a></li>
+              <li><a id="download-oracle-midi" class="text-link" download>Download Atpiano MIDI</a></li>
+              <li><a class="text-link" href="https://ivory-app.com/" target="_blank" rel="noopener">Open Ivory ↗</a></li>
+              <li>Export the first unedited MusicXML result from each upload.</li>
+            </ol>
+            <div class="oracle-imports">
+              <label class="file-button">
+                <span>Import WAV → Ivory MusicXML</span>
+                <input id="import-oracle-audio" type="file" accept=".musicxml,.xml,application/xml">
+              </label>
+              <label class="file-button">
+                <span>Import MIDI → Ivory MusicXML</span>
+                <input id="import-oracle-midi" type="file" accept=".musicxml,.xml,application/xml">
+              </label>
+              <p class="oracle-note">
+                Ivory currently accepts WAV and MIDI up to 15 MB. Its free plan
+                advertises a 30-second preview, so a longer take may require a paid
+                export. Imported files stay in this local run.
+              </p>
+            </div>
+          </div>
+
+          <div class="score-compare">
+            <article class="score-card">
+              <div class="score-heading">
+                <div>
+                  <p class="eyebrow">Open baseline</p>
+                  <h3>Atpiano + Partitura</h3>
+                </div>
+                <a id="download-local-musicxml" class="text-link" download>MusicXML ↓</a>
+              </div>
+              <div id="local-score-summary" class="score-summary"></div>
+              <div id="local-score" class="score-sheet" aria-label="Atpiano generated sheet music"></div>
+            </article>
+
+            <article class="score-card oracle-score-card">
+              <div class="score-heading">
+                <div>
+                  <p class="eyebrow">Black-box oracle</p>
+                  <h3>Ivory <span id="oracle-lane-title">from WAV</span></h3>
+                </div>
+                <div class="segmented" aria-label="Oracle input">
+                  <button class="active" type="button" data-oracle-lane="audio">WAV</button>
+                  <button type="button" data-oracle-lane="midi">MIDI</button>
+                </div>
+              </div>
+              <div id="oracle-score-summary" class="score-summary"></div>
+              <div id="oracle-score" class="score-sheet placeholder" aria-label="Imported Ivory sheet music">
+                Import Ivory MusicXML above to render this lane beside the local score.
+              </div>
+            </article>
+          </div>
+        </section>
+
         <section class="details">
           <article>
             <div class="section-heading compact">
@@ -182,6 +309,12 @@
         <span></span>
       </div>
     </template>
+    <script
+      src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.9/build/opensheetmusicdisplay.min.js"
+      integrity="sha384-fg3wZv9jtlPKdAf6XrWArUctknClaeTcDye6pqhsbofsbXIKtWucGZtDtPXkJi3Z"
+      crossorigin="anonymous"
+      defer
+    ></script>
     <script src="/app.js" defer></script>
   </body>
 </html>

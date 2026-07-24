@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from atpiano.reviewer import create_server
+from atpiano.reviewer import ReviewerHandler, create_server
 
 
 def _write_run(run_directory: Path) -> None:
@@ -47,3 +47,14 @@ def test_reviewer_serves_assets_and_run_files(tmp_path: Path) -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_reviewer_ignores_client_reset_while_writing() -> None:
+    class ResetWriter:
+        def write(self, body: bytes) -> None:
+            raise ConnectionResetError(54, "connection reset by peer")
+
+    handler = object.__new__(ReviewerHandler)
+    handler.wfile = ResetWriter()
+
+    assert handler._write_body(b"artifact bytes") is False
