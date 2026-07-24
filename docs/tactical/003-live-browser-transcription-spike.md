@@ -2,8 +2,9 @@
 
 Topic: live-acoustic-transcription
 
-Status: implemented on 2026-07-24; subjective target-piano review and the
-broader parameter/corpus matrix remain open.
+Status: completed and subjectively reviewed on 2026-07-24. The transport,
+rolling adapter, and final backfill remain; the first duration-oriented live
+evaluator was rejected and is superseded by tactical 004.
 
 ## Objective
 
@@ -358,3 +359,19 @@ intentional slower-than-real-time policy are not yet implemented. They should
 be selected from observed failures rather than expanded pre-emptively. If
 onset feedback is not satisfying, preserve this transport and event boundary
 and open a separate causal or pedal-aware model bakeoff.
+
+### Subjective decision
+
+The user confirmed that a played isolated note was detected, validating the
+basic live path, but rejected this tactical's evaluator:
+
+- notes appeared from room noise before the piano was played;
+- the duration roll was not useful because note tails were unreliable;
+- the 88 equal-cell strip was not a physical piano keyboard; and
+- keyboard orange disagreed with the provisional-yellow legend.
+
+The accepted correction is recorded in
+[`004-noise-gated-onset-display.md`](004-noise-gated-onset-display.md). It
+retains this tactical's transport, clocks, raw windows, revisions, and final
+backfill while adding an explicit signal gate and replacing duration graphics
+with a physical keyboard and grouped grand-staff onsets.

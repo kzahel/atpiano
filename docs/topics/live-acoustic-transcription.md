@@ -2,11 +2,11 @@
 
 Topic: live-acoustic-transcription
 
-Status: implemented prototype awaiting subjective target-piano review.
-Sample-indexed browser audio now drives rolling Basic Pitch while the pianist
-plays, and Stop automatically persists the take and runs the exact full-file
-adapter for reconciliation. No permanent model or streaming policy is
-selected.
+Status: revised prototype awaiting a second subjective target-piano review.
+The first pass detected a played note but rejected the noise behavior and
+duration-oriented evaluator. Live candidates are now room-gated and displayed
+as grouped onsets on a physical keyboard and grand staff. No permanent model
+or streaming policy is selected.
 
 ## Scope And Relationship
 
@@ -27,16 +27,18 @@ consumer remains separable and must also accept direct MIDI.
 
 ## Desired Experience
 
-The near-term target is not instrument-control latency. It is a useful piano
-roll that begins filling while the pianist plays:
+The near-term target is not instrument-control latency or readable full
+notation. It is an onset display that begins filling while the pianist plays:
 
-- show credible provisional onsets in roughly the existing one-second
-  live-feedback band;
+- suppress candidates that do not rise meaningfully above the calibrated room
+  floor;
+- show credible onsets in roughly the existing one-second live-feedback band;
 - make recent pitches and broad chord shape obvious without requiring reliable
   note offsets;
-- revise offsets, velocities, false positives, and window-edge estimates as
-  more context arrives;
-- stabilize older notes according to an explicit commit horizon; and
+- light the correct physical piano keys and place nearby onsets together on a
+  sequential grand staff;
+- retain revisions, offsets, and lifecycle evidence without forcing those
+  details into the pianist-facing view; and
 - after Stop, run the exact full-file path that already sounded useful to the
   user and backfill the final result.
 
@@ -49,13 +51,12 @@ The first subjective success criterion is deliberately simple:
 > While playing, can the pianist tell whether the system recognized the
 > intended notes and broad chord shape?
 
-The first UI should therefore emphasize pitch onsets rather than score
-notation or definitive durations. New notes can appear with open-ended,
-fading, or otherwise provisional tails; an offset update closes the tail
-later. A recent-pitch cluster and keyboard highlight should make single notes,
-intervals, triads, rolled chords, repeated notes, and dense harmony easier to
-judge from short-term memory. This pitch-set display is diagnostic, not chord
-symbol or harmonic analysis.
+The UI therefore ignores model duration. It lights one accurately placed key
+per accepted onset and draws filled quarter-note-like marks from left to right
+on a grand staff. Onsets within 180 ms of the first onset in a group form one
+visual chord. There is no tempo, meter, barline, key signature, hand, voice, or
+rhythmic-value claim. This is a pitch/onset diagnostic, not notation or
+harmonic analysis.
 
 ## Current Evidence
 
@@ -145,6 +146,35 @@ sessions retain clock exchanges and paint acknowledgements for full delivery
 measurement. There is still no aligned MIDI for this take, so agreement with
 the exact-final adapter is not acoustic accuracy.
 
+### First subjective microphone review
+
+The first live piano pass detected a played isolated note, but Basic Pitch also
+emitted notes from ordinary background sound before the piano was played. The
+user found the duration roll unhelpful and the keyboard visibly wrong: it
+assigned equal width to all 88 pitches, so black keys displaced white keys.
+Its recent provisional highlight was orange even though the legend advertised
+yellow.
+
+Two retained sessions captured the reported room and playing:
+
+```text
+job                                    room floor    gate       rejected/native
+20260724T134000-5e1c8bd9c117           -55.71 dBFS   -47.71     256 / 1,902
+20260724T134321-64e32730188c           -61.85 dBFS   -48.00     247 / 1,164
+```
+
+Those figures re-decode the already-preserved native windows and apply the
+implemented onset-energy policy: median 50 ms RMS over the first second, plus
+8 dB, clamped to -48 through -34 dBFS. They are overlapping-window candidate
+decisions, not unique notes or accuracy scores. The gate rejected 13.5% and
+21.2% respectively. The 34.688-second target take's -48 dBFS gate accepted all
+1,282 native candidates; its quietest exact-final attack measured -40.57 dBFS.
+
+Both reviewed sessions also exposed a boundary bug: the old page reached two
+minutes with one AudioWorklet block in flight, and the server rejected that
+block. The page now initiates Stop from the block path and the server permits
+one bounded final block.
+
 ## Implemented Live Architecture
 
 ```text
@@ -158,6 +188,9 @@ binary WebSocket transport ----> gap / backpressure evidence
 host ring buffer + source/host clock mapping
           |
           +----> rolling preview scheduler
+          |             |
+          |             v
+          |       room/onset energy gate
           |             |
           |             v
           |       provisional/revised notes
@@ -186,6 +219,13 @@ configuration, not the promised optimum. The model is warmed and cached before
 the worklet begins, and every native probability window and timing sample is
 preserved.
 
+The first source second calibrates room noise as the median RMS of 50 ms
+frames. A candidate's 140 ms onset-local window must clear a threshold eight
+dB above that floor, clamped from -48 through -34 dBFS. Candidates within the
+calibration second are suppressed. The gate runs before event reconciliation
+and records every decision; it does not alter the preserved model-native
+outputs or the exact final adapter.
+
 The AudioWorklet never waits on the network. The page observes the WebSocket
 queue outside the render thread and turns growth above 4 MiB into an explicit
 failure. The host rejects gaps, duplicates, reordering, sample-rate changes,
@@ -200,8 +240,8 @@ alone remains only partial experience evidence.
 
 ## Revision And Backfill Contract
 
-The live UI should consume the normalized event lifecycle already established
-by the benchmark:
+The browser consumer retains the normalized event lifecycle established by the
+benchmark:
 
 - `provisional`: useful recent estimate that may move or disappear;
 - a higher revision of the same stable identity: corrected onset, offset,
@@ -209,10 +249,15 @@ by the benchmark:
 - `committed`: past the declared rolling commit horizon; and
 - `retracted`: a provisional identity removed by later evidence.
 
+The pianist-facing keyboard and grand staff deliberately reduce this to
+accepted onset identities: commit revisions do not relight a key, retractions
+remove still-visible identities, and offsets are not drawn. The artifacts
+still preserve the full lifecycle.
+
 The final full-file result may differ even from rolling committed notes. That
 is not an ordinary live revision; it is a named **final-pass reconciliation**.
-The UI and artifact should preserve both what was visible live and what became
-the best final transcript. Stable matching should minimize distracting note
+The review UI and artifact preserve both what was visible live and what became
+the best final transcript. Stable matching minimizes distracting note
 replacement while never hiding disagreements in evaluation.
 
 ## Model Lanes
@@ -285,16 +330,18 @@ A focused test covers the behavior.
 
 ## Recommended Direction
 
-The first end-to-end implementation is ready for the user to judge at the
-target piano. Start with isolated notes, intervals, block and rolled chords,
-repeated notes, bass, treble, dense harmony, sustain, and silence. Judge the
-recent pitch set, keyboard, and live roll before Stop, then inspect the named
+The revised implementation is ready for a second target-piano pass. Remain
+quiet for the declared one-second calibration, then first test silence and
+very soft isolated notes. Continue with intervals, block and rolled chords,
+repeated notes, bass, treble, dense harmony, and sustain. Judge the physical
+keyboard and grouped grand staff before Stop, then inspect the named
 live-versus-final reconciliation.
 
 If the pitch/onset feedback is already useful, retain this model as the
 portable reference and prioritize:
 
-1. address concrete UI or lifecycle failures from the play test;
+1. tune or expose the gate only if the retest shows a concrete noise/soft-note
+   failure;
 2. add an aligned real-piano replay subset for quality-at-deadline scoring;
 3. sweep only nearby hop, guard, and commit values justified by those failures;
 4. test throttling and temporarily slower-than-real-time inference explicitly;
@@ -309,7 +356,7 @@ models are especially valuable, but only when code, checkpoint, license, and
 runtime behavior are reproducible.
 
 The bounded implementation record is
-[`003-live-browser-transcription-spike.md`](../tactical/003-live-browser-transcription-spike.md).
+[`004-noise-gated-onset-display.md`](../tactical/004-noise-gated-onset-display.md).
 
 ## Required Measurements
 
@@ -319,6 +366,8 @@ The bounded implementation record is
 - source-onset-to-provisional and source-onset-to-committed p50, p95, and max;
 - precision, recall, and F1 visible at 250 ms, 1 second, and 3 seconds;
 - provisional revision/retraction rate and time to stability;
+- room-floor estimate, gate threshold, accepted/rejected candidate counts, and
+  soft-note false rejection;
 - final-pass disagreement and parity with untouched offline output;
 - CPU, memory, inference queue, and WebSocket queue high-water marks; and
 - silence, room noise, repeated notes, chords, pedal, bass, treble, Stop tail,
@@ -328,10 +377,10 @@ The bounded implementation record is
 
 - Is 0.43-second median but 1.65-second p95 provisional feedback satisfying in
   practice on actual microphone input?
-- Should provisional notes appear faded, outlined, or indistinguishable until
-  revised?
+- Does the automatic gate suppress pre-piano notes without losing soft attacks?
 - Does the implemented 180 ms recent-onset grouping make rolled chords legible
   without merging melodic runs into one pitch set?
+- Is the grand-staff onset stream more useful than pitch names alone?
 - Is the current named live-versus-final summary sufficient to explain changes
   to rolling-committed notes?
 - What hop and commit horizon best preserve the current target-piano quality?

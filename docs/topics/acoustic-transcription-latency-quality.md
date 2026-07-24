@@ -158,6 +158,31 @@ so its latency ends at server emission; actual page sessions retain fitted
 browser clocks and paint acknowledgements for full delivery timing. Basic
 Pitch remains a non-causal portable reference, not a selected live model.
 
+### Target-room onset gate
+
+The first subjective microphone pass confirmed an isolated piano note but also
+produced false notes from background sound. Tactical
+[`004-noise-gated-onset-display.md`](../tactical/004-noise-gated-onset-display.md)
+adds an evidence-preserving live-only gate before reconciliation:
+
+- calibrate the median RMS of 50 ms frames over the first source second;
+- require a candidate's -20 through +120 ms onset window to exceed that floor
+  by 8 dB;
+- clamp the threshold to -48 through -34 dBFS; and
+- retain every native probability window and every gate decision.
+
+Re-decoding the preserved windows from the two reported microphone sessions
+and applying the gate rejected 256 of 1,902 and 247 of 1,164 overlapping-window
+candidates. Their room floors were -55.71 and -61.85 dBFS. By contrast, the
+earlier target take calibrated to -60.72 dBFS, its -48 dBFS gate accepted all
+1,282 native candidates, and its quietest exact-final onset window measured
+-40.57 dBFS.
+
+This is useful target-room separation evidence, not precision or recall.
+Candidate counts contain repeats across windows, and none of these microphone
+sessions has aligned MIDI. The exact full-file adapter remains untouched so
+live-gate misses and final additions remain observable.
+
 ## Accepted Pipeline Boundary
 
 ```text

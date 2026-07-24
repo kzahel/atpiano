@@ -56,18 +56,20 @@ uv run atpiano workbench
 ```
 
 The command opens a browser page. Grant microphone access and press **Start
-live recognition**. The page warms the local Basic Pitch model, then begins
-showing recent pitch names, an 88-key highlight, and a ten-second piano roll
-while audio is still arriving. Yellow notes are provisional; teal notes have
-passed the rolling commit horizon. Their tails remain visibly provisional
-because this first experiment trusts onsets more than note releases.
+live recognition**. The page warms the local Basic Pitch model, then asks for
+one second of quiet room sound to calibrate an automatic onset-energy gate.
+After the status changes to **Listening**, accepted pitches light a
+physically proportioned 88-key keyboard and appear from left to right as
+duration-free notes on a grand staff. Onsets within 180 ms form one group.
+There is deliberately no tempo, meter, barline, or meaningful note duration in
+this live view.
 
 Press **Stop** to flush and hash the exact captured PCM, save the session WAV
 and live event history, and automatically run the untouched full-file Basic
 Pitch adapter. The completed audio, MIDI, normalized events, native live
-windows, timing evidence, final reconciliation, run report, piano roll, and
-experimental score appear in the same page. No second Transcribe action is
-needed.
+windows, noise-gate decisions, timing evidence, final reconciliation, run
+report, piano roll, and experimental score appear in the same page. No second
+Transcribe action is needed.
 
 The score view shows its tempo, beat, meter, key, quantization, and hand-split
 assumptions. Change them and press **Regenerate local score** to retain and

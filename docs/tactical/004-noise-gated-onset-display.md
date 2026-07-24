@@ -2,7 +2,7 @@
 
 Topic: live-acoustic-transcription
 
-Status: accepted from the first subjective live-piano review on 2026-07-24.
+Status: implemented on 2026-07-24; second subjective live-piano review remains.
 
 ## Observation
 
@@ -83,3 +83,78 @@ for adjustment or a model change, not something to hide.
   validation.
 - Repeat the target-piano microphone pass after restart and record whether
   silence, soft notes, chords, and repeated notes behave acceptably.
+
+## Execution Record
+
+The live processor now calibrates the declared gate directly from the retained
+source PCM. Gate decisions happen before rolling reconciliation, while every
+unmodified Basic Pitch probability window remains available. The recognition
+manifest records the policy and aggregate counts, each window timing row
+records native/accepted/rejected counts, and `gate.jsonl` records pitch, onset,
+measured dBFS, threshold, decision, and reason for every native candidate.
+
+The browser shows **Calibrating** and asks the pianist to remain quiet for one
+second. After the server has enough source samples, it displays the measured
+room floor and threshold and changes to **Listening**. The gate affects only
+the provisional live lane; Stop still runs the untouched full-file adapter so
+disagreement is inspectable.
+
+The duration canvas and lifecycle legend are removed. The replacement:
+
+- builds exactly 52 equal white keys and overlays 36 black keys at their
+  physical boundaries;
+- lights the complete accepted key for 1.8 seconds with one color;
+- does not relight a key merely because its event commits later;
+- removes a still-lit onset if that identity retracts;
+- rebuilds 180 ms onset groups from latest non-retracted identities; and
+- draws the groups sequentially as filled noteheads and stems on a grand
+  staff, with accidentals and ledger lines but no rhythmic semantics.
+
+The two microphone sessions underlying the feedback were retained as failed
+jobs `20260724T134000-5e1c8bd9c117` and
+`20260724T134321-64e32730188c`. Their old client reached the two-minute limit
+with one AudioWorklet block in flight, causing the server to reject the block
+instead of finalizing. The browser now initiates Stop as soon as a complete
+block reaches the limit, and the server permits that one bounded in-flight
+block.
+
+### Gate evidence from the reported room
+
+The failed jobs still preserved their exact PCM and 473 native rolling windows
+each. Re-decoding those already-preserved windows and applying the new gate
+without rerunning inference produced:
+
+| Job | Room floor | Gate | Native window candidates | Accepted | Rejected |
+|---|---:|---:|---:|---:|---:|
+| `20260724T134000-5e1c8bd9c117` | -55.71 dBFS | -47.71 dBFS | 1,902 | 1,646 | 256 |
+| `20260724T134321-64e32730188c` | -61.85 dBFS | -48.00 dBFS | 1,164 | 917 | 247 |
+
+These are overlapping-window candidate decisions, not unique note counts.
+The gate rejects 13.5% and 21.2% respectively, including repeated quiet
+background candidates before or between playing. It cannot show how many
+rejections were musically correct because the sessions have no aligned MIDI.
+
+As a quiet-note safety check, the earlier 34.688-second target take calibrated
+to -60.72 dBFS and the -48 dBFS threshold accepted all 1,282 native rolling
+candidates. Its exact-final note attacks ranged down to -40.57 dBFS in the
+declared onset window. This does not guarantee every future soft note, but it
+shows the first threshold separates that take's observed attacks from its
+room floor.
+
+### Validation
+
+```text
+uv run ruff check .
+uv run pytest -q
+node --check src/atpiano/web/app.js
+node --check src/atpiano/web/capture-processor.js
+git diff --check
+uv build
+```
+
+All lint and syntax checks passed and all 23 tests passed. Tests cover gate
+calibration, pre-calibration suppression, below-threshold rejection,
+audible-onset acceptance, decision artifacts, transport exposure, and existing
+capture/final-pass behavior. The built wheel contains the live processor and
+all revised web assets. The second subjective microphone pass remains the
+decision check.
