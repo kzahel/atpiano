@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -16,14 +18,69 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="show the atpiano version",
     )
+    subparsers = parser.add_subparsers(dest="command")
+    fixture_parser = subparsers.add_parser(
+        "fixture",
+        help="generate the deterministic MIDI-derived audio fixture",
+    )
+    fixture_parser.add_argument("output_directory", type=Path)
+    fixture_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="replace fixture files in the target directory",
+    )
+    offline_parser = subparsers.add_parser(
+        "offline",
+        help="run the untouched Basic Pitch offline reference",
+    )
+    offline_parser.add_argument("input_manifest", type=Path)
+    offline_parser.add_argument("run_directory", type=Path)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
     if args.version:
         from atpiano import __version__
 
         print(__version__)
+        return 0
+    if args.command == "fixture":
+        from atpiano.fixture import generate_fixture
+
+        manifest = generate_fixture(args.output_directory, force=args.force)
+        print(args.output_directory / "input.json")
+        print(f"audio sha256: {manifest['audio']['sha256']}")
+        print(f"midi sha256:  {manifest['reference']['sha256']}")
+        return 0
+    if args.command == "offline":
+        from atpiano.offline import run_offline
+
+        run_offline(
+            args.input_manifest,
+            args.run_directory,
+            command=["atpiano", *sys.argv[1:]],
+        )
+        print(args.run_directory / "report.md")
+        print(
+            "onset F1 @ 50 ms: "
+            f"{read_score(args.run_directory, 'onset', '50_ms', 'f1'):.3f}"
+        )
+        return 0
+    if not args.version:
+        parser.print_help()
     return 0
 
+
+def read_score(run_directory: Path, *keys: str) -> float:
+    from atpiano.util import read_json
+
+    value: object = read_json(run_directory / "scores.json")
+    for key in keys:
+        if not isinstance(value, dict):
+            raise ValueError(f"score path {'/'.join(keys)} is not numeric")
+        value = value[key]
+    if not isinstance(value, (int, float)):
+        raise ValueError(f"score path {'/'.join(keys)} is not numeric")
+    return float(value)

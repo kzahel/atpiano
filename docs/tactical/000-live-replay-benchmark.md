@@ -134,5 +134,58 @@ Large inputs and generated run directories remain ignored by Git.
 
 ## Execution Record
 
-Not yet executed.
+### 2026-07-24: environment and offline reference
 
+Commands:
+
+```text
+uv lock
+uv sync
+uv run pytest -q
+uv run atpiano fixture results/smoke-input-v2
+uv run atpiano offline \
+  results/smoke-input-v2/input.json \
+  results/offline-basic-pitch-v2
+```
+
+The generated fixture identities were:
+
+- MIDI SHA-256:
+  `06b1bca5e03b4983ea72067a91803c97ed404988df86166105a9cff842f1f2e0`
+- PCM WAV SHA-256:
+  `39217861396c1bb84ddd883a9f10c63f1be8b8c34462676d87b626916452b043`
+
+Basic Pitch 0.4.0 loaded its shipped Core ML package and completed locally on
+the M4 Pro. The model artifact tree hash was
+`4b0c371ebc032c02caa4103c26578c6544ca8e7b2b98c5b2ed09a8b5b85e5f48`.
+The first process observed 5.179 seconds inside the stock `predict` call. A
+second process observed 0.400 seconds after macOS had compiled or cached the
+model. Runs therefore record no warm-up and an uncontrolled backend-cache
+state; both cold and warmed distributions are needed before drawing a latency
+conclusion.
+
+The 19-note deterministic fixture produced 23 estimates:
+
+| Metric | Precision | Recall | F1 |
+|---|---:|---:|---:|
+| onset, 50 ms | 0.826 | 1.000 | 0.905 |
+| onset, 25 ms | 0.826 | 1.000 | 0.905 |
+| note with offset | 0.565 | 0.684 | 0.619 |
+| frame, 100 Hz | 0.691 | 0.996 | 0.816 |
+
+The smoke test establishes that the released package runs and recovers every
+fixture onset within 25 ms, but it is not a near-lossless MIDI round trip:
+four false onsets remain, decoded offsets are substantially weaker, and the
+model cannot emit the reference sustain-pedal interval. This fixture is a
+synthetic plumbing diagnostic, not evidence of acoustic-piano quality.
+
+Environment fixes discovered during execution:
+
+- Basic Pitch's `resampy` dependency still imports `pkg_resources`; add
+  `setuptools<81` explicitly because new isolated environments omit or remove
+  it.
+- Core ML 9 supports scikit-learn only through 1.5.1; pin that compatible
+  version to avoid resolving a known-unsupported conversion dependency.
+- The 0.4.0 release source differs from current `main`: decoder defaults are
+  literal function defaults rather than exported constants. The adapter
+  records those exact released values instead of importing unreleased names.
