@@ -8,6 +8,7 @@ import json
 import re
 import shutil
 import threading
+import time
 import uuid
 import webbrowser
 from collections.abc import Callable
@@ -19,6 +20,12 @@ from typing import Any
 from urllib.parse import unquote, urlsplit
 
 from atpiano.capture import write_browser_capture_artifacts
+from atpiano.live import (
+    LIVE_STREAM_SCHEMA,
+    LiveCaptureSession,
+    decode_live_message,
+    parse_pcm_block,
+)
 from atpiano.notation import (
     MUSICXML_MAX_BYTES,
     current_notation,
@@ -29,6 +36,7 @@ from atpiano.notation import (
 from atpiano.offline import run_offline
 from atpiano.reviewer import ASSETS, ReviewerHandler
 from atpiano.util import read_json, utc_now
+from atpiano.websocket import encode_frame, encode_json, read_frame, websocket_accept
 
 MAX_UPLOAD_BYTES = 64 * 1024 * 1024
 MAX_METADATA_BYTES = 16 * 1024
@@ -53,6 +61,13 @@ class WorkbenchHandler(ReviewerHandler):
             HTTPStatus.FORBIDDEN,
         )
         return False
+
+    def _origin_is_local(self) -> bool:
+        port = self.server.server_address[1]
+        return self.headers.get("Origin") in {
+            f"http://127.0.0.1:{port}",
+            f"http://localhost:{port}",
+        }
 
     def _send_json(self, value: dict[str, Any], status: HTTPStatus = HTTPStatus.OK) -> None:
         body = (
@@ -102,6 +117,9 @@ class WorkbenchHandler(ReviewerHandler):
         if not self._require_local_host():
             return
         request_path = unquote(urlsplit(self.path).path)
+        if request_path == "/api/live":
+            self._handle_live_websocket()
+            return
         static_path = self._static_asset(request_path)
         if static_path is not None:
             self._send_file(static_path, include_body=True)
@@ -150,6 +168,185 @@ class WorkbenchHandler(ReviewerHandler):
             self._send_file(artifact_path, include_body=True)
             return
         self.send_error(HTTPStatus.NOT_FOUND)
+
+    def _send_websocket_json(self, value: dict[str, object]) -> None:
+        self.connection.sendall(encode_json(value))
+
+    def _send_websocket_close(self, code: int = 1000, reason: str = "") -> None:
+        payload = code.to_bytes(2, "big") + reason.encode("utf-8")[:120]
+        self.connection.sendall(encode_frame(payload, opcode=0x8))
+
+    def _upgrade_websocket(self) -> bool:
+        if not self._origin_is_local():
+            self._send_json(
+                {"error": "live capture requires the local workbench origin"},
+                HTTPStatus.FORBIDDEN,
+            )
+            return False
+        if (
+            self.headers.get("Upgrade", "").lower() != "websocket"
+            or "upgrade" not in self.headers.get("Connection", "").lower()
+            or self.headers.get("Sec-WebSocket-Version") != "13"
+        ):
+            self._send_json(
+                {"error": "live capture requires a WebSocket upgrade"},
+                HTTPStatus.UPGRADE_REQUIRED,
+            )
+            return False
+        try:
+            accept = websocket_accept(self.headers.get("Sec-WebSocket-Key", ""))
+        except ValueError as error:
+            self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+            return False
+        self.send_response(HTTPStatus.SWITCHING_PROTOCOLS)
+        self.send_header("Upgrade", "websocket")
+        self.send_header("Connection", "Upgrade")
+        self.send_header("Sec-WebSocket-Accept", accept)
+        self.end_headers()
+        self.close_connection = True
+        return True
+
+    def _handle_live_websocket(self) -> None:
+        if not self._upgrade_websocket():
+            return
+        capture: LiveCaptureSession | None = None
+        job_id: str | None = None
+        finalized = False
+        try:
+            while True:
+                frame = read_frame(self.rfile)
+                if frame is None or frame.opcode == 0x8:
+                    break
+                if frame.opcode == 0x9:
+                    self.connection.sendall(encode_frame(frame.payload, opcode=0xA))
+                    continue
+                if frame.opcode == 0x2:
+                    if capture is None:
+                        raise ValueError("live PCM arrived before the start message")
+                    block = parse_pcm_block(frame.payload)
+                    row = capture.accept_block(
+                        block,
+                        received_ns=time.perf_counter_ns(),
+                    )
+                    self._send_websocket_json(
+                        {
+                            "schema_version": LIVE_STREAM_SCHEMA,
+                            "type": "block_ack",
+                            "sequence": row["sequence"],
+                            "source_first_sample": row["source_first_sample"],
+                            "source_frame_count": row["source_frame_count"],
+                            "received_source_frames": capture.next_sample,
+                        }
+                    )
+                    continue
+                if frame.opcode != 0x1:
+                    raise ValueError("unsupported WebSocket message kind")
+                try:
+                    message = decode_live_message(frame.payload.decode("utf-8"))
+                except UnicodeDecodeError as error:
+                    raise ValueError("live control message is not UTF-8") from error
+                if message["type"] == "start":
+                    if capture is not None:
+                        raise ValueError("live capture already started")
+                    sample_rate_hz = message.get("sample_rate_hz")
+                    metadata = message.get("client_metadata")
+                    if (
+                        not isinstance(sample_rate_hz, int)
+                        or isinstance(sample_rate_hz, bool)
+                        or not isinstance(metadata, dict)
+                    ):
+                        raise ValueError("live start metadata is invalid")
+                    job_id = self.server.claim_live_job()
+                    job_root = self.server.workspace_directory / job_id
+                    capture = LiveCaptureSession(
+                        job_root,
+                        job_id=job_id,
+                        sample_rate_hz=sample_rate_hz,
+                        client_metadata=metadata,
+                    )
+                    job = {
+                        "schema_version": "atpiano.transcription-job.v1",
+                        "job_id": job_id,
+                        "status": "streaming",
+                        "created_at": utc_now(),
+                        "started_at": utc_now(),
+                        "completed_at": None,
+                        "error": None,
+                        "input_manifest": str(capture.input_directory / "input.json"),
+                        "run_directory": str(job_root / f"run-{job_id}"),
+                        "live_directory": str(capture.live_directory),
+                    }
+                    with self.server.jobs_lock:
+                        self.server.jobs[job_id] = job
+                    self._send_websocket_json(
+                        {
+                            "schema_version": LIVE_STREAM_SCHEMA,
+                            "type": "ready",
+                            "job_id": job_id,
+                            "sample_rate_hz": sample_rate_hz,
+                            "host_monotonic_ns": time.perf_counter_ns(),
+                            "model": "transport-only",
+                        }
+                    )
+                elif message["type"] == "stop":
+                    if capture is None or job_id is None:
+                        raise ValueError("live Stop arrived before start")
+                    frame_count = message.get("frame_count")
+                    block_count = message.get("block_count")
+                    elapsed_s = message.get("capture_elapsed_s")
+                    if (
+                        not isinstance(frame_count, int)
+                        or isinstance(frame_count, bool)
+                        or not isinstance(block_count, int)
+                        or isinstance(block_count, bool)
+                        or not isinstance(elapsed_s, (int, float))
+                        or isinstance(elapsed_s, bool)
+                    ):
+                        raise ValueError("live Stop metadata is invalid")
+                    capture.finalize(
+                        expected_frame_count=frame_count,
+                        expected_block_count=block_count,
+                        capture_elapsed_s=float(elapsed_s),
+                    )
+                    finalized = True
+                    with self.server.jobs_lock:
+                        self.server.jobs[job_id]["status"] = "queued"
+                    self.server.executor.submit(self.server.run_job, job_id)
+                    self.server.release_live_job(job_id)
+                    self._send_websocket_json(
+                        {
+                            "schema_version": LIVE_STREAM_SCHEMA,
+                            "type": "stopped",
+                            "job_id": job_id,
+                            "received_source_frames": capture.next_sample,
+                            "block_count": capture.next_sequence,
+                        }
+                    )
+                    self._send_websocket_close()
+                    return
+                else:
+                    raise ValueError(f"unsupported live control type: {message['type']}")
+        except (ConnectionError, OSError, RuntimeError, ValueError) as error:
+            if capture is not None and not finalized:
+                capture.abort(f"{type(error).__name__}: {error}")
+            if job_id is not None:
+                self.server.fail_live_job(job_id, error)
+            try:
+                self._send_websocket_json(
+                    {
+                        "schema_version": LIVE_STREAM_SCHEMA,
+                        "type": "error",
+                        "error": str(error),
+                    }
+                )
+                self._send_websocket_close(1008, str(error))
+            except OSError:
+                pass
+        finally:
+            if capture is not None and not finalized and not capture.closed:
+                capture.abort("live WebSocket closed before Stop")
+            if job_id is not None and not finalized:
+                self.server.release_live_job(job_id)
 
     def do_HEAD(self) -> None:
         if not self._require_local_host():
@@ -359,12 +556,35 @@ class WorkbenchServer(ThreadingHTTPServer):
         self.workspace_directory.mkdir(parents=True, exist_ok=True)
         self.jobs = _load_completed_jobs(self.workspace_directory)
         self.jobs_lock = threading.Lock()
+        self.live_lock = threading.Lock()
+        self.active_live_job_id: str | None = None
         self.transcriber = transcriber
         self.executor = ThreadPoolExecutor(
             max_workers=1,
             thread_name_prefix="atpiano-transcription",
         )
         super().__init__(("127.0.0.1", port), WorkbenchHandler)
+
+    def claim_live_job(self) -> str:
+        with self.live_lock:
+            if self.active_live_job_id is not None:
+                raise RuntimeError("another live capture is already active")
+            job_id = _new_job_id()
+            self.active_live_job_id = job_id
+            return job_id
+
+    def release_live_job(self, job_id: str) -> None:
+        with self.live_lock:
+            if self.active_live_job_id == job_id:
+                self.active_live_job_id = None
+
+    def fail_live_job(self, job_id: str, error: Exception) -> None:
+        with self.jobs_lock:
+            job = self.jobs.get(job_id)
+            if job is not None and job["status"] != "complete":
+                job["status"] = "failed"
+                job["error"] = f"{type(error).__name__}: {error}"
+                job["completed_at"] = utc_now()
 
     def run_job(self, job_id: str) -> None:
         with self.jobs_lock:

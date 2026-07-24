@@ -4,6 +4,8 @@ import base64
 import io
 import json
 import shutil
+import socket
+import struct
 import threading
 import time
 import urllib.error
@@ -15,6 +17,7 @@ from typing import Any
 import pytest
 
 from atpiano.capture import BROWSER_CAPTURE_SCHEMA, write_browser_capture_artifacts
+from atpiano.live import LIVE_STREAM_SCHEMA, PcmBlock, pack_pcm_block
 from atpiano.util import read_json, write_json
 from atpiano.workbench import create_workbench_server
 
@@ -55,6 +58,40 @@ def _capture_metadata(
 
 def _encoded_metadata(metadata: dict[str, Any]) -> str:
     return base64.b64encode(json.dumps(metadata).encode()).decode()
+
+
+def _client_websocket_frame(payload: bytes, *, opcode: int) -> bytes:
+    mask = b"\x11\x22\x33\x44"
+    length = len(payload)
+    first = 0x80 | opcode
+    if length < 126:
+        prefix = bytes((first, 0x80 | length))
+    elif length <= 0xFFFF:
+        prefix = bytes((first, 0x80 | 126)) + struct.pack("!H", length)
+    else:
+        prefix = bytes((first, 0x80 | 127)) + struct.pack("!Q", length)
+    masked = bytes(value ^ mask[index % 4] for index, value in enumerate(payload))
+    return prefix + mask + masked
+
+
+def _server_websocket_frame(stream: Any) -> tuple[int, bytes]:
+    prefix = stream.read(2)
+    assert len(prefix) == 2
+    first, second = prefix
+    assert first & 0x80
+    assert not second & 0x80
+    length = second & 0x7F
+    if length == 126:
+        length = struct.unpack("!H", stream.read(2))[0]
+    elif length == 127:
+        length = struct.unpack("!Q", stream.read(8))[0]
+    return first & 0x0F, stream.read(length)
+
+
+def _send_live_json(connection: socket.socket, value: dict[str, Any]) -> None:
+    connection.sendall(
+        _client_websocket_frame(json.dumps(value).encode(), opcode=0x1)
+    )
 
 
 def _fake_transcriber(
@@ -279,3 +316,96 @@ def test_workbench_upload_job_and_reloadable_artifacts(tmp_path: Path) -> None:
         restarted.shutdown()
         restarted.server_close()
         restarted_thread.join(timeout=2)
+
+
+def test_workbench_live_websocket_preserves_sample_stream(tmp_path: Path) -> None:
+    server = create_workbench_server(tmp_path, port=0, transcriber=_fake_transcriber)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    port = server.server_address[1]
+    connection = socket.create_connection(("127.0.0.1", port), timeout=2)
+    stream = connection.makefile("rb")
+    try:
+        request = (
+            "GET /api/live HTTP/1.1\r\n"
+            f"Host: 127.0.0.1:{port}\r\n"
+            f"Origin: http://127.0.0.1:{port}\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            "Sec-WebSocket-Version: 13\r\n"
+            "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+            "\r\n"
+        )
+        connection.sendall(request.encode("ascii"))
+        assert stream.readline().startswith(b"HTTP/1.0 101")
+        while stream.readline() not in {b"\r\n", b""}:
+            pass
+
+        _send_live_json(
+            connection,
+            {
+                "schema_version": LIVE_STREAM_SCHEMA,
+                "type": "start",
+                "sample_rate_hz": 22_050,
+                "client_metadata": {
+                    "schema_version": BROWSER_CAPTURE_SCHEMA,
+                    "started_at": "2026-07-24T12:00:00.000Z",
+                    "requested_constraints": {"echoCancellation": False},
+                },
+            },
+        )
+        opcode, payload = _server_websocket_frame(stream)
+        ready = json.loads(payload)
+        assert opcode == 0x1
+        assert ready["type"] == "ready"
+        job_id = ready["job_id"]
+
+        pcm = struct.pack("<6h", -32768, -2, -1, 0, 1, 32767)
+        blocks = (
+            PcmBlock(0, 0, 3, 22_050, 1.0, 0.0, pcm[:6]),
+            PcmBlock(1, 3, 3, 22_050, 2.0, 3 / 22_050, pcm[6:]),
+        )
+        for block in blocks:
+            connection.sendall(
+                _client_websocket_frame(pack_pcm_block(block), opcode=0x2)
+            )
+            _, payload = _server_websocket_frame(stream)
+            assert json.loads(payload)["type"] == "block_ack"
+
+        _send_live_json(
+            connection,
+            {
+                "schema_version": LIVE_STREAM_SCHEMA,
+                "type": "stop",
+                "frame_count": 6,
+                "block_count": 2,
+                "capture_elapsed_s": 6 / 22_050,
+            },
+        )
+        _, payload = _server_websocket_frame(stream)
+        assert json.loads(payload)["type"] == "stopped"
+
+        base_url = f"http://127.0.0.1:{port}"
+        for _ in range(40):
+            with urllib.request.urlopen(
+                f"{base_url}/api/jobs/{job_id}",
+                timeout=2,
+            ) as response:
+                job = json.load(response)
+            if job["status"] == "complete":
+                break
+            time.sleep(0.05)
+        assert job["status"] == "complete"
+        input_directory = tmp_path / job_id / "input"
+        with wave.open(str(input_directory / "recording.wav"), "rb") as recording:
+            assert recording.getnframes() == 6
+            assert recording.readframes(6) == pcm
+        manifest = read_json(input_directory / "input.json")
+        assert manifest["capture"]["adapter"] == "web-audio-worklet-live-v1"
+        assert manifest["capture"]["block_count"] == 2
+    finally:
+        stream.close()
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

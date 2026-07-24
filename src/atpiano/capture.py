@@ -106,6 +106,9 @@ def write_browser_capture_artifacts(
     source_wav: Path,
     *,
     client_metadata: dict[str, Any],
+    adapter: str = "web-audio-worklet-file-v1",
+    transport: str = "same-origin HTTP PCM WAV upload",
+    capture_details: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Validate a browser-produced PCM WAV and write an unaligned input manifest."""
     if client_metadata.get("schema_version") != BROWSER_CAPTURE_SCHEMA:
@@ -153,7 +156,7 @@ def write_browser_capture_artifacts(
         "requested_constraints": client_metadata.get("requested_constraints"),
         "actual_track_settings": client_metadata.get("actual_track_settings"),
         "source_timeline": "AudioWorklet sample index",
-        "transport": "same-origin HTTP PCM WAV upload",
+        "transport": transport,
         "received_at": utc_now(),
     }
     write_json(metadata_path, capture_document)
@@ -176,13 +179,14 @@ def write_browser_capture_artifacts(
         },
         "reference": None,
         "capture": {
-            "adapter": "web-audio-worklet-file-v1",
+            "adapter": adapter,
             "metadata_path": metadata_path.name,
             "metadata_sha256": sha256_file(metadata_path),
             "source_timeline": "audio sample index",
             "host_clock_mapping": None,
             "latency_claim": None,
-        },
+        }
+        | (capture_details or {}),
     }
     write_json(output_directory / "input.json", manifest)
     return manifest
