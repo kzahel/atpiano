@@ -2,10 +2,11 @@
 
 Topic: live-acoustic-transcription
 
-Status: accepted next implementation. Browser recording plus full-file
-transcription is runnable, but browser audio is not yet sent to the model
-while the pianist is playing. The bounded live-browser spike is selected;
-implementation has not started.
+Status: implemented prototype awaiting subjective target-piano review.
+Sample-indexed browser audio now drives rolling Basic Pitch while the pianist
+plays, and Stop automatically persists the take and runs the exact full-file
+adapter for reconciliation. No permanent model or streaming policy is
+selected.
 
 ## Scope And Relationship
 
@@ -115,7 +116,36 @@ This reinforces an onset-first live display. Offset and pedal behavior remain
 important evidence, but they should not delay or visually obscure initial
 pitch feedback.
 
-## Proposed Live Architecture
+### Implemented target-take live replay
+
+The 34.688-second target take was streamed at wall-clock cadence through the
+actual workbench WebSocket and rolling Core ML model on the Apple M4 Pro. Run
+`20260724T130652-50255becb667` retained 132 native model windows and produced:
+
+```text
+first-visible server emission: p50 0.428 s, p95 1.649 s, max 1.876 s
+live committed notes: 140
+exact-final notes: 133
+matched live/final onsets: 127
+final additions: 6
+live removals: 13
+matched onset change: p50 0.006 s, p95 0.034 s
+matched offset change: p50 0.013 s, p95 0.866 s
+```
+
+This is stronger evidence for useful live onsets than for live durations.
+Most final notes had a nearby live identity and their onset changes were small,
+but the live lane also retained 13 notes removed by the final pass and missed
+six final additions. Offset p95 changed by 0.866 seconds, confirming that
+open-ended provisional tails are the honest first interaction.
+
+The replay did not run inside a browser, so these figures end at server event
+emission and its browser-delivery metric is explicitly null. Actual browser
+sessions retain clock exchanges and paint acknowledgements for full delivery
+measurement. There is still no aligned MIDI for this take, so agreement with
+the exact-final adapter is not acoustic accuracy.
+
+## Implemented Live Architecture
 
 ```text
 AudioWorklet
@@ -142,23 +172,31 @@ exact full-file pass after Stop
 final reconciliation / backfill
 ```
 
-The browser should continue using an
+The browser uses an
 [`AudioWorklet`](https://www.w3.org/TR/webaudio-1.1/) so each block has a
-source sample position. It should send binary PCM blocks through the standard
+source sample position. It sends binary PCM16 blocks through the standard
 [`WebSocket`](https://websockets.spec.whatwg.org/) API with a small versioned
 header containing session, sequence number, first source sample, frame count,
 sample rate, and client clock observations.
 
-The AudioWorklet must never wait on the network. The page observes the
-WebSocket queue, applies a bounded backpressure policy outside the render
-thread, and makes any dropped range an explicit gap. The host stores the
-lossless session waveform independently of rolling inference so every live
-run can be replayed.
+The selected model window is Basic Pitch's unchanged 43,844 samples at
+22,050 Hz, or 1.988 seconds. The scheduler runs every 250 ms, with 116 ms and
+232 ms edge guards and a one-second commit horizon. This is one first measured
+configuration, not the promised optimum. The model is warmed and cached before
+the worklet begins, and every native probability window and timing sample is
+preserved.
 
-Musical time remains the audio sample clock. Periodic clock exchanges should
-fit offset and drift between the browser and host monotonic clocks. Browser
-paint acknowledgement is required to measure capture-to-visible latency; a
-server send timestamp alone measures only part of the experience.
+The AudioWorklet never waits on the network. The page observes the WebSocket
+queue outside the render thread and turns growth above 4 MiB into an explicit
+failure. The host rejects gaps, duplicates, reordering, sample-rate changes,
+invalid payloads, and oversized sessions rather than silently repairing them.
+It stores the lossless session waveform independently of rolling inference so
+every live run can be replayed.
+
+Musical time remains the audio sample clock. Periodic clock exchanges fit
+offset and drift between browser and host monotonic clocks. Browser paint
+acknowledgements measure capture-to-visible delivery; a server send timestamp
+alone remains only partial experience evidence.
 
 ## Revision And Backfill Contract
 
@@ -247,24 +285,30 @@ A focused test covers the behavior.
 
 ## Recommended Direction
 
-The user accepted the current browser and Basic Pitch path as the next bounded
-workstream on 2026-07-24. Answer the architecture and subjective recognition
-questions before adopting another model:
+The first end-to-end implementation is ready for the user to judge at the
+target piano. Start with isolated notes, intervals, block and rolled chords,
+repeated notes, bass, treble, dense harmony, sustain, and silence. Judge the
+recent pitch set, keyboard, and live roll before Stop, then inspect the named
+live-versus-final reconciliation.
 
-1. prove sample-exact browser-to-host transport with deterministic replay and
-   no model;
-2. connect the existing rolling adapter and sweep a small hop/guard/commit
-   matrix;
-3. expose provisional onsets as a scrolling roll, keyboard highlights, and a
-   recent pitch-set view whose tails do not imply trusted offsets;
-4. compare what was visible at 250 ms, 1 second, and 3 seconds against the
-   exact full-file output;
-5. run the exact offline adapter after Stop and test stable final backfill; and
-6. only then bake off a truly causal or pedal-aware streaming model whose code,
-   checkpoint, license, and real look-ahead can be verified.
+If the pitch/onset feedback is already useful, retain this model as the
+portable reference and prioritize:
 
-This is the fastest route to interactive evidence without pretending Basic
-Pitch is permanently suitable or truly causal. The accepted bounded slice is
+1. address concrete UI or lifecycle failures from the play test;
+2. add an aligned real-piano replay subset for quality-at-deadline scoring;
+3. sweep only nearby hop, guard, and commit values justified by those failures;
+4. test throttling and temporarily slower-than-real-time inference explicitly;
+   and
+5. define the downstream event consumer without merging it into this service.
+
+If the play test fails because pitches appear too late or are missing live,
+keep the now-tested transport, clocks, artifacts, and revision boundary and
+open a separate causal-model bakeoff. A new lane must beat this measured
+baseline and expose its true future context. Pedal-aware and piano-specific
+models are especially valuable, but only when code, checkpoint, license, and
+runtime behavior are reproducible.
+
+The bounded implementation record is
 [`003-live-browser-transcription-spike.md`](../tactical/003-live-browser-transcription-spike.md).
 
 ## Required Measurements
@@ -282,13 +326,14 @@ Pitch is permanently suitable or truly causal. The accepted bounded slice is
 
 ## Open Questions
 
-- Is roughly one-second provisional feedback already satisfying in practice?
+- Is 0.43-second median but 1.65-second p95 provisional feedback satisfying in
+  practice on actual microphone input?
 - Should provisional notes appear faded, outlined, or indistinguishable until
   revised?
-- What recent-onset grouping makes a rolled chord legible without merging a
-  melodic run into one pitch set?
-- May the final pass revise rolling-committed notes, and how should that be
-  explained visually?
+- Does the implemented 180 ms recent-onset grouping make rolled chords legible
+  without merging melodic runs into one pitch set?
+- Is the current named live-versus-final summary sufficient to explain changes
+  to rolling-committed notes?
 - What hop and commit horizon best preserve the current target-piano quality?
 - Does pedal-aware streaming matter more than improving note-onset latency?
 - When a remote accelerator is tested, is raw LAN PCM still acceptable or

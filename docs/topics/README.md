@@ -18,9 +18,9 @@ normally reuse the document slug in its `Topic:` trailers.
   discovery-stage investigation of acoustic models, streaming adaptations,
   the latency/quality measurement contract, and reproducible benchmarks.
 - [`live-acoustic-transcription.md`](live-acoustic-transcription.md):
-  accepted next implementation for browser audio transport, rolling onset and
-  pitch-shape feedback, event revision, latency measurement, and final
-  full-file backfill.
+  implemented browser prototype for sample-indexed audio transport, rolling
+  onset and pitch-shape feedback, event revision, latency measurement, and
+  automatic final full-file backfill; subjective piano review is next.
 - [`performance-to-notation.md`](performance-to-notation.md):
   evaluated downstream conversion prototype whose artifacts are inspectable
   but whose first target-piano score failed the readability goal.

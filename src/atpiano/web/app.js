@@ -1166,6 +1166,7 @@ async function stopRecording() {
   capture.mutedOutput.disconnect();
   await capture.audioContext.close();
   setCaptureUi(false);
+  document.querySelector("#start-recording").disabled = true;
   state.capture = null;
   if (!stoppedMessage) {
     document.querySelector("#capture-status").textContent = "Live finalization failed";
@@ -1265,10 +1266,12 @@ async function completeLiveJob(jobId) {
     document.querySelector("#capture-status").textContent = "Live take complete";
     document.querySelector("#live-status").textContent = "Finalized";
     await loadRun();
+    document.querySelector("#start-recording").disabled = false;
     document.querySelector("#review").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
     document.querySelector("#job-panel").hidden = true;
     document.querySelector("#live-status").textContent = "Final pass failed";
+    document.querySelector("#start-recording").disabled = false;
     showError(error);
   }
 }

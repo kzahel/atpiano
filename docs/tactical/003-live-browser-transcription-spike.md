@@ -2,7 +2,8 @@
 
 Topic: live-acoustic-transcription
 
-Status: accepted on 2026-07-24. Implementation has not started.
+Status: implemented on 2026-07-24; subjective target-piano review and the
+broader parameter/corpus matrix remain open.
 
 ## Objective
 
@@ -227,3 +228,133 @@ and any verified Mobile-AMT release.
 - `git diff --check`, lint, tests, and package build; and
 - exact commands, artifacts, failures, and recommendation added here before
   marking the tactical complete.
+
+## Execution Record
+
+The first end-to-end lane is implemented in the existing loopback workbench.
+It deliberately selects one justified configuration before attempting the
+larger sweep:
+
+```text
+transport schema: atpiano.live-stream.v1
+session schema: atpiano.live-session.v1
+audio payload: mono little-endian PCM16
+binary header: 48 bytes
+model: stock Spotify Basic Pitch 0.4.0 Core ML package
+model input: 43,844 samples at 22,050 Hz (1.988390 s)
+schedule hop: 0.250 s
+left guard: 0.116100 s
+right guard: 0.232200 s
+commit horizon: 1.000 s
+final match: same pitch and onset within 80 ms
+```
+
+The page opens a same-origin WebSocket and waits for the model to warm before
+connecting its AudioWorklet. Every block carries its sequence, first source
+sample, frame count, rate, page send time, and worklet time. The server rejects
+gaps, duplicates, reordering, sample-rate changes, invalid lengths, and
+oversized sessions instead of repairing them. It retains exact PCM, per-block
+receipt evidence, clock observations, and browser-paint acknowledgements.
+Page-side queue growth above 4 MiB is an explicit transport failure.
+
+Rolling inference uses high-quality deterministic resampling and a cached,
+unmodified Basic Pitch model. Each native probability window is preserved as
+NPZ with source coordinates and timing. The reconciler gives a stable identity
+to same-pitch estimates across overlapping windows, emits material revisions,
+commits tracks after one second, and retracts unmatched provisional tracks
+after 750 ms.
+
+The live evaluator shows:
+
+- recent onset pitch names grouped over a declared 180 ms diagnostic window;
+- an 88-key highlight;
+- a ten-second scrolling piano roll;
+- provisional open tails distinct from committed notes;
+- source head, window count, first-visible timing, and transport state; and
+- live-versus-final additions, removals, matches, and timing changes.
+
+Stop validates the acknowledged block and frame totals, writes the exact
+session WAV and manifests, and automatically queues the existing untouched
+full-file adapter. Live history is copied into that immutable run and matched
+against the final notes. The original review, notation, and oracle paths remain
+available after completion.
+
+### Deterministic and target-hardware evidence
+
+Protocol tests cover exact PCM round trips, continuity rejection, clock and
+paint persistence, stable revision identities, and the complete WebSocket to
+final-run path. A direct 34.688-second target-take processing check completed
+132 windows in 2.009 seconds after a 0.372-second model load, so the M4 Pro
+comfortably keeps up with the selected 250 ms hop.
+
+The same target take was then sent through the real workbench WebSocket at
+wall-clock cadence. It produced run
+`20260724T130652-50255becb667` under the ignored `results/workbench` tree:
+
+```text
+audio duration: 34.688 s
+wall-clock stream elapsed: 34.670 s
+maximum sender schedule lateness: 0.045 s
+rolling windows: 132
+live tracks: 159
+live committed tracks: 140
+live retractions: 18
+exact-final notes: 133
+live/final onset matches: 127
+final additions: 6
+live removals: 13
+
+source onset to first server emission:
+  p50 0.428 s
+  p95 1.649 s
+  max 1.876 s
+
+matched live-to-final onset change:
+  p50 0.006 s
+  p95 0.034 s
+  max 0.061 s
+
+matched live-to-final offset change:
+  p50 0.013 s
+  p95 0.866 s
+  max 2.105 s
+```
+
+This replay did not execute in a browser, so it has no browser clock-fit or
+paint latency. The artifacts state that explicitly instead of treating server
+emission as display time. An actual page session records those observations.
+
+The result supports the onset-first interaction: most exact-final notes had a
+nearby live onset, while offsets were much less stable. It does not show that
+all notes arrive within one second, nor does exact-final output serve as
+acoustic ground truth.
+
+### Commands and validation
+
+```text
+uv run ruff check .
+uv run pytest -q
+node --check src/atpiano/web/app.js
+node --check src/atpiano/web/capture-processor.js
+git diff --check
+```
+
+All lint checks passed and all 22 tests passed. JavaScript syntax and whitespace
+checks passed. The real-model wall-clock replay above additionally exercised
+the selected Core ML model, raw-window preservation, event streaming, capture
+persistence, background final adapter, notation generation, and
+reconciliation on the target hardware.
+
+### Remaining decision evidence
+
+The implementation is ready for the user's subjective microphone pass, which
+must cover isolated notes, intervals, block and rolled chords, repeated notes,
+low bass, high treble, dense harmony, sustain, and silence. That pass decides
+whether the live lane is already useful.
+
+The original sweep, aligned real-piano deadline scoring, CPU/memory telemetry,
+page-throttling tests, input-device changes, reconnect semantics, and an
+intentional slower-than-real-time policy are not yet implemented. They should
+be selected from observed failures rather than expanded pre-emptively. If
+onset feedback is not satisfying, preserve this transport and event boundary
+and open a separate causal or pedal-aware model bakeoff.

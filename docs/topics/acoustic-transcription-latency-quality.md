@@ -6,7 +6,7 @@ Status: prototype. No permanent model or runtime is selected. The first
 deterministic live-replay benchmark is complete with a Basic Pitch 0.4.0 Core
 ML reference, normalized revisable events, timing/quality artifacts, a local
 run reviewer, native file-producing microphone adapter, and a local browser
-record/transcribe/review workbench.
+live-transcription/reconciliation workbench.
 
 ## Scope
 
@@ -128,6 +128,35 @@ body. The run and artifacts completed; this was not a capture or model
 failure. The response writer now treats `ConnectionResetError` and
 `BrokenPipeError` as ordinary client cancellation, and an integration test
 confirms that delivery stops without a traceback.
+
+### First live target-take replay
+
+[`docs/tactical/003-live-browser-transcription-spike.md`](../tactical/003-live-browser-transcription-spike.md)
+implements the first actual browser-stream contract and rolling model lane.
+The AudioWorklet sends sample-indexed mono PCM16 over a same-origin loopback
+WebSocket. The server validates continuity, retains exact capture and clock
+evidence, runs stock Basic Pitch windows every 250 ms, emits stable revisable
+identities, and preserves every native probability window. Stop automatically
+runs the untouched full-file adapter and records live-versus-final
+reconciliation.
+
+The same 34.688-second target take was sent through the real WebSocket at
+wall-clock cadence on the Apple M4 Pro. Its 132 rolling windows produced 140
+committed live tracks. The exact-final adapter produced 133 notes; 127 matched
+a live note of the same pitch within 80 ms, with six final additions and 13
+live removals.
+
+Source-onset-to-first-server-emission latency was 0.428 seconds p50, 1.649
+seconds p95, and 1.876 seconds maximum. Matched onset changes from live to
+final were 0.006 seconds p50 and 0.034 seconds p95. Offset changes were much
+less stable at 0.013 seconds p50 and 0.866 seconds p95.
+
+This supports an onset-first display and shows that local compute can sustain
+the selected lane. It does not establish acoustic precision or recall because
+the recording lacks aligned MIDI. The replay also did not execute a browser,
+so its latency ends at server emission; actual page sessions retain fitted
+browser clocks and paint acknowledgements for full delivery timing. Basic
+Pitch remains a non-causal portable reference, not a selected live model.
 
 ## Accepted Pipeline Boundary
 

@@ -35,7 +35,7 @@ input adapters to the same pipeline.
 The project is in discovery. Python and Spotify Basic Pitch are the first
 prototype stack, not permanent selections. A deterministic MIDI-derived
 fixture, untouched offline reference, wall-clock replay benchmark, and local
-browser capture/transcription workbench are runnable on Apple Silicon.
+browser live-transcription workbench are runnable on Apple Silicon.
 
 Current direction and research questions live in [`docs/topics/`](docs/topics/README.md).
 Acoustic-model benchmarking, live browser transcription, and downstream
@@ -55,11 +55,19 @@ Then start the one local server:
 uv run atpiano workbench
 ```
 
-The command opens a browser page. Grant microphone access, press **Start
-recording**, press **Stop**, listen to the captured waveform, and press
-**Transcribe recording**. The completed audio, MIDI, normalized events, raw
-model output, run report, piano roll, and experimental score appear in the
-same page.
+The command opens a browser page. Grant microphone access and press **Start
+live recognition**. The page warms the local Basic Pitch model, then begins
+showing recent pitch names, an 88-key highlight, and a ten-second piano roll
+while audio is still arriving. Yellow notes are provisional; teal notes have
+passed the rolling commit horizon. Their tails remain visibly provisional
+because this first experiment trusts onsets more than note releases.
+
+Press **Stop** to flush and hash the exact captured PCM, save the session WAV
+and live event history, and automatically run the untouched full-file Basic
+Pitch adapter. The completed audio, MIDI, normalized events, native live
+windows, timing evidence, final reconciliation, run report, piano roll, and
+experimental score appear in the same page. No second Transcribe action is
+needed.
 
 The score view shows its tempo, beat, meter, key, quantization, and hand-split
 assumptions. Change them and press **Regenerate local score** to retain and
@@ -83,8 +91,8 @@ download, so importing its result currently requires a paid plan.
 The first target-piano review found the local Partitura score technically
 valid but unreadable, while the Ivory preview was easy for the user to sight
 read. Treat notation as a diagnostic experiment, not a current product
-capability. Live pitch and chord-shape feedback is the accepted next
-workstream.
+capability. The current workbench therefore emphasizes live pitch onsets and
+broad chord shape rather than score notation.
 
 The workbench binds only to `127.0.0.1` and stores generated artifacts under
 the ignored `results/workbench` directory by default. Browser takes are
@@ -92,10 +100,14 @@ limited to two minutes and the server accepts at most 64 MiB per upload. A
 recording has no aligned MIDI, so its quality metrics are explicitly unscored;
 the piano roll is for listening and subjective inspection.
 
-This path performs full-file inference and score generation after Stop. It
-does not yet transcribe while the piano is being played and makes no
-capture-to-event latency claim. Notation is a separate artifact consumer and
-does not change the acoustic model output.
+Live recognition uses sample-indexed PCM16 blocks over a same-origin loopback
+WebSocket. The first local target-recording replay measured 0.43-second median
+and 1.65-second p95 source-onset-to-server-emission latency. Those are
+prototype measurements, not a promise for every note or a substitute for
+browser microphone review. Browser clock exchanges and paint acknowledgements
+are retained so an actual page session can also report delivery latency.
+Notation remains a separate artifact consumer and does not change the
+acoustic model output.
 
 ## Benchmark Commands
 
