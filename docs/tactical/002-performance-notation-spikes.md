@@ -114,8 +114,9 @@ MusicXML download and all server-side artifacts remain available without it.
 Use [Ivory](https://ivory-app.com/) for the first black-box oracle because its
 official site accepts solo-piano WAV and standard MIDI up to 15 MB, exports
 MusicXML, and advertises smart quantization and hand separation. Pricing
-reviewed on 2026-07-24 lists a free 30-second preview and paid full-length
-exports.
+reviewed on 2026-07-24 lists a free 30-second preview and paid exports. The
+later user trial established that the free preview does not allow MusicXML
+download.
 
 The workbench never uploads automatically. It provides exact download links,
 opens Ivory in another tab, and accepts the two unedited MusicXML exports back
@@ -203,6 +204,52 @@ complete audio-to-notation artifacts: 1.192 s
 The prediction hash exactly matches the earlier workbench result, establishing
 that notation generation did not change acoustic inference.
 
+### Subjective readability decision
+
+The user compared the local score with a playable Ivory preview on
+2026-07-24:
+
+- Ivory's score was easy to sight read and let the user reproduce the random
+  improvisation almost exactly;
+- the local atpiano/Partitura score was completely unreadable and did not make
+  musical sense; and
+- excessive ties were the most obvious local defect.
+
+The screenshot shows A major, a 6/8 interpretation with an apparent 1/8
+pickup, a tempo marking of 47, compact grand-staff writing, chord symbols, and
+selective rolled-chord notation. The local default had A major but used
+82.811 BPM, explicit 4/4, no pickup inference, finer quantization, and
+Partitura voice and measure splitting. The user did not identify whether the
+preview came from the WAV or atpiano MIDI lane.
+
+Ivory's free preview did not allow MusicXML download, so no structural oracle
+artifact could be imported without a paid plan. The screenshot remains useful
+outside-Git evidence:
+
+```text
+SHA-256:
+6a7274e5b3fe65895c0c0dcdb2eabb162f48d0aea12ad089d479e12c4adc4ca7
+dimensions: 1024 x 511
+```
+
+Basic Pitch durations in the take were:
+
+```text
+median: 0.627 s
+p95: 1.870 s
+maximum: 3.148 s
+at least 2 s: 5 of 133 notes
+```
+
+Sustained predictions may contribute, but those values do not explain the
+result alone. Wrong musical grid and phase, boundary splitting, and excessive
+voice assignment turn plausible held notes into a tie-heavy score.
+
+The tactical succeeded at producing traceable artifacts and a comparison
+boundary but failed its user-facing readability objective. This is a useful
+negative result. The current converter should remain a diagnostic baseline,
+not be presented as useful automatic sheet music.
+
 ## Validation
 
 Commands:
@@ -232,8 +279,9 @@ Results:
 
 ## Known Gaps
 
-- The user has not yet supplied the two Ivory MusicXML exports, so the oracle
-  side correctly remains an empty, guided comparison lane.
+- Ivory's free preview blocks MusicXML download. The oracle import lanes
+  therefore require a paid export and remain empty.
+- The supplied screenshot's WAV/MIDI input lane is unknown.
 - Key is only a global hypothesis; modulation is not inferred.
 - Meter, downbeat, pickup, swing, and triplet feel require manual review.
 - Moving the first beat later than early notes currently clamps those notes to
@@ -255,16 +303,12 @@ Results:
 
 ## Recommended Next Work
 
-1. Review the local A-major, 82.811-BPM, 4/4 score against playback.
-2. Adjust tempo, first beat, meter, grid, key, or hand split until the local
-   interpretation is coherent.
-3. Upload the original WAV to Ivory and import its first unedited MusicXML.
-4. Upload the atpiano prediction MIDI as a separate Ivory job and import that
-   first unedited MusicXML.
-5. Record which errors remain in all three lanes before adding another
-   renderer, converter, or learned model.
+Pause this workstream. Implement the accepted live-recognition spike so the
+user can judge note onsets, pitch sets, and broad chord shape before notation
+adds beat, duration, hand, and voice errors.
 
-The next implementation should be driven by that comparison. Likely branches
-are better beat/downbeat estimation, better hand/voice assignment, or a
-semantic MusicXML alignment report; renderer work should wait unless the same
-MusicXML demonstrably renders better elsewhere.
+If notation resumes, first compare Ivory's WAV and atpiano-MIDI previews and
+introduce known-score fixtures. Replace or substantially revise the converter
+around meter/downbeat/pickup, duration normalization, tie cost, and voice
+simplicity. Do not invest in another renderer until the score semantics are
+readable.

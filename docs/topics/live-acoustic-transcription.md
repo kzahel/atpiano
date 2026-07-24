@@ -2,9 +2,10 @@
 
 Topic: live-acoustic-transcription
 
-Status: research proposal. Browser recording plus full-file transcription is
-runnable, but browser audio is not yet sent to the model while the pianist is
-playing. No live implementation is authorized or selected.
+Status: accepted next implementation. Browser recording plus full-file
+transcription is runnable, but browser audio is not yet sent to the model
+while the pianist is playing. The bounded live-browser spike is selected;
+implementation has not started.
 
 ## Scope And Relationship
 
@@ -30,6 +31,8 @@ roll that begins filling while the pianist plays:
 
 - show credible provisional onsets in roughly the existing one-second
   live-feedback band;
+- make recent pitches and broad chord shape obvious without requiring reliable
+  note offsets;
 - revise offsets, velocities, false positives, and window-edge estimates as
   more context arrives;
 - stabilize older notes according to an explicit commit horizon; and
@@ -39,6 +42,19 @@ roll that begins filling while the pianist plays:
 This deliberately separates **time to first useful feedback** from **time to
 best available transcript**. A genuinely causal model may later improve the
 first lane without changing the browser or event contracts.
+
+The first subjective success criterion is deliberately simple:
+
+> While playing, can the pianist tell whether the system recognized the
+> intended notes and broad chord shape?
+
+The first UI should therefore emphasize pitch onsets rather than score
+notation or definitive durations. New notes can appear with open-ended,
+fading, or otherwise provisional tails; an offset update closes the tail
+later. A recent-pitch cluster and keyboard highlight should make single notes,
+intervals, triads, rolled chords, repeated notes, and dense harmony easier to
+judge from short-term memory. This pitch-set display is diagnostic, not chord
+symbol or harmonic analysis.
 
 ## Current Evidence
 
@@ -79,6 +95,25 @@ took 0.973 seconds. The user judged the result as pretty good.
 This is valuable target-room evidence, but it has no aligned MIDI. It cannot
 establish precision, recall, pedal accuracy, or whether a rolling result is
 close enough to the full-file output.
+
+The later notation review made retrospective piano-roll judgment insufficient.
+The generated score was unreadable while a hosted Ivory preview was easy for
+the user to sight read. To isolate acoustic recognition from score inference,
+the user wants to see notes and broad chord shapes while still remembering
+exactly what was played.
+
+The target take's Basic Pitch durations are sustained but not extreme:
+
+```text
+median: 0.627 s
+p95: 1.870 s
+maximum: 3.148 s
+notes at least 2 s: 5 of 133
+```
+
+This reinforces an onset-first live display. Offset and pedal behavior remain
+important evidence, but they should not delay or visually obscure initial
+pitch feedback.
 
 ## Proposed Live Architecture
 
@@ -197,7 +232,7 @@ This could eventually remove host transport latency, but it combines model
 conversion, browser runtime, device variability, and streaming policy in one
 experiment. Python on the current Mac is the smaller first boundary.
 
-## Observed Workbench Disconnect
+## Resolved Workbench Disconnect
 
 The reported `ConnectionResetError: [Errno 54] Connection reset by peer`
 occurred in `_send_file` while the server was writing an artifact body to a
@@ -206,29 +241,30 @@ This is consistent with a browser cancelling an audio range request during
 seek, source replacement, or navigation; it is not a model or recording
 failure.
 
-A later maintenance patch should treat `BrokenPipeError` and
-`ConnectionResetError` during response-body writes as an ordinary client
-disconnect and stop sending that response without a traceback. It should have
-a focused HTTP test. This proposal records the issue but deliberately does not
-change the running server.
+The response writer now treats `BrokenPipeError` and `ConnectionResetError`
+as ordinary client cancellation and stops the response without a traceback.
+A focused test covers the behavior.
 
 ## Recommended Direction
 
-Use the current browser and Basic Pitch path to answer the architecture
-question before adopting another model:
+The user accepted the current browser and Basic Pitch path as the next bounded
+workstream on 2026-07-24. Answer the architecture and subjective recognition
+questions before adopting another model:
 
 1. prove sample-exact browser-to-host transport with deterministic replay and
    no model;
 2. connect the existing rolling adapter and sweep a small hop/guard/commit
    matrix;
-3. compare what was visible at 250 ms, 1 second, and 3 seconds against the
+3. expose provisional onsets as a scrolling roll, keyboard highlights, and a
+   recent pitch-set view whose tails do not imply trusted offsets;
+4. compare what was visible at 250 ms, 1 second, and 3 seconds against the
    exact full-file output;
-4. run the exact offline adapter after Stop and test stable final backfill; and
-5. only then bake off a truly causal or pedal-aware streaming model whose code,
+5. run the exact offline adapter after Stop and test stable final backfill; and
+6. only then bake off a truly causal or pedal-aware streaming model whose code,
    checkpoint, license, and real look-ahead can be verified.
 
 This is the fastest route to interactive evidence without pretending Basic
-Pitch is permanently suitable or truly causal. The proposed bounded slice is
+Pitch is permanently suitable or truly causal. The accepted bounded slice is
 [`003-live-browser-transcription-spike.md`](../tactical/003-live-browser-transcription-spike.md).
 
 ## Required Measurements
@@ -249,6 +285,8 @@ Pitch is permanently suitable or truly causal. The proposed bounded slice is
 - Is roughly one-second provisional feedback already satisfying in practice?
 - Should provisional notes appear faded, outlined, or indistinguishable until
   revised?
+- What recent-onset grouping makes a rolled chord legible without merging a
+  melodic run into one pitch set?
 - May the final pass revise rolling-committed notes, and how should that be
   explained visually?
 - What hop and commit horizon best preserve the current target-piano quality?

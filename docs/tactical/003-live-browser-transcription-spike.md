@@ -2,25 +2,29 @@
 
 Topic: live-acoustic-transcription
 
-Status: proposed. Do not implement until the user selects or amends this
-slice.
+Status: accepted on 2026-07-24. Implementation has not started.
 
 ## Objective
 
 Determine whether the current browser capture and rolling Basic Pitch adapter
-can provide useful live piano-roll feedback while preserving the quality of
-the existing full-recording path after Stop.
+can provide useful live onset, pitch, and broad chord-shape feedback while
+preserving the quality of the existing full-recording path after Stop.
 
 This is a bounded architecture and latency experiment. It does not select a
 permanent model or build a production streaming service.
+
+The first user-facing decision is not whether note offsets or score notation
+are correct. It is whether the pianist can tell, while the performance remains
+in short-term memory, that the intended single notes, intervals, and broad
+chord shapes were recognized.
 
 ## Hypothesis
 
 On the current Apple host, model computation is fast enough that an
 approximately one-second provisional lane is plausible. A sample-indexed
-browser transport plus rolling windows can show recent notes, and the exact
-stock full-file adapter can later reconcile the session to the same result the
-user already judged useful.
+browser transport plus rolling windows can show recent onsets without waiting
+for definitive offsets, and the exact stock full-file adapter can later
+reconcile the session to the same result the user already judged useful.
 
 The experiment should reject this hypothesis if transport gaps, unstable
 window edges, excessive revisions, CPU queueing, or unacceptable quality at
@@ -37,7 +41,8 @@ the one-second deadline are observed.
 - the existing rolling Basic Pitch adapter behind the current model contract;
 - a small hop, edge-guard, and commit-horizon sweep;
 - normalized provisional, revised, committed, and retracted events;
-- a minimal live debug piano roll;
+- a minimal live debug piano roll, keyboard highlight, and recent pitch-set
+  view;
 - lossless session-WAV persistence and raw per-window model output;
 - the exact existing full-file adapter after Stop;
 - stable final-pass reconciliation and an inspectable revision history; and
@@ -102,6 +107,20 @@ Run the matrix first on:
 Use deterministic replay for metrics. A live microphone pass is subjective
 confirmation, not the measurement source.
 
+The preview contract is onset-first:
+
+- emit a visible provisional note as soon as its onset is available;
+- let an open-ended or fading tail state that the offset is not known;
+- revise onset, velocity, confidence, and offset without replacing a stable
+  identity unnecessarily;
+- close, retract, or commit the note only with explicit event evidence; and
+- group recent onsets into a declared diagnostic pitch set without claiming a
+  chord name.
+
+The grouping window must be recorded and tested on block chords, rolled
+chords, repeated notes, and fast melodic motion. It must not silently turn
+every run into one chord.
+
 ## Phase C: Exact Final Backfill
 
 On Stop:
@@ -125,6 +144,8 @@ Extend only enough UI to judge the experiment:
 - horizontally scrolling piano roll;
 - distinct provisional and committed styling;
 - a visible live/playback head;
+- 88-key pitch highlights and a recent-onset pitch-name cluster;
+- open or fading provisional tails so long or unknown offsets do not dominate;
 - queue, gap, and connection status;
 - a Stop transition into final reconciliation; and
 - a concise before/after revision summary.
@@ -166,10 +187,8 @@ Exercise:
 - rejected oversized session; and
 - browser cancellation of an artifact response.
 
-The last case should include the small maintenance fix proposed in
-[`live-acoustic-transcription.md`](../topics/live-acoustic-transcription.md):
-ordinary client disconnects during response writes stop that response without
-printing a traceback.
+Ordinary client disconnects during response writes already stop without a
+traceback. Retain that case as a regression test.
 
 ## Decision Gates
 
@@ -180,7 +199,8 @@ After deterministic transport:
 After rolling preview:
 
 - keep Basic Pitch as the first preview lane if feedback is subjectively
-  useful and quality/revision cost at one second is acceptable;
+  useful, the pianist can judge intended notes and broad chord shape, and
+  quality/revision cost at one second is acceptable;
 - otherwise use the evidence to set a concrete target for a causal model
   bakeoff rather than tuning indefinitely.
 
@@ -202,7 +222,8 @@ and any verified Mobile-AMT release.
 - browser JavaScript syntax and interaction tests;
 - existing offline/replay/workbench regression suite;
 - repeated cold and warm timing trials;
-- target-piano subjective review;
+- target-piano subjective review covering single notes, intervals, triads,
+  rolled chords, repeated notes, bass, treble, and dense harmony;
 - `git diff --check`, lint, tests, and package build; and
 - exact commands, artifacts, failures, and recommendation added here before
   marking the tactical complete.

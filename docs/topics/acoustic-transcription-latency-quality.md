@@ -411,10 +411,13 @@ piano-specific offline adapter with pedal output.
 The first target-piano take now supplies the initial subjective evidence.
 [`002-performance-notation-spikes.md`](../tactical/002-performance-notation-spikes.md)
 is complete: the workbench can render a traceable local score and import
-separate Ivory WAV and atpiano-MIDI MusicXML results. The next acoustic slice,
+separate Ivory WAV and atpiano-MIDI MusicXML results. Its target-piano score
+failed subjective readability review, while the Ivory preview was readily
+playable. The next acoustic slice,
 [`003-live-browser-transcription-spike.md`](../tactical/003-live-browser-transcription-spike.md),
-remains proposed. The model-comparison work above remains valid regardless of
-the next selected slice.
+is accepted and will prioritize onset, pitch-set, and broad chord-shape
+feedback while the performance remains in the user's short-term memory. The
+model-comparison work above remains valid.
 
 ## Open Questions
 

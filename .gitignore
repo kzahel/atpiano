@@ -6,6 +6,7 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+.attachments/
 
 # Benchmark inputs and generated artifacts stay outside Git.
 artifacts/

@@ -2,10 +2,10 @@
 
 Topic: performance-to-notation
 
-Status: integrated prototype. Partitura produces traceable MusicXML,
-OpenSheetMusicDisplay renders it in the local workbench, and a manual
-two-input Ivory comparison is ready for user review. These are experimental
-choices, not a permanent consumer stack.
+Status: evaluated prototype, now paused. Partitura produces traceable
+MusicXML and OpenSheetMusicDisplay renders it, but the first target-piano score
+failed the user's readability test while an Ivory preview succeeded. No
+permanent consumer stack is selected.
 
 ## Scope And Boundary
 
@@ -117,8 +117,8 @@ replaceable artifact consumers, not permanent product commitments.
 
 ### Two-phase paid oracle
 
-The first black-box comparison uses [Ivory](https://ivory-app.com/). The user
-runs two separate jobs:
+The first black-box comparison uses [Ivory](https://ivory-app.com/). The
+intended protocol runs two separate jobs:
 
 1. original WAV to MusicXML, which tests Ivory's complete acoustic and score
    pipeline; and
@@ -132,10 +132,11 @@ credential. Each import records its lane, filename, time, hash, service, and
 structural summary and retains older hash-addressed imports.
 
 Ivory was selected because its official site currently accepts solo-piano WAV
-and standard MIDI, exports MusicXML, and advertises quantization and hand
-separation. Its price and interface are external facts and must be reviewed
-again before treating it as a durable dependency. It is an oracle for
-comparison, not a service dependency.
+and standard MIDI, advertises MusicXML export, quantization, and hand
+separation. In the observed free-plan workflow, the preview was playable but
+MusicXML download was paywalled. Its price and interface are external facts
+and must be reviewed again before treating it as a durable dependency. It is
+an oracle for comparison, not a service dependency.
 
 ## Renderer Options
 
@@ -249,26 +250,75 @@ tied. Nine transparent rolled-chord candidates received arpeggiate marks.
 Every source note retains its original timing and mapping.
 
 The take has no reference score or MIDI. It can support subjective readability
-review, not key, beat, meter, or transcription-accuracy claims. The two Ivory
-results have not yet been supplied, so the comparison lanes correctly remain
-empty and guided.
+review, not key, beat, meter, or transcription-accuracy claims.
+
+### First readability result
+
+The user reviewed the generated score and an Ivory preview on 2026-07-24. The
+result is decisive for the product question:
+
+- the Ivory score was easy to sight read and reproduced the random
+  improvisation almost exactly in the user's judgment;
+- the atpiano/Partitura score was completely unreadable and did not make
+  musical sense; and
+- excessive ties were the most visible local failure.
+
+The supplied Ivory screenshot shows a compact grand staff, A-major key
+signature, a 6/8 interpretation with an apparent 1/8 pickup, a tempo marking
+of 47, chord symbols, and a small number of rolled-chord marks. The atpiano
+baseline instead selected 82.811 BPM and an explicit 4/4 default, then split
+notes across those artificial bar boundaries and assigned too many voices.
+The screenshot's input lane was not identified, so it cannot yet separate
+Ivory's acoustic and MIDI-to-score capabilities.
+
+The screenshot is user-supplied experiment evidence, kept outside Git:
+
+```text
+filename:
+Screenshot 2026-07-24 at 2.11.34 PM-sd.png
+SHA-256:
+6a7274e5b3fe65895c0c0dcdb2eabb162f48d0aea12ad089d479e12c4adc4ca7
+dimensions: 1024 x 511
+```
+
+Ivory's free preview did not permit MusicXML download, so the structural
+oracle lanes remain empty. This prevents automatic note/measure comparison
+but does not weaken the subjective readability result.
+
+The Basic Pitch note durations are not by themselves extreme:
+
+```text
+median: 0.627 s
+p95: 1.870 s
+maximum: 3.148 s
+notes at least 2 s: 5 of 133
+```
+
+Some long offsets may contribute, but the tie forest is primarily a combined
+beat/downbeat, meter, quantization, measure-splitting, and voice-assignment
+failure. A well-formed, traceable MusicXML artifact is not a success when a
+pianist cannot use the score.
 
 ## Recommended Direction
 
-The next step is human comparison, not another converter:
+Pause notation implementation and switch to the accepted
+[`live-acoustic-transcription`](live-acoustic-transcription.md) workstream.
+Interactive onset and pitch-shape feedback will let the user judge the
+acoustic transcript before score inference obscures it.
 
-1. listen to the target take while reviewing the piano roll and local score;
-2. adjust the visible tempo, first beat, meter, grid, key, and split until the
-   interpretation is coherent;
-3. import Ivory's unedited WAV result into the audio lane;
-4. import its unedited atpiano-MIDI result into the MIDI lane; and
-5. identify errors shared by all lanes versus errors introduced by acoustic
-   detection or local notation.
+When notation resumes:
 
-That evidence should select the next bounded slice. Likely candidates are
-better beat/downbeat and pickup inference, improved hand/voice assignment, or
-semantic alignment of the three MusicXML results. Compare Verovio, MuseScore,
-music21, or MIDI2ScoreTransformer only for a concrete observed gap.
+1. obtain both Ivory previews, recording which came from WAV and atpiano MIDI;
+2. use known-score/performance MIDI pairs to isolate duration and score
+   conversion errors;
+3. treat tie count, voices, measure splits, meter/downbeat/pickup, and
+   sight-readability as decision metrics; and
+4. replace or substantially revise the current conversion baseline rather
+   than polishing its engraving.
+
+Verovio cannot repair bad score semantics, and renderer work should remain
+paused. A paid Ivory export is optional; screenshots already establish the
+large readability gap.
 
 ## Evidence To Require
 
@@ -288,13 +338,13 @@ music21, or MIDI2ScoreTransformer only for a concrete observed gap.
   or an editable draft for MuseScore?
 - Should the UI eventually require explicit meter/downbeat confirmation
   instead of generating immediately from its visible 4/4 default?
-- Does the first imported score expose an engraving gap that warrants a
-  Verovio comparison?
+- Which Ivory screenshot came from WAV, and does its atpiano-MIDI preview
+  remain equally readable?
 - How much voice and hand correction is acceptable before automatic output
   stops feeling useful?
 - Should pedal first appear as conventional Ped./* markings, brackets, or only
   as a piano-roll overlay until pedal inference improves?
 - How should a first beat later than the earliest note become a true pickup
   instead of clamping early notes to score time zero?
-- Should the next comparison align measures and source notes automatically,
-  or is side-by-side listening sufficient for the first qualitative review?
+- How should note durations be normalized from acoustic decay and pedal before
+  quantization without destroying meaningful articulation?

@@ -58,7 +58,7 @@ uv run atpiano workbench
 The command opens a browser page. Grant microphone access, press **Start
 recording**, press **Stop**, listen to the captured waveform, and press
 **Transcribe recording**. The completed audio, MIDI, normalized events, raw
-model output, run report, piano roll, and first readable score appear in the
+model output, run report, piano roll, and experimental score appear in the
 same page.
 
 The score view shows its tempo, beat, meter, key, quantization, and hand-split
@@ -77,7 +77,14 @@ The same page supports a consentful two-phase comparison with Ivory:
 
 The workbench does not upload audio automatically or handle Ivory accounts,
 payments, or credentials. Imported oracle scores remain under the ignored
-local run directory.
+local run directory. Ivory's free preview was observed to block MusicXML
+download, so importing its result currently requires a paid plan.
+
+The first target-piano review found the local Partitura score technically
+valid but unreadable, while the Ivory preview was easy for the user to sight
+read. Treat notation as a diagnostic experiment, not a current product
+capability. Live pitch and chord-shape feedback is the accepted next
+workstream.
 
 The workbench binds only to `127.0.0.1` and stores generated artifacts under
 the ignored `results/workbench` directory by default. Browser takes are
