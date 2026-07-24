@@ -66,3 +66,18 @@ def load_pedal_intervals(path: Path) -> list[PedalInterval]:
 def midi_to_hz(pitch: int) -> float:
     return 440.0 * (2.0 ** ((pitch - 69) / 12.0))
 
+
+def write_notes(path: Path, notes: list[MidiNote]) -> None:
+    midi = pretty_midi.PrettyMIDI(initial_tempo=120.0)
+    instrument = pretty_midi.Instrument(program=0, name="Atpiano transcription")
+    instrument.notes = [
+        pretty_midi.Note(
+            velocity=max(1, min(127, note.velocity)),
+            pitch=note.pitch,
+            start=max(0.0, note.onset_s),
+            end=max(note.onset_s + 0.001, note.offset_s),
+        )
+        for note in notes
+    ]
+    midi.instruments.append(instrument)
+    midi.write(str(path))

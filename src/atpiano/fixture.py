@@ -15,7 +15,7 @@ from atpiano.midi import MidiNote, PedalInterval, load_notes, load_pedal_interva
 from atpiano.util import sha256_file, utc_now, write_json
 
 FIXTURE_SCHEMA = "atpiano.input.v1"
-FIXTURE_ID = "deterministic-midi-smoke-v1"
+FIXTURE_ID = "deterministic-midi-smoke-v2"
 SAMPLE_RATE = 22_050
 TEMPO_US_PER_BEAT = 500_000
 TICKS_PER_BEAT = 480
@@ -25,6 +25,7 @@ FIXTURE_NOTES = (
     MidiNote(0.50, 1.10, 36, 72),
     MidiNote(1.45, 1.90, 60, 44),
     MidiNote(2.25, 2.75, 69, 108),
+    # Deliberately crosses the replay adapter's wider right-edge guard.
     MidiNote(3.25, 3.50, 64, 84),
     MidiNote(3.70, 3.95, 64, 76),
     MidiNote(4.45, 5.30, 48, 82),

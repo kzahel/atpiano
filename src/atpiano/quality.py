@@ -19,6 +19,25 @@ def _arrays(notes: list[MidiNote]) -> tuple[np.ndarray, np.ndarray]:
     return intervals, pitches
 
 
+def match_note_indices(
+    reference: list[MidiNote],
+    estimate: list[MidiNote],
+    *,
+    onset_tolerance_s: float = 0.05,
+    offset_ratio: float | None = None,
+) -> list[tuple[int, int]]:
+    reference_intervals, reference_pitches = _arrays(reference)
+    estimate_intervals, estimate_pitches = _arrays(estimate)
+    return mir_eval.transcription.match_notes(
+        reference_intervals,
+        reference_pitches,
+        estimate_intervals,
+        estimate_pitches,
+        onset_tolerance=onset_tolerance_s,
+        offset_ratio=offset_ratio,
+    )
+
+
 def _prf(reference_count: int, estimate_count: int, match_count: int) -> dict[str, Any]:
     precision = match_count / estimate_count if estimate_count else 0.0
     recall = match_count / reference_count if reference_count else 0.0
@@ -81,26 +100,20 @@ def score_notes(reference: list[MidiNote], estimate: list[MidiNote]) -> dict[str
     onset_metrics: dict[str, Any] = {}
     matches_at_50_ms: list[tuple[int, int]] = []
     for tolerance_s, label in ((0.05, "50_ms"), (0.025, "25_ms")):
-        matches = mir_eval.transcription.match_notes(
-            reference_intervals,
-            reference_pitches,
-            estimate_intervals,
-            estimate_pitches,
-            onset_tolerance=tolerance_s,
-            offset_ratio=None,
+        matches = match_note_indices(
+            reference,
+            estimate,
+            onset_tolerance_s=tolerance_s,
         )
         onset_metrics[label] = _prf(len(reference), len(estimate), len(matches))
         if tolerance_s == 0.05:
             matches_at_50_ms = matches
 
-    offset_matches = mir_eval.transcription.match_notes(
-        reference_intervals,
-        reference_pitches,
-        estimate_intervals,
-        estimate_pitches,
-        onset_tolerance=0.05,
+    offset_matches = match_note_indices(
+        reference,
+        estimate,
+        onset_tolerance_s=0.05,
         offset_ratio=0.2,
-        offset_min_tolerance=0.05,
     )
     velocity_errors = [
         abs(reference[reference_index].velocity - estimate[estimate_index].velocity)

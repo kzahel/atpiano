@@ -148,10 +148,10 @@ uv run atpiano offline \
   results/offline-basic-pitch-v2
 ```
 
-The generated fixture identities were:
+The final generated `deterministic-midi-smoke-v2` fixture identities were:
 
 - MIDI SHA-256:
-  `06b1bca5e03b4983ea72067a91803c97ed404988df86166105a9cff842f1f2e0`
+  `84326c3ce5131b4a475a9bd3205fc289a995182e82cbf51b716e5958d540cf12`
 - PCM WAV SHA-256:
   `39217861396c1bb84ddd883a9f10c63f1be8b8c34462676d87b626916452b043`
 
@@ -189,3 +189,47 @@ Environment fixes discovered during execution:
 - The 0.4.0 release source differs from current `main`: decoder defaults are
   literal function defaults rather than exported constants. The adapter
   records those exact released values instead of importing unreleased names.
+
+### 2026-07-24: rolling replay
+
+Commands:
+
+```text
+uv run atpiano replay \
+  results/smoke-input-final/input.json \
+  results/replay-basic-pitch-nowait-v3 \
+  --no-wait
+uv run atpiano replay \
+  results/smoke-input-final/input.json \
+  results/replay-basic-pitch-realtime
+```
+
+Replay delivered 1,024 samples every 46.44 ms against a monotonic deadline.
+It reproduced the release's 43,844-sample inputs, 7,680-sample overlap, and
+36,164-sample window hop. It retained every window output separately with its
+possibly negative source start sample.
+
+The commit policy reserves 10 overlap frames (2,560 samples) at the left edge
+and 20 frames (5,120 samples) at the right edge. Center detections commit
+immediately. Right-edge detections are provisional and the next overlapping
+window either commits a matched pitch/onset or retracts it. The asymmetric
+split deliberately gives the provisional lane more future-edge coverage while
+the two guards still sum to the complete overlap. The fixture exercised one
+provisional-to-committed revision; no retraction happened in this run.
+
+Wall-clock replay produced:
+
+| Measure | Result |
+|---|---:|
+| onset F1, 50 ms | 0.900 |
+| onset F1, 25 ms | 0.850 |
+| note-with-offset F1 | 0.450 |
+| frame F1, 100 Hz | 0.852 |
+| matched first-visible latency p50 / p95 / max | 0.961 / 1.310 / 1.446 s |
+| matched committed latency p50 / p95 / max | 1.085 / 1.516 / 1.916 s |
+| per-window inference p50 / p95 / max | 0.029 / 0.048 / 0.056 s |
+| replay scheduling lateness p50 / p95 / max | 0.005 / 0.005 / 0.042 s |
+
+The host easily keeps up by throughput, but Basic Pitch's future context and
+window commit policy dominate event latency. This is concrete evidence for
+reporting algorithmic wait separately from inference time.

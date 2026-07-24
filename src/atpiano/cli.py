@@ -35,6 +35,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     offline_parser.add_argument("input_manifest", type=Path)
     offline_parser.add_argument("run_directory", type=Path)
+    replay_parser = subparsers.add_parser(
+        "replay",
+        help="replay audio at wall-clock cadence through Basic Pitch windows",
+    )
+    replay_parser.add_argument("input_manifest", type=Path)
+    replay_parser.add_argument("run_directory", type=Path)
+    replay_parser.add_argument(
+        "--block-samples",
+        type=int,
+        default=1024,
+        help="source delivery block size (default: 1024)",
+    )
+    replay_parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="exercise replay without wall-clock waits; latency is not reported",
+    )
     return parser
 
 
@@ -60,6 +77,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         run_offline(
             args.input_manifest,
             args.run_directory,
+            command=["atpiano", *sys.argv[1:]],
+        )
+        print(args.run_directory / "report.md")
+        print(
+            "onset F1 @ 50 ms: "
+            f"{read_score(args.run_directory, 'onset', '50_ms', 'f1'):.3f}"
+        )
+        return 0
+    if args.command == "replay":
+        from atpiano.replay import run_replay
+
+        run_replay(
+            args.input_manifest,
+            args.run_directory,
+            realtime=not args.no_wait,
+            block_samples=args.block_samples,
             command=["atpiano", *sys.argv[1:]],
         )
         print(args.run_directory / "report.md")
