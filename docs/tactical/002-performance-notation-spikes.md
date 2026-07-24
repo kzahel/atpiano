@@ -1,204 +1,270 @@
-# Performance Notation Spikes
+# Integrated Performance Notation Experiment
 
 Topic: performance-to-notation
 
-Status: proposed. Do not implement until the user selects or amends this
-slice.
+Status: complete.
 
 ## Objective
 
-Produce a small, reproducible comparison that separates two decisions:
+Make the first notation experiment usable in the existing browser workbench:
 
-1. which browser renderer best supports an inspectable piano score; and
-2. which deterministic performance-to-score baseline produces the most useful
-   starting notation.
+1. convert every completed atpiano prediction into an inspectable score;
+2. keep every score note traceable to the detected performance event;
+3. expose uncertain tempo, beat, meter, key, quantization, and hand decisions;
+4. render the score beside the source piano roll; and
+5. compare it with a paid piano service given first the original WAV and then
+   the atpiano prediction MIDI.
 
-The output is decision evidence, not a polished editor or a permanent
-conversion engine.
+The two oracle inputs separate the service's capabilities:
 
-## Why This Slice
+- **WAV → score** measures its complete acoustic-transcription and notation
+  stack; and
+- **atpiano MIDI → score** holds the detected pitches and performance timing
+  constant, isolating its beat, rhythm, hand, voice, and engraving decisions.
 
-Sheet-music glyph rendering is mature, but expressive performance MIDI does
-not directly specify beats, measures, hands, voices, or readable durations.
-Choosing a renderer and a conversion algorithm at once would make it hard to
-tell whether a bad-looking result came from musical inference or engraving.
+## Bounds
 
-This slice holds MusicXML constant while comparing renderers, then holds the
-fixtures and evaluation view constant while comparing converters.
+Included:
 
-## Included
+- Partitura 1.9.0 as the first transparent analysis and conversion baseline;
+- versioned hypotheses, selected options, source mapping, and MusicXML;
+- a comfortable-tempo heuristic, ranked key profiles, explicit 4/4 meter
+  default, quantization choices, and configurable hand split;
+- brace-grouped right- and left-hand parts;
+- heuristic upward/downward rolled-chord detection and MusicXML arpeggiate
+  marks;
+- OpenSheetMusicDisplay 1.9.9 in the existing local workbench;
+- editable score controls and a beat-grid overlay on the piano roll;
+- a manual, consentful Ivory WAV/MIDI workflow;
+- durable import and rendering of both unedited Ivory MusicXML results; and
+- compact structural summaries for local and oracle scores.
 
-- a versioned, inspectable score-result manifest;
-- source note identities and original timing retained beside score notes;
-- a hand-authored MusicXML 4 piano fixture covering the required notation;
-- OSMD and Verovio renderings of identical MusicXML;
-- MuseScore as an external open/edit/render reference;
-- Partitura, music21, and MuseScore MIDI-import conversion baselines;
-- explicit tempo, first downbeat, time-signature, pickup, key, subdivision,
-  and quantization overrides;
-- a compact browser comparison with synchronized playback, source piano roll,
-  beat grid, rendered score, and source-note highlighting;
-- machine-readable structural metrics where ground truth exists; and
-- a short human readability scorecard.
+Excluded:
 
-## Excluded
-
-- acoustic transcription changes;
+- automatic upload to any third party;
+- user account, payment, or credential handling;
 - a full notation editor;
-- automatic correction based on user edits;
-- training a score model;
-- committing datasets, recordings, MIDI corpora, or generated scores;
-- treating key, meter, staff, or voice guesses as ground truth;
-- audio-required beat tracking; and
-- selecting MIDI2ScoreTransformer as a dependency before its license and
-  reproducibility are verified.
+- claiming the inferred meter or beat phase is correct;
+- acoustic pedal inference;
+- automatic semantic alignment between two MusicXML scores;
+- phone, LAN, or public serving;
+- Verovio and MuseScore renderer output in this first integrated view; and
+- a learned performance-to-score model.
 
-## Fixtures
+## Decisions
 
-Use the smallest fixtures that reveal the real decisions:
+### Separate source, hypotheses, and score
 
-1. **Engraving fixture:** hand-authored MusicXML with piano grand staff,
-   pickup, key and time changes, chords, upward/downward arpeggiate marks,
-   ties, tuplets, grace notes, dynamics, cross-staff notes, and pedal.
-2. **Known-score performance fixture:** deterministic score plus direct MIDI
-   with controlled rubato, onset spread, duration variation, velocity, and
-   CC64. Strip score metadata before conversion while retaining the score as
-   evaluation reference.
-3. **Existing synthetic fixture:** the current aligned MIDI-derived benchmark
-   for a simple repository-adjacent smoke test.
-4. **Target-piano prediction:** the unscored 133-note result from workbench job
-   `20260724T104057-1c108a0915e3` for subjective realism.
-5. **Optional public pairs:** a tiny checksummed expressive-MIDI/score subset
-   only after source and license review; ASAP is a candidate, not an
-   acquisition decision.
+The detected note events remain authoritative performance evidence. A notation
+variant records:
 
-All generated and acquired artifacts remain outside Git. A tracked manifest
-or execution record must identify source, version, license, and SHA-256.
+- the exact `prediction.json` hash;
+- ranked key and tempo evidence;
+- selected tempo, meter, first beat, key, quantization, and hand split;
+- original onset, offset, velocity, and event identity for every note;
+- quantized onset/duration and timing residual;
+- generated MusicXML note identity, hand, and arpeggio group; and
+- converter version, warnings, MusicXML hash, and structural summary.
 
-## Artifact Contract Spike
+Changing a control creates a hash-addressed variant. Earlier variants remain
+under the ignored run directory, while `notation/current.json` selects the
+one shown in the browser.
 
-Define a result that preserves:
+### Honest initial structure inference
 
-- source input identity and hash;
-- converter and parameter identity;
-- ranked tempo/beat/meter and key hypotheses;
-- explicit user overrides;
-- source event identities and original onset/offset time;
-- score note, measure, staff, voice, and MusicXML element identity;
-- quantization residual for every mapped note;
-- unsupported or discarded source events; and
-- canonical MusicXML plus renderer-specific output.
+Partitura key estimation and a duration/velocity-weighted Krumhansl profile
+provide key evidence. `pretty_midi` supplies an onset-derived tempo estimate;
+the default normalizes tempo octaves into a conservative 55–140 BPM band while
+preserving the raw estimate and alternatives.
 
-Use MusicXML divisions for score time but never discard source seconds or
-samples. Validate MusicXML independently and open it in MuseScore before
-accepting a result.
+Meter inference is not trusted. The first score says explicitly that 4/4 is a
+manual default. Partitura's experimental time estimate is retained as
+diagnostic evidence but is rejected when it proposes an unsupported or
+implausible meter. The first detected onset is the default first beat; pickup
+is not inferred.
 
-## Spike A: Renderer Bakeoff
+The browser makes all of these assumptions visible and editable. The selected
+beat grid is drawn over the original, unquantized piano roll.
 
-Render the exact engraving fixture with:
+### Partitura conversion boundary
 
-- OpenSheetMusicDisplay;
-- Verovio's JavaScript/WebAssembly toolkit; and
-- MuseScore to PDF or SVG as a manual/reference rendering.
+Partitura produces separate right- and left-hand parts grouped with a piano
+brace. This is not yet a single MusicXML piano part with two staves. Its voice
+separation, spelling, measure construction, ties, and tuplet sanitization are
+used without hiding converter warnings.
 
-Compare:
+The result is serialized as MusicXML with a 4.0 version marker and
+well-formedness checked before it is exposed. This is a compatible first
+interchange artifact, not evidence of exhaustive MusicXML 4 schema coverage.
 
-- piano grand-staff layout and pagination;
-- arpeggios, pedal, ties, tuplets, grace notes, and cross-staff notation;
-- element identities and reliable note coloring;
-- playback cursor and source-note selection;
-- resize and long-score behavior;
-- generated SVG accessibility and inspectability;
-- browser bundle and integration cost; and
-- visible discrepancies from MusicXML import.
+### Browser renderer
 
-Decision gate: choose OSMD, Verovio, or retain both behind a tiny renderer
-interface. Current recommendation is to start OSMD for interactivity but keep
-the bakeoff real because its documented pedal and cross-staff limitations
-touch piano use directly.
+Use
+[OpenSheetMusicDisplay 1.9.9](https://github.com/opensheetmusicdisplay/opensheetmusicdisplay)
+for the first interactive renderer. The exact minified bundle URL and SHA-384
+subresource integrity value are pinned in the page. OSMD remains an artifact
+consumer; it does not own conversion or source data.
 
-## Spike B: Deterministic Converter Bakeoff
+This avoids adding a JavaScript build system to the small Python prototype.
+It does mean score rendering needs internet access to load the pinned bundle.
+MusicXML download and all server-side artifacts remain available without it.
 
-Feed the same known-score performance and metadata-stripped MIDI into:
+### Paid oracle
 
-1. MuseScore MIDI import with recorded import settings;
-2. Partitura note-array-to-score plus explicit beat/meter inputs;
-3. music21 MIDI import/quantization; and
-4. one deliberately small in-project baseline that snaps to an explicit beat
-   grid and charges a visible notation-complexity cost.
+Use [Ivory](https://ivory-app.com/) for the first black-box oracle because its
+official site accepts solo-piano WAV and standard MIDI up to 15 MB, exports
+MusicXML, and advertises smart quantization and hand separation. Pricing
+reviewed on 2026-07-24 lists a free 30-second preview and paid full-length
+exports.
 
-Do not compare only final page appearance. Preserve intermediate hypotheses
-and score:
+The workbench never uploads automatically. It provides exact download links,
+opens Ivory in another tab, and accepts the two unedited MusicXML exports back
+into the local run. Each import records lane, original filename, time, hash,
+service, review date, and structural summary. Hash-addressed prior imports are
+not deleted.
 
-- beat and downbeat F1;
-- tempo-curve error;
-- time-signature, pickup, and key-segment accuracy;
-- onset and duration grid error;
-- pitch-spelling accuracy;
-- staff/hand and voice assignment;
-- chord versus rolled-chord classification;
-- ties, rests, tuplets, and total notational complexity;
-- unmapped, merged, and split source events; and
-- subjective readability.
+This boundary avoids silently disclosing a recording, accepting changing terms
+on the user's behalf, storing credentials, or coupling the reproducible local
+pipeline to an undocumented web API.
 
-Decision gate: select a transparent baseline and identify the errors that
-actually justify more sophisticated inference. Partitura is the current
-leading Python candidate; MuseScore is the practical quality reference.
+## Execution Record
 
-## Spike C: Hypothesis And Override UX
+### Local artifacts
 
-Show the source piano roll and rendered score against one playback clock.
-Allow the reviewer to switch or override:
+The offline adapter now creates notation after its unchanged Basic Pitch MIDI
+result. New runs list:
 
-- global or segmented tempo;
-- beat phase and first downbeat;
-- time signature and pickup;
-- straight, swing, or triplet subdivision;
-- key signature;
-- staff split; and
-- rolled-chord interpretation.
+```text
+notation/current.json
+notation/notation-<options-hash>.json
+notation/atpiano-<options-hash>.musicxml
+```
 
-Changing one hypothesis should regenerate the result without changing source
-event identities. Export both the score and the complete hypothesis/override
-record.
+Older completed workbench runs are upgraded lazily when their notation API is
+first requested. This made the existing target-piano take immediately usable
+without rerunning the model.
 
-Decision gate: determine whether explicit corrections make the transparent
-baseline useful enough, and which correction costs dominate.
+The workbench adds:
 
-## Optional Spike D: Learned Conversion
+- local notation manifest retrieval and option regeneration;
+- two bounded MusicXML import endpoints for the oracle lanes;
+- retained imported artifacts under `oracle/`;
+- local and oracle score summaries;
+- side-by-side OSMD rendering;
+- WAV/MIDI download links and the manual Ivory instructions; and
+- ordinary handling of browser connection resets during artifact delivery.
 
-Only if Spike B exposes a meaningful readability ceiling:
+The notation consumer remains distinct from acoustic inference: it reads
+normalized prediction artifacts and would accept the same note representation
+from direct MIDI in a later source adapter.
 
-1. confirm MIDI2ScoreTransformer's code and checkpoint license in writing;
-2. isolate its custom music21 and score-transformer forks;
-3. record checkpoint and data provenance;
-4. run the same fixtures without special-case cleanup; and
-5. compare its source traceability and editability as well as page quality.
+### Target-piano result
 
-If licensing, checkpoint provenance, or deterministic setup remains unclear,
-record it as unavailable rather than absorbing the implementation.
+The previously recorded 34.688-second target-piano take generated:
+
+```text
+source prediction notes: 133
+selected key: A major
+key-profile correlation: 0.906
+raw onset tempo estimate: 165.621 BPM
+selected half-time tempo: 82.811 BPM
+selected meter: 4/4 (explicit default)
+first beat: 1.729545 s
+quantization: sixteenth note
+hand split: MIDI 60
+score parts: 2
+score measures: 11
+MusicXML pitched note elements: 161
+arpeggiate marks: 9
+```
+
+The MusicXML note-element count exceeds the 133 source notes because Partitura
+splits notes at measure or notation boundaries and joins them with ties. The
+source mapping remains one row per detected note.
+
+Partitura's separate time estimator proposed 191.505 BPM and a numerator of
+24. That result is retained as evidence and rejected for the default score. It
+reinforces the need for visible controls and human review.
+
+### Real model-path validation
+
+The exact target WAV was run again through the complete adapter after notation
+integration:
+
+```text
+input SHA-256:
+3d747d653d8f7a30c2e3261c85b8b9207959a7e00e8b009aac5fd969247f6f47
+prediction MIDI SHA-256:
+a106b4d82b0237186c86d6fa228370495db1d027a668d4ae1984898966712e03
+Basic Pitch inference: 0.522 s
+complete audio-to-notation artifacts: 1.192 s
+```
+
+The prediction hash exactly matches the earlier workbench result, establishing
+that notation generation did not change acoustic inference.
 
 ## Validation
 
-- schema and MusicXML validation tests;
-- deterministic regeneration from the same source and parameters;
-- browser syntax, unit, and interaction tests;
-- identical MusicXML bytes passed to both renderers;
-- independent MuseScore open/render check;
-- automated metrics on known-score fixtures;
-- human scorecard with screenshots or saved SVG/PDF outside Git; and
-- `git diff --check`, repository lint, tests, and package build if code is
-  later authorized.
+Commands:
 
-## Completion Evidence
+```text
+uv run ruff check .
+uv run pytest -q
+node --check src/atpiano/web/app.js
+uv build
+git diff --check
+xmllint --noout <generated MusicXML>
+```
 
-This proposed tactical is complete only when its execution record contains:
+Results:
 
-- exact commands and environment versions;
-- fixture sources, licenses, hashes, and generation parameters;
-- side-by-side renderer and converter results;
-- measured failures and unsupported constructs;
-- the user's preference after reviewing the comparison;
-- a selected first implementation boundary or an explicit decision to defer;
-  and
-- a smaller follow-up tactical for the selected path.
+- 17 unit and HTTP integration tests passed;
+- notation options produced distinct retained variants;
+- source identities survived conversion;
+- rolled-chord fixtures produced semantic arpeggiate marks;
+- unrelated or malformed XML was rejected;
+- both oracle lanes persisted independently;
+- traversal, size, content-type, and local-host boundaries remained enforced;
+- cancelled response bodies stopped without a traceback;
+- the real target-piano model and notation path completed;
+- generated MusicXML was well formed; and
+- lint, browser syntax, package contents, build, and diff checks passed.
+
+## Known Gaps
+
+- The user has not yet supplied the two Ivory MusicXML exports, so the oracle
+  side correctly remains an empty, guided comparison lane.
+- Key is only a global hypothesis; modulation is not inferred.
+- Meter, downbeat, pickup, swing, and triplet feel require manual review.
+- Moving the first beat later than early notes currently clamps those notes to
+  score time zero rather than producing a true pickup measure.
+- Hand separation is a configurable pitch threshold, not a fingering model.
+- Partitura may produce more voices and tied note elements than an engraver
+  would choose manually.
+- Rolled-chord recognition is a transparent onset/order/overlap heuristic and
+  can confuse fast melodic motion.
+- Basic Pitch provides no pedal events, so the score cannot yet show credible
+  pedal marks.
+- OSMD is loaded from a pinned CDN. A later production consumer should vendor
+  or bundle the renderer.
+- The current comparison reports structural counts and presents the scores to
+  the user; it does not yet align oracle measures or score notes
+  automatically.
+- Verovio, MuseScore, music21, and learned MIDI-to-score conversion remain
+  comparators only if the first subjective result exposes a concrete need.
+
+## Recommended Next Work
+
+1. Review the local A-major, 82.811-BPM, 4/4 score against playback.
+2. Adjust tempo, first beat, meter, grid, key, or hand split until the local
+   interpretation is coherent.
+3. Upload the original WAV to Ivory and import its first unedited MusicXML.
+4. Upload the atpiano prediction MIDI as a separate Ivory job and import that
+   first unedited MusicXML.
+5. Record which errors remain in all three lanes before adding another
+   renderer, converter, or learned model.
+
+The next implementation should be driven by that comparison. Likely branches
+are better beat/downbeat estimation, better hand/voice assignment, or a
+semantic MusicXML alignment report; renderer work should wait unless the same
+MusicXML demonstrably renders better elsewhere.

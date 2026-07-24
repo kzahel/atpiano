@@ -124,10 +124,10 @@ estimated 165.6 BPM while onset-grid candidates were spread across tempo
 octaves and phases. Those are analysis hypotheses, not ground truth.
 
 The browser also reset one artifact response while the server was writing its
-body, producing a `ConnectionResetError` traceback. The run and artifacts
-completed. This is a benign client-disconnect handling gap, not evidence of a
-capture or model failure; the proposed maintenance fix is recorded in the
-live-transcription topic.
+body. The run and artifacts completed; this was not a capture or model
+failure. The response writer now treats `ConnectionResetError` and
+`BrokenPipeError` as ordinary client cancellation, and an integration test
+confirms that delivery stops without a traceback.
 
 ## Accepted Pipeline Boundary
 
@@ -409,12 +409,12 @@ aligned scoring, repeat cold and warm timing trials, and then add one
 piano-specific offline adapter with pedal output.
 
 The first target-piano take now supplies the initial subjective evidence.
-Before more implementation, the user will review two proposed sibling slices:
 [`002-performance-notation-spikes.md`](../tactical/002-performance-notation-spikes.md)
-and
-[`003-live-browser-transcription-spike.md`](../tactical/003-live-browser-transcription-spike.md).
-The model-comparison work above remains valid regardless of which slice is
-selected.
+is complete: the workbench can render a traceable local score and import
+separate Ivory WAV and atpiano-MIDI MusicXML results. The next acoustic slice,
+[`003-live-browser-transcription-spike.md`](../tactical/003-live-browser-transcription-spike.md),
+remains proposed. The model-comparison work above remains valid regardless of
+the next selected slice.
 
 ## Open Questions
 

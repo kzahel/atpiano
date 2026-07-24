@@ -21,8 +21,8 @@ normally reuse the document slug in its `Topic:` trailers.
   proposed browser audio transport, rolling feedback, event revision, latency
   measurement, and final full-file backfill.
 - [`performance-to-notation.md`](performance-to-notation.md):
-  proposed downstream conversion from performance notes or direct MIDI to
-  inspectable, readable sheet music.
+  integrated downstream conversion from performance notes or direct MIDI to
+  inspectable sheet music, with editable hypotheses and oracle comparison.
 
 ## Update Policy
 

@@ -58,7 +58,26 @@ uv run atpiano workbench
 The command opens a browser page. Grant microphone access, press **Start
 recording**, press **Stop**, listen to the captured waveform, and press
 **Transcribe recording**. The completed audio, MIDI, normalized events, raw
-model output, and run report appear in the same page.
+model output, run report, piano roll, and first readable score appear in the
+same page.
+
+The score view shows its tempo, beat, meter, key, quantization, and hand-split
+assumptions. Change them and press **Regenerate local score** to retain and
+review another interpretation. Score rendering uses a pinned
+OpenSheetMusicDisplay bundle from a CDN, so it needs internet access; the
+MusicXML artifact remains downloadable if that bundle is unavailable.
+
+The same page supports a consentful two-phase comparison with Ivory:
+
+1. download and submit the original WAV to test Ivory's complete
+   audio-to-score pipeline;
+2. download and submit the atpiano prediction MIDI in a separate Ivory job to
+   test its notation conversion with note detection held constant; and
+3. import each unedited MusicXML result into its labeled workbench lane.
+
+The workbench does not upload audio automatically or handle Ivory accounts,
+payments, or credentials. Imported oracle scores remain under the ignored
+local run directory.
 
 The workbench binds only to `127.0.0.1` and stores generated artifacts under
 the ignored `results/workbench` directory by default. Browser takes are
@@ -66,8 +85,10 @@ limited to two minutes and the server accepts at most 64 MiB per upload. A
 recording has no aligned MIDI, so its quality metrics are explicitly unscored;
 the piano roll is for listening and subjective inspection.
 
-This path performs full-file inference after Stop. It does not yet transcribe
-while the piano is being played and makes no capture-to-event latency claim.
+This path performs full-file inference and score generation after Stop. It
+does not yet transcribe while the piano is being played and makes no
+capture-to-event latency claim. Notation is a separate artifact consumer and
+does not change the acoustic model output.
 
 ## Benchmark Commands
 

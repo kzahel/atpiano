@@ -2,8 +2,10 @@
 
 Topic: performance-to-notation
 
-Status: research proposal. No notation converter, renderer, or permanent
-consumer stack is selected, and implementation is awaiting user review.
+Status: integrated prototype. Partitura produces traceable MusicXML,
+OpenSheetMusicDisplay renders it in the local workbench, and a manual
+two-input Ivory comparison is ready for user review. These are experimental
+choices, not a permanent consumer stack.
 
 ## Scope And Boundary
 
@@ -87,6 +89,54 @@ Keep source time in seconds or samples beside score time in divisions and
 beats. Quantization must never destroy the timings needed for playback,
 comparison, or a later reinterpretation.
 
+## Current Prototype
+
+[`002-performance-notation-spikes.md`](../tactical/002-performance-notation-spikes.md)
+is the completed execution record. Every completed offline prediction now
+produces a versioned notation manifest and MusicXML. Existing workbench runs
+are upgraded lazily when first opened.
+
+The manifest records the exact prediction hash, hypotheses, user selections,
+source timing, quantized timing, source-to-score identity mapping, converter
+version, warnings, and MusicXML hash. Regenerating with different controls
+retains a hash-addressed variant instead of overwriting the earlier
+interpretation.
+
+The browser displays:
+
+- ranked key and tempo evidence;
+- editable tempo, meter, first beat, key, grid, and hand split;
+- the selected beat grid against the unquantized piano roll;
+- a two-hand rendered score and MusicXML download; and
+- two independent hosted-oracle score lanes.
+
+Partitura 1.9.0 is the first transparent Python converter.
+OpenSheetMusicDisplay 1.9.9 is the first browser renderer, loaded from a
+pinned CDN URL with subresource integrity. The converter and renderer are
+replaceable artifact consumers, not permanent product commitments.
+
+### Two-phase paid oracle
+
+The first black-box comparison uses [Ivory](https://ivory-app.com/). The user
+runs two separate jobs:
+
+1. original WAV to MusicXML, which tests Ivory's complete acoustic and score
+   pipeline; and
+2. atpiano prediction MIDI to MusicXML, which holds detected notes and
+   performance timing fixed and tests its notation decisions.
+
+The workbench provides exact WAV and MIDI downloads, opens Ivory in another
+tab, and imports each unedited MusicXML result into its own lane. It never
+uploads a recording automatically or handles an account, payment, or
+credential. Each import records its lane, filename, time, hash, service, and
+structural summary and retains older hash-addressed imports.
+
+Ivory was selected because its official site currently accepts solo-piano WAV
+and standard MIDI, exports MusicXML, and advertises quantization and hand
+separation. Its price and interface are external facts and must be reviewed
+again before treating it as a durable dependency. It is an oracle for
+comparison, not a service dependency.
+
 ## Renderer Options
 
 Research reviewed on 2026-07-24:
@@ -98,11 +148,11 @@ Research reviewed on 2026-07-24:
 | [VexFlow](https://github.com/0xfe/vexflow) | Flexible lower-level browser notation primitives | The application must create and position measures and symbols itself | Defer unless custom editing needs justify the layout work |
 | [MuseScore](https://github.com/musescore/MuseScore) | Full GPL score editor with mature MIDI import and MusicXML/PDF/SVG workflows | Too large and copyleft to embed casually; command-line behavior needs version-specific verification | External reference/oracle and manual correction tool |
 
-The first renderer decision should be empirical. Render the same small
-MusicXML fixtures through OSMD and Verovio, compare piano layout, arpeggios,
-pedal, ties, tuplets, source-note highlighting, cursor control, bundle cost,
-and round-trip behavior. MuseScore output is a useful independent visual
-reference.
+OSMD was selected for the first integrated experiment because it renders
+MusicXML directly in the existing browser without adding a JavaScript build
+system. Verovio remains the next renderer comparator only if the same
+MusicXML demonstrates a concrete engraving or interaction problem. MuseScore
+remains a useful independent editor and visual reference.
 
 ## Performance-To-Score Options
 
@@ -185,31 +235,40 @@ The first real workbench take is documented in
 Its Basic Pitch output is a useful unscored renderer fixture: 133 notes over
 34.688 seconds, with pitch 45 through 76.
 
-A simple duration-and-velocity-weighted pitch-class profile ranked A major
-first with correlation 0.907, but onset-grid tempo candidates were diffuse
-and `pretty_midi` estimated 165.6 BPM. This is exactly why the notation path
-must show hypotheses and overrides rather than silently emitting one
-authoritative key and meter.
+A duration-and-velocity-weighted pitch-class profile ranked A major first with
+correlation 0.906. `pretty_midi` estimated 165.621 BPM; the prototype selected
+its half-time interpretation, 82.811 BPM. Partitura's independent time
+estimator proposed 191.505 BPM with numerator 24, which the prototype retained
+as diagnostic evidence and rejected.
+
+The generated score uses A major, 82.811 BPM, an explicit 4/4 default, a first
+beat at the first onset, sixteenth-note quantization, and a middle-C hand
+split. Its 133 source notes became 161 pitched MusicXML note elements across
+two parts and 11 measures because notes split across notation boundaries are
+tied. Nine transparent rolled-chord candidates received arpeggiate marks.
+Every source note retains its original timing and mapping.
 
 The take has no reference score or MIDI. It can support subjective readability
-review, not key, beat, meter, or transcription-accuracy claims.
+review, not key, beat, meter, or transcription-accuracy claims. The two Ivory
+results have not yet been supplied, so the comparison lanes correctly remain
+empty and guided.
 
 ## Recommended Direction
 
-The smallest informative sequence is:
+The next step is human comparison, not another converter:
 
-1. define a versioned score artifact and source-event mapping;
-2. render hand-authored MusicXML fixtures with both OSMD and Verovio;
-3. compare MuseScore, Partitura, and music21 on the same performance fixtures;
-4. build a debug comparison view with piano roll, beat grid, score, playback
-   cursor, and explicit overrides; and
-5. evaluate MIDI2ScoreTransformer only after the deterministic baselines expose
-   a quality gap worth its integration and licensing cost.
+1. listen to the target take while reviewing the piano roll and local score;
+2. adjust the visible tempo, first beat, meter, grid, key, and split until the
+   interpretation is coherent;
+3. import Ivory's unedited WAV result into the audio lane;
+4. import its unedited atpiano-MIDI result into the MIDI lane; and
+5. identify errors shared by all lanes versus errors introduced by acoustic
+   detection or local notation.
 
-This sequence intentionally tests rendering before building an ambitious
-inference engine, while testing inference on known score/performance pairs
-before trusting it on unaligned acoustic output. The proposed bounded slice is
-[`002-performance-notation-spikes.md`](../tactical/002-performance-notation-spikes.md).
+That evidence should select the next bounded slice. Likely candidates are
+better beat/downbeat and pickup inference, improved hand/voice assignment, or
+semantic alignment of the three MusicXML results. Compare Verovio, MuseScore,
+music21, or MIDI2ScoreTransformer only for a concrete observed gap.
 
 ## Evidence To Require
 
@@ -223,14 +282,19 @@ before trusting it on unaligned acoustic output. The proposed bounded slice is
 - Dataset, checkpoint, score, MIDI, and generated artifacts remain outside Git
   with source, license, version, and hash recorded.
 
-## Open Questions
+## Known Gaps And Open Questions
 
 - Is the first goal a quick readable lead sheet, a faithful piano grand staff,
   or an editable draft for MuseScore?
-- Should the UI default to the highest-ranked hypothesis or require an
-  explicit tempo/meter confirmation before score generation?
-- Does OSMD's interactivity outweigh Verovio's engraving and format breadth?
+- Should the UI eventually require explicit meter/downbeat confirmation
+  instead of generating immediately from its visible 4/4 default?
+- Does the first imported score expose an engraving gap that warrants a
+  Verovio comparison?
 - How much voice and hand correction is acceptable before automatic output
   stops feeling useful?
 - Should pedal first appear as conventional Ped./* markings, brackets, or only
   as a piano-roll overlay until pedal inference improves?
+- How should a first beat later than the earliest note become a true pickup
+  instead of clamping early notes to score time zero?
+- Should the next comparison align measures and source notes automatically,
+  or is side-by-side listening sufficient for the first qualitative review?
