@@ -158,6 +158,30 @@ and raw timing samples.
 
 ## Candidate Lanes
 
+### Runnable prototype shortlist
+
+Research on 2026-07-24 narrowed the immediate runnable candidates:
+
+| Priority | Candidate | Why it remains interesting | Constraint |
+|---|---|---|---|
+| 1 | [Spotify Basic Pitch](https://github.com/spotify/basic-pitch) 0.4.0 | Small, Apache-2.0, polyphonic, 88-key output, native activations, and an official Core ML form | Instrument-agnostic, no pedal output, file-oriented two-second windows, and no released streaming decoder |
+| 2 | [ByteDance high-resolution piano transcription](https://github.com/bytedance/piano_transcription) | Piano-specific notes, offsets, velocity, and sustain-pedal events with released checkpoints | Archived in 2025, based on a Python 3.7/PyTorch 1.4 stack, and officially exposes only CPU/CUDA inference |
+| 3 | [Aria-AMT](https://github.com/EleutherAI/aria-amt) | Piano-specific sequence model with note, velocity, and pedal tokens; Apache-2.0 code and released weights | Official inference documentation is oriented toward Linux/CUDA and full-file processing |
+| 4 | [Onsets & Velocities](https://github.com/andres-fr/iamusica_demo) | Piano-specific onset/velocity lane with a released checkpoint and live demonstration | Omits offsets and pedal; published demo commonly uses 4–9 seconds of context and an older Ubuntu/PyTorch stack |
+| Watch | [MuScriptor](https://huggingface.co/MuScriptor/muscriptor-small) | Current open-weight general AMT with 100M–1.3B sizes and instrument conditioning | Five-second segments, no velocity, non-piano specialization, and CC-BY-NC-4.0 weights |
+| Watch | [Mobile-AMT](https://eurasip.org/Proceedings/Eusipco/Eusipco2024/pdfs/0000036.pdf) and its [causal audit](https://arxiv.org/abs/2509.07586) | Directly targets robust streaming piano transcription and exposes important hidden-latency failures | A clean, versioned public implementation/checkpoint acquisition path has not yet been confirmed |
+
+Hugging Face search is useful for checkpoint discovery but currently returns
+several third-party mirrors and undocumented ONNX conversions for piano
+transcription. Do not treat a conversion as equivalent to its upstream model
+until provenance, license, output fidelity, and sample alignment are verified.
+
+Start with Basic Pitch to prove the harness and local execution path. The next
+quality comparison should be piano-specific and should include pedal output;
+ByteDance and Aria-AMT are the leading offline candidates. A streaming lane
+should be added only after its released implementation and true algorithmic
+look-ahead have been audited.
+
 ### 1. Basic Pitch portability baseline
 
 [Spotify Basic Pitch](https://github.com/spotify/basic-pitch) is lightweight,

@@ -8,10 +8,6 @@ and add every tactical to this index. A completed tactical is retained as an
 execution record; continuing status and direction belong in the relevant
 [`../topics/`](../topics/README.md) document.
 
-No tacticals have been opened yet. The likely first slice is a deterministic
-live-replay benchmark described in
-[`../topics/acoustic-transcription-latency-quality.md`](../topics/acoustic-transcription-latency-quality.md).
-
 | Doc | Status | Purpose |
 |---|---|---|
-| — | — | No implementation tacticals yet. |
+| [`000-live-replay-benchmark.md`](000-live-replay-benchmark.md) | In progress | Deterministic MIDI/audio smoke test, Basic Pitch reference, live replay, scoring, and artifact review |

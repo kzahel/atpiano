@@ -1,12 +1,14 @@
 .DS_Store
-.env
+.pytest_cache/
+.ruff_cache/
 .venv/
 __pycache__/
+*.egg-info/
+build/
+dist/
 
-# Large or generated research material
+# Benchmark inputs and generated artifacts stay outside Git.
 artifacts/
-checkpoints/
-datasets/
-models/
+data/
 recordings/
 results/
