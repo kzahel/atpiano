@@ -5,7 +5,8 @@ Topic: acoustic-transcription-latency-quality
 Status: prototype. No permanent model or runtime is selected. The first
 deterministic live-replay benchmark is complete with a Basic Pitch 0.4.0 Core
 ML reference, normalized revisable events, timing/quality artifacts, a local
-run reviewer, and a file-producing microphone adapter.
+run reviewer, native file-producing microphone adapter, and a local browser
+record/transcribe/review workbench.
 
 ## Scope
 
@@ -77,6 +78,14 @@ without reference MIDI are explicitly marked unscored while still producing
 MIDI, normalized events, native outputs, timing, and review artifacts. The
 local reviewer is an independent artifact consumer and does not move piano-roll
 or harmonic analysis into the transcription service.
+
+[`docs/tactical/001-browser-capture-workbench.md`](../tactical/001-browser-capture-workbench.md)
+adds the first user-operated acoustic input path. One loopback-only server lets
+the browser record AudioWorklet PCM, audition a WAV, submit it to the existing
+full-file Basic Pitch adapter, and inspect the completed piano roll. The
+deterministic fixture completed through the real HTTP/job/model path with an
+identical audio hash and 23 estimates. This establishes usability plumbing,
+not acoustic-piano quality or live transcription latency.
 
 ## Accepted Pipeline Boundary
 
@@ -305,6 +314,13 @@ sample clock, send sample-indexed frames, and maintain an explicit mapping to
 the host monotonic clock. The host owns buffering and inference. Local Mac
 capture should produce the same frame contract without network transport.
 
+The local browser workbench now proves the file-producing half of this
+direction. Its AudioWorklet checks source-frame continuity and records the
+effective browser microphone settings, but it uploads only after Stop. It has
+no browser-to-host clock mapping and correctly makes no source-to-emission
+latency claim. Live block transport, backpressure, reconnect behavior, HTTPS,
+and authentication remain separate work.
+
 Execution providers are an experimental dimension:
 
 - Apple Silicon: start with the model's supported Core ML, ONNX, or PyTorch/MPS
@@ -318,7 +334,7 @@ Do not promise one common accelerator runtime until models have been converted
 and compared. The stable boundary is the model adapter, not a particular ML
 framework.
 
-## Completed First Tactical
+## Completed Tacticals
 
 `docs/tactical/000-live-replay-benchmark.md` completed the bounded slice:
 
@@ -334,10 +350,23 @@ It also added a small file-producing microphone adapter and local debug
 reviewer at the user's request. It did not add phone transport, a polished
 product piano roll, model conversion, harmonic analysis, or a second model.
 
+`docs/tactical/001-browser-capture-workbench.md` added a loopback-only browser
+source and one-page workflow:
+
+1. request mono microphone access with speech processing disabled;
+2. capture sample-indexed PCM in an AudioWorklet;
+3. stop, inspect, and audition a lossless WAV;
+4. create a versioned unaligned input through a bounded local upload;
+5. queue the existing full-file adapter outside the audio callback; and
+6. review the completed artifacts at a durable job URL.
+
 Recommended next work is to review a controlled recording from the target
-acoustic piano, acquire a checksummed MAESTRO v3 diagnostic subset for
-real-audio aligned scoring, repeat cold and warm timing trials, and then add
-one piano-specific offline adapter with pedal output.
+acoustic piano through this workbench, compare its browser and native-capture
+audio, acquire a checksummed MAESTRO v3 diagnostic subset for real-audio
+aligned scoring, repeat cold and warm timing trials, and then add one
+piano-specific offline adapter with pedal output. Live browser streaming
+should remain a separate tactical after the file path has produced subjective
+evidence.
 
 ## Open Questions
 

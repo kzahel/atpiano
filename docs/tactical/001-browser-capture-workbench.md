@@ -2,7 +2,7 @@
 
 Topic: acoustic-transcription-latency-quality
 
-Status: active.
+Status: complete.
 
 ## Objective
 
@@ -99,5 +99,98 @@ resource use deterministic enough for the first subjective recordings.
 
 ## Execution Record
 
-Pending.
+### 2026-07-24: browser source and local workbench
 
+The shipped workbench starts with one command:
+
+```text
+uv run atpiano workbench
+```
+
+It binds only to `127.0.0.1`, opens the system browser, and uses
+`results/workbench` by default. The page requests a mono microphone with echo
+cancellation, noise suppression, and automatic gain control disabled. It
+records the browser's effective settings because a browser or device can
+decline those constraints.
+
+An `AudioWorklet` batches 2,048 mono float samples per message. The page
+verifies that every message begins at the expected source sample, requires an
+acknowledged final flush, and refuses to build a take from a discontinuous
+sequence. Stop produces a 16-bit PCM WAV, waveform preview, duration, sample
+rate, and local audio player. Nothing reaches the model until the user presses
+**Transcribe recording**.
+
+The server requires a same-origin-style local Host header, a bounded
+`Content-Length`, `audio/wav`, versioned capture metadata, and a mono 16-bit
+PCM file whose sample rate and frame count match the metadata. The 64 MiB
+server bound exceeds the page's two-minute maximum at normal browser sample
+rates. Every valid submission receives a unique job and run ID. A single
+background worker calls the existing unmodified Basic Pitch offline adapter;
+completed job links continue to work after a server restart.
+
+This is a file-producing source adapter, not a latency experiment. It retains
+the AudioWorklet sample clock but has no browser-to-host monotonic clock
+mapping and reports no capture-to-event latency.
+
+### Real adapter-path validation
+
+The deterministic 12.310-second fixture was submitted as a browser-style WAV
+to the actual HTTP endpoint and processed by the actual Basic Pitch 0.4.0
+worker:
+
+```text
+job: 20260724T103400-1bbf61dd9177
+run: run-20260724T103400-1bbf61dd9177
+audio SHA-256:
+39217861396c1bb84ddd883a9f10c63f1be8b8c34462676d87b626916452b043
+model inference: 0.395 s
+estimated notes: 23
+quality available: false
+```
+
+The uploaded audio hash exactly matched the deterministic fixture. The run was
+correctly unscored because browser input deliberately has no reference MIDI.
+The API served its manifest, scores, audio, and reviewer artifacts through the
+job-scoped run URL.
+
+### Validation
+
+Commands:
+
+```text
+uv run ruff check .
+uv run pytest -q
+node --check src/atpiano/web/app.js
+node --check src/atpiano/web/capture-processor.js
+uv build
+git diff --check
+```
+
+Results:
+
+- 13 unit and HTTP integration tests passed;
+- existing read-only reviewer behavior remains covered;
+- browser PCM preservation and manifest validation passed;
+- malformed metadata, foreign hosts, and artifact traversal were rejected;
+- completed artifacts remained discoverable after a server restart;
+- both browser JavaScript files passed syntax checks;
+- the source distribution and wheel built with all four web assets; and
+- the real upload, model, artifact, and status path completed locally.
+
+Browser visual inspection and a real ambient microphone recording were not
+performed automatically. Microphone permission, input selection, and
+subjective capture quality need to be exercised by the user on the target
+piano.
+
+## Gaps And Recommended Next Work
+
+- Record a 20–40 second target-piano take in the workbench, including silence,
+  isolated dynamics, repeated notes, chords, bass, treble, legato, and pedal.
+- Check whether the browser honors the disabled speech-processing constraints
+  and compare its audio with the native `sounddevice` adapter.
+- Decide from that recording whether raw-probability heatmaps or threshold
+  controls would improve subjective review before adding another model.
+- Keep live browser-to-Python streaming as a separate tactical. It requires a
+  sample-indexed transport, backpressure, disconnect recovery, and an explicit
+  browser-to-host clock mapping before it can report latency.
+- Add authenticated HTTPS transport before attempting phone or LAN capture.

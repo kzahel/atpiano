@@ -35,12 +35,12 @@ input adapters to the same pipeline.
 The project is in discovery. Python and Spotify Basic Pitch are the first
 prototype stack, not permanent selections. A deterministic MIDI-derived
 fixture, untouched offline reference, wall-clock replay benchmark, and local
-artifact reviewer are runnable on Apple Silicon.
+browser capture/transcription workbench are runnable on Apple Silicon.
 
 Current direction and research questions live in
 [`docs/topics/acoustic-transcription-latency-quality.md`](docs/topics/acoustic-transcription-latency-quality.md).
 
-## Prototype Quick Start
+## Browser Workbench
 
 Use the pinned Python 3.10 environment:
 
@@ -48,19 +48,29 @@ Use the pinned Python 3.10 environment:
 uv sync
 ```
 
-For microphone recording, include the optional capture dependency:
+Then start the one local server:
 
 ```text
-uv sync --extra capture
-uv run atpiano devices
-uv run atpiano record \
-  ../atpiano-artifacts/my-piano \
-  --seconds 30
+uv run atpiano workbench
 ```
 
-The recording manifest has no aligned MIDI and is therefore explicitly
-unscored. It can still be passed to `offline`, `replay`, and `review` for
-subjective inspection.
+The command opens a browser page. Grant microphone access, press **Start
+recording**, press **Stop**, listen to the captured waveform, and press
+**Transcribe recording**. The completed audio, MIDI, normalized events, raw
+model output, and run report appear in the same page.
+
+The workbench binds only to `127.0.0.1` and stores generated artifacts under
+the ignored `results/workbench` directory by default. Browser takes are
+limited to two minutes and the server accepts at most 64 MiB per upload. A
+recording has no aligned MIDI, so its quality metrics are explicitly unscored;
+the piano roll is for listening and subjective inspection.
+
+This path performs full-file inference after Stop. It does not yet transcribe
+while the piano is being played and makes no capture-to-event latency claim.
+
+## Benchmark Commands
+
+The lower-level commands remain available for reproducible experiments.
 
 Generate a deterministic MIDI-derived WAV and aligned reference:
 
@@ -88,6 +98,14 @@ Review a completed run in the local browser UI:
 
 ```text
 uv run atpiano review ../atpiano-artifacts/replay
+```
+
+The native fixed-duration capture adapter is also retained for instrumentation
+experiments:
+
+```text
+uv sync --extra capture
+uv run atpiano record ../atpiano-artifacts/my-piano --seconds 30
 ```
 
 Generated inputs, checkpoints, recordings, and run results do not belong in
