@@ -979,7 +979,9 @@ function openLiveSocket(sampleRate, metadata) {
       if (message.type === "ready") {
         ready = true;
         document.querySelector("#live-status").textContent = "Calibrating";
-        document.querySelector("#live-transport").textContent = "continuous";
+        const decoderName = message.model?.decoder?.name;
+        document.querySelector("#live-transport").textContent =
+          decoderName ? decoderName.replaceAll("-", " ") : "continuous";
         resolve({ socket, ready: message });
       } else if (message.type === "block_ack") {
         updateNoiseGate(message.noise_gate);

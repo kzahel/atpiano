@@ -7,7 +7,9 @@ import numpy as np
 import pytest
 
 from atpiano.capture import BROWSER_CAPTURE_SCHEMA
+from atpiano.decoder import STRICT_ONSET_DECODER_POLICY
 from atpiano.live import (
+    BasicPitchLiveModel,
     LiveCaptureSession,
     LiveModelOutput,
     LiveRecognitionProcessor,
@@ -174,6 +176,39 @@ class _WindowModel:
 
     def provenance(self) -> dict[str, object]:
         return {"name": "test-live-model"}
+
+
+class _NativeOutputModel:
+    def predict(self, audio: np.ndarray) -> dict[str, np.ndarray]:
+        assert audio.shape == (1, 2_000, 1)
+        note = np.zeros((1, 50, 88), dtype=np.float32)
+        onset = np.zeros((1, 50, 88), dtype=np.float32)
+        contour = np.zeros((1, 50, 264), dtype=np.float32)
+        note[0, 5:30, 39] = 0.8
+        onset[0, 5, 39] = 0.65
+        return {"note": note, "onset": onset, "contour": contour}
+
+
+def test_basic_pitch_live_model_uses_selected_strict_decoder() -> None:
+    model = BasicPitchLiveModel.__new__(BasicPitchLiveModel)
+    model.model = _NativeOutputModel()
+    model.decoder_policy = STRICT_ONSET_DECODER_POLICY
+
+    output = model.predict(np.zeros(2_000, dtype=np.float32))
+
+    assert len(output.candidates) == 1
+    assert output.candidates[0][0].pitch == 60
+    assert output.candidates[0][1] == pytest.approx(0.65)
+    assert output.candidate_evidence == [
+        {
+            "decoder_source": "explicit_onset",
+            "onset_confidence": pytest.approx(0.65),
+            "decoder_confidence": pytest.approx(0.65),
+            "frame_confidence": pytest.approx(0.8),
+            "start_frame": 5,
+            "end_frame": 30,
+        }
+    ]
 
 
 def test_live_recognition_revises_onset_then_commits(tmp_path: Path) -> None:

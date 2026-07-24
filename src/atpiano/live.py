@@ -17,6 +17,11 @@ import numpy as np
 from scipy.signal import resample_poly
 
 from atpiano.capture import BROWSER_CAPTURE_SCHEMA, write_browser_capture_artifacts
+from atpiano.decoder import (
+    STRICT_ONSET_DECODER_POLICY,
+    BasicPitchDecoderPolicy,
+    decode_basic_pitch_output,
+)
 from atpiano.midi import MidiNote
 from atpiano.quality import match_note_indices
 from atpiano.reconcile import StreamingReconciler, WindowRegion
@@ -66,6 +71,7 @@ class LiveModelOutput:
     raw: dict[str, np.ndarray]
     inference_s: float
     decode_s: float
+    candidate_evidence: list[dict[str, Any]] | None = None
 
 
 class LiveWindowModel(Protocol):
@@ -187,9 +193,12 @@ class OnsetEnergyGate:
 
 
 class BasicPitchLiveModel:
-    """One cached stock Basic Pitch model used on explicit rolling windows."""
+    """One cached Basic Pitch model decoded on explicit rolling windows."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        decoder_policy: BasicPitchDecoderPolicy = STRICT_ONSET_DECODER_POLICY,
+    ) -> None:
         from basic_pitch import ICASSP_2022_MODEL_PATH
         from basic_pitch.constants import AUDIO_N_SAMPLES, AUDIO_SAMPLE_RATE, FFT_HOP
         from basic_pitch.inference import Model
@@ -202,45 +211,37 @@ class BasicPitchLiveModel:
         self.right_guard_samples = 20 * FFT_HOP
         self.model_path = Path(ICASSP_2022_MODEL_PATH).resolve()
         self.model = Model(self.model_path)
+        self.decoder_policy = decoder_policy
 
     def predict(self, audio: np.ndarray) -> LiveModelOutput:
-        from basic_pitch.constants import AUDIO_SAMPLE_RATE, FFT_HOP
-        from basic_pitch.note_creation import model_output_to_notes
-
         inference_start_ns = time.perf_counter_ns()
         with redirect_stdout(io.StringIO()):
             output = self.model.predict(audio.reshape((1, audio.shape[0], 1)))
         inference_end_ns = time.perf_counter_ns()
+        raw = {name: values[0].copy() for name, values in output.items()}
         decode_start_ns = time.perf_counter_ns()
-        _, note_events = model_output_to_notes(
-            {name: values[0].copy() for name, values in output.items()},
-            onset_thresh=0.5,
-            frame_thresh=0.3,
-            min_note_len=round(127.7 / 1000 * (AUDIO_SAMPLE_RATE / FFT_HOP)),
-            min_freq=None,
-            max_freq=None,
-            multiple_pitch_bends=False,
-            melodia_trick=True,
-            midi_tempo=120,
-        )
+        decoded = decode_basic_pitch_output(raw, self.decoder_policy)
         candidates = [
-            (
-                MidiNote(
-                    onset_s=float(start_s),
-                    offset_s=float(end_s),
-                    pitch=int(pitch),
-                    velocity=max(1, min(127, round(float(amplitude) * 127))),
-                ),
-                float(amplitude),
-            )
-            for start_s, end_s, pitch, amplitude, _ in note_events
+            (item.note, item.decoder_confidence)
+            for item in decoded
         ]
         decode_end_ns = time.perf_counter_ns()
         return LiveModelOutput(
             candidates=candidates,
-            raw={name: values[0].copy() for name, values in output.items()},
+            raw=raw,
             inference_s=(inference_end_ns - inference_start_ns) / 1_000_000_000,
             decode_s=(decode_end_ns - decode_start_ns) / 1_000_000_000,
+            candidate_evidence=[
+                {
+                    "decoder_source": item.source,
+                    "onset_confidence": item.onset_confidence,
+                    "decoder_confidence": item.decoder_confidence,
+                    "frame_confidence": item.frame_confidence,
+                    "start_frame": item.start_frame,
+                    "end_frame": item.end_frame,
+                }
+                for item in decoded
+            ],
         )
 
     def provenance(self) -> dict[str, Any]:
@@ -251,6 +252,7 @@ class BasicPitchLiveModel:
             "artifact_sha256": sha256_path(self.model_path),
             "sample_rate_hz": self.sample_rate_hz,
             "window_samples": self.window_samples,
+            "decoder": self.decoder_policy.provenance(),
         }
 
 
@@ -365,22 +367,29 @@ class LiveRecognitionProcessor:
                         velocity=note.velocity,
                     ),
                     confidence,
+                    (
+                        output.candidate_evidence[index]
+                        if output.candidate_evidence is not None
+                        else None
+                    ),
                 )
-                for note, confidence in output.candidates
+                for index, (note, confidence) in enumerate(output.candidates)
             ]
             absolute_candidates: list[tuple[MidiNote, float]] = []
             gate_start = len(self._gate_rows)
-            for note, confidence in native_candidates:
+            for note, confidence, evidence in native_candidates:
                 accepted, onset_level_dbfs, reason = self.noise_gate.evaluate(
                     note,
                     self._pcm,
                 )
                 self._gate_rows.append(
                     {
-                        "schema_version": "atpiano.onset-energy-decision.v1",
+                        "schema_version": "atpiano.onset-energy-decision.v2",
                         "window_index": self._window_index,
                         "pitch": note.pitch,
                         "onset_s": note.onset_s,
+                        "model_confidence": confidence,
+                        "model_evidence": evidence,
                         "onset_level_dbfs": onset_level_dbfs,
                         "threshold_dbfs": self.noise_gate.threshold_dbfs,
                         "accepted": accepted,
