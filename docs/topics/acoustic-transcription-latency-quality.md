@@ -250,6 +250,15 @@ and is intentionally suppressed by the live room-calibration period. This
 validates the implementation boundary while leaving target-piano accuracy for
 controlled or aligned acoustic evidence.
 
+The first strict-onset subjective session,
+`20260724T144840-82ee228fd1bf`, completed 473 rolling windows and 154 committed
+identities. The user judged it to work “pretty great.” Its remaining observed
+failure is a lower-note strike that also activates the octave above on the
+resonant target piano. Because this is an explicit learned onset-head response,
+not a frame-derived or melodia start, confidence inspection and controlled
+low-note/true-octave examples are now more informative than further stock
+decoder tuning.
+
 ## Accepted Pipeline Boundary
 
 ```text

@@ -2,10 +2,10 @@
 
 Topic: live-acoustic-transcription
 
-Status: strict-onset live decoder implemented and ready for subjective review.
-The live lane now requires an explicit Basic Pitch onset-head peak at 0.6;
-frame-inferred and melodia fallback starts remain available only in the
-untouched exact-final lane.
+Status: strict-onset live decoder accepted in initial subjective review. It
+works well enough to expose a narrower target-piano error: a lower-note strike
+can trigger an attack-synchronous octave overtone. Raw/grouped staff controls
+and optional onset-score labels now support direct diagnosis.
 
 ## Scope And Relationship
 
@@ -52,8 +52,10 @@ The first subjective success criterion is deliberately simple:
 
 The UI therefore ignores model duration. It lights one accurately placed key
 per accepted onset and draws filled quarter-note-like marks from left to right
-on a grand staff. Onsets within 180 ms of the first onset in a group form one
-visual chord. There is no tempo, meter, barline, key signature, hand, voice, or
+on a grand staff. The staff can show every raw onset identity or group onsets
+within a configurable 0–250 ms window anchored at the first onset; grouped
+mode defaults to 80 ms. Optional labels show each strict live event's onset
+score. There is no tempo, meter, barline, key signature, hand, voice, or
 rhythmic-value claim. This is a pitch/onset diagnostic, not notation or
 harmonic analysis.
 
@@ -245,6 +247,26 @@ fixture produced 19 identities and matched 18 reference onsets; its missing
 period. After excluding that calibration-period reference, onset recall is
 1.000, precision 0.947, and F1 0.973.
 
+### First strict-onset subjective review
+
+Workbench job `20260724T144840-82ee228fd1bf` completed 473 rolling windows over
+almost two minutes with strict onset 0.6. It produced 154 committed identities
+and two retractions. The user judged the behavior to work “pretty great.”
+
+The remaining reported error is attack-synchronous rather than a stream of
+held-note starts: striking a lower E can also produce the octave above on the
+resonant target piano. That upper partial is real acoustic energy and can
+activate Basic Pitch's learned onset head, so strict decoding alone cannot
+remove it. A generic high-frequency or octave filter would also destroy real
+upper notes and octave dyads.
+
+Tactical
+[`006-live-confidence-display-controls.md`](../tactical/006-live-confidence-display-controls.md)
+adds raw and grouped staff modes, a configurable chord window, and optional
+two-decimal onset-score labels beside noteheads. The view explicitly describes
+scores as uncalibrated model evidence. Settings persist locally and are
+retained with capture metadata, but never alter accepted events.
+
 ## Implemented Live Architecture
 
 ```text
@@ -408,15 +430,15 @@ Do not tune the absolute-volume gate or add a generic harmonic filter for this
 failure. The former cannot distinguish a new strike from loud resonance; the
 latter would erase legitimate piano octaves and fifths.
 
-First repeat the held-chord interaction with the selected strict 0.6 live
-decoder. The workbench identifies that policy in the live status area. Judge
-whether a chord held without restrikes remains visually stable and whether
-ordinary repeated notes still appear.
+Use raw mode and onset-score labels to compare low-note-only octave errors
+against real octave dyads. Record representative lower and upper score pairs,
+but do not treat score magnitude as calibrated probability.
 
-Then record a short controlled local clip with silence, isolated soft and loud
-notes, a held chord, repeated strikes at several gaps, true octaves/fifths,
-bass, treble, and pedal. Retain or manually annotate enough onset truth to
-separate false resonance starts from real reattacks.
+Then record a short controlled local clip with low notes alone, their octave
+partners alone, true octave dyads, lower-note-then-upper-note sequences,
+isolated soft and loud notes, a held chord, repeated strikes, bass, treble, and
+pedal. Retain or manually annotate enough onset truth to separate false
+resonance starts from real reattacks.
 
 If strict decoding still confuses sustained harmonics with new attacks, keep
 the proven transport, clock, artifact, keyboard, and staff boundaries and open
@@ -424,8 +446,8 @@ the causal/piano-onset model bakeoff. An onset-specific or piano-specific lane
 is more justified than adding a refractory period or harmonic filter without
 ground truth.
 
-The current implementation record is
-[`005-strict-onset-decoder-spike.md`](../tactical/005-strict-onset-decoder-spike.md).
+The current display implementation record is
+[`006-live-confidence-display-controls.md`](../tactical/006-live-confidence-display-controls.md).
 
 ## Required Measurements
 
@@ -447,10 +469,10 @@ The current implementation record is
 - Is 0.43-second median but 1.65-second p95 provisional feedback satisfying in
   practice on actual microphone input?
 - Does the automatic gate suppress pre-piano notes without losing soft attacks?
-- Does the implemented 180 ms recent-onset grouping make rolled chords legible
-  without merging melodic runs into one pitch set?
-- Does strict onset 0.6 subjectively stabilize a held chord on the target
-  piano while retaining ordinary repeated strikes?
+- Which raw/grouped window is most legible for chords, rolls, and fast melodic
+  runs on the target piano?
+- Are false upper-octave onsets marginal threshold crossings or confident
+  learned-onset mistakes?
 - Which remaining learned-onset responses in a controlled held-only clip are
   false, and do they justify a source-attack or active-note policy?
 - Is the current named live-versus-final summary sufficient to explain changes
