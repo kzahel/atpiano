@@ -151,6 +151,7 @@ def write_browser_capture_artifacts(
         "capture_elapsed_s": float(capture_elapsed_s),
         "started_at": client_metadata.get("started_at"),
         "requested_constraints": client_metadata.get("requested_constraints"),
+        "actual_track_settings": client_metadata.get("actual_track_settings"),
         "source_timeline": "AudioWorklet sample index",
         "transport": "same-origin HTTP PCM WAV upload",
         "received_at": utc_now(),

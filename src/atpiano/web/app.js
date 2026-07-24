@@ -443,6 +443,8 @@ async function startRecording() {
       chunkCount: 0,
       startedAt: new Date().toISOString(),
       stopped: false,
+      sequenceError: false,
+      stopFrameCount: null,
       stopResolver: null,
       animation: null,
     };
@@ -450,14 +452,16 @@ async function startRecording() {
       if (event.data.type === "chunk") {
         const samples = new Float32Array(event.data.samples);
         if (event.data.firstSample !== capture.frameCount) {
+          capture.sequenceError = true;
           showError(new Error("The browser audio sample sequence was discontinuous."));
         }
         capture.chunks.push(samples);
         capture.frameCount += samples.length;
         capture.chunkCount += 1;
         updateCaptureMeter(samples);
-      } else if (event.data.type === "stopped" && capture.stopResolver) {
-        capture.stopResolver();
+      } else if (event.data.type === "stopped") {
+        capture.stopFrameCount = event.data.frameCount;
+        if (capture.stopResolver) capture.stopResolver(true);
       }
     };
     state.capture = capture;
@@ -491,11 +495,12 @@ async function stopRecording() {
     capture.stopResolver = resolve;
   });
   capture.captureNode.port.postMessage({ type: "stop" });
-  await Promise.race([
+  const acknowledged = await Promise.race([
     stopped,
-    new Promise((resolve) => window.setTimeout(resolve, 500)),
+    new Promise((resolve) => window.setTimeout(() => resolve(false), 500)),
   ]);
   if (capture.animation) cancelAnimationFrame(capture.animation);
+  const trackSettings = capture.stream.getAudioTracks()[0]?.getSettings() || {};
   capture.stream.getTracks().forEach((track) => track.stop());
   capture.source.disconnect();
   capture.captureNode.disconnect();
@@ -504,6 +509,15 @@ async function stopRecording() {
   setCaptureUi(false);
   state.capture = null;
 
+  if (
+    !acknowledged ||
+    capture.sequenceError ||
+    capture.stopFrameCount !== capture.frameCount
+  ) {
+    document.querySelector("#capture-status").textContent = "Recording was incomplete";
+    showError(new Error("The browser did not deliver one continuous audio sample sequence."));
+    return;
+  }
   if (capture.frameCount === 0) {
     document.querySelector("#capture-status").textContent = "No samples were captured";
     showError(new Error("The microphone did not produce any audio samples."));
@@ -523,6 +537,14 @@ async function stopRecording() {
       capture_elapsed_s: duration,
       started_at: capture.startedAt,
       requested_constraints: CAPTURE_CONSTRAINTS,
+      actual_track_settings: {
+        sampleRate: trackSettings.sampleRate ?? null,
+        channelCount: trackSettings.channelCount ?? null,
+        echoCancellation: trackSettings.echoCancellation ?? null,
+        noiseSuppression: trackSettings.noiseSuppression ?? null,
+        autoGainControl: trackSettings.autoGainControl ?? null,
+        latency: trackSettings.latency ?? null,
+      },
     },
   };
   if (state.recordingUrl) URL.revokeObjectURL(state.recordingUrl);
