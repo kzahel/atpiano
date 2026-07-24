@@ -60,9 +60,16 @@ live recognition**. The page warms the local Basic Pitch model, then asks for
 one second of quiet room sound to calibrate an automatic onset-energy gate.
 After the status changes to **Listening**, accepted pitches light a
 physically proportioned 88-key keyboard and appear from left to right as
-duration-free notes on a grand staff. Onsets within 180 ms form one group.
-There is deliberately no tempo, meter, barline, or meaningful note duration in
-this live view.
+onset-first notes on a grand staff. Nearby onsets form one group using a
+configurable window that defaults to 80 ms. Source-onset gaps are visible by
+default, with absolute source time and raw-onset modes available for closer
+diagnosis.
+
+The staff uses a deliberately rough 120 BPM rhythm preset by default. When the
+next onset arrives, it revises the preceding mark to the nearest sixteenth,
+eighth, quarter, half, or whole glyph. Other fixed-tempo presets and neutral
+quarter marks are selectable. These glyphs represent inter-onset spacing, not
+detected key duration, tempo inference, meter, or a finished score.
 
 Press **Stop** to flush and hash the exact captured PCM, save the session WAV
 and live event history, and automatically run the untouched full-file Basic

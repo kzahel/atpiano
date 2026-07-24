@@ -5,7 +5,9 @@ Topic: live-acoustic-transcription
 Status: strict-onset live decoder accepted in initial subjective review. It
 works well enough to expose a narrower target-piano error: a lower-note strike
 can trigger an attack-synchronous octave overtone. Raw/grouped staff controls
-and optional onset-score labels now support direct diagnosis.
+plus optional onset-score and source-timing labels now support direct
+diagnosis. Fixed-tempo rough rhythm glyphs add a deliberately approximate view
+of inter-onset spacing without changing transcription.
 
 ## Scope And Relationship
 
@@ -51,13 +53,18 @@ The first subjective success criterion is deliberately simple:
 > intended notes and broad chord shape?
 
 The UI therefore ignores model duration. It lights one accurately placed key
-per accepted onset and draws filled quarter-note-like marks from left to right
-on a grand staff. The staff can show every raw onset identity or group onsets
-within a configurable 0–250 ms window anchored at the first onset; grouped
-mode defaults to 80 ms. Optional labels show each strict live event's onset
-score. There is no tempo, meter, barline, key signature, hand, voice, or
-rhythmic-value claim. This is a pitch/onset diagnostic, not notation or
-harmonic analysis.
+per accepted onset and draws notes from left to right on a grand staff. The
+staff can show every raw onset identity or group onsets within a configurable
+0–250 ms window anchored at the first onset; grouped mode defaults to 80 ms.
+Optional labels show each strict live event's onset score, absolute source
+time, previous-onset gap, or both.
+
+A selectable fixed-tempo guide maps each inter-onset gap to the nearest
+sixteenth, eighth, quarter, half, or whole glyph. It defaults to 120 BPM and
+revises the previous group only when the next onset arrives. It is explicitly
+not detected key duration, inferred tempo, meter, rests, or score notation.
+This remains a pitch/onset diagnostic rather than harmonic analysis or the
+paused performance-to-notation consumer.
 
 ## Current Evidence
 
@@ -267,6 +274,28 @@ two-decimal onset-score labels beside noteheads. The view explicitly describes
 scores as uncalibrated model evidence. Settings persist locally and are
 retained with capture metadata, but never alter accepted events.
 
+### Source timing and rough rhythm guides
+
+Tactical
+[`007-live-timing-rhythm-guides.md`](../tactical/007-live-timing-rhythm-guides.md)
+adds source-onset time and previous-onset gaps to the same live view. Musical
+time still comes from `onset_sample / sample_rate`; transport and display
+clocks are not substituted.
+
+Basic Pitch's native hop is 256 samples at 22,050 Hz, so its onset grid is
+approximately 11.609977 ms even when the retained source recording has a
+finer sample period. In the descending-scale session
+`20260724T152536-b607d6fd4434`, most late scale gaps are 197–250 ms, while a
+suspicious lower-pitch/upper-octave pair is one model frame apart. The new
+labels expose both patterns directly.
+
+The rough-rhythm guide uses only inter-onset gaps and one selected fixed-tempo
+preset. At the default 120 BPM, the scale's roughly 200–250 ms gaps appear as
+eighth-note glyphs. The most recent group remains a quarter-like pending mark
+until the next onset supplies its interval. These are reversible display
+settings retained in capture metadata, not changes to normalized events or
+the model.
+
 ## Implemented Live Architecture
 
 ```text
@@ -446,8 +475,10 @@ the causal/piano-onset model bakeoff. An onset-specific or piano-specific lane
 is more justified than adding a refractory period or harmonic filter without
 ground truth.
 
-The current display implementation record is
-[`006-live-confidence-display-controls.md`](../tactical/006-live-confidence-display-controls.md).
+The current display implementation records are
+[`006-live-confidence-display-controls.md`](../tactical/006-live-confidence-display-controls.md)
+and
+[`007-live-timing-rhythm-guides.md`](../tactical/007-live-timing-rhythm-guides.md).
 
 ## Required Measurements
 
@@ -471,6 +502,8 @@ The current display implementation record is
 - Does the automatic gate suppress pre-piano notes without losing soft attacks?
 - Which raw/grouped window is most legible for chords, rolls, and fast melodic
   runs on the target piano?
+- Which fixed-tempo rhythm preset makes runs and rolls easier to read without
+  implying more musical structure than the onset stream contains?
 - Are false upper-octave onsets marginal threshold crossings or confident
   learned-onset mistakes?
 - Which remaining learned-onset responses in a controlled held-only clip are

@@ -2,7 +2,7 @@
 
 Topic: live-acoustic-transcription
 
-Status: planned on 2026-07-24.
+Status: complete on 2026-07-24.
 
 ## Motivation
 
@@ -80,7 +80,90 @@ inference, meter, rests, voices, ties, or score readability.
 - JavaScript syntax, Node tests, Python tests, lint, build, and whitespace
   checks pass.
 
-## Gaps
+## Implemented Result
+
+The live panel now adds two settings:
+
+- **Timing labels:** previous-onset gaps, absolute source time, both, or off;
+- **Rough rhythm:** neutral quarter marks or fixed 60, 80, 100, 120, 140,
+  or 160 BPM presets.
+
+Relative timing and 120 BPM are the initial defaults. Absolute times render as
+`minutes:seconds.milliseconds`; deltas render as rounded milliseconds. Both
+come from each normalized event's source `onset_sample` and the capture sample
+rate. They never use WebSocket arrival, model completion, or browser paint
+time.
+
+Each group is decorated only after the existing raw/grouped aggregation.
+Grouped mode therefore measures from group anchor to group anchor. Raw mode
+exposes every event identity, including zero-millisecond simultaneous onsets.
+Changing any control immediately reinterprets retained live events without
+rerunning the model.
+
+At a nonzero preset, the gap to the next onset selects the preceding group's
+sixteenth, eighth, quarter, half, or whole glyph. The final group remains the
+existing quarter-like mark because its next interval is unknown. Selecting
+neutral mode leaves every group quarter-like. There are deliberately no
+rests, ties, beams, barlines, or note-offset semantics.
+
+Display settings now use `atpiano.live-display-settings.v2`. The browser reads
+the earlier v1 storage key when v2 is absent and fills the new defaults. The
+capture writer accepts both schema versions, while new starts and Stops retain
+the selected v2 timing mode and rhythm preset in `browser-capture.json`.
+
+## Evidence
+
+Basic Pitch 0.4.0 predicts on a 256-sample hop at 22,050 Hz:
+
+```text
+256 / 22,050 = 0.011609977 s = 11.609977 ms
+```
+
+The source recording can have a much finer sample period, but model onsets
+remain quantized to approximately this frame grid. The workbench explains
+that distinction beside the timing control.
+
+The retained descending-scale session
+`20260724T152536-b607d6fd4434` includes visible inter-onset gaps around
+197–250 ms. Its final lower-pitch/upper-octave pair appears at 116.563 s and
+116.574 s: an 11.6 ms difference, exactly one model frame. Timing labels make
+that attack-synchronous harmonic behavior directly visible.
+
+At the default 120 BPM, a beat is 500 ms, so the scale's roughly 200–250 ms
+gaps map to eighth-note glyphs. This is useful expected behavior, not evidence
+of inferred tempo or duration.
+
+## Validation Result
+
+```text
+node --test tests/test_live_view.js
+6 passed
+
+uv run pytest
+29 passed
+
+uv run ruff check .
+passed
+
+node --check src/atpiano/web/live-view.js
+node --check src/atpiano/web/app.js
+passed
+
+uv build
+passed
+
+git diff --check
+passed
+```
+
+The deterministic browser tests cover anchored grouping, raw ordering,
+strongest-score duplicate handling, settings normalization, prior-glyph rhythm
+revision, the pending final mark, and the exact 11.609977 ms Basic Pitch frame
+interval. Capture tests cover v2 preservation, rejected unsupported presets,
+and v1 compatibility. The real page test verifies both controls and their
+explanatory copy.
+
+## Gaps And Next Direction
 
 Preset rhythm is only a visual heuristic. Subjective review must determine
 whether it makes runs and chord shapes easier to read or merely adds false
