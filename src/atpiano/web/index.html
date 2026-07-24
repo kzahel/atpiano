@@ -42,16 +42,52 @@
               <span id="level-fill"></span>
             </div>
             <p class="capture-copy">
-              Start with a few seconds of room silence, then play isolated notes,
-              repeated notes, chords, bass, treble, legato, and pedal.
+              Play isolated notes, intervals, chords, rolls, repeated notes, bass,
+              and treble. Provisional onsets should appear while the sound is still
+              in your memory.
             </p>
             <div class="button-row">
               <button id="start-recording" class="button primary" type="button">
-                Start recording
+                Start live recognition
               </button>
               <button id="stop-recording" class="button" type="button" disabled>
                 Stop
               </button>
+            </div>
+          </article>
+
+          <article id="live-panel" class="live-panel" aria-labelledby="live-title">
+            <div class="live-heading">
+              <div>
+                <p class="eyebrow">Onset-first evaluator</p>
+                <h2 id="live-title">Notes as the model sees them</h2>
+              </div>
+              <span id="live-status" class="badge">Not connected</span>
+            </div>
+
+            <div class="live-pitch-readout">
+              <span>Recent pitch set</span>
+              <strong id="live-pitch-set">Play to reveal pitches</strong>
+            </div>
+
+            <canvas
+              id="live-roll"
+              height="360"
+              aria-label="Live provisional and committed piano roll"
+            ></canvas>
+            <div id="live-keyboard" class="live-keyboard" aria-label="Detected piano keys"></div>
+
+            <div class="live-telemetry" aria-live="polite">
+              <div><span>Audio head</span><strong id="live-audio-head">0.0 s</strong></div>
+              <div><span>Windows</span><strong id="live-window-count">0</strong></div>
+              <div><span>First-visible</span><strong id="live-latency">—</strong></div>
+              <div><span>Transport</span><strong id="live-transport">idle</strong></div>
+            </div>
+
+            <div class="live-legend" aria-label="Live event legend">
+              <span><i class="provisional"></i> provisional onset</span>
+              <span><i class="committed"></i> committed</span>
+              <span><i class="retracted"></i> retracted</span>
             </div>
           </article>
 
@@ -69,9 +105,6 @@
             <canvas id="recording-waveform" height="128" aria-label="Recorded audio waveform"></canvas>
             <div class="button-row">
               <button id="discard-recording" class="button" type="button">Discard</button>
-              <button id="transcribe-recording" class="button primary" type="button">
-                Transcribe recording
-              </button>
             </div>
           </article>
         </div>

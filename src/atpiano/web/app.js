@@ -1,6 +1,10 @@
 "use strict";
 
 const MAX_CAPTURE_SECONDS = 120;
+const LIVE_STREAM_SCHEMA = "atpiano.live-stream.v1";
+const LIVE_BLOCK_HEADER_BYTES = 48;
+const MAX_WEBSOCKET_BUFFER_BYTES = 4 * 1024 * 1024;
+const LIVE_VIEW_SECONDS = 10;
 const CAPTURE_CONSTRAINTS = {
   channelCount: 1,
   echoCancellation: false,
@@ -29,9 +33,18 @@ const state = {
   capture: null,
   take: null,
   recordingUrl: null,
+  live: {
+    events: new Map(),
+    audioHeadS: 0,
+    sampleRate: 0,
+    windowCount: 0,
+    recentPitches: [],
+    highlightedPitches: new Map(),
+    animation: null,
+  },
 };
 
-const noteNames = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B"];
+const noteNames = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"];
 
 function artifact(name) {
   if (state.runId) {
@@ -102,8 +115,9 @@ function renderMetrics() {
   const latency = scores.latency || {};
   const visible = latency.reference_onset_to_first_visible_s || {};
   const committed = latency.reference_onset_to_commit_s || {};
+  const live = scores.live_reconciliation;
   const qualityLabel = scores.quality_available === false ? "No aligned reference" : "aligned MIDI";
-  document.querySelector("#metric-grid").innerHTML = [
+  const metrics = [
     metric("Onset F1", formatF1(scores.onset?.["50_ms"]?.f1), "±50 ms matching tolerance"),
     metric("Note + offset F1", formatF1(scores.note_with_offset?.f1), "20% duration / 50 ms floor"),
     metric("Frame F1", formatF1(scores.frame?.f1), `${scores.frame?.frame_hz || "—"} Hz activity grid`),
@@ -116,7 +130,24 @@ function renderMetrics() {
       scores.retraction_rate == null ? "n/a" : `${(scores.retraction_rate * 100).toFixed(1)}%`,
       "of provisional emissions"
     ),
-  ].join("");
+  ];
+  if (live) {
+    metrics.push(
+      metric(
+        "Live ↔ final matches",
+        `${live.matched_note_count} / ${live.final_note_count}`,
+        "same pitch and onset within 80 ms"
+      ),
+      metric("Final additions", String(live.final_additions), "notes absent from committed live view"),
+      metric("Live removals", String(live.live_removals), "live notes absent from final pass"),
+      metric(
+        "Onset revision p50",
+        formatSeconds(live.onset_change_s?.p50),
+        `${live.onset_change_s?.count || 0} matched notes`
+      )
+    );
+  }
+  document.querySelector("#metric-grid").innerHTML = metrics.join("");
 }
 
 function renderLifecycle() {
@@ -615,6 +646,255 @@ function updateCaptureMeter(samples) {
   document.querySelector("#level-fill").style.width = `${percentage}%`;
 }
 
+function liveSend(socket, type, values = {}) {
+  if (socket?.readyState !== WebSocket.OPEN) return false;
+  socket.send(JSON.stringify({ schema_version: LIVE_STREAM_SCHEMA, type, ...values }));
+  return true;
+}
+
+function resetLiveEvaluator() {
+  state.live.events.clear();
+  state.live.audioHeadS = 0;
+  state.live.sampleRate = 0;
+  state.live.windowCount = 0;
+  state.live.recentPitches = [];
+  state.live.highlightedPitches.clear();
+  document.querySelector("#live-status").textContent = "Connecting";
+  document.querySelector("#live-pitch-set").textContent = "Play to reveal pitches";
+  document.querySelector("#live-audio-head").textContent = "0.0 s";
+  document.querySelector("#live-window-count").textContent = "0";
+  document.querySelector("#live-latency").textContent = "—";
+  document.querySelector("#live-transport").textContent = "warming model";
+  renderLiveKeyboard();
+  drawLiveRoll();
+}
+
+function buildLiveKeyboard() {
+  const keyboard = document.querySelector("#live-keyboard");
+  keyboard.replaceChildren();
+  for (let pitch = 21; pitch <= 108; pitch += 1) {
+    const key = document.createElement("span");
+    key.className = `live-key${[1, 3, 6, 8, 10].includes(pitch % 12) ? " black" : ""}`;
+    key.dataset.pitch = String(pitch);
+    key.title = `${pitchName(pitch)} · MIDI ${pitch}`;
+    keyboard.appendChild(key);
+  }
+}
+
+function renderLiveKeyboard() {
+  const now = performance.now();
+  document.querySelectorAll(".live-key").forEach((key) => {
+    const highlight = state.live.highlightedPitches.get(Number(key.dataset.pitch));
+    const visible = highlight && now - highlight.at < 1500;
+    key.classList.toggle("active", Boolean(visible));
+    key.classList.toggle("committed", Boolean(visible && highlight.lifecycle === "committed"));
+  });
+}
+
+function drawLiveRoll() {
+  const canvas = document.querySelector("#live-roll");
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const width = Math.max(320, canvas.clientWidth);
+  const height = 360;
+  if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+  }
+  const context = canvas.getContext("2d");
+  context.setTransform(dpr, 0, 0, dpr, 0, 0);
+  context.fillStyle = "#0c0d0d";
+  context.fillRect(0, 0, width, height);
+
+  const viewEnd = Math.max(LIVE_VIEW_SECONDS, state.live.audioHeadS + 0.25);
+  const viewStart = viewEnd - LIVE_VIEW_SECONDS;
+  const timeX = (seconds) => ((seconds - viewStart) / LIVE_VIEW_SECONDS) * width;
+  const pitchY = (pitch) => ((108 - pitch) / 88) * height;
+  const rowHeight = height / 88;
+
+  for (let second = Math.ceil(viewStart); second <= viewEnd; second += 1) {
+    const x = timeX(second);
+    context.strokeStyle = second % 5 === 0 ? "#383d39" : "#202321";
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(x + 0.5, 0);
+    context.lineTo(x + 0.5, height);
+    context.stroke();
+  }
+  for (let pitch = 24; pitch <= 108; pitch += 12) {
+    const y = pitchY(pitch);
+    context.strokeStyle = "#292d2a";
+    context.beginPath();
+    context.moveTo(0, y);
+    context.lineTo(width, y);
+    context.stroke();
+  }
+
+  const events = [...state.live.events.values()].sort(
+    (left, right) => left.onset_sample - right.onset_sample
+  );
+  for (const event of events) {
+    const onset = event.onset_sample / state.live.sampleRate;
+    const detectedOffset = event.offset_sample / state.live.sampleRate;
+    const offset =
+      event.lifecycle === "provisional"
+        ? Math.max(onset + 0.06, state.live.audioHeadS)
+        : Math.max(onset + 0.04, detectedOffset);
+    if (offset < viewStart || onset > viewEnd || event.pitch < 21 || event.pitch > 108) continue;
+    const x = timeX(Math.max(viewStart, onset));
+    const endX = timeX(Math.min(viewEnd, offset));
+    const y = pitchY(event.pitch);
+    if (event.lifecycle === "retracted") {
+      context.strokeStyle = "#9b83d5";
+      context.strokeRect(x, y, Math.max(3, endX - x), Math.max(2, rowHeight - 1));
+    } else {
+      context.fillStyle = event.lifecycle === "committed" ? "#53d8d0" : "#f6c453";
+      context.globalAlpha = event.lifecycle === "committed" ? 0.86 : 0.74;
+      context.fillRect(x, y, Math.max(3, endX - x), Math.max(2, rowHeight - 1));
+      context.globalAlpha = 1;
+    }
+  }
+
+  const headX = timeX(state.live.audioHeadS);
+  context.strokeStyle = "#f4efe4";
+  context.lineWidth = 1.5;
+  context.beginPath();
+  context.moveTo(headX, 0);
+  context.lineTo(headX, height);
+  context.stroke();
+  renderLiveKeyboard();
+}
+
+function animateLiveEvaluator() {
+  drawLiveRoll();
+  const capture = state.capture;
+  if (capture && !capture.stopped) {
+    state.live.animation = requestAnimationFrame(animateLiveEvaluator);
+  }
+}
+
+function applyLiveEvents(message, socket) {
+  state.live.audioHeadS = message.audio_head_sample / state.live.sampleRate;
+  document.querySelector("#live-audio-head").textContent = `${state.live.audioHeadS.toFixed(1)} s`;
+  state.live.windowCount += message.windows_processed;
+  document.querySelector("#live-window-count").textContent = String(state.live.windowCount);
+  const firstEvents = [];
+  for (const event of message.events) {
+    state.live.events.set(event.event_id, event);
+    if (event.lifecycle !== "retracted") {
+      state.live.highlightedPitches.set(event.pitch, {
+        at: performance.now(),
+        lifecycle: event.lifecycle,
+      });
+    }
+    if (event.revision === 1 && event.lifecycle === "provisional") firstEvents.push(event);
+  }
+  if (firstEvents.length) {
+    const newestOnset = Math.max(...firstEvents.map((event) => event.onset_sample));
+    const cluster = [...state.live.events.values()]
+      .filter(
+        (event) =>
+          event.lifecycle !== "retracted" &&
+          Math.abs(event.onset_sample - newestOnset) / state.live.sampleRate <= 0.18
+      )
+      .map((event) => event.pitch);
+    state.live.recentPitches = [...new Set(cluster)].sort((left, right) => left - right);
+    document.querySelector("#live-pitch-set").textContent =
+      state.live.recentPitches.map(pitchName).join(" · ") || "—";
+    const latency = firstEvents[firstEvents.length - 1].source_to_emission_latency_s;
+    document.querySelector("#live-latency").textContent =
+      latency == null ? "—" : `${latency.toFixed(2)} s`;
+  }
+  drawLiveRoll();
+  requestAnimationFrame(() => {
+    liveSend(socket, "paint", {
+      batch_id: message.batch_id,
+      page_paint_ms: performance.now(),
+      first_event_ids: firstEvents.map((event) => event.event_id),
+    });
+  });
+}
+
+function openLiveSocket(sampleRate, metadata) {
+  return new Promise((resolve, reject) => {
+    const scheme = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const socket = new WebSocket(`${scheme}//${window.location.host}/api/live`);
+    let ready = false;
+    const fail = (error) => {
+      if (!ready) reject(error);
+      else showError(error);
+    };
+    socket.addEventListener("open", () => {
+      liveSend(socket, "start", {
+        sample_rate_hz: sampleRate,
+        client_metadata: metadata,
+      });
+    });
+    socket.addEventListener("message", (event) => {
+      if (typeof event.data !== "string") return;
+      const message = JSON.parse(event.data);
+      if (message.type === "ready") {
+        ready = true;
+        document.querySelector("#live-status").textContent = "Listening";
+        document.querySelector("#live-transport").textContent = "continuous";
+        resolve({ socket, ready: message });
+      } else if (message.type === "block_ack") {
+        if (state.capture) {
+          state.capture.acknowledgedBlocks = message.sequence + 1;
+          state.capture.serverFrames = message.received_source_frames;
+        }
+      } else if (message.type === "events") {
+        applyLiveEvents(message, socket);
+      } else if (message.type === "clock_pong") {
+        const pageReceiveMs = performance.now();
+        liveSend(socket, "clock_observation", {
+          page_send_ms: message.page_send_ms,
+          page_receive_ms: pageReceiveMs,
+          host_receive_ns: message.host_receive_ns,
+          host_send_ns: message.host_send_ns,
+        });
+      } else if (message.type === "stopped") {
+        if (state.capture?.stopSocketResolver) {
+          state.capture.stopSocketResolver(message);
+        }
+      } else if (message.type === "error") {
+        fail(new Error(message.error || "Live recognition failed."));
+      }
+    });
+    socket.addEventListener("error", () => fail(new Error("Live WebSocket connection failed.")));
+    socket.addEventListener("close", () => {
+      if (!ready) reject(new Error("Live WebSocket closed before the model was ready."));
+    });
+  });
+}
+
+function packLivePcmBlock(samples, capture, firstSample, workletTime) {
+  const buffer = new ArrayBuffer(LIVE_BLOCK_HEADER_BYTES + samples.length * 2);
+  const view = new DataView(buffer);
+  for (const [index, value] of [..."ATPB"].entries()) {
+    view.setUint8(index, value.charCodeAt(0));
+  }
+  view.setUint8(4, 1);
+  view.setUint8(5, 1);
+  view.setUint16(6, LIVE_BLOCK_HEADER_BYTES, true);
+  view.setUint32(8, capture.chunkCount, true);
+  view.setUint32(12, 0, true);
+  view.setBigUint64(16, BigInt(firstSample), true);
+  view.setUint32(24, samples.length, true);
+  view.setUint32(28, capture.audioContext.sampleRate, true);
+  view.setFloat64(32, performance.now(), true);
+  view.setFloat64(40, workletTime, true);
+  for (let index = 0; index < samples.length; index += 1) {
+    const sample = Math.max(-1, Math.min(1, samples[index]));
+    view.setInt16(
+      LIVE_BLOCK_HEADER_BYTES + index * 2,
+      sample < 0 ? sample * 32768 : sample * 32767,
+      true
+    );
+  }
+  return buffer;
+}
+
 function flattenChunks(chunks, frameCount) {
   const samples = new Float32Array(frameCount);
   let cursor = 0;
@@ -695,24 +975,25 @@ async function startRecording() {
     return;
   }
   setCaptureUi(true);
+  resetLiveEvaluator();
   document.querySelector("#capture-status").textContent = "Requesting microphone access…";
   let stream = null;
   let audioContext = null;
+  let capture = null;
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       audio: CAPTURE_CONSTRAINTS,
       video: false,
     });
     audioContext = new AudioContext();
+    await audioContext.resume();
     await audioContext.audioWorklet.addModule("/capture-processor.js");
     const source = audioContext.createMediaStreamSource(stream);
     const captureNode = new AudioWorkletNode(audioContext, "atpiano-capture");
     const mutedOutput = audioContext.createGain();
     mutedOutput.gain.value = 0;
-    source.connect(captureNode);
-    captureNode.connect(mutedOutput);
-    mutedOutput.connect(audioContext.destination);
-    const capture = {
+    const trackSettings = stream.getAudioTracks()[0]?.getSettings() || {};
+    capture = {
       stream,
       audioContext,
       source,
@@ -726,8 +1007,16 @@ async function startRecording() {
       sequenceError: false,
       stopFrameCount: null,
       stopResolver: null,
+      stopSocketResolver: null,
       animation: null,
+      clockInterval: null,
+      websocket: null,
+      jobId: null,
+      acknowledgedBlocks: 0,
+      serverFrames: 0,
+      transportError: null,
     };
+    state.capture = capture;
     captureNode.port.onmessage = (event) => {
       if (event.data.type === "chunk") {
         const samples = new Float32Array(event.data.samples);
@@ -735,6 +1024,23 @@ async function startRecording() {
           capture.sequenceError = true;
           showError(new Error("The browser audio sample sequence was discontinuous."));
         }
+        if (
+          !capture.websocket ||
+          capture.websocket.readyState !== WebSocket.OPEN ||
+          capture.websocket.bufferedAmount > MAX_WEBSOCKET_BUFFER_BYTES
+        ) {
+          capture.transportError = "The live transport could not keep up with capture.";
+          showError(new Error(capture.transportError));
+          stopRecording();
+          return;
+        }
+        const block = packLivePcmBlock(
+          samples,
+          capture,
+          event.data.firstSample,
+          event.data.workletTime
+        );
+        capture.websocket.send(block);
         capture.chunks.push(samples);
         capture.frameCount += samples.length;
         capture.chunkCount += 1;
@@ -744,8 +1050,32 @@ async function startRecording() {
         if (capture.stopResolver) capture.stopResolver(true);
       }
     };
-    state.capture = capture;
-    document.querySelector("#capture-status").textContent = "Recording mono PCM";
+    document.querySelector("#capture-status").textContent = "Warming the local model…";
+    const metadata = {
+      schema_version: "atpiano.browser-capture.v1",
+      started_at: capture.startedAt,
+      requested_constraints: CAPTURE_CONSTRAINTS,
+      actual_track_settings: {
+        sampleRate: trackSettings.sampleRate ?? null,
+        channelCount: trackSettings.channelCount ?? null,
+        echoCancellation: trackSettings.echoCancellation ?? null,
+        noiseSuppression: trackSettings.noiseSuppression ?? null,
+        autoGainControl: trackSettings.autoGainControl ?? null,
+        latency: trackSettings.latency ?? null,
+      },
+    };
+    const connection = await openLiveSocket(audioContext.sampleRate, metadata);
+    capture.websocket = connection.socket;
+    capture.jobId = connection.ready.job_id;
+    state.live.sampleRate = audioContext.sampleRate;
+    capture.clockInterval = window.setInterval(() => {
+      liveSend(capture.websocket, "clock_ping", { page_send_ms: performance.now() });
+    }, 2000);
+    liveSend(capture.websocket, "clock_ping", { page_send_ms: performance.now() });
+    source.connect(captureNode);
+    captureNode.connect(mutedOutput);
+    mutedOutput.connect(audioContext.destination);
+    document.querySelector("#capture-status").textContent = "Recognizing mono PCM live";
     const tick = () => {
       if (state.capture !== capture || capture.stopped) return;
       const elapsed = capture.frameCount / audioContext.sampleRate;
@@ -757,10 +1087,16 @@ async function startRecording() {
       capture.animation = requestAnimationFrame(tick);
     };
     tick();
+    animateLiveEvaluator();
   } catch (error) {
+    if (capture?.clockInterval) window.clearInterval(capture.clockInterval);
+    if (capture?.websocket) capture.websocket.close();
     if (stream) stream.getTracks().forEach((track) => track.stop());
     if (audioContext && audioContext.state !== "closed") await audioContext.close();
+    state.capture = null;
     setCaptureUi(false);
+    document.querySelector("#live-status").textContent = "Unavailable";
+    document.querySelector("#live-transport").textContent = "failed";
     document.querySelector("#capture-status").textContent = "Microphone unavailable";
     showError(error);
   }
@@ -777,10 +1113,53 @@ async function stopRecording() {
   capture.captureNode.port.postMessage({ type: "stop" });
   const acknowledged = await Promise.race([
     stopped,
-    new Promise((resolve) => window.setTimeout(() => resolve(false), 500)),
+    new Promise((resolve) => window.setTimeout(() => resolve(false), 1000)),
   ]);
   if (capture.animation) cancelAnimationFrame(capture.animation);
+  if (state.live.animation) cancelAnimationFrame(state.live.animation);
+  if (capture.clockInterval) window.clearInterval(capture.clockInterval);
   const trackSettings = capture.stream.getAudioTracks()[0]?.getSettings() || {};
+
+  if (
+    !acknowledged ||
+    capture.sequenceError ||
+    capture.stopFrameCount !== capture.frameCount ||
+    capture.transportError
+  ) {
+    capture.websocket?.close();
+    capture.stream.getTracks().forEach((track) => track.stop());
+    await capture.audioContext.close();
+    setCaptureUi(false);
+    state.capture = null;
+    document.querySelector("#capture-status").textContent = "Recording was incomplete";
+    showError(
+      new Error(capture.transportError || "The browser audio sample sequence was incomplete.")
+    );
+    return;
+  }
+  if (capture.frameCount === 0) {
+    capture.websocket?.close();
+    capture.stream.getTracks().forEach((track) => track.stop());
+    await capture.audioContext.close();
+    setCaptureUi(false);
+    state.capture = null;
+    document.querySelector("#capture-status").textContent = "No samples were captured";
+    showError(new Error("The microphone did not produce any audio samples."));
+    return;
+  }
+  document.querySelector("#capture-status").textContent = "Closing the live stream…";
+  const socketStopped = new Promise((resolve) => {
+    capture.stopSocketResolver = resolve;
+  });
+  liveSend(capture.websocket, "stop", {
+    frame_count: capture.frameCount,
+    block_count: capture.chunkCount,
+    capture_elapsed_s: capture.frameCount / capture.audioContext.sampleRate,
+  });
+  const stoppedMessage = await Promise.race([
+    socketStopped,
+    new Promise((resolve) => window.setTimeout(() => resolve(null), 30000)),
+  ]);
   capture.stream.getTracks().forEach((track) => track.stop());
   capture.source.disconnect();
   capture.captureNode.disconnect();
@@ -788,21 +1167,12 @@ async function stopRecording() {
   await capture.audioContext.close();
   setCaptureUi(false);
   state.capture = null;
+  if (!stoppedMessage) {
+    document.querySelector("#capture-status").textContent = "Live finalization failed";
+    showError(new Error("The local server did not acknowledge the complete live stream."));
+    return;
+  }
 
-  if (
-    !acknowledged ||
-    capture.sequenceError ||
-    capture.stopFrameCount !== capture.frameCount
-  ) {
-    document.querySelector("#capture-status").textContent = "Recording was incomplete";
-    showError(new Error("The browser did not deliver one continuous audio sample sequence."));
-    return;
-  }
-  if (capture.frameCount === 0) {
-    document.querySelector("#capture-status").textContent = "No samples were captured";
-    showError(new Error("The microphone did not produce any audio samples."));
-    return;
-  }
   const samples = flattenChunks(capture.chunks, capture.frameCount);
   const duration = capture.frameCount / capture.audioContext.sampleRate;
   const blob = encodeWav(samples, capture.audioContext.sampleRate);
@@ -834,8 +1204,11 @@ async function stopRecording() {
     `${duration.toFixed(1)} s · ${capture.audioContext.sampleRate.toLocaleString()} Hz`;
   document.querySelector("#take-panel").hidden = false;
   document.querySelector("#capture-time").textContent = formatClock(duration);
-  document.querySelector("#capture-status").textContent = "Take ready to review";
+  document.querySelector("#capture-status").textContent = "Running the exact final pass";
+  document.querySelector("#live-status").textContent = "Reconciling";
+  document.querySelector("#live-transport").textContent = "complete";
   drawRecordingWaveform(samples);
+  await completeLiveJob(stoppedMessage.job_id);
 }
 
 function discardRecording() {
@@ -849,7 +1222,6 @@ function discardRecording() {
   document.querySelector("#capture-status").textContent = "Ready for a new take";
   document.querySelector("#capture-time").textContent = "0:00.0";
   document.querySelector("#level-fill").style.width = "0";
-  document.querySelector("#transcribe-recording").disabled = false;
 }
 
 async function pollJob(jobId) {
@@ -876,37 +1248,27 @@ async function pollJob(jobId) {
   }
 }
 
-async function transcribeRecording() {
-  if (!state.take) return;
-  const button = document.querySelector("#transcribe-recording");
-  button.disabled = true;
+async function completeLiveJob(jobId) {
   document.querySelector("#job-panel").hidden = false;
   document.querySelector(".spinner").hidden = false;
-  document.querySelector("#job-title").textContent = "Uploading recording";
-  document.querySelector("#job-detail").textContent = "Preparing a versioned local input.";
+  document.querySelector("#job-title").textContent = "Reconciling the complete take";
+  document.querySelector("#job-detail").textContent =
+    "The untouched full-file adapter is replacing or confirming the rolling preview.";
   try {
-    const encodedMetadata = btoa(JSON.stringify(state.take.metadata));
-    const response = await fetch("/api/transcriptions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "audio/wav",
-        "X-Atpiano-Capture-Metadata": encodedMetadata,
-      },
-      body: state.take.blob,
-    });
-    const job = await response.json();
-    if (!response.ok) throw new Error(job.error || `Upload failed: HTTP ${response.status}`);
-    const completed = await pollJob(job.job_id);
+    const completed = await pollJob(jobId);
     state.runId = completed.job_id;
     window.history.replaceState({}, "", completed.run_url);
     document.querySelector("#job-title").textContent = "Transcription complete";
-    document.querySelector("#job-detail").textContent = "The recovered notes are ready below.";
+    document.querySelector("#job-detail").textContent =
+      "The live history and best final transcript are ready below.";
     document.querySelector(".spinner").hidden = true;
+    document.querySelector("#capture-status").textContent = "Live take complete";
+    document.querySelector("#live-status").textContent = "Finalized";
     await loadRun();
     document.querySelector("#review").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
     document.querySelector("#job-panel").hidden = true;
-    button.disabled = false;
+    document.querySelector("#live-status").textContent = "Final pass failed";
     showError(error);
   }
 }
@@ -915,7 +1277,8 @@ function wireRecorder() {
   document.querySelector("#start-recording").addEventListener("click", startRecording);
   document.querySelector("#stop-recording").addEventListener("click", stopRecording);
   document.querySelector("#discard-recording").addEventListener("click", discardRecording);
-  document.querySelector("#transcribe-recording").addEventListener("click", transcribeRecording);
+  buildLiveKeyboard();
+  drawLiveRoll();
 }
 
 async function init() {

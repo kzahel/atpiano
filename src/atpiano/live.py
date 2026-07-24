@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import io
 import json
 import struct
 import time
 import wave
+from contextlib import redirect_stdout
 from dataclasses import dataclass
 from math import gcd
 from pathlib import Path
@@ -94,7 +96,8 @@ class BasicPitchLiveModel:
         from basic_pitch.note_creation import model_output_to_notes
 
         inference_start_ns = time.perf_counter_ns()
-        output = self.model.predict(audio.reshape((1, audio.shape[0], 1)))
+        with redirect_stdout(io.StringIO()):
+            output = self.model.predict(audio.reshape((1, audio.shape[0], 1)))
         inference_end_ns = time.perf_counter_ns()
         decode_start_ns = time.perf_counter_ns()
         _, note_events = model_output_to_notes(
@@ -332,6 +335,11 @@ class LiveRecognitionProcessor:
             "session_id": self.session_id,
             "source_sample_rate_hz": self.source_sample_rate_hz,
             "source_frame_count": self.available_source_samples,
+            "session_origin_ns": self.session_origin_ns,
+            "session_origin_policy": (
+                "first block receipt minus its source end; browser clock "
+                "observations retained for delivery analysis"
+            ),
             "model": self.model.provenance(),
             "window": {
                 "duration_s": self.window_duration_s,
@@ -384,6 +392,21 @@ def finalize_live_run(run_directory: Path) -> dict[str, Any] | None:
         return None
     recognition = read_json(recognition_path)
     prediction = read_json(prediction_path)
+    input_manifest_path = run_directory / "input.json"
+    input_manifest = read_json(input_manifest_path)
+    capture = input_manifest.get("capture")
+    if isinstance(capture, dict) and capture.get("adapter") == (
+        "web-audio-worklet-live-v1"
+    ):
+        for field in (
+            "block_timing_path",
+            "clock_observations_path",
+            "browser_paint_path",
+        ):
+            relative_path = capture.get(field)
+            if isinstance(relative_path, str):
+                capture[field] = f"live/{Path(relative_path).name}"
+        write_json(input_manifest_path, input_manifest)
     sample_rate_hz = int(recognition["source_sample_rate_hz"])
     latest: dict[str, dict[str, Any]] = {}
     for line in events_path.read_text(encoding="utf-8").splitlines():
@@ -425,6 +448,11 @@ def finalize_live_run(run_directory: Path) -> dict[str, Any] | None:
         abs(final_notes[final_index].offset_s - live_notes[live_index].offset_s)
         for final_index, live_index in matches
     ]
+    delivery = _browser_delivery_summary(
+        run_directory / "live",
+        recognition=recognition,
+        events_path=events_path,
+    )
     result = {
         "schema_version": "atpiano.live-reconciliation.v1",
         "live_committed_note_count": len(live_notes),
@@ -439,6 +467,7 @@ def finalize_live_run(run_directory: Path) -> dict[str, Any] | None:
             "live": "live/recognition/events.jsonl",
             "final": "prediction.json",
         },
+        "browser_delivery": delivery,
     }
     reconciliation_path = run_directory / "live" / "reconciliation.json"
     write_json(reconciliation_path, result)
@@ -447,15 +476,110 @@ def finalize_live_run(run_directory: Path) -> dict[str, Any] | None:
         "recognition": "live/recognition/recognition.json",
         "events": "live/recognition/events.jsonl",
         "reconciliation": "live/reconciliation.json",
+        "delivery": "live/delivery.json" if delivery is not None else None,
     }
     run.setdefault("artifacts", {})["live_recognition"] = run["live"]["recognition"]
     run["artifacts"]["live_events"] = run["live"]["events"]
     run["artifacts"]["live_reconciliation"] = run["live"]["reconciliation"]
+    if run["live"]["delivery"] is not None:
+        run["artifacts"]["live_delivery"] = run["live"]["delivery"]
     write_json(run_directory / "run.json", run)
     scores_path = run_directory / "scores.json"
     scores = read_json(scores_path)
     scores["live_reconciliation"] = result
     write_json(scores_path, scores)
+    return result
+
+
+def _browser_delivery_summary(
+    live_directory: Path,
+    *,
+    recognition: dict[str, Any],
+    events_path: Path,
+) -> dict[str, Any] | None:
+    clock_path = live_directory / "clock.jsonl"
+    paint_path = live_directory / "paint.jsonl"
+    if not clock_path.is_file() or not paint_path.is_file():
+        return None
+    clocks = [
+        json.loads(line)
+        for line in clock_path.read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+    paints = [
+        json.loads(line)
+        for line in paint_path.read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+    if not clocks:
+        return None
+    page_mid_ms = np.asarray(
+        [
+            (row["page_send_ms"] + row["page_receive_ms"]) / 2
+            for row in clocks
+        ],
+        dtype=np.float64,
+    )
+    host_mid_ns = np.asarray(
+        [
+            (row["host_receive_ns"] + row["host_send_ns"]) / 2
+            for row in clocks
+        ],
+        dtype=np.float64,
+    )
+    if len(clocks) >= 2 and float(np.ptp(page_mid_ms)) > 0:
+        slope, intercept = np.polyfit(page_mid_ms, host_mid_ns, 1)
+        policy = "least-squares page-performance-ms to host-monotonic-ns"
+    else:
+        slope = 1_000_000.0
+        intercept = float(host_mid_ns[0] - slope * page_mid_ms[0])
+        policy = "single-observation offset with fixed monotonic clock rate"
+    residual_ns = host_mid_ns - (page_mid_ms * slope + intercept)
+    round_trip_ms = [
+        (row["page_receive_ms"] - row["page_send_ms"])
+        - (row["host_send_ns"] - row["host_receive_ns"]) / 1_000_000
+        for row in clocks
+    ]
+    first_events: dict[str, dict[str, Any]] = {}
+    for line in events_path.read_text(encoding="utf-8").splitlines():
+        if not line:
+            continue
+        event = json.loads(line)
+        if event["revision"] == 1:
+            first_events[event["event_id"]] = event
+    session_origin_ns = int(recognition["session_origin_ns"])
+    sample_rate_hz = int(recognition["source_sample_rate_hz"])
+    painted_latencies: list[float] = []
+    painted_event_ids: set[str] = set()
+    for paint in paints:
+        paint_host_ns = paint["page_paint_ms"] * slope + intercept
+        for event_id in paint["first_event_ids"]:
+            if event_id in painted_event_ids or event_id not in first_events:
+                continue
+            event = first_events[event_id]
+            onset_s = event["onset_sample"] / sample_rate_hz
+            paint_elapsed_s = (paint_host_ns - session_origin_ns) / 1_000_000_000
+            painted_latencies.append(float(paint_elapsed_s - onset_s))
+            painted_event_ids.add(event_id)
+    result = {
+        "schema_version": "atpiano.live-browser-delivery.v1",
+        "clock_mapping": {
+            "policy": policy,
+            "observation_count": len(clocks),
+            "slope_ns_per_page_ms": float(slope),
+            "intercept_ns": float(intercept),
+            "residual_s": _latency_summary(
+                [abs(float(value)) / 1_000_000_000 for value in residual_ns]
+            ),
+            "round_trip_s": _latency_summary(
+                [max(0.0, float(value)) / 1000 for value in round_trip_ms]
+            ),
+        },
+        "paint_acknowledgement_count": len(paints),
+        "first_visible_event_count": len(painted_event_ids),
+        "source_onset_to_browser_paint_s": _latency_summary(painted_latencies),
+    }
+    write_json(live_directory / "delivery.json", result)
     return result
 
 
@@ -543,9 +667,11 @@ class LiveCaptureSession:
         self.input_directory.mkdir(parents=True)
         self.live_directory.mkdir()
         self.pcm_path = self.live_directory / ".capture.pcm"
-        self.block_timing_path = self.input_directory / "live-blocks.jsonl"
+        self.block_timing_path = self.live_directory / "blocks.jsonl"
         self._pcm = self.pcm_path.open("wb")
         self._block_rows: list[dict[str, Any]] = []
+        self._clock_rows: list[dict[str, Any]] = []
+        self._paint_rows: list[dict[str, Any]] = []
         self.next_sequence = 0
         self.next_sample = 0
         self.closed = False
@@ -584,6 +710,56 @@ class LiveCaptureSession:
         self.next_sample += block.frame_count
         return row
 
+    def record_clock_observation(
+        self,
+        message: dict[str, Any],
+        *,
+        received_ns: int,
+    ) -> None:
+        values = {
+            name: message.get(name)
+            for name in (
+                "page_send_ms",
+                "page_receive_ms",
+                "host_receive_ns",
+                "host_send_ns",
+            )
+        }
+        if not all(
+            isinstance(value, (int, float)) and not isinstance(value, bool)
+            for value in values.values()
+        ):
+            raise ValueError("live clock observation is invalid")
+        self._clock_rows.append(
+            {
+                "schema_version": "atpiano.live-clock-observation.v1",
+                **values,
+                "observation_received_monotonic_ns": received_ns,
+            }
+        )
+
+    def record_paint(self, message: dict[str, Any], *, received_ns: int) -> None:
+        batch_id = message.get("batch_id")
+        page_paint_ms = message.get("page_paint_ms")
+        first_event_ids = message.get("first_event_ids")
+        if (
+            not isinstance(batch_id, str)
+            or not isinstance(page_paint_ms, (int, float))
+            or isinstance(page_paint_ms, bool)
+            or not isinstance(first_event_ids, list)
+            or not all(isinstance(event_id, str) for event_id in first_event_ids)
+        ):
+            raise ValueError("live browser paint acknowledgement is invalid")
+        self._paint_rows.append(
+            {
+                "schema_version": "atpiano.live-browser-paint.v1",
+                "batch_id": batch_id,
+                "page_paint_ms": float(page_paint_ms),
+                "first_event_ids": first_event_ids,
+                "acknowledgement_received_monotonic_ns": received_ns,
+            }
+        )
+
     def finalize(
         self,
         *,
@@ -608,6 +784,10 @@ class LiveCaptureSession:
         self._pcm.close()
         self.closed = True
         write_jsonl(self.block_timing_path, self._block_rows)
+        clock_path = self.live_directory / "clock.jsonl"
+        paint_path = self.live_directory / "paint.jsonl"
+        write_jsonl(clock_path, self._clock_rows)
+        write_jsonl(paint_path, self._paint_rows)
         wav_path = self.input_directory / ".live.wav"
         with wave.open(str(wav_path), "wb") as recording:
             recording.setnchannels(1)
@@ -627,10 +807,14 @@ class LiveCaptureSession:
             adapter="web-audio-worklet-live-v1",
             transport="same-origin loopback WebSocket PCM16 blocks",
             capture_details={
-                "block_timing_path": self.block_timing_path.name,
+                "block_timing_path": f"../live/{self.block_timing_path.name}",
                 "block_timing_sha256": sha256_file(self.block_timing_path),
                 "block_count": self.next_sequence,
                 "continuity": "exact; gaps, duplicates, and reordering rejected",
+                "clock_observations_path": f"../live/{clock_path.name}",
+                "clock_observations_sha256": sha256_file(clock_path),
+                "browser_paint_path": f"../live/{paint_path.name}",
+                "browser_paint_sha256": sha256_file(paint_path),
             },
         )
         wav_path.unlink()
@@ -643,6 +827,8 @@ class LiveCaptureSession:
             "sample_rate_hz": self.sample_rate_hz,
             "source_frame_count": self.next_sample,
             "block_count": self.next_sequence,
+            "clock_observation_count": len(self._clock_rows),
+            "paint_acknowledgement_count": len(self._paint_rows),
             "pcm_sha256": sha256_file(self.pcm_path),
             "audio_sha256": manifest["audio"]["sha256"],
             "input_manifest": str(self.input_directory / "input.json"),

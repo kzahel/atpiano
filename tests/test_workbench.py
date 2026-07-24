@@ -109,6 +109,7 @@ def _fake_transcriber(
     manifest = read_json(input_manifest)
     run_directory.mkdir(parents=True)
     shutil.copyfile(input_manifest.parent / manifest["audio"]["path"], run_directory / "input.wav")
+    shutil.copyfile(input_manifest, run_directory / "input.json")
     run = {
         "schema_version": "atpiano.run.v1",
         "run_id": run_directory.name,
@@ -222,7 +223,9 @@ def test_workbench_upload_job_and_reloadable_artifacts(tmp_path: Path) -> None:
     base_url = f"http://127.0.0.1:{server.server_address[1]}"
     try:
         with urllib.request.urlopen(f"{base_url}/api/config", timeout=2) as response:
-            assert json.load(response)["mode"] == "workbench"
+            config = json.load(response)
+        assert config["mode"] == "workbench"
+        assert config["live"]["enabled"] is True
         foreign_host = urllib.request.Request(
             f"{base_url}/api/config",
             headers={"Host": "example.test"},
@@ -232,6 +235,8 @@ def test_workbench_upload_job_and_reloadable_artifacts(tmp_path: Path) -> None:
         assert host_error.value.code == 403
         with urllib.request.urlopen(f"{base_url}/capture-processor.js", timeout=2) as response:
             assert b"registerProcessor" in response.read()
+        with urllib.request.urlopen(base_url, timeout=2) as response:
+            assert b'id="live-roll"' in response.read()
 
         invalid_request = urllib.request.Request(
             f"{base_url}/api/transcriptions",
@@ -390,6 +395,28 @@ def test_workbench_live_websocket_preserves_sample_stream(tmp_path: Path) -> Non
         assert opcode == 0x1
         assert ready["type"] == "ready"
         job_id = ready["job_id"]
+        _send_live_json(
+            connection,
+            {
+                "schema_version": LIVE_STREAM_SCHEMA,
+                "type": "clock_ping",
+                "page_send_ms": 10.0,
+            },
+        )
+        _, payload = _server_websocket_frame(stream)
+        clock = json.loads(payload)
+        assert clock["type"] == "clock_pong"
+        _send_live_json(
+            connection,
+            {
+                "schema_version": LIVE_STREAM_SCHEMA,
+                "type": "clock_observation",
+                "page_send_ms": 10.0,
+                "page_receive_ms": 11.0,
+                "host_receive_ns": clock["host_receive_ns"],
+                "host_send_ns": clock["host_send_ns"],
+            },
+        )
 
         pcm = struct.pack("<6h", -32768, -2, -1, 0, 1, 32767)
         blocks = (
@@ -405,7 +432,18 @@ def test_workbench_live_websocket_preserves_sample_stream(tmp_path: Path) -> Non
             assert acknowledgement["type"] == "block_ack"
             if acknowledgement["window_count"]:
                 _, payload = _server_websocket_frame(stream)
-                assert json.loads(payload)["type"] == "events"
+                event_batch = json.loads(payload)
+                assert event_batch["type"] == "events"
+                _send_live_json(
+                    connection,
+                    {
+                        "schema_version": LIVE_STREAM_SCHEMA,
+                        "type": "paint",
+                        "batch_id": event_batch["batch_id"],
+                        "page_paint_ms": 12.0,
+                        "first_event_ids": [],
+                    },
+                )
 
         _send_live_json(
             connection,
@@ -438,6 +476,11 @@ def test_workbench_live_websocket_preserves_sample_stream(tmp_path: Path) -> Non
         manifest = read_json(input_directory / "input.json")
         assert manifest["capture"]["adapter"] == "web-audio-worklet-live-v1"
         assert manifest["capture"]["block_count"] == 2
+        run_directory = tmp_path / job_id / f"run-{job_id}"
+        run = read_json(run_directory / "run.json")
+        assert run["live"]["delivery"] == "live/delivery.json"
+        delivery = read_json(run_directory / "live" / "delivery.json")
+        assert delivery["clock_mapping"]["observation_count"] == 1
     finally:
         stream.close()
         connection.close()

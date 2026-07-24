@@ -64,6 +64,23 @@ def test_live_capture_preserves_exact_pcm_and_continuity(tmp_path: Path) -> None
     second = _block(1, 3, [1, 32767])
     session.accept_block(first, received_ns=1_000)
     session.accept_block(second, received_ns=2_000)
+    session.record_clock_observation(
+        {
+            "page_send_ms": 10.0,
+            "page_receive_ms": 12.0,
+            "host_receive_ns": 10_500_000,
+            "host_send_ns": 10_600_000,
+        },
+        received_ns=12_500_000,
+    )
+    session.record_paint(
+        {
+            "batch_id": "test-1",
+            "page_paint_ms": 13.0,
+            "first_event_ids": ["event-1"],
+        },
+        received_ns=13_500_000,
+    )
 
     manifest = session.finalize(
         expected_frame_count=5,
@@ -73,12 +90,16 @@ def test_live_capture_preserves_exact_pcm_and_continuity(tmp_path: Path) -> None
 
     assert manifest["capture"]["adapter"] == "web-audio-worklet-live-v1"
     assert manifest["capture"]["block_count"] == 2
+    assert manifest["capture"]["clock_observations_path"] == "../live/clock.jsonl"
+    assert manifest["capture"]["browser_paint_path"] == "../live/paint.jsonl"
     assert manifest["audio"]["frame_count"] == 5
     recording = session.input_directory / "recording.wav"
     assert recording.read_bytes()[-10:] == first.pcm_s16le + second.pcm_s16le
     live = read_json(session.live_directory / "session.json")
     assert live["status"] == "captured"
     assert live["source_frame_count"] == 5
+    assert live["clock_observation_count"] == 1
+    assert live["paint_acknowledgement_count"] == 1
 
 
 def test_live_capture_rejects_sequence_and_source_gaps(tmp_path: Path) -> None:

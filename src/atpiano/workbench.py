@@ -135,6 +135,13 @@ class WorkbenchHandler(ReviewerHandler):
                     "schema_version": "atpiano.workbench-config.v1",
                     "mode": "workbench",
                     "max_upload_bytes": MAX_UPLOAD_BYTES,
+                    "live": {
+                        "enabled": True,
+                        "schema_version": LIVE_STREAM_SCHEMA,
+                        "transport": "same-origin loopback WebSocket PCM16",
+                        "hop_s": 0.25,
+                        "commit_horizon_s": 1.0,
+                    },
                 }
             )
             return
@@ -384,6 +391,37 @@ class WorkbenchHandler(ReviewerHandler):
                     )
                     self._send_websocket_close()
                     return
+                elif message["type"] == "clock_ping":
+                    page_send_ms = message.get("page_send_ms")
+                    if (
+                        not isinstance(page_send_ms, (int, float))
+                        or isinstance(page_send_ms, bool)
+                    ):
+                        raise ValueError("live clock ping is invalid")
+                    host_receive_ns = time.perf_counter_ns()
+                    self._send_websocket_json(
+                        {
+                            "schema_version": LIVE_STREAM_SCHEMA,
+                            "type": "clock_pong",
+                            "page_send_ms": page_send_ms,
+                            "host_receive_ns": host_receive_ns,
+                            "host_send_ns": time.perf_counter_ns(),
+                        }
+                    )
+                elif message["type"] == "clock_observation":
+                    if capture is None:
+                        raise ValueError("clock observation arrived before start")
+                    capture.record_clock_observation(
+                        message,
+                        received_ns=time.perf_counter_ns(),
+                    )
+                elif message["type"] == "paint":
+                    if capture is None:
+                        raise ValueError("paint acknowledgement arrived before start")
+                    capture.record_paint(
+                        message,
+                        received_ns=time.perf_counter_ns(),
+                    )
                 else:
                     raise ValueError(f"unsupported live control type: {message['type']}")
         except (ConnectionError, OSError, RuntimeError, ValueError) as error:
@@ -673,6 +711,12 @@ class WorkbenchServer(ThreadingHTTPServer):
                 command=["atpiano", "workbench", "browser-upload", job_id],
             )
             if live_directory is not None and live_directory.is_dir():
+                capture_metadata = input_manifest.parent / "browser-capture.json"
+                if capture_metadata.is_file():
+                    shutil.copyfile(
+                        capture_metadata,
+                        run_directory / capture_metadata.name,
+                    )
                 shutil.copytree(live_directory, run_directory / "live")
                 finalize_live_run(run_directory)
         except Exception as error:

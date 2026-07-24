@@ -24,6 +24,7 @@ class AtpianoCaptureProcessor extends AudioWorkletProcessor {
       {
         type: "chunk",
         firstSample: this.emittedFrames,
+        workletTime: currentTime,
         samples: output.buffer,
       },
       [output.buffer]
