@@ -269,6 +269,7 @@ class WorkbenchHandler(ReviewerHandler):
                             "source_frame_count": row["source_frame_count"],
                             "received_source_frames": capture.next_sample,
                             "window_count": recognition_batch["window_count"],
+                            "noise_gate": recognition_batch["noise_gate"],
                         }
                     )
                     if (
@@ -288,6 +289,7 @@ class WorkbenchHandler(ReviewerHandler):
                                 "windows_processed": recognition_batch[
                                     "windows_processed"
                                 ],
+                                "noise_gate": recognition_batch["noise_gate"],
                                 "events": recognition_batch["events"],
                                 "host_sent_monotonic_ns": time.perf_counter_ns(),
                             }
@@ -348,6 +350,13 @@ class WorkbenchHandler(ReviewerHandler):
                                 ),
                                 "hop_s": 0.25,
                                 "commit_horizon_s": 1.0,
+                            },
+                            "noise_gate": {
+                                "calibration_s": 1.0,
+                                "policy": (
+                                    "median 50 ms room RMS + 8 dB, clamped "
+                                    "to -48 through -34 dBFS"
+                                ),
                             },
                         }
                     )

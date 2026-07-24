@@ -11,6 +11,7 @@ from atpiano.live import (
     LiveCaptureSession,
     LiveModelOutput,
     LiveRecognitionProcessor,
+    OnsetEnergyGate,
     PcmBlock,
     pack_pcm_block,
     parse_pcm_block,
@@ -118,6 +119,31 @@ def test_live_capture_rejects_sequence_and_source_gaps(tmp_path: Path) -> None:
     session.abort("test complete")
 
 
+def test_onset_energy_gate_calibrates_and_rejects_background() -> None:
+    gate = OnsetEnergyGate(sample_rate_hz=1_000)
+    samples = np.zeros(2_000, dtype="<i2")
+    samples[1_380:1_520] = 8_000
+    pcm = samples.tobytes()
+
+    assert gate.calibrate(pcm) is True
+    assert gate.noise_floor_dbfs == -120.0
+    assert gate.threshold_dbfs == -48.0
+
+    calibration_note = MidiNote(onset_s=0.5, offset_s=0.8, pitch=60, velocity=80)
+    background_note = MidiNote(onset_s=1.7, offset_s=1.9, pitch=62, velocity=80)
+    audible_note = MidiNote(onset_s=1.4, offset_s=1.8, pitch=64, velocity=80)
+
+    assert gate.evaluate(calibration_note, pcm)[2] == "calibration"
+    assert gate.evaluate(background_note, pcm)[2] == "below_threshold"
+    accepted, level_dbfs, reason = gate.evaluate(audible_note, pcm)
+    assert accepted is True
+    assert reason == "accepted"
+    assert level_dbfs is not None and level_dbfs > gate.threshold_dbfs
+    assert gate.status()["accepted_candidate_count"] == 1
+    assert gate.status()["rejected_calibration_count"] == 1
+    assert gate.status()["rejected_level_count"] == 1
+
+
 class _WindowModel:
     sample_rate_hz = 1_000
     window_samples = 2_000
@@ -161,10 +187,15 @@ def test_live_recognition_revises_onset_then_commits(tmp_path: Path) -> None:
     batches = []
     cursor = 0
     for sequence, frame_count in enumerate((1_800, 250, 250, 250)):
+        samples = [0] * frame_count
+        signal_start = max(cursor, 1_380)
+        signal_end = min(cursor + frame_count, 1_520)
+        for sample in range(signal_start, signal_end):
+            samples[sample - cursor] = 8_000
         block = _block(
             sequence,
             cursor,
-            [0] * frame_count,
+            samples,
             sample_rate_hz=1_000,
         )
         batches.append(processor.accept_block(block, received_ns=sequence + 1))
@@ -180,3 +211,6 @@ def test_live_recognition_revises_onset_then_commits(tmp_path: Path) -> None:
     manifest = processor.finalize()
     assert manifest["window"]["window_count"] == 4
     assert manifest["events"]["committed_tracks"] == 1
+    assert manifest["noise_gate"]["accepted_candidate_count"] == 4
+    assert manifest["noise_gate"]["rejected_level_count"] == 0
+    assert (tmp_path / "recognition" / "gate.jsonl").is_file()

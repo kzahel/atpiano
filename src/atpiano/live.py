@@ -40,6 +40,13 @@ MAX_PCM_BLOCK_FRAMES = 16_384
 MAX_LIVE_SECONDS = 120
 DEFAULT_LIVE_HOP_S = 0.25
 DEFAULT_COMMIT_HORIZON_S = 1.0
+DEFAULT_NOISE_CALIBRATION_S = 1.0
+DEFAULT_NOISE_FRAME_S = 0.05
+DEFAULT_NOISE_MARGIN_DB = 8.0
+DEFAULT_NOISE_GATE_MIN_DBFS = -48.0
+DEFAULT_NOISE_GATE_MAX_DBFS = -34.0
+DEFAULT_ONSET_LOOKBEHIND_S = 0.02
+DEFAULT_ONSET_LOOKAHEAD_S = 0.12
 
 
 @dataclass(frozen=True)
@@ -72,6 +79,111 @@ class LiveWindowModel(Protocol):
     def predict(self, audio: np.ndarray) -> LiveModelOutput: ...
 
     def provenance(self) -> dict[str, Any]: ...
+
+
+class OnsetEnergyGate:
+    """Calibrate a room floor and reject candidates without an audible attack."""
+
+    def __init__(
+        self,
+        sample_rate_hz: int,
+        *,
+        calibration_s: float = DEFAULT_NOISE_CALIBRATION_S,
+        frame_s: float = DEFAULT_NOISE_FRAME_S,
+        margin_db: float = DEFAULT_NOISE_MARGIN_DB,
+        minimum_dbfs: float = DEFAULT_NOISE_GATE_MIN_DBFS,
+        maximum_dbfs: float = DEFAULT_NOISE_GATE_MAX_DBFS,
+        lookbehind_s: float = DEFAULT_ONSET_LOOKBEHIND_S,
+        lookahead_s: float = DEFAULT_ONSET_LOOKAHEAD_S,
+    ) -> None:
+        self.sample_rate_hz = sample_rate_hz
+        self.calibration_s = calibration_s
+        self.frame_s = frame_s
+        self.margin_db = margin_db
+        self.minimum_dbfs = minimum_dbfs
+        self.maximum_dbfs = maximum_dbfs
+        self.lookbehind_s = lookbehind_s
+        self.lookahead_s = lookahead_s
+        self.noise_floor_dbfs: float | None = None
+        self.threshold_dbfs: float | None = None
+        self.native_candidate_count = 0
+        self.accepted_candidate_count = 0
+        self.rejected_calibration_count = 0
+        self.rejected_level_count = 0
+
+    @property
+    def calibration_samples(self) -> int:
+        return round(self.calibration_s * self.sample_rate_hz)
+
+    def calibrate(self, pcm_s16le: bytes | bytearray) -> bool:
+        if self.threshold_dbfs is not None:
+            return True
+        if len(pcm_s16le) // 2 < self.calibration_samples:
+            return False
+        samples = np.frombuffer(
+            bytes(pcm_s16le[: self.calibration_samples * 2]),
+            dtype="<i2",
+        ).astype(np.float64)
+        frame_samples = max(1, round(self.frame_s * self.sample_rate_hz))
+        levels = [
+            _rms_dbfs(samples[start : start + frame_samples] / 32768.0)
+            for start in range(0, samples.shape[0], frame_samples)
+        ]
+        self.noise_floor_dbfs = float(np.median(levels))
+        self.threshold_dbfs = float(
+            np.clip(
+                self.noise_floor_dbfs + self.margin_db,
+                self.minimum_dbfs,
+                self.maximum_dbfs,
+            )
+        )
+        return True
+
+    def evaluate(
+        self,
+        note: MidiNote,
+        pcm_s16le: bytes | bytearray,
+    ) -> tuple[bool, float | None, str]:
+        self.native_candidate_count += 1
+        if note.onset_s < self.calibration_s:
+            self.rejected_calibration_count += 1
+            return False, None, "calibration"
+        if not self.calibrate(pcm_s16le):
+            self.rejected_calibration_count += 1
+            return False, None, "uncalibrated"
+        onset_sample = round(note.onset_s * self.sample_rate_hz)
+        start = max(0, onset_sample - round(self.lookbehind_s * self.sample_rate_hz))
+        end = min(
+            len(pcm_s16le) // 2,
+            onset_sample + round(self.lookahead_s * self.sample_rate_hz),
+        )
+        samples = np.frombuffer(
+            bytes(pcm_s16le[start * 2 : end * 2]),
+            dtype="<i2",
+        ).astype(np.float64)
+        level_dbfs = _rms_dbfs(samples / 32768.0)
+        if level_dbfs < (self.threshold_dbfs or self.maximum_dbfs):
+            self.rejected_level_count += 1
+            return False, level_dbfs, "below_threshold"
+        self.accepted_candidate_count += 1
+        return True, level_dbfs, "accepted"
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "schema_version": "atpiano.onset-energy-gate.v1",
+            "calibrated": self.threshold_dbfs is not None,
+            "calibration_s": self.calibration_s,
+            "frame_s": self.frame_s,
+            "noise_floor_dbfs": self.noise_floor_dbfs,
+            "margin_db": self.margin_db,
+            "threshold_dbfs": self.threshold_dbfs,
+            "threshold_clamp_dbfs": [self.minimum_dbfs, self.maximum_dbfs],
+            "onset_window_s": [-self.lookbehind_s, self.lookahead_s],
+            "native_candidate_count": self.native_candidate_count,
+            "accepted_candidate_count": self.accepted_candidate_count,
+            "rejected_calibration_count": self.rejected_calibration_count,
+            "rejected_level_count": self.rejected_level_count,
+        }
 
 
 class BasicPitchLiveModel:
@@ -179,6 +291,8 @@ class LiveRecognitionProcessor:
         self._events: list[dict[str, Any]] = []
         self._timing_rows: list[dict[str, Any]] = []
         self._raw_rows: list[dict[str, Any]] = []
+        self._gate_rows: list[dict[str, Any]] = []
+        self.noise_gate = OnsetEnergyGate(source_sample_rate_hz)
         self.reconciler = StreamingReconciler(
             session_id=session_id,
             sample_rate_hz=source_sample_rate_hz,
@@ -227,6 +341,7 @@ class LiveRecognitionProcessor:
         if block.first_sample != self.available_source_samples:
             raise ValueError("recognition PCM position does not match capture position")
         self._pcm.extend(block.pcm_s16le)
+        self.noise_gate.calibrate(self._pcm)
         batch_events: list[dict[str, Any]] = []
         processed = 0
         while True:
@@ -239,7 +354,7 @@ class LiveRecognitionProcessor:
             prepare_end_ns = time.perf_counter_ns()
             output = self.model.predict(model_audio)
             emitted_ns = time.perf_counter_ns()
-            absolute_candidates = [
+            native_candidates = [
                 (
                     MidiNote(
                         onset_s=note.onset_s
@@ -253,6 +368,27 @@ class LiveRecognitionProcessor:
                 )
                 for note, confidence in output.candidates
             ]
+            absolute_candidates: list[tuple[MidiNote, float]] = []
+            gate_start = len(self._gate_rows)
+            for note, confidence in native_candidates:
+                accepted, onset_level_dbfs, reason = self.noise_gate.evaluate(
+                    note,
+                    self._pcm,
+                )
+                self._gate_rows.append(
+                    {
+                        "schema_version": "atpiano.onset-energy-decision.v1",
+                        "window_index": self._window_index,
+                        "pitch": note.pitch,
+                        "onset_s": note.onset_s,
+                        "onset_level_dbfs": onset_level_dbfs,
+                        "threshold_dbfs": self.noise_gate.threshold_dbfs,
+                        "accepted": accepted,
+                        "reason": reason,
+                    }
+                )
+                if accepted:
+                    absolute_candidates.append((note, confidence))
             region = WindowRegion(
                 index=self._window_index,
                 source_start_sample=source_start,
@@ -306,6 +442,10 @@ class LiveRecognitionProcessor:
                     "prepare_s": (prepare_end_ns - prepare_start_ns) / 1_000_000_000,
                     "inference_s": output.inference_s,
                     "decode_s": output.decode_s,
+                    "native_candidate_count": len(native_candidates),
+                    "gate_accepted_count": len(absolute_candidates),
+                    "gate_rejected_count": len(self._gate_rows) - gate_start
+                    - len(absolute_candidates),
                     "emitted_monotonic_ns": emitted_ns,
                     "event_count": len(records),
                 }
@@ -318,12 +458,14 @@ class LiveRecognitionProcessor:
             "windows_processed": processed,
             "window_count": self._window_index,
             "audio_head_sample": self.available_source_samples,
+            "noise_gate": self.noise_gate.status(),
         }
 
     def finalize(self) -> dict[str, Any]:
         write_jsonl(self.artifact_directory / "events.jsonl", self._events)
         write_jsonl(self.artifact_directory / "timing.jsonl", self._timing_rows)
         write_jsonl(self.artifact_directory / "raw" / "windows.jsonl", self._raw_rows)
+        write_jsonl(self.artifact_directory / "gate.jsonl", self._gate_rows)
         latencies = [
             event["source_to_emission_latency_s"]
             for event in self._events
@@ -360,11 +502,13 @@ class LiveRecognitionProcessor:
                     for lifecycle in ("provisional", "committed", "retracted")
                 },
             },
+            "noise_gate": self.noise_gate.status(),
             "first_visible_latency_s": _latency_summary(latencies),
             "artifacts": {
                 "events": "events.jsonl",
                 "timing": "timing.jsonl",
                 "raw_index": "raw/windows.jsonl",
+                "gate_decisions": "gate.jsonl",
             },
         }
         write_json(self.artifact_directory / "recognition.json", manifest)
@@ -380,6 +524,13 @@ def _latency_summary(values: list[float]) -> dict[str, Any]:
         "p95": float(np.percentile(values, 95)),
         "max": max(values),
     }
+
+
+def _rms_dbfs(samples: np.ndarray) -> float:
+    if samples.size == 0:
+        return -120.0
+    rms = float(np.sqrt(np.mean(np.square(samples, dtype=np.float64))))
+    return 20.0 * float(np.log10(max(rms, 1e-6)))
 
 
 def finalize_live_run(run_directory: Path) -> dict[str, Any] | None:
