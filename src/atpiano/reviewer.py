@@ -16,6 +16,7 @@ ASSETS = {
     "/index.html": WEB_ROOT / "index.html",
     "/app.js": WEB_ROOT / "app.js",
     "/capture-processor.js": WEB_ROOT / "capture-processor.js",
+    "/live-view.js": WEB_ROOT / "live-view.js",
     "/styles.css": WEB_ROOT / "styles.css",
 }
 

@@ -113,6 +113,9 @@ def write_browser_capture_artifacts(
     """Validate a browser-produced PCM WAV and write an unaligned input manifest."""
     if client_metadata.get("schema_version") != BROWSER_CAPTURE_SCHEMA:
         raise ValueError("unsupported browser capture metadata schema")
+    display_settings = _browser_display_settings(
+        client_metadata.get("display_settings")
+    )
     output_directory = output_directory.resolve()
     source_wav = source_wav.resolve()
     output_directory.mkdir(parents=True, exist_ok=True)
@@ -155,6 +158,7 @@ def write_browser_capture_artifacts(
         "started_at": client_metadata.get("started_at"),
         "requested_constraints": client_metadata.get("requested_constraints"),
         "actual_track_settings": client_metadata.get("actual_track_settings"),
+        "display_settings": display_settings,
         "source_timeline": "AudioWorklet sample index",
         "transport": transport,
         "received_at": utc_now(),
@@ -190,6 +194,34 @@ def write_browser_capture_artifacts(
     }
     write_json(output_directory / "input.json", manifest)
     return manifest
+
+
+def _browser_display_settings(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict) or value.get("schema_version") != (
+        "atpiano.live-display-settings.v1"
+    ):
+        raise ValueError("unsupported live display settings")
+    mode = value.get("mode")
+    group_window_ms = value.get("groupWindowMs")
+    show_confidence = value.get("showConfidence")
+    if mode not in {"grouped", "raw"}:
+        raise ValueError("live display mode must be grouped or raw")
+    if (
+        not isinstance(group_window_ms, int)
+        or isinstance(group_window_ms, bool)
+        or not 0 <= group_window_ms <= 250
+    ):
+        raise ValueError("live display group window must be 0 through 250 ms")
+    if not isinstance(show_confidence, bool):
+        raise ValueError("live display confidence setting must be boolean")
+    return {
+        "schema_version": "atpiano.live-display-settings.v1",
+        "mode": mode,
+        "groupWindowMs": group_window_ms,
+        "showConfidence": show_confidence,
+    }
 
 
 def list_input_devices() -> str:

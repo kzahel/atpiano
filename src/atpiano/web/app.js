@@ -4,8 +4,8 @@ const MAX_CAPTURE_SECONDS = 120;
 const LIVE_STREAM_SCHEMA = "atpiano.live-stream.v1";
 const LIVE_BLOCK_HEADER_BYTES = 48;
 const MAX_WEBSOCKET_BUFFER_BYTES = 4 * 1024 * 1024;
-const LIVE_ONSET_GROUP_SECONDS = 0.18;
 const LIVE_KEY_HIGHLIGHT_MS = 1800;
+const LIVE_VIEW = window.atpianoLiveView;
 const BLACK_PITCH_CLASSES = new Set([1, 3, 6, 8, 10]);
 const STAFF_SPELLINGS = [
   { letter: 0, accidental: "" },
@@ -58,6 +58,7 @@ const state = {
     highlightedPitches: new Map(),
     animation: null,
     noiseGate: null,
+    display: LIVE_VIEW.normalizedSettings(),
   },
 };
 
@@ -669,6 +670,82 @@ function liveSend(socket, type, values = {}) {
   return true;
 }
 
+function loadLiveDisplaySettings() {
+  try {
+    const stored = window.localStorage.getItem(LIVE_VIEW.STORAGE_KEY);
+    state.live.display = LIVE_VIEW.normalizedSettings(
+      stored ? JSON.parse(stored) : LIVE_VIEW.DEFAULT_SETTINGS
+    );
+  } catch {
+    state.live.display = LIVE_VIEW.normalizedSettings();
+  }
+}
+
+function saveLiveDisplaySettings() {
+  try {
+    window.localStorage.setItem(
+      LIVE_VIEW.STORAGE_KEY,
+      JSON.stringify(state.live.display)
+    );
+  } catch {
+    // The controls still work when browser storage is unavailable.
+  }
+}
+
+function liveDisplaySettingsDocument() {
+  return LIVE_VIEW.settingsDocument(state.live.display);
+}
+
+function updateLivePitchReadout() {
+  const groups = liveOnsetGroups();
+  const recentNotes = groups.at(-1)?.notes || [];
+  state.live.recentPitches = recentNotes.map((note) => note.pitch);
+  document.querySelector("#live-pitch-set").textContent =
+    state.live.recentPitches.map(pitchName).join(" · ") || "Play to reveal pitches";
+}
+
+function syncLiveDisplayControls() {
+  const settings = state.live.display;
+  const mode = document.querySelector("#live-display-mode");
+  const groupWindow = document.querySelector("#live-group-window");
+  const groupWindowValue = document.querySelector("#live-group-window-value");
+  const groupWindowControl = document.querySelector("#live-group-window-control");
+  const confidence = document.querySelector("#live-show-confidence");
+  mode.value = settings.mode;
+  groupWindow.value = String(settings.groupWindowMs);
+  groupWindow.disabled = settings.mode === "raw";
+  groupWindowValue.value = `${settings.groupWindowMs} ms`;
+  groupWindowControl.classList.toggle("is-disabled", settings.mode === "raw");
+  confidence.checked = settings.showConfidence;
+  document.querySelector("#live-confidence-help").hidden = !settings.showConfidence;
+  document.querySelector("#live-pitch-label").textContent =
+    settings.mode === "raw" ? "Latest raw onset" : "Latest onset group";
+}
+
+function applyLiveDisplaySettings(values) {
+  state.live.display = LIVE_VIEW.normalizedSettings({
+    ...state.live.display,
+    ...values,
+  });
+  saveLiveDisplaySettings();
+  syncLiveDisplayControls();
+  updateLivePitchReadout();
+  drawLiveStaff();
+}
+
+function wireLiveDisplayControls() {
+  syncLiveDisplayControls();
+  document.querySelector("#live-display-mode").addEventListener("change", (event) => {
+    applyLiveDisplaySettings({ mode: event.target.value });
+  });
+  document.querySelector("#live-group-window").addEventListener("input", (event) => {
+    applyLiveDisplaySettings({ groupWindowMs: Number(event.target.value) });
+  });
+  document.querySelector("#live-show-confidence").addEventListener("change", (event) => {
+    applyLiveDisplaySettings({ showConfidence: event.target.checked });
+  });
+}
+
 function resetLiveEvaluator() {
   state.live.events.clear();
   state.live.audioHeadS = 0;
@@ -728,29 +805,11 @@ function renderLiveKeyboard() {
 }
 
 function liveOnsetGroups() {
-  if (!state.live.sampleRate) return [];
-  const events = [...state.live.events.values()]
-    .filter(
-      (event) =>
-        event.lifecycle !== "retracted" &&
-        event.pitch >= 21 &&
-        event.pitch <= 108
-    )
-    .sort((left, right) => left.onset_sample - right.onset_sample || left.pitch - right.pitch);
-  const groups = [];
-  for (const event of events) {
-    let group = groups[groups.length - 1];
-    if (
-      !group ||
-      (event.onset_sample - group.onsetSample) / state.live.sampleRate >
-        LIVE_ONSET_GROUP_SECONDS
-    ) {
-      group = { onsetSample: event.onset_sample, pitches: [] };
-      groups.push(group);
-    }
-    if (!group.pitches.includes(event.pitch)) group.pitches.push(event.pitch);
-  }
-  return groups;
+  return LIVE_VIEW.groupEvents(
+    state.live.events.values(),
+    state.live.sampleRate,
+    state.live.display
+  );
 }
 
 function staffPitch(pitch) {
@@ -784,9 +843,9 @@ function drawLedgerLines(context, x, step, staff) {
   }
 }
 
-function drawStaffChord(context, pitches, x, staff) {
-  const positions = pitches
-    .map((pitch) => ({ pitch, ...staffPitch(pitch) }))
+function drawStaffChord(context, notes, x, staff) {
+  const positions = notes
+    .map((note) => ({ ...note, ...staffPitch(note.pitch) }))
     .sort((left, right) => left.step - right.step)
     .map((note, index, notes) => ({
       ...note,
@@ -827,6 +886,15 @@ function drawStaffChord(context, pitches, x, staff) {
     context.lineTo(x - 7, lowestY + 29);
   }
   context.stroke();
+  if (state.live.display.showConfidence) {
+    context.fillStyle = "#8b351d";
+    context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+    context.textAlign = "left";
+    for (const note of positions) {
+      if (note.confidence == null) continue;
+      context.fillText(note.confidence.toFixed(2), note.x + 10, note.y - 5);
+    }
+  }
 }
 
 function drawLiveStaff() {
@@ -881,13 +949,13 @@ function drawLiveStaff() {
       const x = 88 + index * stepX;
       drawStaffChord(
         context,
-        group.pitches.filter((pitch) => pitch >= 60),
+        group.notes.filter((note) => note.pitch >= 60),
         x,
         treble
       );
       drawStaffChord(
         context,
-        group.pitches.filter((pitch) => pitch < 60),
+        group.notes.filter((note) => note.pitch < 60),
         x,
         bass
       );
@@ -940,10 +1008,7 @@ function applyLiveEvents(message, socket) {
     if (event.revision === 1 && event.lifecycle === "provisional") firstEvents.push(event);
   }
   if (firstEvents.length) {
-    const groups = liveOnsetGroups();
-    state.live.recentPitches = groups.at(-1)?.pitches || [];
-    document.querySelector("#live-pitch-set").textContent =
-      state.live.recentPitches.map(pitchName).join(" · ") || "—";
+    updateLivePitchReadout();
     const latency = firstEvents[firstEvents.length - 1].source_to_emission_latency_s;
     document.querySelector("#live-latency").textContent =
       latency == null ? "—" : `${latency.toFixed(2)} s`;
@@ -1204,6 +1269,7 @@ async function startRecording() {
       schema_version: "atpiano.browser-capture.v1",
       started_at: capture.startedAt,
       requested_constraints: CAPTURE_CONSTRAINTS,
+      display_settings: liveDisplaySettingsDocument(),
       actual_track_settings: {
         sampleRate: trackSettings.sampleRate ?? null,
         channelCount: trackSettings.channelCount ?? null,
@@ -1305,6 +1371,7 @@ async function stopRecording() {
     frame_count: capture.frameCount,
     block_count: capture.chunkCount,
     capture_elapsed_s: capture.frameCount / capture.audioContext.sampleRate,
+    display_settings: liveDisplaySettingsDocument(),
   });
   const stoppedMessage = await Promise.race([
     socketStopped,
@@ -1338,6 +1405,7 @@ async function stopRecording() {
       capture_elapsed_s: duration,
       started_at: capture.startedAt,
       requested_constraints: CAPTURE_CONSTRAINTS,
+      display_settings: liveDisplaySettingsDocument(),
       actual_track_settings: {
         sampleRate: trackSettings.sampleRate ?? null,
         channelCount: trackSettings.channelCount ?? null,
@@ -1427,6 +1495,8 @@ async function completeLiveJob(jobId) {
 }
 
 function wireRecorder() {
+  loadLiveDisplaySettings();
+  wireLiveDisplayControls();
   document.querySelector("#start-recording").addEventListener("click", startRecording);
   document.querySelector("#stop-recording").addEventListener("click", stopRecording);
   document.querySelector("#discard-recording").addEventListener("click", discardRecording);

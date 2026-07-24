@@ -366,6 +366,7 @@ class WorkbenchHandler(ReviewerHandler):
                     frame_count = message.get("frame_count")
                     block_count = message.get("block_count")
                     elapsed_s = message.get("capture_elapsed_s")
+                    display_settings = message.get("display_settings")
                     if (
                         not isinstance(frame_count, int)
                         or isinstance(frame_count, bool)
@@ -373,6 +374,10 @@ class WorkbenchHandler(ReviewerHandler):
                         or isinstance(block_count, bool)
                         or not isinstance(elapsed_s, (int, float))
                         or isinstance(elapsed_s, bool)
+                        or (
+                            display_settings is not None
+                            and not isinstance(display_settings, dict)
+                        )
                     ):
                         raise ValueError("live Stop metadata is invalid")
                     recognition_manifest = (
@@ -382,6 +387,7 @@ class WorkbenchHandler(ReviewerHandler):
                         expected_frame_count=frame_count,
                         expected_block_count=block_count,
                         capture_elapsed_s=float(elapsed_s),
+                        display_settings=display_settings,
                     )
                     finalized = True
                     with self.server.jobs_lock:

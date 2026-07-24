@@ -66,9 +66,40 @@
             </div>
 
             <div class="live-pitch-readout">
-              <span>Latest onset group</span>
+              <span id="live-pitch-label">Latest onset group</span>
               <strong id="live-pitch-set">Play to reveal pitches</strong>
             </div>
+
+            <div class="live-view-controls" aria-label="Live staff display settings">
+              <label>
+                <span>Staff display</span>
+                <select id="live-display-mode">
+                  <option value="grouped">Group nearby onsets</option>
+                  <option value="raw">Raw onset sequence</option>
+                </select>
+              </label>
+              <label id="live-group-window-control">
+                <span>Chord window</span>
+                <div class="live-range-control">
+                  <input
+                    id="live-group-window"
+                    type="range"
+                    min="0"
+                    max="250"
+                    step="10"
+                    value="80"
+                  >
+                  <output id="live-group-window-value" for="live-group-window">80 ms</output>
+                </div>
+              </label>
+              <label class="live-debug-toggle">
+                <input id="live-show-confidence" type="checkbox">
+                <span>Show onset scores</span>
+              </label>
+            </div>
+            <p id="live-confidence-help" class="live-confidence-help" hidden>
+              Labels are Basic Pitch onset scores from 0–1, not calibrated probabilities.
+            </p>
 
             <canvas
               id="live-score"
@@ -344,6 +375,7 @@
       crossorigin="anonymous"
       defer
     ></script>
+    <script src="/live-view.js" defer></script>
     <script src="/app.js" defer></script>
   </body>
 </html>

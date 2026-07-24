@@ -89,6 +89,12 @@ def test_live_capture_preserves_exact_pcm_and_continuity(tmp_path: Path) -> None
         expected_frame_count=5,
         expected_block_count=2,
         capture_elapsed_s=5 / 22_050,
+        display_settings={
+            "schema_version": "atpiano.live-display-settings.v1",
+            "mode": "raw",
+            "groupWindowMs": 40,
+            "showConfidence": True,
+        },
     )
 
     assert manifest["capture"]["adapter"] == "web-audio-worklet-live-v1"
@@ -103,6 +109,9 @@ def test_live_capture_preserves_exact_pcm_and_continuity(tmp_path: Path) -> None
     assert live["source_frame_count"] == 5
     assert live["clock_observation_count"] == 1
     assert live["paint_acknowledgement_count"] == 1
+    capture = read_json(session.input_directory / "browser-capture.json")
+    assert capture["display_settings"]["mode"] == "raw"
+    assert capture["display_settings"]["showConfidence"] is True
 
 
 def test_live_capture_rejects_sequence_and_source_gaps(tmp_path: Path) -> None:

@@ -203,6 +203,97 @@ section,
   white-space: nowrap;
 }
 
+.live-view-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.9fr) minmax(210px, 1.2fr) auto;
+  align-items: end;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-top: 0;
+  background: #171918;
+}
+
+.live-view-controls label {
+  min-width: 0;
+}
+
+.live-view-controls label > span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.live-view-controls select,
+.live-view-controls input[type="range"] {
+  width: 100%;
+}
+
+.live-view-controls select {
+  min-height: 34px;
+  padding: 5px 28px 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink);
+  background: #101211;
+  font: inherit;
+}
+
+.live-range-control {
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) 50px;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+}
+
+.live-range-control output {
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+.live-debug-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #101211;
+  white-space: nowrap;
+}
+
+.live-debug-toggle input {
+  margin: 0;
+}
+
+.live-debug-toggle > span {
+  margin: 0 !important;
+  color: var(--ink) !important;
+  font-size: 0.68rem !important;
+}
+
+.live-view-controls label.is-disabled {
+  opacity: 0.42;
+}
+
+.live-confidence-help {
+  margin: 0;
+  padding: 8px 14px;
+  color: #d5a07f;
+  border-right: 1px solid #c5bdaa;
+  border-left: 1px solid #c5bdaa;
+  background: #f8f4e9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.66rem;
+}
+
 #live-score {
   display: block;
   width: 100%;
@@ -315,6 +406,16 @@ section,
   margin-top: 5px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.78rem;
+}
+
+@media (max-width: 800px) {
+  .live-view-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .live-debug-toggle {
+    grid-column: 1 / -1;
+  }
 }
 
 .capture-status {

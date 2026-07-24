@@ -59,6 +59,12 @@ def _capture_metadata(
             "channelCount": 1,
             "echoCancellation": False,
         },
+        "display_settings": {
+            "schema_version": "atpiano.live-display-settings.v1",
+            "mode": "grouped",
+            "groupWindowMs": 80,
+            "showConfidence": True,
+        },
     }
 
 
@@ -200,6 +206,8 @@ def test_browser_capture_writer_preserves_validated_pcm_wav(tmp_path: Path) -> N
     assert (output / "recording.wav").read_bytes() == source.read_bytes()
     capture = read_json(output / "browser-capture.json")
     assert capture["source_timeline"] == "AudioWorklet sample index"
+    assert capture["display_settings"]["groupWindowMs"] == 80
+    assert capture["display_settings"]["showConfidence"] is True
 
 
 def test_browser_capture_writer_rejects_metadata_mismatch(tmp_path: Path) -> None:
@@ -235,10 +243,16 @@ def test_workbench_upload_job_and_reloadable_artifacts(tmp_path: Path) -> None:
         assert host_error.value.code == 403
         with urllib.request.urlopen(f"{base_url}/capture-processor.js", timeout=2) as response:
             assert b"registerProcessor" in response.read()
+        with urllib.request.urlopen(f"{base_url}/live-view.js", timeout=2) as response:
+            assert b"function groupEvents" in response.read()
         with urllib.request.urlopen(base_url, timeout=2) as response:
             page = response.read()
         assert b'id="live-score"' in page
         assert b'class="live-keyboard"' in page
+        assert b'id="live-display-mode"' in page
+        assert b'id="live-group-window"' in page
+        assert b'id="live-show-confidence"' in page
+        assert b"not calibrated probabilities" in page
         assert b"provisional onset" not in page
 
         invalid_request = urllib.request.Request(

@@ -929,6 +929,7 @@ class LiveCaptureSession:
         expected_frame_count: int,
         expected_block_count: int,
         capture_elapsed_s: float,
+        display_settings: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if self.closed:
             raise RuntimeError("live capture is already closed")
@@ -963,6 +964,8 @@ class LiveCaptureSession:
             "chunk_count": self.next_sequence,
             "capture_elapsed_s": capture_elapsed_s,
         }
+        if display_settings is not None:
+            metadata["display_settings"] = display_settings
         manifest = write_browser_capture_artifacts(
             self.input_directory,
             wav_path,
