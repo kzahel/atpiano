@@ -13,6 +13,7 @@ import numpy as np
 
 from atpiano.fixture import INPUT_SCHEMA
 from atpiano.midi import MidiNote, load_notes, note_set_document
+from atpiano.notation import generate_notation_artifacts
 from atpiano.quality import score_notes, unscored_notes
 from atpiano.util import (
     read_json,
@@ -233,6 +234,7 @@ def run_offline(
         emitted_elapsed_s=emitted_elapsed_s,
     )
     write_jsonl(run_directory / "events.jsonl", events)
+    notation = generate_notation_artifacts(run_directory)
 
     scores = (
         score_notes(load_notes(reference_path), prediction_notes)
@@ -311,6 +313,8 @@ def run_offline(
             "scores": "scores.json",
             "timing": "timing.jsonl",
             "report": "report.md",
+            "notation_manifest": "notation/current.json",
+            "notation_musicxml": notation["artifacts"]["musicxml"],
         },
         "timing_summary": {
             "adapter_setup_s": (adapter_setup_end_ns - adapter_setup_start_ns)
