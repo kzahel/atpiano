@@ -126,6 +126,7 @@ def score_notes(reference: list[MidiNote], estimate: list[MidiNote]) -> dict[str
     ]
     return {
         "schema_version": "atpiano.scores.v1",
+        "quality_available": True,
         "reference_note_count": len(reference),
         "estimated_note_count": len(estimate),
         "onset": onset_metrics,
@@ -138,6 +139,45 @@ def score_notes(reference: list[MidiNote], estimate: list[MidiNote]) -> dict[str
         "matched_velocity_mae": (
             float(np.mean(velocity_errors)) if velocity_errors else None
         ),
+        "pedal": {
+            "supported_by_model": False,
+            "metrics": None,
+        },
+    }
+
+
+def unscored_notes(estimate: list[MidiNote]) -> dict[str, Any]:
+    unavailable = {
+        "matches": None,
+        "precision": None,
+        "recall": None,
+        "f1": None,
+    }
+    return {
+        "schema_version": "atpiano.scores.v1",
+        "quality_available": False,
+        "quality_unavailable_reason": "input has no aligned reference MIDI",
+        "reference_note_count": None,
+        "estimated_note_count": len(estimate),
+        "onset": {
+            "50_ms": dict(unavailable),
+            "25_ms": dict(unavailable),
+        },
+        "note_with_offset": dict(unavailable),
+        "frame": {
+            "frame_hz": 100,
+            "precision": None,
+            "recall": None,
+            "f1": None,
+            "true_positive_frames": None,
+            "false_positive_frames": None,
+            "false_negative_frames": None,
+        },
+        "matched_onset_error_ms": {
+            "mean": None,
+            "max": None,
+        },
+        "matched_velocity_mae": None,
         "pedal": {
             "supported_by_model": False,
             "metrics": None,

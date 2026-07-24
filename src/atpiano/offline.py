@@ -11,9 +11,9 @@ from typing import Any
 
 import numpy as np
 
-from atpiano.fixture import FIXTURE_SCHEMA
+from atpiano.fixture import INPUT_SCHEMA
 from atpiano.midi import MidiNote, load_notes, note_set_document
-from atpiano.quality import score_notes
+from atpiano.quality import score_notes, unscored_notes
 from atpiano.util import (
     read_json,
     runtime_provenance,
@@ -26,12 +26,12 @@ from atpiano.util import (
 
 
 def _validate_input_manifest(manifest: dict[str, Any], manifest_path: Path) -> None:
-    if manifest.get("schema_version") != FIXTURE_SCHEMA:
+    if manifest.get("schema_version") != INPUT_SCHEMA:
         raise ValueError(
             f"{manifest_path} has unsupported schema_version "
             f"{manifest.get('schema_version')!r}"
         )
-    for section in ("audio", "reference"):
+    for section in ("audio",):
         if not isinstance(manifest.get(section), dict):
             raise ValueError(f"{manifest_path} is missing object {section!r}")
         for field in ("path", "sha256"):
@@ -76,10 +76,13 @@ def _normalized_events(
 
 
 def _report(run: dict[str, Any], scores: dict[str, Any]) -> str:
+    def metric_value(value: float | None) -> str:
+        return "n/a" if value is None else f"{value:.3f}"
+
     def metric_row(name: str, metric: dict[str, Any]) -> str:
         return (
-            f"| {name} | {metric['precision']:.3f} "
-            f"| {metric['recall']:.3f} | {metric['f1']:.3f} |"
+            f"| {name} | {metric_value(metric['precision'])} "
+            f"| {metric_value(metric['recall'])} | {metric_value(metric['f1'])} |"
         )
 
     onset_50 = scores["onset"]["50_ms"]
@@ -94,7 +97,7 @@ def _report(run: dict[str, Any], scores: dict[str, Any]) -> str:
             f"- Input: `{run['input']['input_id']}`",
             f"- Model: Basic Pitch {run['model']['package_version']}",
             f"- Backend artifact: `{run['model']['artifact_kind']}`",
-            f"- Reference notes: {scores['reference_note_count']}",
+            f"- Reference notes: {scores['reference_note_count'] or 'not supplied'}",
             f"- Estimated notes: {scores['estimated_note_count']}",
             f"- Adapter import/setup: {run['timing_summary']['adapter_setup_s']:.3f} s",
             f"- Inference wall time: {run['timing_summary']['inference_s']:.3f} s",
@@ -131,19 +134,29 @@ def run_offline(
     _validate_input_manifest(manifest, input_manifest_path)
     source_root = input_manifest_path.parent
     source_audio = (source_root / manifest["audio"]["path"]).resolve()
-    source_reference = (source_root / manifest["reference"]["path"]).resolve()
+    reference_manifest = manifest.get("reference")
+    source_reference = (
+        (source_root / reference_manifest["path"]).resolve()
+        if isinstance(reference_manifest, dict)
+        else None
+    )
     if sha256_file(source_audio) != manifest["audio"]["sha256"]:
         raise ValueError(f"audio hash does not match manifest: {source_audio}")
-    if sha256_file(source_reference) != manifest["reference"]["sha256"]:
+    if (
+        source_reference is not None
+        and sha256_file(source_reference) != reference_manifest["sha256"]
+    ):
         raise ValueError(f"reference hash does not match manifest: {source_reference}")
 
-    audio_path = run_directory / "fixture.wav"
-    reference_path = run_directory / "reference.mid"
+    audio_path = run_directory / "input.wav"
     shutil.copyfile(source_audio, audio_path)
-    shutil.copyfile(source_reference, reference_path)
+    reference_path = run_directory / "reference.mid" if source_reference is not None else None
+    if source_reference is not None and reference_path is not None:
+        shutil.copyfile(source_reference, reference_path)
     copied_manifest = json.loads(json.dumps(manifest))
     copied_manifest["audio"]["path"] = audio_path.name
-    copied_manifest["reference"]["path"] = reference_path.name
+    if reference_path is not None:
+        copied_manifest["reference"]["path"] = reference_path.name
     write_json(run_directory / "input.json", copied_manifest)
 
     started_at = utc_now()
@@ -165,7 +178,14 @@ def run_offline(
 
     prediction_path = run_directory / "prediction.mid"
     midi_data.write(str(prediction_path))
-    write_json(run_directory / "reference.json", note_set_document(reference_path))
+    write_json(
+        run_directory / "reference.json",
+        (
+            note_set_document(reference_path)
+            if reference_path is not None
+            else {"schema_version": "atpiano.note-set.v1", "notes": [], "pedals": []}
+        ),
+    )
     write_json(run_directory / "prediction.json", note_set_document(prediction_path))
     raw_directory = run_directory / "raw"
     raw_directory.mkdir(parents=True, exist_ok=True)
@@ -214,7 +234,11 @@ def run_offline(
     )
     write_jsonl(run_directory / "events.jsonl", events)
 
-    scores = score_notes(load_notes(reference_path), prediction_notes)
+    scores = (
+        score_notes(load_notes(reference_path), prediction_notes)
+        if reference_path is not None
+        else unscored_notes(prediction_notes)
+    )
     write_json(run_directory / "scores.json", scores)
     timing_rows = [
         {
@@ -255,8 +279,10 @@ def run_offline(
             "manifest": "input.json",
             "audio": audio_path.name,
             "audio_sha256": sha256_file(audio_path),
-            "reference_midi": reference_path.name,
-            "reference_sha256": sha256_file(reference_path),
+            "reference_midi": reference_path.name if reference_path is not None else None,
+            "reference_sha256": (
+                sha256_file(reference_path) if reference_path is not None else None
+            ),
         },
         "model": {
             "adapter": "basic-pitch-offline-reference-v1",

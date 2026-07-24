@@ -151,4 +151,3 @@ def serve_review(
         pass
     finally:
         server.server_close()
-

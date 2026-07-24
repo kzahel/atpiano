@@ -13,6 +13,7 @@ dependencies = [
     { name = "pretty-midi" },
     { name = "scikit-learn" },
     { name = "setuptools" },
+    { name = "soundfile" },
 ]
 
 [package.optional-dependencies]
@@ -35,6 +36,7 @@ requires-dist = [
     { name = "scikit-learn", specifier = ">=1.5,<1.5.2" },
     { name = "setuptools", specifier = ">=75,<81" },
     { name = "sounddevice", marker = "extra == 'capture'", specifier = ">=0.5,<1" },
+    { name = "soundfile", specifier = ">=0.12,<1" },
 ]
 provides-extras = ["capture"]
 

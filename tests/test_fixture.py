@@ -35,4 +35,3 @@ def test_fixture_contains_expected_events(tmp_path: Path) -> None:
         assert audio.getframerate() == 22_050
         assert audio.getnchannels() == 1
         assert audio.getsampwidth() == 2
-

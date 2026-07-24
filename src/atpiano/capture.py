@@ -1,0 +1,196 @@
+"""Sample-clocked microphone capture artifacts."""
+
+from __future__ import annotations
+
+import threading
+import time
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import soundfile
+
+from atpiano.fixture import INPUT_SCHEMA
+from atpiano.util import sha256_file, utc_now, write_json, write_jsonl
+
+
+def _sounddevice() -> Any:
+    try:
+        import sounddevice
+    except ImportError as error:
+        raise RuntimeError(
+            "microphone capture requires: uv sync --extra capture"
+        ) from error
+    return sounddevice
+
+
+def _target_paths(output_directory: Path) -> tuple[Path, Path, Path]:
+    return (
+        output_directory / "recording.wav",
+        output_directory / "capture-timing.jsonl",
+        output_directory / "input.json",
+    )
+
+
+def ensure_capture_target(output_directory: Path, *, force: bool = False) -> None:
+    existing = [path for path in _target_paths(output_directory) if path.exists()]
+    if existing and not force:
+        names = ", ".join(path.name for path in existing)
+        raise FileExistsError(f"refusing to overwrite capture files: {names}")
+
+
+def write_capture_artifacts(
+    output_directory: Path,
+    audio: np.ndarray,
+    *,
+    sample_rate_hz: int,
+    block_records: list[dict[str, Any]],
+    device: dict[str, Any],
+    requested_duration_s: float,
+    block_samples: int,
+    force: bool = False,
+) -> dict[str, Any]:
+    output_directory = output_directory.resolve()
+    output_directory.mkdir(parents=True, exist_ok=True)
+    ensure_capture_target(output_directory, force=force)
+    audio_path, timing_path, manifest_path = _target_paths(output_directory)
+    mono = np.asarray(audio, dtype=np.float32).reshape(-1)
+    soundfile.write(
+        audio_path,
+        mono,
+        sample_rate_hz,
+        subtype="PCM_16",
+        format="WAV",
+    )
+    write_jsonl(timing_path, block_records)
+    audio_hash = sha256_file(audio_path)
+    timing_hash = sha256_file(timing_path)
+    manifest = {
+        "schema_version": INPUT_SCHEMA,
+        "input_id": f"microphone-{audio_hash[:16]}",
+        "created_at": utc_now(),
+        "license": "user-provided local recording; rights not asserted by atpiano",
+        "audio": {
+            "path": audio_path.name,
+            "sha256": audio_hash,
+            "format": "wav-pcm-s16le",
+            "sample_rate_hz": sample_rate_hz,
+            "channels": 1,
+            "first_sample_index": 0,
+            "frame_count": int(mono.shape[0]),
+            "duration_s": mono.shape[0] / sample_rate_hz,
+        },
+        "reference": None,
+        "capture": {
+            "adapter": "sounddevice-fixed-duration-v1",
+            "requested_duration_s": requested_duration_s,
+            "block_samples": block_samples,
+            "timing_path": timing_path.name,
+            "timing_sha256": timing_hash,
+            "device": device,
+            "source_timeline": "audio sample index",
+            "receipt_clock": "time.perf_counter_ns",
+            "block_count": len(block_records),
+            "status_blocks": sum(bool(record.get("status")) for record in block_records),
+        },
+    }
+    write_json(manifest_path, manifest)
+    return manifest
+
+
+def list_input_devices() -> str:
+    sounddevice = _sounddevice()
+    return str(sounddevice.query_devices())
+
+
+def record_microphone(
+    output_directory: Path,
+    *,
+    duration_s: float,
+    sample_rate_hz: int = 22_050,
+    block_samples: int = 1024,
+    device: int | str | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    if duration_s <= 0:
+        raise ValueError("duration must be positive")
+    if sample_rate_hz <= 0 or block_samples <= 0:
+        raise ValueError("sample rate and block size must be positive")
+    output_directory = output_directory.resolve()
+    ensure_capture_target(output_directory, force=force)
+    sounddevice = _sounddevice()
+    sounddevice.check_input_settings(
+        device=device,
+        channels=1,
+        dtype="float32",
+        samplerate=sample_rate_hz,
+    )
+    queried = sounddevice.query_devices(device, "input")
+    device_info = {
+        "requested": device,
+        "name": str(queried["name"]),
+        "hostapi": int(queried["hostapi"]),
+        "max_input_channels": int(queried["max_input_channels"]),
+        "default_samplerate": float(queried["default_samplerate"]),
+    }
+    target_frames = round(duration_s * sample_rate_hz)
+    received: list[np.ndarray] = []
+    block_records: list[dict[str, Any]] = []
+    finished = threading.Event()
+    source_cursor = 0
+
+    def callback(
+        input_data: np.ndarray,
+        frames: int,
+        time_info: Any,
+        status: Any,
+    ) -> None:
+        nonlocal source_cursor
+        remaining = target_frames - source_cursor
+        accepted = min(frames, remaining)
+        if accepted > 0:
+            received.append(input_data[:accepted, 0].copy())
+            block_records.append(
+                {
+                    "schema_version": "atpiano.capture-block.v1",
+                    "source_first_sample": source_cursor,
+                    "source_frame_count": accepted,
+                    "callback_monotonic_ns": time.perf_counter_ns(),
+                    "input_adc_time_s": float(time_info.inputBufferAdcTime),
+                    "status": str(status) if status else "",
+                }
+            )
+            source_cursor += accepted
+        if source_cursor >= target_frames:
+            finished.set()
+            raise sounddevice.CallbackStop
+
+    timeout_s = duration_s + 5.0
+    with sounddevice.InputStream(
+        samplerate=sample_rate_hz,
+        blocksize=block_samples,
+        device=device,
+        channels=1,
+        dtype="float32",
+        callback=callback,
+    ):
+        if not finished.wait(timeout_s):
+            raise TimeoutError(
+                f"microphone capture did not produce {target_frames} samples "
+                f"within {timeout_s:.1f} seconds"
+            )
+    if source_cursor != target_frames:
+        raise RuntimeError(
+            f"capture ended with {source_cursor} of {target_frames} requested samples"
+        )
+    audio = np.concatenate(received) if received else np.zeros(0, dtype=np.float32)
+    return write_capture_artifacts(
+        output_directory,
+        audio,
+        sample_rate_hz=sample_rate_hz,
+        block_records=block_records,
+        device=device_info,
+        requested_duration_s=duration_s,
+        block_samples=block_samples,
+        force=force,
+    )

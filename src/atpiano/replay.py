@@ -12,9 +12,9 @@ from typing import Any
 import numpy as np
 import soundfile
 
-from atpiano.fixture import FIXTURE_SCHEMA
+from atpiano.fixture import INPUT_SCHEMA
 from atpiano.midi import MidiNote, load_notes, note_set_document, write_notes
-from atpiano.quality import match_note_indices, score_notes
+from atpiano.quality import match_note_indices, score_notes, unscored_notes
 from atpiano.reconcile import NoteTrack, Reconciler, WindowRegion
 from atpiano.util import (
     read_json,
@@ -36,9 +36,9 @@ class ReplayWindow:
 
 
 def _validate_manifest(manifest: dict[str, Any], path: Path) -> None:
-    if manifest.get("schema_version") != FIXTURE_SCHEMA:
+    if manifest.get("schema_version") != INPUT_SCHEMA:
         raise ValueError(f"{path} has unsupported schema_version")
-    for section in ("audio", "reference"):
+    for section in ("audio",):
         if not isinstance(manifest.get(section), dict):
             raise ValueError(f"{path} is missing {section}")
 
@@ -156,6 +156,7 @@ def _report(run: dict[str, Any], scores: dict[str, Any]) -> str:
     def seconds(value: float | None) -> str:
         return "n/a" if value is None else f"{value:.3f}"
 
+    onset_f1 = "not scored" if onset["f1"] is None else f"{onset['f1']:.3f}"
     return "\n".join(
         (
             "# Atpiano Live Replay",
@@ -165,7 +166,7 @@ def _report(run: dict[str, Any], scores: dict[str, Any]) -> str:
             f"- Cadence: {'wall clock' if run['replay']['realtime'] else 'no-wait functional'}",
             f"- Model windows: {run['replay']['window_count']}",
             f"- Final estimated notes: {scores['estimated_note_count']}",
-            f"- Onset F1 at 50 ms: {onset['f1']:.3f}",
+            f"- Onset F1 at 50 ms: {onset_f1}",
             "",
             "| Event latency | p50 s | p95 s | max s | count |",
             "|---|---:|---:|---:|---:|",
@@ -207,19 +208,29 @@ def run_replay(
     _validate_manifest(manifest, input_manifest_path)
     source_root = input_manifest_path.parent
     source_audio = (source_root / manifest["audio"]["path"]).resolve()
-    source_reference = (source_root / manifest["reference"]["path"]).resolve()
+    reference_manifest = manifest.get("reference")
+    source_reference = (
+        (source_root / reference_manifest["path"]).resolve()
+        if isinstance(reference_manifest, dict)
+        else None
+    )
     if sha256_file(source_audio) != manifest["audio"]["sha256"]:
         raise ValueError("audio hash does not match input manifest")
-    if sha256_file(source_reference) != manifest["reference"]["sha256"]:
+    if (
+        source_reference is not None
+        and sha256_file(source_reference) != reference_manifest["sha256"]
+    ):
         raise ValueError("reference hash does not match input manifest")
 
-    audio_path = run_directory / "fixture.wav"
-    reference_path = run_directory / "reference.mid"
+    audio_path = run_directory / "input.wav"
     shutil.copyfile(source_audio, audio_path)
-    shutil.copyfile(source_reference, reference_path)
+    reference_path = run_directory / "reference.mid" if source_reference is not None else None
+    if source_reference is not None and reference_path is not None:
+        shutil.copyfile(source_reference, reference_path)
     copied_manifest = json.loads(json.dumps(manifest))
     copied_manifest["audio"]["path"] = audio_path.name
-    copied_manifest["reference"]["path"] = reference_path.name
+    if reference_path is not None:
+        copied_manifest["reference"]["path"] = reference_path.name
     write_json(run_directory / "input.json", copied_manifest)
 
     audio, sample_rate_hz = soundfile.read(
@@ -442,7 +453,14 @@ def run_replay(
     prediction_notes = [track.note for track in final_tracks]
     prediction_path = run_directory / "prediction.mid"
     write_notes(prediction_path, prediction_notes)
-    write_json(run_directory / "reference.json", note_set_document(reference_path))
+    write_json(
+        run_directory / "reference.json",
+        (
+            note_set_document(reference_path)
+            if reference_path is not None
+            else {"schema_version": "atpiano.note-set.v1", "notes": [], "pedals": []}
+        ),
+    )
     write_json(run_directory / "prediction.json", note_set_document(prediction_path))
     write_jsonl(run_directory / "events.jsonl", all_events)
     write_jsonl(run_directory / "timing.jsonl", timing_rows)
@@ -466,8 +484,12 @@ def run_replay(
         },
     )
 
-    reference_notes = load_notes(reference_path)
-    scores = score_notes(reference_notes, prediction_notes)
+    reference_notes = load_notes(reference_path) if reference_path is not None else []
+    scores = (
+        score_notes(reference_notes, prediction_notes)
+        if reference_path is not None
+        else unscored_notes(prediction_notes)
+    )
     scores["latency"] = _latency_scores(
         reference_notes,
         final_tracks,
@@ -523,8 +545,10 @@ def run_replay(
             "manifest": "input.json",
             "audio": audio_path.name,
             "audio_sha256": sha256_file(audio_path),
-            "reference_midi": reference_path.name,
-            "reference_sha256": sha256_file(reference_path),
+            "reference_midi": reference_path.name if reference_path is not None else None,
+            "reference_sha256": (
+                sha256_file(reference_path) if reference_path is not None else None
+            ),
         },
         "model": {
             "adapter": "basic-pitch-window-replay-v1",

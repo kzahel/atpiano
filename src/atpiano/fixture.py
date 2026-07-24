@@ -14,7 +14,7 @@ import numpy as np
 from atpiano.midi import MidiNote, PedalInterval, load_notes, load_pedal_intervals, midi_to_hz
 from atpiano.util import sha256_file, utc_now, write_json
 
-FIXTURE_SCHEMA = "atpiano.input.v1"
+INPUT_SCHEMA = "atpiano.input.v1"
 FIXTURE_ID = "deterministic-midi-smoke-v2"
 SAMPLE_RATE = 22_050
 TEMPO_US_PER_BEAT = 500_000
@@ -178,7 +178,7 @@ def generate_fixture(output_directory: Path, *, force: bool = False) -> dict[str
     loaded_notes = load_notes(midi_path)
     loaded_pedals = load_pedal_intervals(midi_path)
     manifest: dict[str, Any] = {
-        "schema_version": FIXTURE_SCHEMA,
+        "schema_version": INPUT_SCHEMA,
         "input_id": FIXTURE_ID,
         "created_at": utc_now(),
         "license": "project-generated test fixture",

@@ -47,4 +47,3 @@ def test_reviewer_serves_assets_and_run_files(tmp_path: Path) -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
-

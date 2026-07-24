@@ -194,4 +194,3 @@ class Reconciler:
             (track for track in self.tracks if track.lifecycle == "committed"),
             key=lambda track: track.note,
         )
-

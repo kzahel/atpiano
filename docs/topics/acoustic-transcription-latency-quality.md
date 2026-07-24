@@ -2,9 +2,10 @@
 
 Topic: acoustic-transcription-latency-quality
 
-Status: discovery. No model or runtime is selected. The accepted first
-direction is a deterministic live-replay benchmark that measures a
-latency/quality frontier before live capture or product UI work.
+Status: prototype. No permanent model or runtime is selected. The first
+deterministic live-replay benchmark is complete with a Basic Pitch 0.4.0 Core
+ML reference, normalized revisable events, timing/quality artifacts, a local
+run reviewer, and a file-producing microphone adapter.
 
 ## Scope
 
@@ -38,6 +39,44 @@ for an assumed threshold:
 
 These are experiment buckets, not acceptance promises. The first study should
 show whether quality improves materially between them and what users notice.
+
+## Current Prototype Evidence
+
+[`docs/tactical/000-live-replay-benchmark.md`](../tactical/000-live-replay-benchmark.md)
+is the completed execution record. The current pinned stack is Python 3.10,
+Basic Pitch 0.4.0, and its shipped Core ML model on an Apple M4 Pro with
+48 GiB RAM. This is a prototype choice, not a product selection.
+
+The deterministic 19-note MIDI-derived fixture establishes:
+
+- untouched offline onset F1 of 0.905 at both 25 and 50 ms;
+- untouched offline note-with-offset F1 of 0.619;
+- rolling replay onset F1 of 0.900 at 50 ms and 0.850 at 25 ms;
+- rolling replay note-with-offset F1 of 0.450;
+- rolling replay first-visible matched latency of 0.961 s p50, 1.310 s p95,
+  and 1.446 s maximum;
+- rolling replay committed matched latency of 1.085 s p50, 1.516 s p95, and
+  1.916 s maximum; and
+- per-window inference of 0.029 s p50 and 0.048 s p95.
+
+The host has ample throughput for this model, but the result is in the
+live-feedback or delayed-live bands because model context and commit policy
+dominate inference time. The synthetic fixture recovers every offline onset
+but still produces false notes and weak offsets. It is a plumbing diagnostic,
+not acoustic-piano quality evidence.
+
+The rolling adapter retains every native probability window with explicit
+source-sample coordinates. It uses a deterministic 10-frame left guard and
+20-frame right guard within Basic Pitch's 30-frame overlap. Center detections
+commit immediately; right-edge detections emit provisionally and are committed
+or retracted against the next window. The fixture exercised one provisional
+revision to a committed event.
+
+Aligned inputs receive objective quality scores. Microphone or other inputs
+without reference MIDI are explicitly marked unscored while still producing
+MIDI, normalized events, native outputs, timing, and review artifacts. The
+local reviewer is an independent artifact consumer and does not move piano-roll
+or harmonic analysis into the transcription service.
 
 ## Accepted Pipeline Boundary
 
@@ -279,10 +318,9 @@ Do not promise one common accelerator runtime until models have been converted
 and compared. The stable boundary is the model adapter, not a particular ML
 framework.
 
-## Recommended First Tactical
+## Completed First Tactical
 
-Open `docs/tactical/000-live-replay-benchmark.md` when implementation begins.
-Keep the slice bounded to:
+`docs/tactical/000-live-replay-benchmark.md` completed the bounded slice:
 
 1. a versioned input/run manifest;
 2. deterministic real-time-cadence replay from a small aligned corpus subset;
@@ -292,10 +330,14 @@ Keep the slice bounded to:
 6. offline and replay-mode quality scoring; and
 7. a report that plots or tabulates quality against event latency.
 
-The first tactical should not include live microphone capture, phone transport,
-a polished piano roll, model conversion, or a second model. Those follow once
-the benchmark can distinguish actual improvements from timing and decoder
-artifacts.
+It also added a small file-producing microphone adapter and local debug
+reviewer at the user's request. It did not add phone transport, a polished
+product piano roll, model conversion, harmonic analysis, or a second model.
+
+Recommended next work is to review a controlled recording from the target
+acoustic piano, acquire a checksummed MAESTRO v3 diagnostic subset for
+real-audio aligned scoring, repeat cold and warm timing trials, and then add
+one piano-specific offline adapter with pedal output.
 
 ## Open Questions
 

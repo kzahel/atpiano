@@ -48,6 +48,20 @@ Use the pinned Python 3.10 environment:
 uv sync
 ```
 
+For microphone recording, include the optional capture dependency:
+
+```text
+uv sync --extra capture
+uv run atpiano devices
+uv run atpiano record \
+  ../atpiano-artifacts/my-piano \
+  --seconds 30
+```
+
+The recording manifest has no aligned MIDI and is therefore explicitly
+unscored. It can still be passed to `offline`, `replay`, and `review` for
+subjective inspection.
+
 Generate a deterministic MIDI-derived WAV and aligned reference:
 
 ```text

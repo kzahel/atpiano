@@ -64,6 +64,24 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="do not open the reviewer in the default browser",
     )
+    subparsers.add_parser(
+        "devices",
+        help="list audio devices available for microphone capture",
+    )
+    record_parser = subparsers.add_parser(
+        "record",
+        help="record a fixed-duration sample-clocked microphone input",
+    )
+    record_parser.add_argument("output_directory", type=Path)
+    record_parser.add_argument("--seconds", type=float, default=20.0)
+    record_parser.add_argument("--sample-rate", type=int, default=22_050)
+    record_parser.add_argument("--block-samples", type=int, default=1024)
+    record_parser.add_argument("--device")
+    record_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="replace capture files in the target directory",
+    )
     return parser
 
 
@@ -94,7 +112,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(args.run_directory / "report.md")
         print(
             "onset F1 @ 50 ms: "
-            f"{read_score(args.run_directory, 'onset', '50_ms', 'f1'):.3f}"
+            f"{format_score(read_score(args.run_directory, 'onset', '50_ms', 'f1'))}"
         )
         return 0
     if args.command == "review":
@@ -106,6 +124,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             port=args.port,
             open_browser=not args.no_open,
         )
+        return 0
+    if args.command == "devices":
+        from atpiano.capture import list_input_devices
+
+        print(list_input_devices())
+        return 0
+    if args.command == "record":
+        from atpiano.capture import record_microphone
+
+        device: int | str | None = args.device
+        if isinstance(device, str) and device.isdecimal():
+            device = int(device)
+        manifest = record_microphone(
+            args.output_directory,
+            duration_s=args.seconds,
+            sample_rate_hz=args.sample_rate,
+            block_samples=args.block_samples,
+            device=device,
+            force=args.force,
+        )
+        print(args.output_directory / "input.json")
+        print(f"audio sha256: {manifest['audio']['sha256']}")
         return 0
     if args.command == "replay":
         from atpiano.replay import run_replay
@@ -120,7 +160,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(args.run_directory / "report.md")
         print(
             "onset F1 @ 50 ms: "
-            f"{read_score(args.run_directory, 'onset', '50_ms', 'f1'):.3f}"
+            f"{format_score(read_score(args.run_directory, 'onset', '50_ms', 'f1'))}"
         )
         return 0
     if not args.version:
@@ -128,7 +168,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 0
 
 
-def read_score(run_directory: Path, *keys: str) -> float:
+def read_score(run_directory: Path, *keys: str) -> float | None:
     from atpiano.util import read_json
 
     value: object = read_json(run_directory / "scores.json")
@@ -136,6 +176,12 @@ def read_score(run_directory: Path, *keys: str) -> float:
         if not isinstance(value, dict):
             raise ValueError(f"score path {'/'.join(keys)} is not numeric")
         value = value[key]
+    if value is None:
+        return None
     if not isinstance(value, (int, float)):
         raise ValueError(f"score path {'/'.join(keys)} is not numeric")
     return float(value)
+
+
+def format_score(value: float | None) -> str:
+    return "not scored" if value is None else f"{value:.3f}"

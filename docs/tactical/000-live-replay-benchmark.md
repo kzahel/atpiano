@@ -2,7 +2,7 @@
 
 Topic: acoustic-transcription-latency-quality
 
-Status: in progress.
+Status: complete.
 
 ## Objective
 
@@ -112,9 +112,10 @@ Every generated run directory will contain:
 - `raw/` — model-native arrays and their sample-coordinate metadata;
 - `events.jsonl` — normalized event revisions and lifecycles;
 - `prediction.mid` — final decoded transcript;
+- `reference.json` and `prediction.json` — browser-readable note sets;
 - `scores.json` — machine-readable quality and latency measurements;
 - `report.md` — compact human-readable result; and
-- referenced audio and reference MIDI paths or copies selected by the command.
+- referenced audio plus an optional reference MIDI selected by the command.
 
 Large inputs and generated run directories remain ignored by Git.
 
@@ -256,7 +257,7 @@ uv run pytest -q
 node --check src/atpiano/web/app.js
 curl http://127.0.0.1:8765/artifacts/run.json
 curl -I -H 'Range: bytes=0-99' \
-  http://127.0.0.1:8765/artifacts/fixture.wav
+  http://127.0.0.1:8765/artifacts/input.wav
 ```
 
 The server test covers packaged UI assets, artifact delivery, and path
@@ -264,3 +265,91 @@ traversal rejection. Manual HTTP validation confirmed byte-range audio
 responses. Browser visual inspection was not part of this tactical's automated
 validation; the user-facing command opens the local reviewer for subjective
 audition.
+
+### 2026-07-24: microphone input and unaligned runs
+
+The optional `sounddevice` adapter records a fixed number of mono samples
+without running inference in the audio callback. Every callback block records
+its first source sample, frame count, PortAudio ADC time, host monotonic receipt
+time, and status. The resulting WAV, timing JSONL, and `atpiano.input.v1`
+manifest feed the same offline, replay, and review commands.
+
+Commands:
+
+```text
+uv sync --extra capture
+uv run atpiano devices
+uv run python -c \
+  "import sounddevice; sounddevice.check_input_settings(\
+device=0, channels=1, dtype='float32', samplerate=22050)"
+uv run atpiano record results/my-piano --seconds 30
+```
+
+Device discovery found the built-in MacBook Pro microphone, and a non-recording
+settings check confirmed that it accepts mono float32 input at 22,050 Hz. No
+ambient microphone recording was made during automated validation.
+
+An unaligned fixture copy exercised the actual model paths:
+
+```text
+uv run atpiano offline \
+  results/unaligned-input/input.json \
+  results/offline-unaligned
+uv run atpiano replay \
+  results/unaligned-input/input.json \
+  results/replay-unaligned \
+  --no-wait
+```
+
+Both completed with empty reference-note artifacts and `quality_available:
+false`; they did not report zero as if it were a measured quality result. The
+offline path emitted 23 final estimates and the replay path emitted 21.
+
+### Final validation
+
+```text
+uv sync --extra capture
+uv run ruff check .
+uv run pytest -q
+node --check src/atpiano/web/app.js
+uv build
+git diff --check
+```
+
+Results:
+
+- 10 unit/integration tests passed;
+- lint and JavaScript syntax checks passed;
+- the source distribution and wheel built successfully;
+- the wheel contains all three reviewer assets;
+- deterministic MIDI and WAV generation repeated byte-identically;
+- aligned offline, no-wait replay, and wall-clock replay completed;
+- unaligned offline and no-wait replay completed without fabricated scores;
+- HTTP tests covered UI assets, run artifacts, path traversal rejection, and
+  byte-range audio; and
+- all tracked outputs pass whitespace validation.
+
+Commit series through the reviewer:
+
+- `48bbb22` — open the tactical and pinned prototype environment;
+- `9ffbd72` — deterministic fixture and untouched offline reference;
+- `190a600` — wall-clock replay, raw windows, lifecycle, and latency; and
+- `242654e` — independent local artifact reviewer.
+
+## Gaps And Recommended Next Work
+
+- Audition an actual 20–40 second recording from the target acoustic piano in
+  the reviewer. Include silence, soft and loud isolated notes, repeated notes,
+  dense chords, low bass, high treble, legato, and pedal gestures.
+- Acquire a checksummed, license-recorded MAESTRO v3 diagnostic subset and run
+  both offline and wall-clock modes on real aligned piano audio.
+- Capture multiple warm and cold replay trials. Current timing is one warmed
+  Core ML process and is insufficient for a latency distribution.
+- Compare one piano-specific model with pedal output. ByteDance is the most
+  direct legacy comparator; Aria-AMT is the stronger modern offline candidate
+  if its CUDA-oriented runtime can be isolated behind the adapter boundary.
+- Improve Basic Pitch rolling offset reconciliation. The prototype primarily
+  establishes onset visibility; sustained notes crossing windows are still
+  truncated or revised poorly.
+- Decide whether the debug reviewer should gain raw-probability heatmaps and
+  threshold re-decoding before any product piano-roll work.
