@@ -288,6 +288,44 @@ This is one unaligned take, so it is comparative evidence and not precision or
 recall. It does support promoting a piano-specific offline adapter above
 further Basic Pitch decoder tuning.
 
+### Transkun does not survive short context
+
+Transkun is an offline adapter, not a live one. Its shipped 2.0 configuration
+uses 16-second segments with an 8-second hop, a six-layer transformer attending
+over both frequency and time within the segment, and a semi-CRF that decodes
+whole note intervals by dynamic programming. Nothing about that is causal, and
+a note is not emitted until its span is decided.
+
+Sweeping segment size on the reference WAV, scored against its own default
+16-second output as the reference:
+
+```text
+segment  hop  raw notes   wall    xRT      P      R     F1
+     16    8         96   4.09s   8.5x  1.000  1.000  1.000
+      8    4         52   2.85s  12.2x  0.769  0.417  0.541
+      4    2         44   2.91s  11.9x  0.750  0.344  0.471
+      3  1.5         77   3.04s  11.4x  0.870  0.698  0.775
+      2    1         47   3.54s   9.8x  0.702  0.344  0.462
+      1  0.5         40   5.62s   6.2x  0.675  0.281  0.397
+```
+
+Recall collapses to roughly a third once context drops below the trained
+segment size, while throughput stays near ten times real time throughout. The
+limit is context, not compute — the same conclusion the rolling Basic Pitch
+work reached, for a different reason.
+
+The 3-second row is out of order relative to its neighbours. Treat the sweep as
+a single-take feasibility probe rather than a curve; it is enough to reject
+naive windowing and not enough to locate an optimum.
+
+Counts here are raw semi-CRF estimates. Transkun's `writeMidi` drops 96 raw
+estimates to the 80 notes in the emitted MIDI, so the two numbers are not
+interchangeable.
+
+This confirms the two-lane split the implemented architecture already has: a
+small causal model for the rolling live feed, and Transkun on Stop for the
+final backfill and any score conversion.
+
 ## Accepted Pipeline Boundary
 
 ```text
