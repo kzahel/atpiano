@@ -2,10 +2,23 @@
 
 Topic: browser-only-wasm-deployment
 
-Status: plausible deployment candidate with a successful local ONNX Runtime
-Web WASM execution smoke test. Browser replay, model-output parity, live
-microphone latency, storage behavior, and offline installation are not yet
-validated. Do not describe this as an implemented deployment.
+Status: **deprioritized option, not a requirement.** The user clarified on
+2026-07-25 that browser-only deployment was an appealing idea rather than a
+constraint, and that any execution backend including NVIDIA/CUDA is acceptable
+if it gives a clearly better result.
+
+A local ONNX Runtime Web WASM execution smoke test succeeded. Browser replay,
+model-output parity, live microphone latency, storage behavior, and offline
+installation are not validated. Do not describe this as an implemented
+deployment.
+
+**This topic must not constrain model selection.** Quality is chosen first, on
+the evidence owned by
+[`acoustic-transcription-latency-quality.md`](acoustic-transcription-latency-quality.md);
+deployment adapts to it. If a selected model cannot run in a browser, that is a
+fact about this topic's feasibility, not an argument against the model. The
+work below stays valid as a description of what a browser-only build would
+require, should a small enough model lane ever be worth shipping that way.
 
 ## Scope And Relationship
 
@@ -533,19 +546,39 @@ offline with no application server.
 
 ## Recommended Direction
 
-Open one bounded tactical for **browser WASM replay and parity**, not a full
-rewrite. It should deliver a static page that runs retained PCM through the
-exact ONNX artifact in real browsers and produces a machine-comparable raw and
-decoded result.
+Hold. Do not open the browser WASM replay tactical yet.
 
-If that tactical passes, port the rolling scheduler, strict decoder, gate, and
-reconciler into a worker while leaving the current Python implementation as
-the reference. Add OPFS, final-pass export, and PWA packaging only after the
-live model path is measured.
+The measured bottlenecks are context, score-inference quality, and beat
+inference on rubato — none of which a browser runtime affects, and all of which
+it constrains. The accepted direction is instead
+[`009-three-phase-unbounded-sessions.md`](../tactical/009-three-phase-unbounded-sessions.md),
+which is host-executed and free to select the best available model.
 
-This sequence establishes a reproducible offline result before adapting the
-browser lane for rolling inference, preserves the existing sample-clock and
-latency guardrails, and isolates model parity from UI and storage changes.
+This topic becomes relevant again under one of two conditions:
+
+1. a model lane small enough for WASM is shown to be good enough for the
+   provisional zone, making a browser-only build of Lane A worthwhile; or
+2. distribution to other users becomes a goal, at which point a static build
+   competes with a desktop wrapper on install friction, not on quality.
+
+If it resumes, the earlier sequence still applies: one bounded tactical for
+browser WASM replay and parity — a static page that runs retained PCM through
+the exact ONNX artifact in real browsers and produces a machine-comparable raw
+and decoded result — before any scheduler, storage, or packaging work.
+
+### Execution backend is now open
+
+With CUDA, ROCm, MPS, and remote hosts all acceptable, the existing guardrail
+becomes more load-bearing rather than less: accelerator-specific code stays
+behind the model-adapter boundary, and every backend must be validated against
+a known-good CPU result. The MIDI2ScoreTransformer MPS failure recorded in
+[`008-score-pipeline-bakeoff.md`](../tactical/008-score-pipeline-bakeoff.md) is
+the reason — it produced an empty score and exited zero. The failure mode for a
+bad backend is silence, not a crash.
+
+A remote accelerator additionally reintroduces transport as a live-path
+concern: raw LAN PCM is the measured control, and any codec is an experiment
+against it, not a shortcut.
 
 ## Open Questions
 

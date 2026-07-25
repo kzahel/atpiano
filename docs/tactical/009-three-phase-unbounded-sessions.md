@@ -179,11 +179,14 @@ That last one is the regression test that keeps the whole design honest.
 
 ## Risks And Open Questions
 
-- **Deployment tension.** Transkun is a six-layer transformer plus a semi-CRF.
-  Running it in browser WASM is implausible, so v2 is server-backed or a
-  desktop application, which conflicts with
-  [`browser-only-wasm-deployment.md`](../topics/browser-only-wasm-deployment.md).
-  That topic's premise needs revisiting, or Lane B needs a smaller model.
+- **Deployment is no longer a constraint.** The user clarified that
+  browser-only WASM was an appealing idea rather than a requirement, and that
+  any backend including NVIDIA/CUDA is acceptable if it clearly wins.
+  [`browser-only-wasm-deployment.md`](../topics/browser-only-wasm-deployment.md)
+  is deprioritized accordingly, and v2 is host-executed. The remaining
+  obligation is the existing guardrail: accelerator code stays behind the model
+  adapter, and every backend is validated against a known-good CPU result,
+  because a bad backend fails silently rather than loudly.
 - **Is Lane A still needed?** If Lane B's lag is acceptable, Lane A may only be
   earning the sub-second key-lighting feel. Worth testing by turning it off.
 - **Identity churn.** A note that appears, then moves or vanishes several
