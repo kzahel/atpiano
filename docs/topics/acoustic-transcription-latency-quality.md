@@ -75,6 +75,18 @@ dominate inference time. The synthetic fixture recovers every offline onset
 but still produces false notes and weak offsets. It is a plumbing diagnostic,
 not acoustic-piano quality evidence.
 
+That 19-note `deterministic-midi-smoke-v2` fixture is now frozen because later
+decoder choices and recorded measurements depend on its exact MIDI and WAV
+hashes. V2 integration will add, rather than replace it with, a second aligned
+`deterministic-musical-loop-v1` fixture. The new fixture is a 16-bar C-major
+phrase in 4/4 at 96 BPM with an explicit I-V-vi-IV / ii-V7-I progression,
+block chords and inversions, a second-section Alberti bass, melody, repeated
+attacks, register coverage, and pedal changes. Its approximately 40 seconds of
+music exceed the proposed 28-second Transkun context window. Its MIDI, rendered
+WAV, bar and harmony metadata, and expected musical structures are
+deterministic and objectively testable. It remains synthetic correctness
+evidence, not a substitute for the target-piano golden reference.
+
 The rolling adapter retains every native probability window with explicit
 source-sample coordinates. It uses a deterministic 10-frame left guard and
 20-frame right guard within Basic Pitch's 30-frame overlap. Center detections

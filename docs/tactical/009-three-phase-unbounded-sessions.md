@@ -190,19 +190,51 @@ engine, scheduler, model lanes, reconciliation, persistence, and event
 delivery used after live capture. It must support both one-shot wall-clock
 replay and indefinite repetition without resetting the session.
 
+The existing 12.25-second `deterministic-midi-smoke-v2` fixture remains frozen.
+Its deliberately isolated 19 events protect historical decoder and latency
+evidence, but it is not a musical performance and must not be stretched into
+one.
+
+Slice 1 adds a second aligned fixture,
+`deterministic-musical-loop-v1`, specifically for v2 integration:
+
+- 16 bars of 4/4 at 96 BPM, approximately 40 seconds of music, preceded by
+  calibration silence and followed by a deterministic release tail;
+- an eight-bar C-major progression
+  `C - G/B - Am - F - Dm - G7 - C - C`, repeated with a different texture;
+- a first section with bass notes, inversions, block triads, a dominant
+  seventh, and a simple right-hand melody;
+- a second section with an explicit low-high-middle-high Alberti pattern under
+  a varied melody, ending with block-chord cadence evidence;
+- fixed dynamics, repeated-note reattacks, pedal changes at declared harmonic
+  boundaries, and useful bass, middle, and treble coverage; and
+- a resolved final tonic plus silence so ordinary repetitions do not create an
+  unexplained chord collision at the loop boundary.
+
+The Standard MIDI File is the structural source of truth and the WAV is
+rendered by the repository-owned deterministic synthesizer. The manifest
+records tempo, meter, bar boundaries, harmonic labels, texture sections,
+pedal intervals, renderer version, and hashes of both files. Structural tests
+must assert the progression, simultaneous chord onsets, the Alberti pitch
+order, repeated strikes, pedal changes, duration, register coverage, and
+byte-identical regeneration. It is still a synthetic model diagnostic, not a
+claim that the renderer sounds like the target acoustic piano.
+
 The bring-up sequence is:
 
-1. run the aligned deterministic MIDI-derived WAV once for exact source-clock
-   and known-note assertions;
-2. repeat that deterministic fixture on one continuous sample clock and require
+1. run the frozen diagnostic fixture once to preserve its historical
+   assertions;
+2. run the aligned musical-loop fixture once for exact source-clock,
+   note-event, pedal, harmony-section, and texture assertions;
+3. repeat the musical-loop fixture on one continuous sample clock and require
    the same aligned note result on every ordinary repetition, while scoring
    synthetic loop boundaries separately;
-3. run the checksummed golden-reference WAV once and compare each lane with its
+4. run the checksummed golden-reference WAV once and compare each lane with its
    established offline or finite-replay control;
-4. repeat the golden-reference WAV at wall-clock cadence for at least 30
+5. repeat the golden-reference WAV at wall-clock cadence for at least 30
    minutes and then for several hours to measure resource stability and output
    repeatability; and
-5. only then use a real microphone session for subjective capture, room-gate,
+6. only then use a real microphone session for subjective capture, room-gate,
    browser-clock, and end-to-end paint confirmation.
 
 Loop repetitions use one continuous sample clock. Every boundary and any
@@ -216,8 +248,8 @@ for the process to stay alive.
 The golden-reference take has no aligned MIDI, so it can prove repeatability,
 agreement with offline model output, horizon advancement, bounded resource
 use, and stable UI delivery, but not absolute transcription accuracy. The
-MIDI-derived fixture remains the automated correctness oracle. Generated loop
-audio and results stay outside Git.
+two MIDI-derived fixtures remain the automated correctness oracles. Generated
+loop audio and results stay outside Git.
 
 ## Slices
 
@@ -225,10 +257,11 @@ Each becomes its own tactical when started. Only slice 1 is currently scoped
 tightly enough to begin.
 
 1. **V2 foundation, horizons, and retention; Basic Pitch only.** Add the
-   separate v2 entry point, frontend, schema, and artifact namespace. Add
-   one-shot and looping WAV replay first, then implement the horizon model,
-   bounded retention, segmented PCM log, and virtualized UI. V2 has no
-   two-minute cap. No new model. V1 remains runnable and unchanged.
+   separate v2 entry point, frontend, schema, and artifact namespace. Add the
+   aligned musical-loop fixture plus one-shot and looping WAV replay first,
+   then implement the horizon model, bounded retention, segmented PCM log, and
+   virtualized UI. V2 has no two-minute cap. No new model. V1 remains runnable
+   and unchanged.
 2. **Lane B.** Trailing Transkun with proper stitching, continuous
    reconciliation, repeated-WAV parity, backpressure policy, and only then
    replacement of v2's Stop-time final pass.
@@ -246,8 +279,8 @@ tightly enough to begin.
   retracted, and how visible that is;
 - per-repetition event-count, pitch, onset, offset, pedal, and boundary-band
   variance against the single-take control;
-- aligned note precision, recall, F1, and source-clock error on every repeated
-  deterministic MIDI-derived fixture;
+- aligned note precision, recall, F1, pedal metrics, and source-clock error on
+  every repeated deterministic musical-loop fixture;
 - CPU duty per lane, and behavior when the machine is deliberately loaded;
 - silence, pause, resume, disconnect, reconnect, and sleep/wake; and
 - that each repeated take's committed transcript remains within a declared

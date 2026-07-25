@@ -40,11 +40,13 @@ frontend, session schema, and artifact namespace. It may share proven capture,
 transport, clock, adapter, and event internals with v1, but shared changes must
 pass a v1 smoke test and must not silently turn v1 into an alias for v2.
 
-V2 bring-up is file-driven. The deterministic MIDI-derived WAV and the
-checksummed golden-reference WAV feed the same sample-indexed session engine
-used by live capture, first once and then on a continuous-clock loop. Long
-replays establish repeatability, horizon movement, and bounded resources
-before a pianist is asked to perform into a microphone. Because the
+V2 bring-up is file-driven. The frozen 19-note diagnostic fixture, a new
+aligned 16-bar musical fixture, and the checksummed golden-reference WAV feed
+the same sample-indexed session engine used by live capture. The musical
+fixture contains a declared progression, block chords, Alberti bass, melody,
+and pedal evidence rather than only isolated smoke-test events. Long
+continuous-clock loops establish repeatability, horizon movement, and bounded
+resources before a pianist is asked to perform into a microphone. Because the
 golden-reference recording has no aligned MIDI, it is an operational and
 offline-parity oracle, not absolute note truth.
 
@@ -522,12 +524,14 @@ the v2 boundary and deterministic looping WAV input, then implements horizons
 and bounded retention with no new model. It removes the two-minute cap only in
 v2; the v1 MVP remains runnable and unchanged.
 
-Bring up and stress the pipeline with the aligned fixture and the checksummed
-golden-reference WAV before microphone review. The loop uses a continuous
-sample clock, records each boundary, and compares each repetition with a
-single-take control rather than merely checking that the process survives.
-Microphone testing is later subjective confirmation of capture, room gating,
-clock mapping, and display delivery.
+Bring up and stress the pipeline with both aligned fixtures and the checksummed
+golden-reference WAV before microphone review. Preserve the existing
+diagnostic fixture unchanged, and use the new 16-bar progression for repeated
+musical correctness checks. The loop uses a continuous sample clock, records
+each boundary, and compares each repetition with a single-take control rather
+than merely checking that the process survives. Microphone testing is later
+subjective confirmation of capture, room gating, clock mapping, and display
+delivery.
 
 The octave failure below no longer needs a dedicated Lane A fix if the trailing
 commit lane demonstrates that it corrects the error a few seconds later using
