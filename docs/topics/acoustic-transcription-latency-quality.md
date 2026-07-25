@@ -259,6 +259,35 @@ not a frame-derived or melodia start, confidence inspection and controlled
 low-note/true-octave examples are now more informative than further stock
 decoder tuning.
 
+### Octave errors are a model-class property
+
+[`008-score-pipeline-bakeoff.md`](../tactical/008-score-pipeline-bakeoff.md)
+tested the reported low-note/upper-octave failure by swapping the model rather
+than filtering its output. On the same reference WAV:
+
+```text
+model         notes  range  dur_med  dur_p95  octave-sync pairs  sub-s restarts  pedal CC
+basic-pitch     133  45-76    0.627    1.875                 17              37         0
+transkun         80  47-76    1.153    3.632                  2              11        30
+```
+
+Octave-sync pairs are note pairs exactly 12 semitones apart whose onsets fall
+within 30 ms. Transkun 2.0.1 is piano-specific, MIT-licensed, pip-installable,
+and runs on CPU in 5.5 s warm for this 34.688-second take. It also supplies the
+project's first sustain-pedal output.
+
+Basic Pitch consumes a harmonic-stacked CQT and is instrument-agnostic, so bins
+`p` and `p+12` share much of their evidence and a low piano string's strong
+second partial can drive the shared onset head. A proposed inharmonicity and
+envelope-correlation veto was **rejected before implementation**: it can only
+separate a partial from a struck string in sparse, dry textures, and the target
+failure occurs with pedal and overlapping notes. Changing the model addressed
+the same failure without a heuristic.
+
+This is one unaligned take, so it is comparative evidence and not precision or
+recall. It does support promoting a piano-specific offline adapter above
+further Basic Pitch decoder tuning.
+
 ## Accepted Pipeline Boundary
 
 ```text

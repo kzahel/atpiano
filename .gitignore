@@ -13,3 +13,6 @@ artifacts/
 data/
 recordings/
 results/
+
+# The golden-reference manifest is tracked; its captured audio is not.
+oracle/*.wav

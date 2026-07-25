@@ -2,10 +2,17 @@
 
 Topic: performance-to-notation
 
-Status: evaluated prototype, now paused. Partitura produces traceable
-MusicXML and OpenSheetMusicDisplay renders it, but the first target-piano score
-failed the user's readability test while an Ivory preview succeeded. No
-permanent consumer stack is selected.
+Status: resumed. Partitura's baseline failed the user's readability test while
+an Ivory preview succeeded. A local Transkun + MIDI2ScoreTransformer cascade has
+now produced the first sight-readable local score for the same reference take,
+cutting ties from 20 to 1 and voices from 10 to 5. No permanent consumer stack
+is selected, and the leading score converter has no published license. See
+[`008-score-pipeline-bakeoff.md`](../tactical/008-score-pipeline-bakeoff.md).
+
+The product goal is fixed and narrow: legible engraved sheet music the
+performer can sight read back. Lead sheets and chord-symbol summaries do not
+satisfy it. The reference input and the standard to beat are pinned in
+[`oracle/`](../../oracle/README.md).
 
 ## Scope And Boundary
 
@@ -299,26 +306,45 @@ beat/downbeat, meter, quantization, measure-splitting, and voice-assignment
 failure. A well-formed, traceable MusicXML artifact is not a success when a
 pianist cannot use the score.
 
+## Bakeoff Against The Oracle
+
+[`008-score-pipeline-bakeoff.md`](../tactical/008-score-pipeline-bakeoff.md)
+decomposed the Ivory gap by holding the reference WAV fixed and swapping one
+stage at a time. Both halves of the pipeline were deficient.
+
+Replacing Basic Pitch with Transkun 2.0.1 dropped attack-synchronous octave
+pairs from 17 to 2 on the reference take and supplied the project's first
+sustain-pedal output. Replacing Partitura with MIDI2ScoreTransformer dropped
+ties from 20 to 1, voices from 10 to 5, and measures from 14 to 8, matching the
+oracle's measure count and key.
+
+The most useful negative result is that MuseScore 4's default MIDI import is
+also a tie forest, and that supplying the oracle's own tempo and meter fixes
+measure structure without fixing readability. A single constant tempo cannot
+absorb rubato, so a correct tempo estimate is necessary but far from
+sufficient. A time-varying beat map or a learned quantizer is required.
+
+Beat This! corroborated the oracle's `quarter = 47` in aggregate but produced
+beat spacings from 0.14 s to 3.0 s on this free improvisation, so it is not
+currently a usable grid source for this material.
+
 ## Recommended Direction
 
-Pause notation implementation and switch to the accepted
-[`live-acoustic-transcription`](live-acoustic-transcription.md) workstream.
-Interactive onset and pitch-shape feedback will let the user judge the
-acoustic transcript before score inference obscures it.
+Notation is no longer paused. The immediate work is:
 
-When notation resumes:
+1. resolve the MIDI2ScoreTransformer license, or treat its architecture as a
+   design to reimplement rather than a dependency;
+2. adopt Transkun behind the existing offline model-adapter boundary;
+3. score the cascade on ASAP so the notation layer has a real metric instead of
+   one subjective take;
+4. feed ground-truth MIDI and predicted MIDI through the same converter to
+   separate detection error from notation error; and
+5. treat tie count, voices, measure splits, meter/downbeat/pickup, and
+   sight-readability as the decision metrics.
 
-1. obtain both Ivory previews, recording which came from WAV and atpiano MIDI;
-2. use known-score/performance MIDI pairs to isolate duration and score
-   conversion errors;
-3. treat tie count, voices, measure splits, meter/downbeat/pickup, and
-   sight-readability as decision metrics; and
-4. replace or substantially revise the current conversion baseline rather
-   than polishing its engraving.
-
-Verovio cannot repair bad score semantics, and renderer work should remain
-paused. A paid Ivory export is optional; screenshots already establish the
-large readability gap.
+Verovio cannot repair bad score semantics, and renderer work remains
+deprioritized. A paid Ivory export would enable note-level comparison against
+the oracle, which the screenshot alone cannot support.
 
 ## Evidence To Require
 
