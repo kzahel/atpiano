@@ -41,7 +41,12 @@ Current direction and research questions live in [`docs/topics/`](docs/topics/RE
 Acoustic-model benchmarking, live browser transcription, and downstream
 performance-to-notation conversion have separate owners there.
 
-## Browser Workbench
+## Browser Workbench (v1 MVP)
+
+The current workbench remains the runnable v1 MVP. The planned three-phase v2
+is a separate live web application; it may reuse proven internals but does not
+replace this command, its session artifacts, or its review path. See
+[`docs/tactical/009-three-phase-unbounded-sessions.md`](docs/tactical/009-three-phase-unbounded-sessions.md).
 
 Use the pinned Python 3.10 environment:
 

@@ -2,12 +2,12 @@
 
 Topic: live-acoustic-transcription
 
-Status: strict-onset live decoder accepted in initial subjective review. It
-works well enough to expose a narrower target-piano error: a lower-note strike
-can trigger an attack-synchronous octave overtone. Raw/grouped staff controls
-plus optional onset-score and source-timing labels now support direct
-diagnosis. Fixed-tempo rough rhythm glyphs add a deliberately approximate view
-of inter-onset spacing without changing transcription.
+Status: the strict-onset v1 live decoder is accepted in initial subjective
+review and remains the runnable MVP. It works well enough to expose a narrower
+target-piano error: a lower-note strike can trigger an attack-synchronous
+octave overtone. The accepted next direction is a separate v2 successor with
+progressive correction, bounded-memory indefinite sessions, and deterministic
+WAV bring-up before microphone testing.
 
 ## Scope And Relationship
 
@@ -17,7 +17,8 @@ This topic owns the live user path:
 - session clocks, buffering, backpressure, gaps, and reconnect behavior;
 - scheduling rolling inference while capture continues;
 - provisional, revised, committed, and retracted UI behavior;
-- a final full-file reconciliation pass after Stop; and
+- v1's final full-file reconciliation pass after Stop and v2's proposed
+  continuously committed replacement; and
 - measured capture-to-browser-display latency.
 
 [`acoustic-transcription-latency-quality.md`](acoustic-transcription-latency-quality.md)
@@ -25,6 +26,27 @@ continues to own model adapters, raw model evidence, transcription quality,
 and the general latency/quality benchmark. This topic applies those contracts
 to a user-operated browser session. The downstream piano-roll or notation
 consumer remains separable and must also accept direct MIDI.
+
+## Product Version Boundary
+
+The current `uv run atpiano workbench` application is the v1 MVP. Its command,
+frontend behavior, session artifacts, exact Basic Pitch final pass, review
+path, and tests remain supported. Existing sessions remain reviewable.
+
+The plan in
+[`009-three-phase-unbounded-sessions.md`](../tactical/009-three-phase-unbounded-sessions.md)
+builds a separate v2 live web application. V2 gets its own CLI entry point,
+frontend, session schema, and artifact namespace. It may share proven capture,
+transport, clock, adapter, and event internals with v1, but shared changes must
+pass a v1 smoke test and must not silently turn v1 into an alias for v2.
+
+V2 bring-up is file-driven. The deterministic MIDI-derived WAV and the
+checksummed golden-reference WAV feed the same sample-indexed session engine
+used by live capture, first once and then on a continuous-clock loop. Long
+replays establish repeatability, horizon movement, and bounded resources
+before a pianist is asked to perform into a microphone. Because the
+golden-reference recording has no aligned MIDI, it is an operational and
+offline-parity oracle, not absolute note truth.
 
 ## Desired Experience
 
@@ -492,14 +514,25 @@ A focused test covers the behavior.
 The accepted next direction is the three-phase, unbounded-session architecture
 sketched in
 [`009-three-phase-unbounded-sessions.md`](../tactical/009-three-phase-unbounded-sessions.md):
-a provisional Basic Pitch lane, a trailing Transkun commit lane, and an
-engraving lane, each bounded by a monotonic horizon so a session can run
-indefinitely at constant cost. Its first slice implements horizons and bounded
-retention with no new model, which by itself removes the two-minute cap.
+a separate v2 live web application with a provisional Basic Pitch lane, a
+trailing Transkun commit lane, and an engraving lane. Monotonic horizons plus
+bounded in-memory working sets and segmented disk logs let a session run
+indefinitely without retaining the whole session in RAM. Its first slice adds
+the v2 boundary and deterministic looping WAV input, then implements horizons
+and bounded retention with no new model. It removes the two-minute cap only in
+v2; the v1 MVP remains runnable and unchanged.
 
-The octave failure below no longer needs a dedicated live fix. A trailing
-commit lane corrects it a few seconds later using a piano-specific model, so it
-becomes a transient display artifact rather than a permanent wrong note.
+Bring up and stress the pipeline with the aligned fixture and the checksummed
+golden-reference WAV before microphone review. The loop uses a continuous
+sample clock, records each boundary, and compares each repetition with a
+single-take control rather than merely checking that the process survives.
+Microphone testing is later subjective confirmation of capture, room gating,
+clock mapping, and display delivery.
+
+The octave failure below no longer needs a dedicated Lane A fix if the trailing
+commit lane demonstrates that it corrects the error a few seconds later using
+a piano-specific model. That is a measured v2 acceptance criterion, not an
+assumption that every octave error disappears.
 
 Do not tune the absolute-volume gate or add a generic harmonic filter for this
 failure. The former cannot distinguish a new strike from loud resonance; the
