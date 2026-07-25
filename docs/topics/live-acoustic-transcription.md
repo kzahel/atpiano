@@ -296,6 +296,40 @@ until the next onset supplies its interval. These are reversible display
 settings retained in capture metadata, not changes to normalized events or
 the model.
 
+### Trailing commit lane is viable
+
+The user proposed stabilizing the live view continuously instead of only at
+Stop: run the stronger offline model over settled audio behind the play head
+while Basic Pitch keeps the newest second responsive.
+
+A simulation on the reference WAV decoded a sliding buffer ending `guard`
+seconds behind the capture head and committed only the newly exposed interior
+band, scored against Transkun's own full-file result:
+
+```text
+window guard  hop steps  decode  duty commits     P     R    F1  lat p50  lat max
+    20     8    4     7   17.6s  0.51      97 0.928 0.938 0.933     9.4s    12.0s
+    20     4    4     8   19.1s  0.55      95 0.947 0.938 0.942     5.9s     8.0s
+    20     2    4     9   22.7s  0.65      99 0.929 0.958 0.944     4.0s     6.0s
+    28     8    4     7   20.0s  0.58     100 0.940 0.979 0.959     9.4s    12.0s
+```
+
+A trailing lane recovers 93 to 96 percent of the full-file result at roughly
+half of one core. Shrinking the right-edge guard from 8 s to 2 s costs nothing
+measurable, while lengthening the buffer from 20 s to 28 s gives the best
+agreement: this model wants past context, not future context, because its own
+16-second internal segmentation already supplies local look-ahead.
+
+Reported latencies are audio-time lag and exclude the roughly 2.5-second decode,
+so expect about 6.5 s best case and 14 s worst case end to end.
+
+Caveats: one unaligned take; the reference is the model's own full-file output
+rather than ground truth; and the band filter is crude. Transkun exposes
+`forcedStartPos`, `onsetBound`, and `mergeIncompleteEvent`, which appear
+designed for exactly this stitching problem and were not used. The 0.5 duty
+cycle is also wasteful, since each step recomputes work the previous step
+already did.
+
 ## Implemented Live Architecture
 
 ```text
@@ -454,6 +488,18 @@ as ordinary client cancellation and stops the response without a traceback.
 A focused test covers the behavior.
 
 ## Recommended Direction
+
+The accepted next direction is the three-phase, unbounded-session architecture
+sketched in
+[`009-three-phase-unbounded-sessions.md`](../tactical/009-three-phase-unbounded-sessions.md):
+a provisional Basic Pitch lane, a trailing Transkun commit lane, and an
+engraving lane, each bounded by a monotonic horizon so a session can run
+indefinitely at constant cost. Its first slice implements horizons and bounded
+retention with no new model, which by itself removes the two-minute cap.
+
+The octave failure below no longer needs a dedicated live fix. A trailing
+commit lane corrects it a few seconds later using a piano-specific model, so it
+becomes a transient display artifact rather than a permanent wrong note.
 
 Do not tune the absolute-volume gate or add a generic harmonic filter for this
 failure. The former cannot distinguish a new strike from loud resonance; the
