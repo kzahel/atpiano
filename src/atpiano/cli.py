@@ -190,6 +190,61 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("results/midi2score-runtime"),
         help="isolated MIDI2ScoreTransformer runtime directory",
     )
+    shared_app_parser = subparsers.add_parser(
+        "workbench-v3",
+        help="run the shared React performance workspace",
+    )
+    shared_app_parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=Path("results/workbench-v3"),
+        help="segmented session directory (default: results/workbench-v3)",
+    )
+    shared_app_parser.add_argument("--port", type=int, default=8002)
+    shared_app_parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="do not open the shared application in the default browser",
+    )
+    shared_app_parser.add_argument(
+        "--replay",
+        type=Path,
+        help="start by replaying this deterministic input manifest",
+    )
+    shared_app_parser.add_argument(
+        "--repeat",
+        type=int,
+        default=1,
+        help="number of continuous-clock replay repetitions (default: 1)",
+    )
+    shared_app_parser.add_argument(
+        "--silence-seconds",
+        type=float,
+        default=0.0,
+        help="declared silence inserted between replay repetitions (default: 0)",
+    )
+    shared_app_parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="run configured replay without wall-clock waits",
+    )
+    shared_app_parser.add_argument(
+        "--minimum-free-gib",
+        type=float,
+        default=2.0,
+        help="stop before free space falls below this reserve (default: 2)",
+    )
+    shared_app_parser.add_argument(
+        "--commit-device",
+        default="cpu",
+        help="Transkun execution device (default: cpu)",
+    )
+    shared_app_parser.add_argument(
+        "--score-runtime",
+        type=Path,
+        default=Path("results/midi2score-runtime"),
+        help="isolated MIDI2ScoreTransformer runtime directory",
+    )
     score_setup_parser = subparsers.add_parser(
         "setup-midi2score",
         help="install the internal MIDI2ScoreTransformer runtime",
@@ -314,6 +369,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         from atpiano.corrected_workbench import serve_corrected_workbench
 
         serve_corrected_workbench(
+            args.workspace,
+            port=args.port,
+            open_browser=not args.no_open,
+            commit_device=args.commit_device,
+            minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
+            replay_manifest=args.replay,
+            replay_repeat=args.repeat,
+            replay_silence_s=args.silence_seconds,
+            replay_realtime=not args.no_wait,
+            score_runtime=args.score_runtime,
+        )
+        return 0
+    if args.command == "workbench-v3":
+        from atpiano.corrected_workbench import serve_shared_application
+
+        serve_shared_application(
             args.workspace,
             port=args.port,
             open_browser=not args.no_open,

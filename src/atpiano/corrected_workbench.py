@@ -7,6 +7,7 @@ import mimetypes
 import re
 import shutil
 import sqlite3
+import subprocess
 import threading
 import time
 import uuid
@@ -74,14 +75,6 @@ MAX_CLIENT_METADATA_BYTES = 16 * 1024
 MAX_VISIBLE_RANGE_S = 120.0
 DEFAULT_MINIMUM_FREE_BYTES = 2 * 1024**3
 WEB_ROOT = Path(__file__).with_name("web_v2")
-ASSETS = {
-    "/": WEB_ROOT / "index.html",
-    "/index.html": WEB_ROOT / "index.html",
-    "/app.js": WEB_ROOT / "app.js",
-    "/capture-processor.js": WEB_ROOT / "capture-processor.js",
-    "/timeline.js": WEB_ROOT / "timeline.js",
-    "/styles.css": WEB_ROOT / "styles.css",
-}
 EXPORT_ASSETS = {
     "/api/artifacts/exports/session.mid": "session.mid",
     "/api/artifacts/exports/session.jsonl": "session.jsonl",
@@ -131,6 +124,8 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         replay_realtime: bool = True,
         score_runtime: Path = Path("results/midi2score-runtime"),
         score_runner: ScoreRunner | None = None,
+        web_root: Path = WEB_ROOT,
+        application_mode: str = "corrected-workbench-v2",
     ) -> None:
         if minimum_free_bytes < 0:
             raise ValueError("minimum free bytes cannot be negative")
@@ -150,6 +145,8 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self.replay_realtime = replay_realtime
         self.score_runtime = score_runtime.resolve()
         self.score_runner = score_runner
+        self.web_root = web_root.resolve()
+        self.application_mode = application_mode
         self.state_lock = threading.Lock()
         self.model_lock = threading.Lock()
         self.score_lock = threading.Lock()
@@ -172,6 +169,13 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self._score_completed_at: datetime | None = None
         self._load_latest_session()
         super().__init__(("127.0.0.1", port), CorrectedWorkbenchHandler)
+
+    def asset_path(self, request_path: str) -> Path | None:
+        relative = "index.html" if request_path == "/" else request_path.lstrip("/")
+        candidate = (self.web_root / relative).resolve()
+        if self.web_root != candidate and self.web_root not in candidate.parents:
+            return None
+        return candidate if candidate.is_file() else None
 
     def _load_latest_session(self) -> None:
         manifests = sorted(
@@ -944,14 +948,15 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         if request_path == "/api/live":
             self._handle_live_websocket()
             return
-        if request_path in ASSETS:
-            self._send_file(ASSETS[request_path], include_body=True)
+        asset = self.server.asset_path(request_path)
+        if asset is not None:
+            self._send_file(asset, include_body=True)
             return
         if request_path == "/api/config":
             self._send_json(
                 {
                     "schema_version": CORRECTED_WORKBENCH_SCHEMA,
-                    "mode": "corrected-workbench-v2",
+                    "mode": self.server.application_mode,
                     "stream_schema": CORRECTED_STREAM_SCHEMA,
                     "max_visible_range_s": MAX_VISIBLE_RANGE_S,
                     "replay": {
@@ -999,8 +1004,9 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             include_body=False,
         ):
             return
-        if request_path in ASSETS:
-            self._send_file(ASSETS[request_path], include_body=False)
+        asset = self.server.asset_path(request_path)
+        if asset is not None:
+            self._send_file(asset, include_body=False)
             return
         export_path = self._current_export(request_path)
         if export_path is not None:
@@ -1435,6 +1441,8 @@ def create_corrected_workbench_server(
     replay_realtime: bool = True,
     score_runtime: Path = Path("results/midi2score-runtime"),
     score_runner: ScoreRunner | None = None,
+    web_root: Path = WEB_ROOT,
+    application_mode: str = "corrected-workbench-v2",
 ) -> CorrectedWorkbenchServer:
     factory = commit_model_factory or (lambda: _default_commit_model(device=commit_device))
     return CorrectedWorkbenchServer(
@@ -1449,6 +1457,8 @@ def create_corrected_workbench_server(
         replay_realtime=replay_realtime,
         score_runtime=score_runtime,
         score_runner=score_runner,
+        web_root=web_root,
+        application_mode=application_mode,
     )
 
 
@@ -1464,6 +1474,9 @@ def serve_corrected_workbench(
     replay_silence_s: float = 0.0,
     replay_realtime: bool = True,
     score_runtime: Path = Path("results/midi2score-runtime"),
+    web_root: Path = WEB_ROOT,
+    application_mode: str = "corrected-workbench-v2",
+    application_label: str = "Corrected-note workspace",
 ) -> None:
     server = create_corrected_workbench_server(
         workspace_directory,
@@ -1475,10 +1488,12 @@ def serve_corrected_workbench(
         replay_silence_s=replay_silence_s,
         replay_realtime=replay_realtime,
         score_runtime=score_runtime,
+        web_root=web_root,
+        application_mode=application_mode,
     )
     actual_port = server.server_address[1]
     url = f"http://127.0.0.1:{actual_port}/"
-    print(f"Corrected-note workspace: {server.workspace_directory}")
+    print(f"{application_label}: {server.workspace_directory}")
     print(url)
     if open_browser:
         webbrowser.open(url)
@@ -1490,3 +1505,40 @@ def serve_corrected_workbench(
         pass
     finally:
         server.server_close()
+
+
+def serve_shared_application(
+    workspace_directory: Path,
+    *,
+    port: int = 8002,
+    open_browser: bool = True,
+    commit_device: str = "cpu",
+    minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
+    replay_manifest: Path | None = None,
+    replay_repeat: int = 1,
+    replay_silence_s: float = 0.0,
+    replay_realtime: bool = True,
+    score_runtime: Path = Path("results/midi2score-runtime"),
+) -> None:
+    repository_root = Path(__file__).resolve().parents[2]
+    app_root = repository_root / "app"
+    subprocess.run(
+        ["npm", "run", "build", "--prefix", str(app_root)],
+        cwd=repository_root,
+        check=True,
+    )
+    serve_corrected_workbench(
+        workspace_directory,
+        port=port,
+        open_browser=open_browser,
+        commit_device=commit_device,
+        minimum_free_bytes=minimum_free_bytes,
+        replay_manifest=replay_manifest,
+        replay_repeat=replay_repeat,
+        replay_silence_s=replay_silence_s,
+        replay_realtime=replay_realtime,
+        score_runtime=score_runtime,
+        web_root=app_root / "dist",
+        application_mode="shared-react-v3",
+        application_label="Atpiano performance workspace",
+    )

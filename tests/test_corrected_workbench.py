@@ -177,6 +177,16 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
             "--no-wait",
         ]
     )
+    v3 = parser.parse_args(
+        [
+            "workbench-v3",
+            "--port",
+            "8102",
+            "--repeat",
+            "2",
+            "--no-wait",
+        ]
+    )
 
     assert v1.command == "workbench"
     assert v1.port == 8100
@@ -186,6 +196,56 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
     assert v2.repeat == 3
     assert v2.silence_seconds == 1.5
     assert v2.no_wait is True
+    assert v3.command == "workbench-v3"
+    assert v3.port == 8102
+    assert v3.repeat == 2
+    assert v3.workspace == Path("results/workbench-v3")
+
+
+def test_corrected_workbench_can_serve_the_shared_app_shell(
+    tmp_path: Path,
+) -> None:
+    web_root = tmp_path / "dist"
+    assets = web_root / "assets"
+    assets.mkdir(parents=True)
+    (web_root / "index.html").write_text(
+        "<!doctype html><title>Atpiano performance workspace</title>",
+        encoding="utf-8",
+    )
+    (assets / "app.js").write_text("globalThis.atpianoV3 = true;\n", encoding="utf-8")
+    server = create_corrected_workbench_server(
+        tmp_path / "workspace",
+        port=0,
+        preview_model_factory=_FakePreviewModel,
+        commit_model_factory=_FakeCommitModel,
+        minimum_free_bytes=0,
+        web_root=web_root,
+        application_mode="shared-react-v3",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        with urllib.request.urlopen(f"{base_url}/", timeout=2) as response:
+            page = response.read()
+        with urllib.request.urlopen(
+            f"{base_url}/assets/app.js",
+            timeout=2,
+        ) as response:
+            script = response.read()
+        with urllib.request.urlopen(
+            f"{base_url}/api/config",
+            timeout=2,
+        ) as response:
+            config = json.load(response)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert b"Atpiano performance workspace" in page
+    assert b"atpianoV3" in script
+    assert config["mode"] == "shared-react-v3"
 
 
 def test_corrected_workbench_generates_committed_score_in_background(

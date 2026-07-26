@@ -1,0 +1,584 @@
+import {
+  createAtpianoHttpClient,
+  type AtpianoHttpClient,
+} from "../http-client.js";
+import type {
+  ArtifactAccess,
+  ArtifactPage,
+  AtpianoRuntime,
+  Capture,
+  CaptureStart,
+  CaptureStop,
+  DeleteSessionRequest,
+  DeleteSessionResult,
+  EventPage,
+  EventRangeRequest,
+  EventSubscriber,
+  EventSubscription,
+  Horizon,
+  Job,
+  PageRequest,
+  PcmBlock,
+  ReplayStart,
+  RuntimeCapabilities,
+  RuntimeRequest,
+  ScoreJobStart,
+  Session,
+  SessionPage,
+  WorkspacePage,
+} from "./atpiano-runtime.js";
+
+const streamSchema = "atpiano.corrected-stream.v1";
+const pcmHeaderBytes = 48;
+const subscriptionIntervalMs = 750;
+
+interface StreamMessage {
+  readonly type?: string;
+  readonly session_id?: string;
+  readonly sample_rate_hz?: number;
+  readonly received_source_frames?: number;
+  readonly error?: string;
+}
+
+interface PendingSocket {
+  readonly socket: WebSocket;
+  readonly ready: Promise<Capture>;
+  resolveReady(capture: Capture): void;
+  rejectReady(error: Error): void;
+  readonly stopped: Promise<void>;
+  resolveStopped(): void;
+  rejectStopped(error: Error): void;
+  capture: Capture | null;
+}
+
+function abortOptions(request: RuntimeRequest): { signal?: AbortSignal } {
+  return request.signal === undefined ? {} : { signal: request.signal };
+}
+
+function errorMessage(error: unknown): string {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "error" in error &&
+    typeof error.error === "object" &&
+    error.error !== null &&
+    "message" in error.error
+  ) {
+    return String(error.error.message);
+  }
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error
+  ) {
+    return String(error.message);
+  }
+  return "The local runtime request failed.";
+}
+
+function dataOrThrow<T>(result: { data?: T; error?: unknown }): T {
+  if (result.data !== undefined) return result.data;
+  throw new Error(errorMessage(result.error));
+}
+
+function captureFromSession(
+  session: Session,
+  source: Capture["source"],
+): Capture {
+  return {
+    schema_version: "atpiano.contract.v1",
+    workspace_id: session.workspace_id,
+    session_id: session.session_id,
+    capture_id: session.active_capture_id ?? `capture:${session.session_id}`,
+    status:
+      session.status === "stopping"
+        ? "stopping"
+        : session.status === "complete"
+          ? "complete"
+          : "recording",
+    source,
+    sample_rate_hz: session.sample_rate_hz,
+    accepted_through_sample: session.source_frame_count,
+    started_at: session.started_at,
+    stopped_at: session.completed_at,
+    error_id: null,
+  };
+}
+
+function packPcmBlock(block: PcmBlock): ArrayBuffer {
+  const output = new ArrayBuffer(pcmHeaderBytes + block.payload.byteLength);
+  const view = new DataView(output);
+  for (const [index, value] of [..."ATPB"].entries()) {
+    view.setUint8(index, value.charCodeAt(0));
+  }
+  view.setUint8(4, 1);
+  view.setUint8(5, 1);
+  view.setUint16(6, pcmHeaderBytes, true);
+  view.setUint32(8, block.envelope.sequence, true);
+  view.setUint32(12, 0, true);
+  view.setBigUint64(16, BigInt(block.envelope.first_sample), true);
+  view.setUint32(24, block.envelope.frame_count, true);
+  view.setUint32(28, block.envelope.sample_rate_hz, true);
+  view.setFloat64(32, performance.now(), true);
+  view.setFloat64(
+    40,
+    block.envelope.first_sample / block.envelope.sample_rate_hz,
+    true,
+  );
+  new Uint8Array(output, pcmHeaderBytes).set(new Uint8Array(block.payload));
+  return output;
+}
+
+export class LocalRuntime implements AtpianoRuntime {
+  readonly #baseUrl: string;
+  readonly #client: AtpianoHttpClient;
+  readonly #fetch: typeof fetch;
+  readonly #WebSocket: typeof WebSocket;
+  #pendingSocket: PendingSocket | null = null;
+
+  constructor({
+    baseUrl = globalThis.location?.origin ?? "http://127.0.0.1",
+    fetchImplementation = globalThis.fetch,
+    WebSocketImplementation = globalThis.WebSocket,
+  }: {
+    readonly baseUrl?: string;
+    readonly fetchImplementation?: typeof fetch;
+    readonly WebSocketImplementation?: typeof WebSocket;
+  } = {}) {
+    this.#baseUrl = baseUrl.replace(/\/$/, "");
+    this.#fetch = fetchImplementation;
+    this.#WebSocket = WebSocketImplementation;
+    this.#client = createAtpianoHttpClient({
+      baseUrl: this.#baseUrl,
+      fetch: fetchImplementation,
+    });
+  }
+
+  async getCapabilities(request: RuntimeRequest): Promise<RuntimeCapabilities> {
+    return dataOrThrow(
+      await this.#client.GET("/api/v1/capabilities", abortOptions(request)),
+    );
+  }
+
+  async listWorkspaces(request: PageRequest): Promise<WorkspacePage> {
+    return dataOrThrow(
+      await this.#client.GET("/api/v1/workspaces", {
+        ...abortOptions(request),
+        params: {
+          query: {
+            ...(request.cursor === undefined ? {} : { cursor: request.cursor }),
+            ...(request.limit === undefined ? {} : { limit: request.limit }),
+          },
+        },
+      }),
+    );
+  }
+
+  async listSessions(
+    workspaceId: string,
+    request: PageRequest,
+  ): Promise<SessionPage> {
+    return dataOrThrow(
+      await this.#client.GET("/api/v1/workspaces/{workspace_id}/sessions", {
+        ...abortOptions(request),
+        params: {
+          path: { workspace_id: workspaceId },
+          query: {
+            ...(request.cursor === undefined ? {} : { cursor: request.cursor }),
+            ...(request.limit === undefined ? {} : { limit: request.limit }),
+          },
+        },
+      }),
+    );
+  }
+
+  async getSession(
+    workspaceId: string,
+    sessionId: string,
+    request: RuntimeRequest,
+  ): Promise<Session> {
+    return dataOrThrow(
+      await this.#client.GET(
+        "/api/v1/workspaces/{workspace_id}/sessions/{session_id}",
+        {
+          ...abortOptions(request),
+          params: {
+            path: {
+              workspace_id: workspaceId,
+              session_id: sessionId,
+            },
+          },
+        },
+      ),
+    );
+  }
+
+  async getHorizon(
+    workspaceId: string,
+    sessionId: string,
+    request: RuntimeRequest,
+  ): Promise<Horizon> {
+    return dataOrThrow(
+      await this.#client.GET(
+        "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/horizon",
+        {
+          ...abortOptions(request),
+          params: {
+            path: {
+              workspace_id: workspaceId,
+              session_id: sessionId,
+            },
+          },
+        },
+      ),
+    );
+  }
+
+  async startCapture(
+    input: CaptureStart,
+    request: RuntimeRequest,
+  ): Promise<Capture> {
+    if (request.signal?.aborted) {
+      throw request.signal.reason ?? new DOMException("Aborted", "AbortError");
+    }
+    if (this.#pendingSocket !== null) {
+      throw new Error("a local microphone capture is already connected");
+    }
+    const protocol = this.#baseUrl.startsWith("https:") ? "wss:" : "ws:";
+    const host = new URL(this.#baseUrl).host;
+    const socket = new this.#WebSocket(`${protocol}//${host}/api/live`);
+    let resolveReady!: (capture: Capture) => void;
+    let rejectReady!: (error: Error) => void;
+    let resolveStopped!: () => void;
+    let rejectStopped!: (error: Error) => void;
+    const pending: PendingSocket = {
+      socket,
+      ready: new Promise((resolve, reject) => {
+        resolveReady = resolve;
+        rejectReady = reject;
+      }),
+      resolveReady,
+      rejectReady,
+      stopped: new Promise((resolve, reject) => {
+        resolveStopped = resolve;
+        rejectStopped = reject;
+      }),
+      resolveStopped,
+      rejectStopped,
+      capture: null,
+    };
+    this.#pendingSocket = pending;
+    socket.binaryType = "arraybuffer";
+    socket.addEventListener("open", () => {
+      socket.send(
+        JSON.stringify({
+          schema_version: streamSchema,
+          type: "start",
+          sample_rate_hz: input.sample_rate_hz,
+          client_metadata: {
+            started_at: new Date().toISOString(),
+            request_id: input.request_id,
+            user_agent: navigator.userAgent,
+          },
+        }),
+      );
+    });
+    socket.addEventListener("message", (event) => {
+      if (typeof event.data !== "string") return;
+      const message = JSON.parse(event.data) as StreamMessage;
+      if (
+        message.type === "ready" &&
+        message.session_id &&
+        message.sample_rate_hz
+      ) {
+        const capture: Capture = {
+          schema_version: "atpiano.contract.v1",
+          workspace_id: input.workspace_id,
+          session_id: message.session_id,
+          capture_id: `capture:${message.session_id}`,
+          status: "recording",
+          source: "microphone",
+          sample_rate_hz: message.sample_rate_hz,
+          accepted_through_sample: 0,
+          started_at: new Date().toISOString(),
+          stopped_at: null,
+          error_id: null,
+        };
+        pending.capture = capture;
+        pending.resolveReady(capture);
+      } else if (message.type === "block_ack" && pending.capture) {
+        pending.capture = {
+          ...pending.capture,
+          accepted_through_sample:
+            message.received_source_frames ??
+            pending.capture.accepted_through_sample,
+        };
+      } else if (message.type === "stopped") {
+        pending.resolveStopped();
+      } else if (message.type === "error") {
+        const error = new Error(message.error ?? "Local capture failed.");
+        pending.rejectReady(error);
+        pending.rejectStopped(error);
+      }
+    });
+    socket.addEventListener("error", () => {
+      const error = new Error("The local capture WebSocket failed.");
+      pending.rejectReady(error);
+      pending.rejectStopped(error);
+    });
+    request.signal?.addEventListener(
+      "abort",
+      () => {
+        socket.close();
+        pending.rejectReady(
+          request.signal?.reason ?? new DOMException("Aborted", "AbortError"),
+        );
+      },
+      { once: true },
+    );
+    try {
+      return await pending.ready;
+    } catch (error) {
+      this.#pendingSocket = null;
+      socket.close();
+      throw error;
+    }
+  }
+
+  streamPcm(block: PcmBlock): void {
+    const pending = this.#pendingSocket;
+    if (
+      pending?.capture === null ||
+      pending?.capture === undefined ||
+      pending.socket.readyState !== this.#WebSocket.OPEN
+    ) {
+      throw new Error("local capture is not ready for PCM");
+    }
+    if (
+      block.envelope.capture_id !== pending.capture.capture_id ||
+      block.envelope.session_id !== pending.capture.session_id
+    ) {
+      throw new Error("PCM target does not match the active local capture");
+    }
+    pending.socket.send(packPcmBlock(block));
+  }
+
+  async stopCapture(
+    input: CaptureStop,
+    request: RuntimeRequest,
+  ): Promise<Session> {
+    const pending = this.#pendingSocket;
+    if (
+      pending?.capture === null ||
+      pending?.capture === undefined ||
+      pending.capture.capture_id !== input.capture_id ||
+      pending.capture.session_id !== input.session_id
+    ) {
+      throw new Error("Stop target does not match the active local capture");
+    }
+    pending.socket.send(
+      JSON.stringify({
+        schema_version: streamSchema,
+        type: "stop",
+        frame_count: input.accepted_frame_count,
+        block_count: Math.ceil(input.accepted_frame_count / 2_048),
+      }),
+    );
+    const timeout = new Promise<never>((_, reject) => {
+      window.setTimeout(
+        () => reject(new Error("The local engine did not finish Stop in time.")),
+        90_000,
+      );
+    });
+    try {
+      await Promise.race([pending.stopped, timeout]);
+    } finally {
+      pending.socket.close();
+      this.#pendingSocket = null;
+    }
+    return this.getSession(input.workspace_id, input.session_id, request);
+  }
+
+  async startReplay(
+    input: ReplayStart,
+    request: RuntimeRequest,
+  ): Promise<Capture> {
+    const response = await this.#fetch(`${this.#baseUrl}/api/replay`, {
+      ...abortOptions(request),
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fixture_id: input.fixture_id,
+        request_id: input.request_id,
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.json() as unknown;
+      throw new Error(errorMessage(error));
+    }
+    const page = await this.listSessions(input.workspace_id, {
+      requestId: request.requestId,
+      ...(request.signal === undefined ? {} : { signal: request.signal }),
+      limit: 1,
+    });
+    const session = page.items[0];
+    if (session === undefined) {
+      throw new Error("The local replay did not create a session.");
+    }
+    return captureFromSession(session, "replay");
+  }
+
+  subscribeEvents(
+    workspaceId: string,
+    sessionId: string,
+    range: EventRangeRequest,
+    subscriber: EventSubscriber,
+  ): EventSubscription {
+    let closed = false;
+    let timer: number | undefined;
+    let controller: AbortController | null = null;
+    const poll = async () => {
+      if (closed) return;
+      controller = new AbortController();
+      range.signal?.addEventListener("abort", () => controller?.abort(), {
+        once: true,
+      });
+      try {
+        const page = dataOrThrow<EventPage>(
+          await this.#client.GET(
+            "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/events",
+            {
+              signal: controller.signal,
+              params: {
+                path: {
+                  workspace_id: workspaceId,
+                  session_id: sessionId,
+                },
+                query: {
+                  start_sample: range.startSample,
+                  end_sample: range.endSample,
+                  ...(range.cursor === undefined ? {} : { cursor: range.cursor }),
+                  ...(range.limit === undefined ? {} : { limit: range.limit }),
+                },
+              },
+            },
+          ),
+        );
+        if (!closed && page.session_id === sessionId) subscriber.next(page);
+      } catch (error) {
+        if (!closed && !(error instanceof DOMException && error.name === "AbortError")) {
+          subscriber.error(error);
+        }
+      } finally {
+        if (!closed) timer = window.setTimeout(poll, subscriptionIntervalMs);
+      }
+    };
+    void poll();
+    return {
+      close() {
+        closed = true;
+        controller?.abort();
+        if (timer !== undefined) window.clearTimeout(timer);
+      },
+    };
+  }
+
+  async listArtifacts(
+    workspaceId: string,
+    sessionId: string,
+    request: PageRequest,
+  ): Promise<ArtifactPage> {
+    return dataOrThrow(
+      await this.#client.GET(
+        "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/artifacts",
+        {
+          ...abortOptions(request),
+          params: {
+            path: {
+              workspace_id: workspaceId,
+              session_id: sessionId,
+            },
+            query: {
+              ...(request.cursor === undefined ? {} : { cursor: request.cursor }),
+              ...(request.limit === undefined ? {} : { limit: request.limit }),
+            },
+          },
+        },
+      ),
+    );
+  }
+
+  async getArtifactAccess(
+    workspaceId: string,
+    sessionId: string,
+    artifactId: string,
+    request: RuntimeRequest,
+  ): Promise<ArtifactAccess> {
+    return dataOrThrow(
+      await this.#client.GET(
+        "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/artifacts/{artifact_id}/access",
+        {
+          ...abortOptions(request),
+          params: {
+            path: {
+              workspace_id: workspaceId,
+              session_id: sessionId,
+              artifact_id: artifactId,
+            },
+          },
+        },
+      ),
+    );
+  }
+
+  async startScoreJob(
+    input: ScoreJobStart,
+    request: RuntimeRequest,
+  ): Promise<Job> {
+    return dataOrThrow(
+      await this.#client.POST(
+        "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/score-jobs",
+        {
+          ...abortOptions(request),
+          params: {
+            path: {
+              workspace_id: input.workspace_id,
+              session_id: input.session_id,
+            },
+          },
+          body: input,
+        },
+      ),
+    );
+  }
+
+  async getJob(jobId: string, request: RuntimeRequest): Promise<Job> {
+    return dataOrThrow(
+      await this.#client.GET("/api/v1/jobs/{job_id}", {
+        ...abortOptions(request),
+        params: { path: { job_id: jobId } },
+      }),
+    );
+  }
+
+  async deleteSession(
+    input: DeleteSessionRequest,
+    request: RuntimeRequest,
+  ): Promise<DeleteSessionResult> {
+    return dataOrThrow(
+      await this.#client.DELETE(
+        "/api/v1/workspaces/{workspace_id}/sessions/{session_id}",
+        {
+          ...abortOptions(request),
+          params: {
+            path: {
+              workspace_id: input.workspace_id,
+              session_id: input.session_id,
+            },
+          },
+          body: input,
+        },
+      ),
+    );
+  }
+}
