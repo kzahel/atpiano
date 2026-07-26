@@ -7,6 +7,7 @@ const TIMELINE = window.atpianoTimeline;
 const PITCH_MIN = 21;
 const PITCH_MAX = 108;
 const PEDAL_HEIGHT = 38;
+const PITCH_GUTTER_WIDTH = 64;
 const CAPTURE_CONSTRAINTS = {
   channelCount: 1,
   echoCancellation: false,
@@ -26,6 +27,10 @@ const state = {
   capture: null,
   pollTimer: null,
   eventRequestId: 0,
+  inspectionS: null,
+  showRoll: true,
+  showKeyboard: true,
+  keyboardKeys: new Map(),
 };
 
 function el(id) {
@@ -75,6 +80,91 @@ function currentWindow() {
     state.windowS,
     state.seekS,
     state.follow
+  );
+}
+
+function buildKeyboard() {
+  const keyboard = el("piano-keyboard");
+  for (const layout of TIMELINE.keyboardLayout(PITCH_MIN, PITCH_MAX)) {
+    const key = document.createElement("span");
+    key.className = `piano-key ${layout.kind}`;
+    key.dataset.pitch = String(layout.pitch);
+    key.dataset.landmark = layout.landmark;
+    key.style.width = `${layout.widthPercent}%`;
+    if (layout.leftPercent != null) {
+      key.style.left = `${layout.leftPercent}%`;
+    }
+    key.title = layout.name;
+    const label = document.createElement("span");
+    label.className = "key-label";
+    label.textContent = layout.landmark;
+    key.appendChild(label);
+    keyboard.appendChild(key);
+    state.keyboardKeys.set(layout.pitch, key);
+  }
+}
+
+function updateViewVisibility() {
+  el("roll-view").hidden = !state.showRoll;
+  el("keyboard-view").hidden = !state.showKeyboard;
+}
+
+function pinInspection(seconds) {
+  const range = currentWindow();
+  state.seekS = range.startS;
+  state.follow = false;
+  state.inspectionS = Math.max(
+    range.startS,
+    Math.min(Number(seconds) || 0, range.endS)
+  );
+  el("follow-head").checked = false;
+  drawTimeline();
+}
+
+function drawKeyboard(snapshot) {
+  const activeByPitch = new Map(
+    snapshot.notes.map((event) => [event.pitch, event])
+  );
+  for (const [pitch, key] of state.keyboardKeys) {
+    const event = activeByPitch.get(pitch);
+    const kind = TIMELINE.isBlackKey(pitch) ? "black" : "white";
+    key.className = `piano-key ${kind}${
+      event ? ` ${event.lifecycle}` : ""
+    }`;
+    key.querySelector(".key-label").textContent = event
+      ? TIMELINE.midiName(pitch)
+      : key.dataset.landmark;
+  }
+
+  const sampleRate = Number(state.session?.session?.sample_rate_hz || 1);
+  const range = currentWindow();
+  const sampleS =
+    snapshot.sample == null ? null : Number(snapshot.sample) / sampleRate;
+  const noteNames = snapshot.notes.map((event) => TIMELINE.midiName(event.pitch));
+  const pinned = snapshot.mode === "pinned";
+  el("keyboard-time").textContent =
+    sampleS == null
+      ? "Waiting for notes"
+      : `${pinned ? "Pinned" : "Latest attack"} · ${formatClock(sampleS, true)}`;
+  el("keyboard-notes").textContent =
+    noteNames.length > 0 ? noteNames.join(" · ") : "No notes sounding";
+  el("follow-latest").disabled = !pinned;
+  el("follow-latest").textContent = pinned
+    ? "Follow latest attack"
+    : "Following latest attack";
+  el("inspection-time").min = String(range.startS);
+  el("inspection-time").max = String(range.endS);
+  el("inspection-time").value = String(
+    Math.max(range.startS, Math.min(sampleS ?? range.startS, range.endS))
+  );
+  el("inspection-time").disabled = state.events.length === 0;
+  el("piano-keyboard").setAttribute(
+    "aria-label",
+    noteNames.length > 0
+      ? `${pinned ? "Notes sounding" : "Latest detected attack"}: ${noteNames.join(
+          ", "
+        )}`
+      : "No detected piano keys"
   );
 }
 
@@ -232,6 +322,7 @@ async function poll() {
     if (state.session.session_id !== previousSessionId) {
       state.nextSequence = 0;
       state.queryKey = "";
+      state.inspectionS = null;
     }
     updateStatus();
     await loadVisibleEvents();
@@ -247,6 +338,7 @@ function drawTimeline() {
   const canvas = el("timeline");
   const width = Math.max(300, canvas.clientWidth);
   const height = Math.max(300, canvas.clientHeight);
+  const plotWidth = Math.max(1, width - PITCH_GUTTER_WIDTH);
   const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.round(width * dpr);
   canvas.height = Math.round(height * dpr);
@@ -260,18 +352,42 @@ function drawTimeline() {
   const rowHeight = noteHeight / (PITCH_MAX - PITCH_MIN + 1);
   for (let pitch = PITCH_MIN; pitch <= PITCH_MAX; pitch += 1) {
     const pitchClass = ((pitch % 12) + 12) % 12;
-    const black = [1, 3, 6, 8, 10].includes(pitchClass);
+    const black = TIMELINE.isBlackKey(pitch);
     const y = (PITCH_MAX - pitch) * rowHeight;
     context.fillStyle = black ? "#0f1311" : pitchClass === 0 ? "#181d1a" : "#141816";
-    context.fillRect(0, y, width, Math.ceil(rowHeight));
+    context.fillRect(PITCH_GUTTER_WIDTH, y, plotWidth, Math.ceil(rowHeight));
+    context.fillStyle = "#d7d2c7";
+    context.fillRect(0, y, PITCH_GUTTER_WIDTH, Math.ceil(rowHeight));
+    if (black) {
+      context.fillStyle = "#111412";
+      context.fillRect(
+        PITCH_GUTTER_WIDTH * 0.34,
+        y,
+        PITCH_GUTTER_WIDTH * 0.66,
+        Math.ceil(rowHeight)
+      );
+    }
+    if (pitch === PITCH_MIN || pitch === PITCH_MAX || pitchClass === 0) {
+      context.fillStyle = "#30342f";
+      context.font = "8px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.textBaseline = "middle";
+      context.fillText(TIMELINE.midiName(pitch), 4, y + rowHeight / 2);
+    }
   }
+  context.strokeStyle = "#555a53";
+  context.beginPath();
+  context.moveTo(PITCH_GUTTER_WIDTH + 0.5, 0);
+  context.lineTo(PITCH_GUTTER_WIDTH + 0.5, height);
+  context.stroke();
 
   const tickStep = range.spanS <= 15 ? 1 : range.spanS <= 60 ? 5 : 10;
   const firstTick = Math.ceil(range.startS / tickStep) * tickStep;
   context.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
   context.textBaseline = "top";
   for (let second = firstTick; second <= range.endS; second += tickStep) {
-    const x = ((second - range.startS) / range.spanS) * width;
+    const x =
+      PITCH_GUTTER_WIDTH +
+      ((second - range.startS) / range.spanS) * plotWidth;
     context.strokeStyle = second % 10 === 0 ? "#394039" : "#252a26";
     context.beginPath();
     context.moveTo(x + 0.5, 0);
@@ -294,7 +410,7 @@ function drawTimeline() {
       sampleRate,
       range.startS,
       range.spanS,
-      width,
+      plotWidth,
       PITCH_MIN,
       PITCH_MAX,
       noteHeight
@@ -304,13 +420,13 @@ function drawTimeline() {
     context.strokeStyle = provisional ? "#ffbd6a" : "#99f0d7";
     context.lineWidth = provisional ? 1 : 0.5;
     context.fillRect(
-      geometry.x,
+      PITCH_GUTTER_WIDTH + geometry.x,
       geometry.y + 0.5,
       geometry.width,
       geometry.height
     );
     context.strokeRect(
-      geometry.x + 0.5,
+      PITCH_GUTTER_WIDTH + geometry.x + 0.5,
       geometry.y + 1,
       geometry.width,
       Math.max(1, geometry.height - 1)
@@ -318,13 +434,23 @@ function drawTimeline() {
   }
 
   context.fillStyle = "#101512";
-  context.fillRect(0, noteHeight, width, PEDAL_HEIGHT);
+  context.fillRect(PITCH_GUTTER_WIDTH, noteHeight, plotWidth, PEDAL_HEIGHT);
+  context.fillStyle = "#252a26";
+  context.fillRect(0, noteHeight, PITCH_GUTTER_WIDTH, PEDAL_HEIGHT);
+  context.fillStyle = "#aaa79f";
+  context.font = "8px ui-monospace, SFMono-Regular, Menlo, monospace";
+  context.textBaseline = "middle";
+  context.fillText("PEDAL", 4, noteHeight + PEDAL_HEIGHT / 2);
   for (const event of state.events.filter((item) => Number.isInteger(item.controller))) {
     const onsetS = event.onset_sample / sampleRate;
     const offsetS =
       event.offset_sample == null ? range.endS : event.offset_sample / sampleRate;
-    const x = ((onsetS - range.startS) / range.spanS) * width;
-    const endX = ((offsetS - range.startS) / range.spanS) * width;
+    const x =
+      PITCH_GUTTER_WIDTH +
+      ((onsetS - range.startS) / range.spanS) * plotWidth;
+    const endX =
+      PITCH_GUTTER_WIDTH +
+      ((offsetS - range.startS) / range.spanS) * plotWidth;
     const y = event.controller === 64 ? noteHeight + 5 : noteHeight + 21;
     context.fillStyle = event.controller === 64 ? "#76a9ff" : "#c596ff";
     context.fillRect(x, y, Math.max(2, endX - x), 11);
@@ -333,13 +459,35 @@ function drawTimeline() {
   const commitSample = Number(state.session?.horizons?.commit_sample || 0);
   const commitS = commitSample / sampleRate;
   if (commitS >= range.startS && commitS <= range.endS) {
-    const x = ((commitS - range.startS) / range.spanS) * width;
+    const x =
+      PITCH_GUTTER_WIDTH +
+      ((commitS - range.startS) / range.spanS) * plotWidth;
     context.strokeStyle = "#76a9ff";
     context.lineWidth = 2;
     context.beginPath();
     context.moveTo(x, 0);
     context.lineTo(x, height);
     context.stroke();
+  }
+
+  const snapshot = TIMELINE.keyboardSnapshot(
+    state.events,
+    sampleRate,
+    state.inspectionS
+  );
+  if (snapshot.mode === "pinned" && snapshot.sample != null) {
+    const inspectionS = snapshot.sample / sampleRate;
+    if (inspectionS >= range.startS && inspectionS <= range.endS) {
+      const x =
+        PITCH_GUTTER_WIDTH +
+        ((inspectionS - range.startS) / range.spanS) * plotWidth;
+      context.strokeStyle = "#ff816c";
+      context.lineWidth = 1;
+      context.beginPath();
+      context.moveTo(x, 0);
+      context.lineTo(x, height);
+      context.stroke();
+    }
   }
 
   const windowState = currentWindow();
@@ -355,6 +503,7 @@ function drawTimeline() {
     `${notes.length} ${notes.length === 1 ? "note" : "notes"}` +
     (pedalCount ? ` · ${pedalCount} pedal` : "");
   el("timeline-empty").hidden = state.events.length > 0;
+  drawKeyboard(snapshot);
 }
 
 function packPcmBlock(samples, capture, firstSample, workletTime) {
@@ -569,6 +718,7 @@ async function startReplay() {
     });
     state.nextSequence = 0;
     state.queryKey = "";
+    state.inspectionS = null;
     updateStatus();
   } catch (error) {
     showError(error);
@@ -579,6 +729,16 @@ function wireInteractions() {
   el("start-microphone").addEventListener("click", startMicrophone);
   el("stop-microphone").addEventListener("click", stopMicrophone);
   el("start-replay").addEventListener("click", startReplay);
+  el("show-roll").addEventListener("change", (event) => {
+    state.showRoll = event.target.checked;
+    updateViewVisibility();
+    if (state.showRoll) drawTimeline();
+  });
+  el("show-keyboard").addEventListener("change", (event) => {
+    state.showKeyboard = event.target.checked;
+    updateViewVisibility();
+    if (state.showKeyboard) drawTimeline();
+  });
   el("window-size").addEventListener("change", (event) => {
     state.windowS = Number(event.target.value);
     state.queryKey = "";
@@ -596,10 +756,35 @@ function wireInteractions() {
     state.queryKey = "";
     loadVisibleEvents(true).catch(showError);
   });
+  el("timeline").addEventListener("click", (event) => {
+    if (event.offsetX < PITCH_GUTTER_WIDTH) return;
+    const range = currentWindow();
+    const plotWidth = Math.max(
+      1,
+      el("timeline").clientWidth - PITCH_GUTTER_WIDTH
+    );
+    const position = Math.max(
+      0,
+      Math.min(1, (event.offsetX - PITCH_GUTTER_WIDTH) / plotWidth)
+    );
+    pinInspection(range.startS + position * range.spanS);
+  });
+  el("inspection-time").addEventListener("input", (event) => {
+    pinInspection(Number(event.target.value));
+  });
+  el("follow-latest").addEventListener("click", () => {
+    state.inspectionS = null;
+    state.follow = true;
+    el("follow-head").checked = true;
+    state.queryKey = "";
+    loadVisibleEvents(true).catch(showError);
+  });
   window.addEventListener("resize", drawTimeline);
 }
 
 async function boot() {
+  buildKeyboard();
+  updateViewVisibility();
   wireInteractions();
   drawTimeline();
   try {

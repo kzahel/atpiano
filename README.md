@@ -155,6 +155,12 @@ Use `--repeat N` to loop it on one continuous source sample clock,
 `--no-wait` for accelerated bring-up. Generated session data defaults to
 `results/workbench-v2/`.
 
+The Performance card can show the piano roll, an 88-key detected-note
+keyboard, or both. The roll includes an aligned pitch-key gutter with octave
+labels. The keyboard follows the latest detected attack by default; click the
+roll or move its source-time slider to inspect the exact pitches sounding at
+an earlier moment. Amber keys are provisional and mint keys are corrected.
+
 Start the app without `--replay` to use its microphone Start/Stop controls:
 
 ```text

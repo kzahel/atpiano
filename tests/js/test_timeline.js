@@ -58,6 +58,76 @@ assert.notEqual(
   timeline.viewportQueryKey("replay", 0, 100, 0, 0, "complete")
 );
 
+assert.equal(timeline.midiName(21), "A0");
+assert.equal(timeline.midiName(60), "C4");
+assert.equal(timeline.midiName(108), "C8");
+assert.equal(timeline.isBlackKey(61), true);
+assert.equal(timeline.isBlackKey(60), false);
+const keyboardLayout = timeline.keyboardLayout();
+assert.equal(keyboardLayout.length, 88);
+assert.equal(
+  keyboardLayout.filter((key) => key.kind === "white").length,
+  52
+);
+assert.equal(
+  keyboardLayout.filter((key) => key.kind === "black").length,
+  36
+);
+assert.deepEqual(
+  keyboardLayout
+    .filter((key) => key.landmark)
+    .map((key) => key.landmark),
+  ["A0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"]
+);
+
+const keyboardEvents = [
+  {
+    event_id: "c-committed",
+    lifecycle: "committed",
+    pitch: 60,
+    onset_sample: 100,
+    offset_sample: 300,
+  },
+  {
+    event_id: "c-provisional",
+    lifecycle: "provisional",
+    pitch: 60,
+    onset_sample: 158,
+    offset_sample: 320,
+  },
+  {
+    event_id: "e",
+    lifecycle: "provisional",
+    pitch: 64,
+    onset_sample: 104,
+    offset_sample: 250,
+  },
+  {
+    event_id: "g",
+    lifecycle: "committed",
+    pitch: 67,
+    onset_sample: 160,
+    offset_sample: null,
+  },
+];
+const latestKeys = timeline.keyboardSnapshot(keyboardEvents, 1000);
+assert.equal(latestKeys.mode, "latest");
+assert.equal(latestKeys.sample, 160);
+assert.deepEqual(
+  latestKeys.notes.map((event) => [event.pitch, event.lifecycle]),
+  [
+    [60, "committed"],
+    [64, "provisional"],
+    [67, "committed"],
+  ]
+);
+const pinnedKeys = timeline.keyboardSnapshot(keyboardEvents, 1000, 0.26);
+assert.equal(pinnedKeys.mode, "pinned");
+assert.deepEqual(
+  pinnedKeys.notes.map((event) => event.pitch),
+  [60, 67]
+);
+
 const geometry = timeline.noteGeometry(
   { onset_sample: 100, offset_sample: 200, pitch: 60 },
   100,

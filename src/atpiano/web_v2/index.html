@@ -82,46 +82,109 @@
             </div>
           </div>
 
-          <div class="timeline-controls">
+          <div class="view-switcher" role="group" aria-label="Visualization modes">
+            <span class="label">Show views</span>
             <label>
-              View
-              <select id="window-size">
-                <option value="15">15 seconds</option>
-                <option value="30" selected>30 seconds</option>
-                <option value="60">60 seconds</option>
-                <option value="120">2 minutes</option>
-              </select>
+              <input id="show-roll" type="checkbox" checked />
+              Piano roll
             </label>
-            <label class="follow-control">
-              <input id="follow-head" type="checkbox" checked />
-              Follow live edge
+            <label>
+              <input id="show-keyboard" type="checkbox" checked />
+              Keyboard
             </label>
-            <div class="timeline-readout">
-              <output id="visible-count">0 visible events</output>
-              <output id="range-label">00:00 — 00:30</output>
-            </div>
           </div>
 
-          <div class="seek-row">
-            <input
-              id="timeline-seek"
-              type="range"
-              min="0"
-              max="0"
-              value="0"
-              step="0.25"
-              aria-label="Timeline position"
-            />
+          <div id="roll-view">
+            <div class="timeline-controls">
+              <label>
+                Window
+                <select id="window-size">
+                  <option value="15">15 seconds</option>
+                  <option value="30" selected>30 seconds</option>
+                  <option value="60">60 seconds</option>
+                  <option value="120">2 minutes</option>
+                </select>
+              </label>
+              <label class="follow-control">
+                <input id="follow-head" type="checkbox" checked />
+                Follow live edge
+              </label>
+              <div class="timeline-readout">
+                <output id="visible-count">0 visible events</output>
+                <output id="range-label">00:00 — 00:30</output>
+              </div>
+            </div>
+
+            <div class="seek-row">
+              <input
+                id="timeline-seek"
+                type="range"
+                min="0"
+                max="0"
+                value="0"
+                step="0.25"
+                aria-label="Timeline position"
+              />
+            </div>
+
+            <div class="canvas-shell">
+              <canvas
+                id="timeline"
+                aria-label="Corrected-note piano roll with pitch keyboard"
+              ></canvas>
+              <div id="timeline-empty" class="timeline-empty">
+                Start the fixture replay or microphone to fill the timeline.
+              </div>
+            </div>
+            <p id="timeline-error" class="timeline-error" role="alert" hidden></p>
+            <div class="pedal-label">PEDAL · sustain 64 / soft 67</div>
           </div>
 
-          <div class="canvas-shell">
-            <canvas id="timeline" aria-label="Corrected-note piano roll"></canvas>
-            <div id="timeline-empty" class="timeline-empty">
-              Start the fixture replay or microphone to fill the timeline.
+          <section
+            id="keyboard-view"
+            class="keyboard-view"
+            aria-labelledby="keyboard-heading"
+          >
+            <div class="keyboard-heading">
+              <div>
+                <p class="eyebrow">Exact pitch check</p>
+                <h3 id="keyboard-heading">Detected keys</h3>
+              </div>
+              <div class="keyboard-follow">
+                <output id="keyboard-time">Waiting for notes</output>
+                <button id="follow-latest" class="small" type="button" disabled>
+                  Following latest attack
+                </button>
+              </div>
             </div>
-          </div>
-          <p id="timeline-error" class="timeline-error" role="alert" hidden></p>
-          <div class="pedal-label">PEDAL · sustain 64 / soft 67</div>
+
+            <div class="keyboard-scroll">
+              <div
+                id="piano-keyboard"
+                class="piano-keyboard"
+                role="img"
+                aria-label="No detected piano keys"
+              ></div>
+            </div>
+
+            <div class="keyboard-inspection">
+              <label for="inspection-time">Inspect source time</label>
+              <input
+                id="inspection-time"
+                type="range"
+                min="0"
+                max="30"
+                value="0"
+                step="0.01"
+                disabled
+              />
+              <output id="keyboard-notes">No detected keys</output>
+            </div>
+            <p class="keyboard-help">
+              Latest attack follows live recognition. Click the roll or move
+              the slider to inspect notes sounding at an exact time.
+            </p>
+          </section>
         </section>
 
         <section class="session-foot">

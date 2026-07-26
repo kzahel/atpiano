@@ -5,6 +5,65 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
+  const NOTE_NAMES = [
+    "C",
+    "C#",
+    "D",
+    "D#",
+    "E",
+    "F",
+    "F#",
+    "G",
+    "G#",
+    "A",
+    "A#",
+    "B",
+  ];
+
+  function isBlackKey(pitch) {
+    return [1, 3, 6, 8, 10].includes(((Number(pitch) % 12) + 12) % 12);
+  }
+
+  function midiName(pitch) {
+    const value = Number(pitch);
+    if (!Number.isInteger(value)) return "—";
+    const pitchClass = ((value % 12) + 12) % 12;
+    return `${NOTE_NAMES[pitchClass]}${Math.floor(value / 12) - 1}`;
+  }
+
+  function keyboardLayout(pitchMin = 21, pitchMax = 108) {
+    const pitches = [];
+    for (let pitch = pitchMin; pitch <= pitchMax; pitch += 1) {
+      pitches.push(pitch);
+    }
+    const whitePitches = pitches.filter((pitch) => !isBlackKey(pitch));
+    const whiteWidth = 100 / whitePitches.length;
+    const blackWidth = whiteWidth * 0.64;
+    const keys = pitches.map((pitch) => {
+      const black = isBlackKey(pitch);
+      const name = midiName(pitch);
+      const landmark =
+        pitch === pitchMin || pitch === pitchMax || pitch % 12 === 0
+          ? name
+          : "";
+      return {
+        pitch,
+        name,
+        landmark,
+        kind: black ? "black" : "white",
+        widthPercent: black ? blackWidth : whiteWidth,
+        leftPercent: black
+          ? whitePitches.filter((value) => value < pitch).length * whiteWidth -
+            blackWidth / 2
+          : null,
+      };
+    });
+    return [
+      ...keys.filter((key) => key.kind === "white"),
+      ...keys.filter((key) => key.kind === "black"),
+    ];
+  }
+
   function materialize(events) {
     const latest = new Map();
     for (const event of events) {
@@ -49,6 +108,63 @@
     ].join(":");
   }
 
+  function keyboardSnapshot(
+    events,
+    sampleRate,
+    pinnedS = null,
+    attackWindowS = 0.08
+  ) {
+    const rate = Math.max(1, Number(sampleRate) || 1);
+    const notes = events.filter(
+      (event) =>
+        event.lifecycle !== "retracted" &&
+        Number.isInteger(event.pitch) &&
+        Number.isInteger(event.onset_sample)
+    );
+    if (notes.length === 0) {
+      return { mode: pinnedS == null ? "latest" : "pinned", sample: null, notes: [] };
+    }
+
+    let sample;
+    let selected;
+    if (pinnedS == null) {
+      sample = Math.max(...notes.map((event) => event.onset_sample));
+      const attackWindow = Math.max(0, Math.round(attackWindowS * rate));
+      selected = notes.filter(
+        (event) => Math.abs(event.onset_sample - sample) <= attackWindow
+      );
+    } else {
+      sample = Math.max(0, Math.round((Number(pinnedS) || 0) * rate));
+      selected = notes.filter(
+        (event) =>
+          event.onset_sample <= sample &&
+          (event.offset_sample == null || event.offset_sample >= sample)
+      );
+    }
+
+    const priority = { provisional: 1, committed: 2 };
+    const byPitch = new Map();
+    for (const event of selected) {
+      const current = byPitch.get(event.pitch);
+      if (
+        !current ||
+        (priority[event.lifecycle] || 0) > (priority[current.lifecycle] || 0) ||
+        ((priority[event.lifecycle] || 0) ===
+          (priority[current.lifecycle] || 0) &&
+          event.onset_sample > current.onset_sample)
+      ) {
+        byPitch.set(event.pitch, event);
+      }
+    }
+    return {
+      mode: pinnedS == null ? "latest" : "pinned",
+      sample,
+      notes: [...byPitch.values()].sort(
+        (left, right) => left.pitch - right.pitch
+      ),
+    };
+  }
+
   function noteGeometry(
     event,
     sampleRate,
@@ -75,5 +191,14 @@
     };
   }
 
-  return { materialize, visibleWindow, viewportQueryKey, noteGeometry };
+  return {
+    isBlackKey,
+    keyboardLayout,
+    keyboardSnapshot,
+    materialize,
+    midiName,
+    visibleWindow,
+    viewportQueryKey,
+    noteGeometry,
+  };
 });

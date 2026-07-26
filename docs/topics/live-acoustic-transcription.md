@@ -96,6 +96,15 @@ present in the index and exports while the first empty viewport response
 remained cached, confirming a presentation failure rather than an inference
 or fixture failure.
 
+The roll is no longer v2's only pitch view. The Performance card independently
+toggles the roll and an 88-key keyboard. The roll has an aligned key gutter
+with A0, C-octave, and C8 labels; the keyboard names and lights the latest
+detected attack, with amber provisional and mint corrected states. Clicking
+the roll or moving a source-time slider pins the keyboard to notes sounding at
+that exact sample-clock time. This exact-pitch view does not infer score
+rhythm, meter, key, spelling, hands, or chord names; those remain Lane C
+concerns.
+
 Final page-facing acceptance used both aligned and target-piano WAV loops. Two
 musical-fixture repetitions differed by 0.009 aligned-reference onset F1 and
 scored 0.939 directly against each other. Two repetitions of the retained
