@@ -9,6 +9,7 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
+from atpiano.corrected_export import midi_tick_at_sample
 from atpiano.util import sha256_file
 
 SCORE_INPUT_NOTES_SCHEMA = "atpiano.score-input-notes.v1"
@@ -23,14 +24,29 @@ def score_input_notes_document(
 ) -> dict[str, Any]:
     """Freeze selected source notes in the transformer's MIDI-note order."""
 
+    def midi_order(event: dict[str, Any]) -> tuple[int, int, int, int, int, str]:
+        onset_sample = int(event["onset_sample"])
+        offset_sample = int(event["offset_sample"])
+        onset_tick = midi_tick_at_sample(
+            onset_sample,
+            sample_rate_hz=sample_rate_hz,
+        )
+        offset_tick = midi_tick_at_sample(
+            offset_sample,
+            sample_rate_hz=sample_rate_hz,
+        )
+        return (
+            onset_tick,
+            int(event["pitch"]),
+            offset_tick - onset_tick,
+            onset_sample,
+            offset_sample,
+            str(event["event_id"]),
+        )
+
     ordered = sorted(
         notes,
-        key=lambda event: (
-            int(event["onset_sample"]),
-            int(event["pitch"]),
-            int(event["offset_sample"]) - int(event["onset_sample"]),
-            str(event["event_id"]),
-        ),
+        key=midi_order,
     )
     return {
         "schema_version": SCORE_INPUT_NOTES_SCHEMA,

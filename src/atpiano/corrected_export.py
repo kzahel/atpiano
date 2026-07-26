@@ -35,6 +35,20 @@ _LATEST_JOIN = """
 """
 
 
+def midi_tick_at_sample(source_sample: int, *, sample_rate_hz: int) -> int:
+    """Return the exact tick written for one source-sample position."""
+
+    if sample_rate_hz <= 0:
+        raise ValueError("MIDI export sample rate must be positive")
+    return round(
+        mido.second2tick(
+            source_sample / sample_rate_hz,
+            MIDI_TICKS_PER_BEAT,
+            MIDI_TEMPO_US_PER_BEAT,
+        )
+    )
+
+
 def ensure_materialized_index(database_path: Path) -> None:
     """Add or rebuild the bounded range-query table in an older v2 index."""
 
@@ -251,13 +265,9 @@ def _write_midi(
         timeline,
         key=lambda item: (item[0], item[1]),
     ):
-        seconds = source_sample / sample_rate_hz
-        tick = round(
-            mido.second2tick(
-                seconds,
-                MIDI_TICKS_PER_BEAT,
-                MIDI_TEMPO_US_PER_BEAT,
-            )
+        tick = midi_tick_at_sample(
+            source_sample,
+            sample_rate_hz=sample_rate_hz,
         )
         message.time = max(0, tick - previous_tick)
         track.append(message)

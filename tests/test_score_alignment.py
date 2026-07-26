@@ -43,6 +43,37 @@ def _source_document() -> dict:
     )
 
 
+def test_source_notes_follow_transformer_order_after_midi_tick_collision() -> None:
+    document = score_input_notes_document(
+        session_id="tick-collision",
+        sample_rate_hz=48_000,
+        notes=[
+            {
+                "event_id": "earlier-high",
+                "pitch": 60,
+                "onset_sample": 1_421_403,
+                "offset_sample": 1_460_087,
+                "velocity": 36,
+            },
+            {
+                "event_id": "later-low",
+                "pitch": 48,
+                "onset_sample": 1_421_409,
+                "offset_sample": 1_505_777,
+                "velocity": 33,
+            },
+        ],
+    )
+
+    assert [
+        (note["source_index"], note["event_id"])
+        for note in document["notes"]
+    ] == [
+        (0, "later-low"),
+        (1, "earlier-high"),
+    ]
+
+
 def _alignment(source_path: Path, musicxml_path: Path) -> dict:
     source = json.loads(source_path.read_text(encoding="utf-8"))
     rows = []
