@@ -134,9 +134,11 @@ class SegmentedAudioLog:
         self._segment_frames_written = 0
         self._path: Path | None = None
         self._wave: wave.Wave_write | None = None
+        self._segments: list[dict[str, Any]] = []
+        self._lock = threading.RLock()
         self.last_free_bytes: int | None = None
 
-    def _open_segment(self) -> None:
+    def _open_segment_unlocked(self) -> None:
         usage = shutil.disk_usage(self.directory)
         self.last_free_bytes = usage.free
         if usage.free < self.minimum_free_bytes:
@@ -156,7 +158,7 @@ class SegmentedAudioLog:
         output.setframerate(self.sample_rate_hz)
         self._wave = output
 
-    def _close_segment(self) -> None:
+    def _close_segment_unlocked(self) -> None:
         if self._wave is None or self._path is None:
             return
         self._wave.close()
@@ -170,6 +172,7 @@ class SegmentedAudioLog:
             "sample_rate_hz": self.sample_rate_hz,
         }
         _append_jsonl(self.index_path, [row])
+        self._segments.append(row)
         self.segment_count += 1
         self._wave = None
         self._path = None
@@ -183,23 +186,75 @@ class SegmentedAudioLog:
                 f"audio segment source gap: expected {self.next_sample}, "
                 f"got {first_sample}"
             )
-        remaining = memoryview(pcm_s16le)
-        while remaining:
-            if self._wave is None:
-                self._open_segment()
-            available_frames = self.segment_frames - self._segment_frames_written
-            write_frames = min(len(remaining) // 2, available_frames)
-            write_bytes = write_frames * 2
-            assert self._wave is not None
-            self._wave.writeframesraw(remaining[:write_bytes])
-            remaining = remaining[write_bytes:]
-            self._segment_frames_written += write_frames
-            self.next_sample += write_frames
-            if self._segment_frames_written == self.segment_frames:
-                self._close_segment()
+        with self._lock:
+            remaining = memoryview(pcm_s16le)
+            while remaining:
+                if self._wave is None:
+                    self._open_segment_unlocked()
+                available_frames = (
+                    self.segment_frames - self._segment_frames_written
+                )
+                write_frames = min(len(remaining) // 2, available_frames)
+                write_bytes = write_frames * 2
+                assert self._wave is not None
+                self._wave.writeframesraw(remaining[:write_bytes])
+                remaining = remaining[write_bytes:]
+                self._segment_frames_written += write_frames
+                self.next_sample += write_frames
+                if self._segment_frames_written == self.segment_frames:
+                    self._close_segment_unlocked()
+
+    def read(self, start_sample: int, end_sample: int) -> bytes:
+        """Read an accepted source range, closing an overlapping active segment."""
+        with self._lock:
+            if not 0 <= start_sample <= end_sample <= self.next_sample:
+                raise ValueError(
+                    "audio segment range is outside accepted samples "
+                    f"[0, {self.next_sample})"
+                )
+            if start_sample == end_sample:
+                return b""
+            if (
+                self._wave is not None
+                and end_sample > self._segment_first_sample
+            ):
+                self._close_segment_unlocked()
+            parts: list[bytes] = []
+            cursor = start_sample
+            for row in self._segments:
+                segment_start = int(row["first_sample"])
+                segment_end = segment_start + int(row["frame_count"])
+                if segment_end <= cursor:
+                    continue
+                if segment_start > cursor:
+                    break
+                read_end = min(end_sample, segment_end)
+                path = self.directory / str(row["path"])
+                with wave.open(str(path), "rb") as source:
+                    if (
+                        source.getnchannels() != 1
+                        or source.getsampwidth() != 2
+                        or source.getframerate() != self.sample_rate_hz
+                    ):
+                        raise ValueError(
+                            f"audio segment format changed: {path}"
+                        )
+                    source.setpos(cursor - segment_start)
+                    payload = source.readframes(read_end - cursor)
+                if len(payload) != (read_end - cursor) * 2:
+                    raise ValueError(f"audio segment ended early: {path}")
+                parts.append(payload)
+                cursor = read_end
+                if cursor == end_sample:
+                    return b"".join(parts)
+            raise ValueError(
+                "audio segment index does not cover requested samples "
+                f"[{start_sample}, {end_sample})"
+            )
 
     def close(self) -> None:
-        self._close_segment()
+        with self._lock:
+            self._close_segment_unlocked()
 
 
 class SegmentedEventStore:
@@ -557,6 +612,8 @@ class CorrectedSession:
         )
         self._next_head_snapshot = 0
         self._last_snapshot: tuple[int, int, int] | None = None
+        self._state_lock = threading.RLock()
+        self._latest_block: PcmBlock | None = None
         self._write_session(status="active")
         self._record_horizons(force=True)
 
@@ -600,12 +657,13 @@ class CorrectedSession:
         self._write_session(status="active")
 
     def _apply_lane_update(self, update: LaneUpdate) -> list[dict[str, Any]]:
-        assigned = self.events.append(update.events)
-        if update.provisional_sample is not None:
-            self.advance_provisional(update.provisional_sample)
-        if update.commit_sample is not None:
-            self.advance_commit(update.commit_sample)
-        return assigned
+        with self._state_lock:
+            assigned = self.events.append(update.events)
+            if update.provisional_sample is not None:
+                self.advance_provisional(update.provisional_sample)
+            if update.commit_sample is not None:
+                self.advance_commit(update.commit_sample)
+            return assigned
 
     def _record_horizons(self, *, force: bool = False) -> None:
         state = (
@@ -622,44 +680,89 @@ class CorrectedSession:
         write_json(self.directory / "horizons.json", row)
         self._last_snapshot = state
 
+    def accept_pcm(
+        self,
+        block: PcmBlock,
+        *,
+        received_ns: int,
+    ) -> None:
+        """Accept and persist one PCM block without executing a model lane."""
+        del received_ns
+        with self._state_lock:
+            if self.closed:
+                raise RuntimeError("corrected session is closed")
+            if block.sample_rate_hz != self.sample_rate_hz:
+                raise ValueError("corrected session sample rate changed")
+            if block.sequence != self.next_sequence:
+                raise ValueError(
+                    "corrected session sequence gap: expected "
+                    f"{self.next_sequence}, got {block.sequence}"
+                )
+            if block.first_sample != self.horizons.audio_head_sample:
+                raise ValueError(
+                    "corrected session source gap: expected "
+                    f"{self.horizons.audio_head_sample}, got {block.first_sample}"
+                )
+            if not 0 < block.frame_count <= MAX_PCM_BLOCK_FRAMES:
+                raise ValueError("corrected session PCM block size is invalid")
+            if len(block.pcm_s16le) != block.frame_count * 2:
+                raise ValueError(
+                    "corrected session PCM payload length is invalid"
+                )
+            self.audio.append(block.first_sample, block.pcm_s16le)
+            self.ring.append(block.first_sample, block.pcm_s16le)
+            self.next_sequence += 1
+            self.horizons.audio_head_sample += block.frame_count
+            self._latest_block = block
+            if self.horizons.audio_head_sample >= self._next_head_snapshot:
+                self._record_horizons()
+                self._next_head_snapshot = (
+                    self.horizons.audio_head_sample
+                    + self._snapshot_interval_frames
+                )
+
+    def process_lane(
+        self,
+        lane: CorrectedSessionLane,
+        *,
+        received_ns: int,
+    ) -> list[dict[str, Any]]:
+        """Advance one lane over all currently eligible accepted audio."""
+        with self._state_lock:
+            if self.closed:
+                raise RuntimeError("corrected session is closed")
+            block = self._latest_block
+        if block is None:
+            return []
+        update = lane.accept_block(self, block, received_ns=received_ns)
+        return self._apply_lane_update(update)
+
     def accept_block(
         self,
         block: PcmBlock,
         *,
         received_ns: int,
     ) -> list[dict[str, Any]]:
-        if self.closed:
-            raise RuntimeError("corrected session is closed")
-        if block.sample_rate_hz != self.sample_rate_hz:
-            raise ValueError("corrected session sample rate changed")
-        if block.sequence != self.next_sequence:
-            raise ValueError(
-                f"corrected session sequence gap: expected {self.next_sequence}, "
-                f"got {block.sequence}"
-            )
-        if block.first_sample != self.horizons.audio_head_sample:
-            raise ValueError(
-                "corrected session source gap: expected "
-                f"{self.horizons.audio_head_sample}, got {block.first_sample}"
-            )
-        if not 0 < block.frame_count <= MAX_PCM_BLOCK_FRAMES:
-            raise ValueError("corrected session PCM block size is invalid")
-        if len(block.pcm_s16le) != block.frame_count * 2:
-            raise ValueError("corrected session PCM payload length is invalid")
-        self.audio.append(block.first_sample, block.pcm_s16le)
-        self.ring.append(block.first_sample, block.pcm_s16le)
-        self.next_sequence += 1
-        self.horizons.audio_head_sample += block.frame_count
+        """Compatibility composition for synchronous deterministic replay."""
+        self.accept_pcm(block, received_ns=received_ns)
         assigned: list[dict[str, Any]] = []
         for lane in self.lanes:
-            update = lane.accept_block(self, block, received_ns=received_ns)
-            assigned.extend(self._apply_lane_update(update))
-        if self.horizons.audio_head_sample >= self._next_head_snapshot:
-            self._record_horizons()
-            self._next_head_snapshot = (
-                self.horizons.audio_head_sample + self._snapshot_interval_frames
-            )
+            assigned.extend(self.process_lane(lane, received_ns=received_ns))
         return assigned
+
+    def read_pcm(self, start_sample: int, end_sample: int) -> bytes:
+        """Read accepted PCM from memory when possible, otherwise durable audio."""
+        with self._state_lock:
+            if not 0 <= start_sample <= end_sample <= self.horizons.audio_head_sample:
+                raise ValueError(
+                    "corrected PCM range is outside the accepted audio horizon"
+                )
+            if (
+                self.ring.start_sample <= start_sample
+                and end_sample <= self.ring.end_sample
+            ):
+                return self.ring.read(start_sample, end_sample)
+            return self.audio.read(start_sample, end_sample)
 
     def append_events(self, events: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
         if self.closed:

@@ -603,7 +603,7 @@ class CorrectedCommitLane:
         final: bool,
     ) -> LaneUpdate:
         source_start = max(0, decode_head - self.buffer_frames)
-        pcm = session.ring.read(source_start, decode_head)
+        pcm = session.read_pcm(source_start, decode_head)
         padding_frames = self.guard_frames if final else 0
         if padding_frames:
             pcm += bytes(padding_frames * 2)

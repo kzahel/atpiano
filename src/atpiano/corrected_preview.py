@@ -117,11 +117,11 @@ class CorrectedPreviewLane:
     ) -> np.ndarray:
         source_frames = source_end - source_start
         audio = np.zeros(source_frames, dtype=np.float32)
-        copy_start = max(session.ring.start_sample, source_start, 0)
-        copy_end = min(session.ring.end_sample, source_end)
+        copy_start = max(source_start, 0)
+        copy_end = min(session.horizons.audio_head_sample, source_end)
         if copy_end > copy_start:
             values = np.frombuffer(
-                session.ring.read(copy_start, copy_end),
+                session.read_pcm(copy_start, copy_end),
                 dtype="<i2",
             ).astype(np.float32)
             destination_start = copy_start - source_start
@@ -139,12 +139,16 @@ class CorrectedPreviewLane:
             audio = np.pad(audio, (0, self.model.window_samples - audio.shape[0]))
         return audio[: self.model.window_samples]
 
-    def _retain_calibration(self, block: PcmBlock) -> None:
-        needed_bytes = self.noise_gate.calibration_samples * 2 - len(
-            self._calibration_pcm
+    def _retain_calibration(self, session: CorrectedSession) -> None:
+        retained_frames = len(self._calibration_pcm) // 2
+        available_frames = min(
+            self.noise_gate.calibration_samples,
+            session.horizons.audio_head_sample,
         )
-        if needed_bytes > 0:
-            self._calibration_pcm.extend(block.pcm_s16le[:needed_bytes])
+        if available_frames > retained_frames:
+            self._calibration_pcm.extend(
+                session.read_pcm(retained_frames, available_frames)
+            )
         self.noise_gate.calibrate(self._calibration_pcm)
 
     def _gate_candidate(
@@ -154,16 +158,16 @@ class CorrectedPreviewLane:
     ) -> tuple[bool, float | None, str]:
         onset_sample = round(note.onset_s * self.source_sample_rate_hz)
         start = max(
-            session.ring.start_sample,
+            0,
             onset_sample
             - round(self.noise_gate.lookbehind_s * self.source_sample_rate_hz),
         )
         end = min(
-            session.ring.end_sample,
+            session.horizons.audio_head_sample,
             onset_sample
             + round(self.noise_gate.lookahead_s * self.source_sample_rate_hz),
         )
-        pcm = session.ring.read(start, end) if end > start else b""
+        pcm = session.read_pcm(start, end) if end > start else b""
         return self.noise_gate.evaluate(note, pcm, first_sample=start)
 
     def _persist_native(
@@ -274,7 +278,8 @@ class CorrectedPreviewLane:
         *,
         received_ns: int,
     ) -> LaneUpdate:
-        self._retain_calibration(block)
+        del block
+        self._retain_calibration(session)
         events: list[dict[str, Any]] = []
         timing_rows: list[dict[str, Any]] = []
         gate_rows: list[dict[str, Any]] = []

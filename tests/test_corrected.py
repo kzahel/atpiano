@@ -10,6 +10,7 @@ import pytest
 from atpiano.corrected import (
     CORRECTED_EVENT_SCHEMA,
     CorrectedSession,
+    LaneUpdate,
     PcmRing,
     SegmentedEventStore,
     run_corrected_replay,
@@ -163,6 +164,82 @@ def test_corrected_session_segments_audio_and_enforces_horizons(tmp_path: Path) 
     assert values == [1, 2, 3, 4, 5, 6, 7]
     with pytest.raises(RuntimeError, match="closed"):
         session.advance_commit(5)
+
+
+def test_corrected_session_accepts_pcm_before_processing_lanes(
+    tmp_path: Path,
+) -> None:
+    class RecordingLane:
+        name = "recording"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def accept_block(
+            self,
+            session: CorrectedSession,
+            block: PcmBlock,
+            *,
+            received_ns: int,
+        ) -> LaneUpdate:
+            del block, received_ns
+            self.calls += 1
+            return LaneUpdate(
+                provisional_sample=session.horizons.audio_head_sample
+            )
+
+        def finalize(self, session: CorrectedSession) -> LaneUpdate:
+            del session
+            return LaneUpdate()
+
+        def status(self) -> dict[str, object]:
+            return {"name": self.name}
+
+    session = CorrectedSession(
+        tmp_path / "session",
+        session_id="session",
+        sample_rate_hz=8_000,
+        source="microphone",
+        pcm_ring_s=0.0005,
+        segment_s=0.001,
+        minimum_free_bytes=0,
+    )
+    lane = RecordingLane()
+    session.add_lane(lane)
+
+    session.accept_pcm(_block(0, 0, [1, 2, 3, 4]), received_ns=1)
+
+    assert session.horizons.audio_head_sample == 4
+    assert session.horizons.provisional_sample == 0
+    assert lane.calls == 0
+
+    session.process_lane(lane, received_ns=2)
+
+    assert lane.calls == 1
+    assert session.horizons.provisional_sample == 4
+
+
+def test_corrected_session_reads_audio_older_than_pcm_ring(
+    tmp_path: Path,
+) -> None:
+    session = CorrectedSession(
+        tmp_path / "session",
+        session_id="session",
+        sample_rate_hz=8_000,
+        source="microphone",
+        pcm_ring_s=0.0005,
+        segment_s=0.001,
+        minimum_free_bytes=0,
+    )
+    first = list(range(8))
+    second = list(range(8, 16))
+
+    session.accept_pcm(_block(0, 0, first), received_ns=1)
+    session.accept_pcm(_block(1, 8, second), received_ns=2)
+
+    assert session.ring.start_sample == 12
+    assert struct.unpack("<12h", session.read_pcm(2, 14)) == tuple(range(2, 14))
+    assert session.audio.segment_count >= 2
 
 
 def test_corrected_replay_repeats_one_continuous_sample_clock(tmp_path: Path) -> None:
