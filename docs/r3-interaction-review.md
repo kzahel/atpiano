@@ -139,7 +139,7 @@ its artifact access handle, and rendered it as SVG. Automated tests also
 cover score failure isolation.
 
 The final `uv run atpiano migration-regression` passed at
-`results/migration-regression/20260726T115307Z/report.json`: 81 Python tests,
+`results/migration-regression/20260726T115529Z/report.json`: 81 Python tests,
 the retained JavaScript suites, 23 application tests, contract drift,
 TypeScript, dependency audit, Ruff, JavaScript syntax, and whitespace all
 passed. The dependency audit found zero vulnerabilities.

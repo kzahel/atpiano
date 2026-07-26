@@ -193,7 +193,7 @@ views, the score job, artifact refresh, and real SVG notation without browser
 alerts or page-level horizontal overflow.
 
 The final `uv run atpiano migration-regression` report at
-`results/migration-regression/20260726T115307Z/report.json` passed 81 Python
+`results/migration-regression/20260726T115529Z/report.json` passed 81 Python
 tests, retained JavaScript tests, 23 application tests, contract drift,
 TypeScript, dependency audit, Ruff, syntax, and whitespace. Physical
 microphone permission and playing remain the explicit human lane at R3. The
