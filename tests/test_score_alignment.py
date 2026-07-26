@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from atpiano.midi2score_adapter import _monotonic_exact_pitch_pairs
 from atpiano.score_alignment import (
     score_input_notes_document,
     validate_score_alignment,
@@ -74,6 +75,34 @@ def test_source_notes_follow_transformer_order_after_midi_tick_collision() -> No
     ]
 
 
+def test_reconciliation_does_not_shift_identity_across_dropped_slots() -> None:
+    source = [
+        {"pitch": pitch}
+        for pitch in (57, 69, 68, 61, 80, 69, 78, 71, 76, 68)
+    ]
+    score = [
+        {"pitch": pitch}
+        for pitch in (57, 61, 69, 78, 68, 71, 76)
+    ]
+
+    pairs = _monotonic_exact_pitch_pairs(source, score)
+
+    assert pairs == sorted(pairs)
+    assert all(source[left]["pitch"] == score[right]["pitch"] for left, right in pairs)
+    assert (0, 0) in pairs
+    assert (3, 1) in pairs
+    assert (6, 3) in pairs
+    assert (7, 5) in pairs
+    assert (8, 6) in pairs
+
+
+def test_reconciliation_prefers_nearby_repeated_pitch_identity() -> None:
+    source = [{"pitch": pitch} for pitch in (60, 61, 60)]
+    score = [{"pitch": pitch} for pitch in (60, 60)]
+
+    assert _monotonic_exact_pitch_pairs(source, score) == [(0, 0), (2, 1)]
+
+
 def _alignment(source_path: Path, musicxml_path: Path) -> dict:
     source = json.loads(source_path.read_text(encoding="utf-8"))
     rows = []
@@ -124,7 +153,7 @@ def _alignment(source_path: Path, musicxml_path: Path) -> dict:
             }
         )
     return {
-        "schema_version": "atpiano.score-alignment.v1",
+        "schema_version": "atpiano.score-alignment.v2",
         "session_id": source["session_id"],
         "sample_rate_hz": source["sample_rate_hz"],
         "source": {
@@ -132,6 +161,11 @@ def _alignment(source_path: Path, musicxml_path: Path) -> dict:
             "sha256": sha256_file(source_path),
         },
         "musicxml": {"sha256": sha256_file(musicxml_path)},
+        "mapping": {
+            "algorithm": "monotonic-exact-pitch-lcs-v1",
+            "source_order": "onset-sample,pitch,duration,source-index",
+            "score_order": "attack-quarters,pitch,output-index",
+        },
         "summary": {
             "source_notes": 3,
             "mapped_source_notes": 3,
@@ -207,8 +241,41 @@ def test_score_alignment_rejects_nonmonotonic_score_positions(
         "numerator": -1,
         "denominator": 1,
     }
+    alignment["rows"][2]["segments"][0]["score_time_quarters"] = {
+        "numerator": -1,
+        "denominator": 1,
+    }
 
     with pytest.raises(ValueError, match="not monotonic"):
+        validate_score_alignment(
+            alignment,
+            source_notes_path=source_path,
+            musicxml_path=musicxml_path,
+        )
+
+
+def test_score_alignment_rejects_mapped_pitch_substitution(
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "source-notes.json"
+    musicxml_path = tmp_path / "score.musicxml"
+    write_json(source_path, _source_document())
+    musicxml_path.write_text(
+        """<score-partwise version="4.0">
+<part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+<part id="P1"><measure number="1">
+<note id="note-e"><pitch><step>E</step><octave>4</octave></pitch></note>
+<note id="note-g"><chord/><pitch><step>G</step><octave>4</octave></pitch></note>
+<note id="note-c-a"><pitch><step>C</step><octave>4</octave></pitch></note>
+<note id="note-c-b"><pitch><step>C</step><octave>4</octave></pitch></note>
+</measure></part></score-partwise>
+""",
+        encoding="utf-8",
+    )
+    alignment = deepcopy(_alignment(source_path, musicxml_path))
+    alignment["rows"][0]["segments"][0]["pitch"] = 61
+
+    with pytest.raises(ValueError, match="pitch differs"):
         validate_score_alignment(
             alignment,
             source_notes_path=source_path,

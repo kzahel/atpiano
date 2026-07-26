@@ -85,7 +85,7 @@ def _fake_runner(
     write_json(
         output_alignment,
         {
-            "schema_version": "atpiano.score-alignment.v1",
+            "schema_version": "atpiano.score-alignment.v2",
             "session_id": source["session_id"],
             "sample_rate_hz": source["sample_rate_hz"],
             "source": {
@@ -93,6 +93,11 @@ def _fake_runner(
                 "sha256": sha256_file(input_notes),
             },
             "musicxml": {"sha256": sha256_file(output_musicxml)},
+            "mapping": {
+                "algorithm": "monotonic-exact-pitch-lcs-v1",
+                "source_order": "onset-sample,pitch,duration,source-index",
+                "score_order": "attack-quarters,pitch,output-index",
+            },
             "summary": {
                 "source_notes": 1,
                 "mapped_source_notes": 1,

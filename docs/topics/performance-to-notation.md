@@ -10,10 +10,13 @@ for the same reference take, cutting ties from 20 to 1 and voices from 10 to
 through that cascade. Tactical 018 now preserves a checksummed
 source-event-to-MusicXML alignment beside each new snapshot and uses it to
 drive discrete OSMD playback attacks from the authoritative source-sample
-clock. Source identities follow the actual serialized MIDI tick, pitch, and
-duration order consumed by the transformer; the browser normalizes validated
-rows back onto raw source-sample order for playback lookup. Historical
-snapshots without alignment still render without a cursor.
+clock. Tactical 028 corrects that first contract after a retained public
+session proved generated score-token positions do not preserve source-note
+identity across padding or deletions. New `atpiano.score-alignment.v2`
+artifacts reconcile raw source attacks and rendered score attacks in monotonic
+order with exact MIDI pitch; unmatched source notes and inserted rendered
+notes remain explicit. V1 alignment artifacts no longer drive a cursor, while
+their MusicXML continues to render.
 Tactical 021 now retains the model baseline and publishes deterministic
 `music21` score variants: automatic measure-span clef cleanup is the default,
 and a safe paired enharmonic signature can be selected without rerunning the
@@ -24,7 +27,9 @@ selection, and the leading score converter has no published license. See
 and
 [`012-committed-score-snapshots.md`](../tactical/012-committed-score-snapshots.md),
 plus the current evidence in
-[`018-score-playback-alignment.md`](../tactical/018-score-playback-alignment.md).
+[`018-score-playback-alignment.md`](../tactical/018-score-playback-alignment.md)
+and
+[`028-score-alignment-reconciliation.md`](../tactical/028-score-alignment-reconciliation.md).
 
 The product goal is fixed and narrow: legible engraved sheet music the
 performer can sight read back. Lead sheets and chord-symbol summaries do not

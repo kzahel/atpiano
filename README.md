@@ -55,7 +55,11 @@ saturated isolated Transkun worker, sub-second Stop acknowledgement, reload
 reattachment, and complete checksummed settlement. This host's measured
 two-thread CPU profile selects after-Stop correction. A consentful human
 browser-microphone review, a multi-hour real-model soak, and Linux latency
-parity have not been validated.
+parity have not been validated. The internal score runtime installs, and score
+alignment now reconciles generated score attacks to source events with an
+explicit monotonic exact-pitch pass instead of assuming generated token
+positions retain source identity. The corrected contract passes the retained
+public two-minute session that exposed the defect.
 
 Current direction and research questions live in [`docs/topics/`](docs/topics/README.md).
 Acoustic-model benchmarking, live browser transcription, and downstream

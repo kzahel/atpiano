@@ -18,7 +18,12 @@ from fractions import Fraction
 from pathlib import Path
 
 SCORE_INPUT_NOTES_SCHEMA = "atpiano.score-input-notes.v1"
-SCORE_ALIGNMENT_SCHEMA = "atpiano.score-alignment.v1"
+SCORE_ALIGNMENT_SCHEMA = "atpiano.score-alignment.v2"
+SCORE_ALIGNMENT_MAPPING = {
+    "algorithm": "monotonic-exact-pitch-lcs-v1",
+    "source_order": "onset-sample,pitch,duration,source-index",
+    "score_order": "attack-quarters,pitch,output-index",
+}
 
 
 def _sha256(path: Path) -> str:
@@ -85,8 +90,6 @@ def _verify_midi_order(source: dict, midi_sequence: list) -> None:
 def _tag_transformer_notes(
     tokenizer_module,
     token_output: dict,
-    *,
-    source_count: int,
 ) -> object:
     from tokenizer import one_hot_unbucketing
 
@@ -114,11 +117,7 @@ def _tag_transformer_notes(
             raise RuntimeError("score detokenizer created an unexpected note")
         value = original_note(*args, **kwargs)
         output_index = creation_order[len(created)]
-        value.id = (
-            f"atpiano-token-{output_index:06d}"
-            if output_index < source_count
-            else f"atpiano-inserted-{output_index:06d}"
-        )
+        value.id = f"atpiano-output-{output_index:06d}"
         created.append(output_index)
         return value
 
@@ -132,36 +131,101 @@ def _tag_transformer_notes(
     return score
 
 
+def _monotonic_exact_pitch_pairs(
+    source_notes: list[dict],
+    score_notes: list[dict],
+) -> list[tuple[int, int]]:
+    """Reconcile two ordered note sequences without inventing pitch identity."""
+
+    source_count = len(source_notes)
+    score_count = len(score_notes)
+    if not source_count or not score_count:
+        return []
+
+    choices = bytearray(source_count * score_count)
+    prior_counts = [0] * (score_count + 1)
+    prior_displacements = [0] * (score_count + 1)
+    for source_position, source_note in enumerate(source_notes):
+        counts = [0] * (score_count + 1)
+        displacements = [0] * (score_count + 1)
+        choice_offset = source_position * score_count
+        for score_column, score_note in enumerate(score_notes, start=1):
+            score_position = score_column - 1
+            upper = (
+                prior_counts[score_column],
+                prior_displacements[score_column],
+                0,
+            )
+            left = (
+                counts[score_column - 1],
+                displacements[score_column - 1],
+                1,
+            )
+            candidates = [upper, left]
+            if source_note["pitch"] == score_note["pitch"]:
+                candidates.append(
+                    (
+                        prior_counts[score_column - 1] + 1,
+                        prior_displacements[score_column - 1]
+                        + abs(
+                            source_position * max(score_count - 1, 1)
+                            - score_position * max(source_count - 1, 1)
+                        ),
+                        2,
+                    )
+                )
+            best = min(
+                candidates,
+                key=lambda candidate: (
+                    -candidate[0],
+                    candidate[1],
+                    -candidate[2],
+                ),
+            )
+            counts[score_column], displacements[score_column] = best[:2]
+            choices[choice_offset + score_position] = best[2]
+        prior_counts = counts
+        prior_displacements = displacements
+
+    source_position = source_count - 1
+    score_position = score_count - 1
+    pairs: list[tuple[int, int]] = []
+    while source_position >= 0 and score_position >= 0:
+        choice = choices[source_position * score_count + score_position]
+        if choice == 2:
+            pairs.append((source_position, score_position))
+            source_position -= 1
+            score_position -= 1
+        elif choice == 0:
+            source_position -= 1
+        else:
+            score_position -= 1
+    pairs.reverse()
+    return pairs
+
+
 def _alignment_rows(
     score,
     source: dict,
 ) -> tuple[list[dict], list[dict]]:
     from music21 import chord
 
-    segments_by_source: dict[int, list[dict]] = defaultdict(list)
-    segment_counts: dict[int, int] = defaultdict(int)
-    inserted_segments: list[dict] = []
-    inserted_segment_counts: dict[int, int] = defaultdict(int)
+    components_by_output: dict[int, list[tuple[object, dict]]] = defaultdict(list)
+    component_ordinal = 0
     for part_number, part in enumerate(score.parts, start=1):
         for value in part.recurse().notes:
             score_time = value.getOffsetInHierarchy(part)
             components = value.notes if isinstance(value, chord.Chord) else [value]
             for component in components:
                 identifier = str(component.id)
-                source_prefix = "atpiano-token-"
-                inserted_prefix = "atpiano-inserted-"
-                if identifier.startswith(inserted_prefix):
-                    output_index = int(identifier[len(inserted_prefix) :])
-                    segment = inserted_segment_counts[output_index]
-                    inserted_segment_counts[output_index] += 1
-                    xml_id = (
-                        f"atpiano-inserted-{output_index:06d}-{segment:03d}"
-                    )
-                    component.id = xml_id
-                    inserted_segments.append(
+                output_prefix = "atpiano-output-"
+                if not identifier.startswith(output_prefix):
+                    raise RuntimeError("post-processed score note lost source identity")
+                output_index = int(identifier[len(output_prefix) :])
+                components_by_output[output_index].append(
+                    (
+                        component,
                         {
-                            "output_index": output_index,
-                            "musicxml_note_id": xml_id,
                             "part": part_number,
                             "pitch": int(component.pitch.midi),
                             "score_time_quarters": _rational(score_time),
@@ -173,50 +237,100 @@ def _alignment_rows(
                                 if component.tie is not None
                                 else None
                             ),
-                        }
+                            "_ordinal": component_ordinal,
+                        },
                     )
-                    continue
-                if not identifier.startswith(source_prefix):
-                    raise RuntimeError("post-processed score note lost source identity")
-                source_index = int(identifier[len(source_prefix) :])
-                segment = segment_counts[source_index]
-                segment_counts[source_index] += 1
-                xml_id = _event_xml_id(
-                    source["notes"][source_index]["event_id"],
-                    segment,
+                )
+                component_ordinal += 1
+
+    score_notes = []
+    for output_index, components in components_by_output.items():
+        components.sort(
+            key=lambda item: (
+                Fraction(
+                    item[1]["score_time_quarters"]["numerator"],
+                    item[1]["score_time_quarters"]["denominator"],
+                ),
+                item[1]["part"],
+                item[1]["_ordinal"],
+            )
+        )
+        pitches = {item[1]["pitch"] for item in components}
+        if len(pitches) != 1:
+            raise RuntimeError("one score output token changed pitch across ties")
+        attack = components[0][1]["score_time_quarters"]
+        score_notes.append(
+            {
+                "output_index": output_index,
+                "pitch": next(iter(pitches)),
+                "score_time_quarters": attack,
+                "components": components,
+            }
+        )
+    score_notes.sort(
+        key=lambda item: (
+            Fraction(
+                item["score_time_quarters"]["numerator"],
+                item["score_time_quarters"]["denominator"],
+            ),
+            item["pitch"],
+            item["output_index"],
+        )
+    )
+    source_notes = sorted(
+        source["notes"],
+        key=lambda item: (
+            item["onset_sample"],
+            item["pitch"],
+            item["offset_sample"] - item["onset_sample"],
+            item["source_index"],
+        ),
+    )
+    pairs = _monotonic_exact_pitch_pairs(source_notes, score_notes)
+    source_by_output = {
+        score_notes[score_position]["output_index"]: source_notes[source_position]
+        for source_position, score_position in pairs
+    }
+
+    segments_by_source: dict[int, list[dict]] = defaultdict(list)
+    inserted_segments: list[dict] = []
+    for score_note in score_notes:
+        output_index = score_note["output_index"]
+        source_note = source_by_output.get(output_index)
+        for segment_index, (component, raw_segment) in enumerate(
+            score_note["components"]
+        ):
+            segment = {
+                key: value
+                for key, value in raw_segment.items()
+                if key != "_ordinal"
+            }
+            if source_note is None:
+                xml_id = (
+                    f"atpiano-inserted-{output_index:06d}-{segment_index:03d}"
                 )
                 component.id = xml_id
-                segments_by_source[source_index].append(
+                inserted_segments.append(
                     {
+                        "output_index": output_index,
                         "musicxml_note_id": xml_id,
-                        "part": part_number,
-                        "pitch": int(component.pitch.midi),
-                        "score_time_quarters": _rational(score_time),
-                        "score_duration_quarters": _rational(
-                            component.duration.quarterLength
-                        ),
-                        "tie": (
-                            component.tie.type
-                            if component.tie is not None
-                            else None
-                        ),
                     }
+                    | segment
                 )
+                continue
+            xml_id = _event_xml_id(source_note["event_id"], segment_index)
+            component.id = xml_id
+            segments_by_source[source_note["source_index"]].append(
+                {
+                    "musicxml_note_id": xml_id,
+                }
+                | segment
+            )
 
     rows = []
     for item in source["notes"]:
         source_index = item["source_index"]
-        segments = sorted(
-            segments_by_source.get(source_index, []),
-            key=lambda segment: (
-                Fraction(
-                    segment["score_time_quarters"]["numerator"],
-                    segment["score_time_quarters"]["denominator"],
-                ),
-                segment["part"],
-                segment["musicxml_note_id"],
-            ),
-        )
+        segments = segments_by_source.get(source_index, [])
         base = {
             "source_index": source_index,
             "event_id": item["event_id"],
@@ -244,6 +358,7 @@ def _alignment_rows(
                     "segments": [],
                 }
             )
+
     inserted_segments.sort(
         key=lambda segment: (
             Fraction(
@@ -288,6 +403,7 @@ def _write_alignment(
         "musicxml": {
             "sha256": _sha256(output_musicxml),
         },
+        "mapping": SCORE_ALIGNMENT_MAPPING,
         "summary": summary,
         "rows": rows,
         "inserted_score_segments": inserted_score_segments,
@@ -358,7 +474,6 @@ def main() -> int:
     score = _tag_transformer_notes(
         tokenizer,
         token_output,
-        source_count=len(source["notes"]),
     )
     score = postprocess_score(score)
     rows, inserted_score_segments = _alignment_rows(score, source)

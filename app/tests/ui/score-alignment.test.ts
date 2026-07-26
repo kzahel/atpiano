@@ -12,10 +12,15 @@ const scoreHash = "a".repeat(64);
 
 function alignmentDocument() {
   return {
-    schema_version: "atpiano.score-alignment.v1",
+    schema_version: "atpiano.score-alignment.v2",
     session_id: "session-1",
     sample_rate_hz: 48_000,
     musicxml: { sha256: scoreHash },
+    mapping: {
+      algorithm: "monotonic-exact-pitch-lcs-v1",
+      source_order: "onset-sample,pitch,duration,source-index",
+      score_order: "attack-quarters,pitch,output-index",
+    },
     rows: [
       {
         source_index: 0,
@@ -93,7 +98,7 @@ describe("score playback alignment", () => {
         onset_sample: 48_009,
         offset_sample: 72_009,
         status: "mapped",
-        score_time_quarters: { numerator: 2, denominator: 1 },
+        score_time_quarters: { numerator: 3, denominator: 1 },
       },
       {
         source_index: 1,
@@ -117,6 +122,36 @@ describe("score playback alignment", () => {
     ]);
     expect(scoreAttackAtSample(alignment, 48_002, 144_000)).toBeNull();
     expect(scoreAttackAtSample(alignment, 48_003, 144_000)).toBe(2);
+    expect(scoreAttackAtSample(alignment, 48_009, 144_000)).toBe(3);
+  });
+
+  it("rejects score reversals on the source sample clock", () => {
+    const document = alignmentDocument();
+    document.rows[3]!.score_time_quarters = {
+      numerator: 1,
+      denominator: 1,
+    };
+
+    expect(() =>
+      parseScoreAlignment(document, {
+        sessionId: "session-1",
+        musicXmlSha256: scoreHash,
+      }),
+    ).toThrow(/score order/);
+  });
+
+  it("rejects legacy token-index alignment semantics", () => {
+    const document = {
+      ...alignmentDocument(),
+      schema_version: "atpiano.score-alignment.v1",
+    };
+
+    expect(() =>
+      parseScoreAlignment(document, {
+        sessionId: "session-1",
+        musicXmlSha256: scoreHash,
+      }),
+    ).toThrow(/version/);
   });
 
   it("moves the OSMD cursor forward, backward, and out of coverage", () => {

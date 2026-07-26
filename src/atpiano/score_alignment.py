@@ -13,7 +13,12 @@ from atpiano.corrected_export import midi_tick_at_sample
 from atpiano.util import sha256_file
 
 SCORE_INPUT_NOTES_SCHEMA = "atpiano.score-input-notes.v1"
-SCORE_ALIGNMENT_SCHEMA = "atpiano.score-alignment.v1"
+SCORE_ALIGNMENT_SCHEMA = "atpiano.score-alignment.v2"
+SCORE_ALIGNMENT_MAPPING = {
+    "algorithm": "monotonic-exact-pitch-lcs-v1",
+    "source_order": "onset-sample,pitch,duration,source-index",
+    "score_order": "attack-quarters,pitch,output-index",
+}
 
 
 def score_input_notes_document(
@@ -109,6 +114,8 @@ def validate_score_alignment(
 
     if document.get("schema_version") != SCORE_ALIGNMENT_SCHEMA:
         raise ValueError("score alignment schema is unsupported")
+    if document.get("mapping") != SCORE_ALIGNMENT_MAPPING:
+        raise ValueError("score alignment mapping contract is unsupported")
     source = document.get("source")
     musicxml = document.get("musicxml")
     if not isinstance(source, dict) or not isinstance(musicxml, dict):
@@ -135,10 +142,10 @@ def validate_score_alignment(
     if len(rows) != len(source_notes):
         raise ValueError("score alignment must account for every source note")
 
-    prior_score_time: Fraction | None = None
     mapped = 0
     unmatched = 0
     aligned_note_ids: list[str] = []
+    mapped_attacks: list[tuple[int, int, int, int, Fraction]] = []
     for index, (source_note, row) in enumerate(zip(source_notes, rows)):
         if not isinstance(source_note, dict) or not isinstance(row, dict):
             raise ValueError("score alignment note row is invalid")
@@ -167,9 +174,15 @@ def validate_score_alignment(
             row.get("score_time_quarters"),
             field="score_time_quarters",
         )
-        if prior_score_time is not None and score_time < prior_score_time:
-            raise ValueError("score alignment positions are not monotonic")
-        prior_score_time = score_time
+        mapped_attacks.append(
+            (
+                int(row["onset_sample"]),
+                int(row["pitch"]),
+                int(row["offset_sample"]) - int(row["onset_sample"]),
+                index,
+                score_time,
+            )
+        )
         mapped += 1
         segment_times: list[Fraction] = []
         for segment in segments:
@@ -178,6 +191,8 @@ def validate_score_alignment(
             identifier = segment.get("musicxml_note_id")
             if not isinstance(identifier, str) or not identifier:
                 raise ValueError("score alignment segment has no MusicXML ID")
+            if segment.get("pitch") != row["pitch"]:
+                raise ValueError("score alignment segment pitch differs")
             segment_time = _fraction(
                 segment.get("score_time_quarters"),
                 field="segment.score_time_quarters",
@@ -210,6 +225,12 @@ def validate_score_alignment(
         if duration < 0:
             raise ValueError("inserted score segment duration is invalid")
         aligned_note_ids.append(identifier)
+
+    prior_score_time: Fraction | None = None
+    for *_, score_time in sorted(mapped_attacks):
+        if prior_score_time is not None and score_time < prior_score_time:
+            raise ValueError("score alignment positions are not monotonic")
+        prior_score_time = score_time
 
     musicxml_note_ids = _pitched_musicxml_ids(musicxml_path)
     if sorted(aligned_note_ids) != sorted(musicxml_note_ids):

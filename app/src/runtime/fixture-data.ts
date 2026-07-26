@@ -376,10 +376,15 @@ function record(
     }),
   ];
   const alignment = {
-    schema_version: "atpiano.score-alignment.v1",
+    schema_version: "atpiano.score-alignment.v2",
     session_id: value.session_id,
     sample_rate_hz: value.sample_rate_hz,
     musicxml: { sha256: scoreHash },
+    mapping: {
+      algorithm: "monotonic-exact-pitch-lcs-v1",
+      source_order: "onset-sample,pitch,duration,source-index",
+      score_order: "attack-quarters,pitch,output-index",
+    },
     rows: alignmentRows,
   };
   const access = Object.fromEntries(

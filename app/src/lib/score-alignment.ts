@@ -14,7 +14,7 @@ export interface ScoreAlignmentRow {
 }
 
 export interface ScoreAlignment {
-  readonly schema_version: "atpiano.score-alignment.v1";
+  readonly schema_version: "atpiano.score-alignment.v2";
   readonly session_id: string;
   readonly sample_rate_hz: number;
   readonly musicxml: {
@@ -72,7 +72,7 @@ export function parseScoreAlignment(
   expected: ExpectedScoreAlignment,
 ): ScoreAlignment {
   const document = record(value, "score alignment");
-  if (document.schema_version !== "atpiano.score-alignment.v1") {
+  if (document.schema_version !== "atpiano.score-alignment.v2") {
     throw new Error("Score alignment version is unsupported");
   }
   if (document.session_id !== expected.sessionId) {
@@ -82,12 +82,23 @@ export function parseScoreAlignment(
   if (musicxml.sha256 !== expected.musicXmlSha256) {
     throw new Error("Score alignment belongs to another score snapshot");
   }
+  const mapping = record(document.mapping, "score alignment mapping");
+  if (
+    mapping.algorithm !== "monotonic-exact-pitch-lcs-v1" ||
+    mapping.source_order !==
+      "onset-sample,pitch,duration,source-index" ||
+    mapping.score_order !== "attack-quarters,pitch,output-index"
+  ) {
+    throw new Error("Score alignment mapping is unsupported");
+  }
   if (!Array.isArray(document.rows)) {
     throw new Error("Score alignment rows are invalid");
   }
   const sampleRateHz = integer(document.sample_rate_hz, "sample_rate_hz");
+  if (sampleRateHz === 0) {
+    throw new Error("sample_rate_hz is invalid");
+  }
   let priorMidiOrder: readonly [number, number, number] | null = null;
-  let priorScoreTime = -1;
   const rows = document.rows.map((value, index): ScoreAlignmentRow => {
     const item = record(value, `score alignment row ${index}`);
     const sourceIndex = integer(item.source_index, "source_index");
@@ -149,11 +160,6 @@ export function parseScoreAlignment(
       item.score_time_quarters,
       "score_time_quarters",
     );
-    const scoreValue = scoreRationalValue(scoreTime);
-    if (scoreValue < priorScoreTime) {
-      throw new Error("Score alignment score order is invalid");
-    }
-    priorScoreTime = scoreValue;
     return {
       source_index: sourceIndex,
       event_id: item.event_id,
@@ -164,16 +170,33 @@ export function parseScoreAlignment(
       score_time_quarters: scoreTime,
     };
   });
+  const sourceOrderedRows = rows.toSorted(
+    (left, right) =>
+      left.onset_sample - right.onset_sample ||
+      left.pitch - right.pitch ||
+      (
+        left.offset_sample - left.onset_sample -
+        (right.offset_sample - right.onset_sample)
+      ) ||
+      left.source_index - right.source_index,
+  );
+  let priorScoreTime = -1;
+  for (const row of sourceOrderedRows) {
+    if (row.status === "unmatched" || row.score_time_quarters === null) {
+      continue;
+    }
+    const scoreValue = scoreRationalValue(row.score_time_quarters);
+    if (scoreValue < priorScoreTime) {
+      throw new Error("Score alignment score order is invalid");
+    }
+    priorScoreTime = scoreValue;
+  }
   return {
-    schema_version: "atpiano.score-alignment.v1",
+    schema_version: "atpiano.score-alignment.v2",
     session_id: expected.sessionId,
     sample_rate_hz: sampleRateHz,
     musicxml: { sha256: expected.musicXmlSha256 },
-    rows: rows.toSorted(
-      (left, right) =>
-        left.onset_sample - right.onset_sample ||
-        left.source_index - right.source_index,
-    ),
+    rows: sourceOrderedRows,
   };
 }
 

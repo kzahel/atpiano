@@ -12,7 +12,7 @@ import hashlib
 import json
 from pathlib import Path
 
-SCORE_ALIGNMENT_SCHEMA = "atpiano.score-alignment.v1"
+SCORE_ALIGNMENT_SCHEMA = "atpiano.score-alignment.v2"
 
 
 def _sha256(path: Path) -> str:

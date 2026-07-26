@@ -234,6 +234,21 @@ is `results/migration-regression/20260726T140248Z/report.json` and records 86
 Python tests, 29 Vitest tests, five TypeScript node tests, contract parity,
 Ruff, npm audit, and legacy JavaScript checks.
 
+### Later v1 identity correction
+
+The larger retained public session
+`20260726T183203-d19b9f410710` disproved one premise of the v1 execution
+record. Generated score token positions are not stable source-note identities
+when the independently padded output sequence contains deletions. A v1 row
+could therefore remain monotonic while naming a rendered note of another
+pitch. The reported session made the defect visible as a score-time reversal,
+but weakening that guard would not have fixed the underlying identity drift.
+
+[`028-score-alignment-reconciliation.md`](028-score-alignment-reconciliation.md)
+supersedes the v1 mapping semantics with an explicitly reconciled v2 artifact.
+The v1 artifacts above remain historical evidence for the original cursor and
+tick-order work, not the current source-to-score identity contract.
+
 ## Rollback
 
 Alignment is an additive snapshot artifact and cursor rendering is
