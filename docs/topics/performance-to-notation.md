@@ -181,6 +181,28 @@ request. It must not be called an append-only engraving lane. Continuous
 notation still needs bounded musical chunks with overlap, reconciliation,
 barline ownership, and a monotonic `H_engrave`.
 
+### Deterministic score post-processing direction
+
+[`021-deterministic-score-postprocessing.md`](../tactical/021-deterministic-score-postprocessing.md)
+owns the planned score-semantic cleanup boundary between model inference and
+MusicXML publication. The existing adapter already constructs an in-memory
+`music21.Score`; the planned pass preserves a baseline artifact, creates
+hash-addressed derived variants, and validates every result against its exact
+source alignment.
+
+The first automatic policy minimizes ledger-line cost across stable treble-
+and bass-clef spans without moving notes between parts or voices. A separate
+user action creates a pitch-preserving enharmonic key variant when one
+ordinary global signature has a safe `fifths ± 12` alternative. It respells
+notes and the signature together and is explicitly not transposition.
+
+Retained session `20260726T142937-d49ef33ca321` motivates the slice. Its
+second part opens in sustained treble-clef range but receives the upstream
+detokenizer's unconditional bass clef, and its six-flat spelling differs from
+the performer's intended six-sharp spelling for the BWV 853 fugue. Its wrong
+3/4 inference remains a separate model-quality issue and is deliberately not
+hidden by the post-processor.
+
 ### Responsive score reader direction
 
 [`020-responsive-score-reader.md`](../tactical/020-responsive-score-reader.md)
@@ -415,17 +437,19 @@ currently a usable grid source for this material.
 
 Notation is no longer paused. The immediate work is:
 
-1. resolve the MIDI2ScoreTransformer license, or treat its architecture as a
+1. complete the automatic clef and enharmonic-variant pipeline defined by
+   Tactical 021 without mutating model baselines;
+2. resolve the MIDI2ScoreTransformer license, or treat its architecture as a
    design to reimplement rather than a dependency;
-2. adopt Transkun behind the existing offline model-adapter boundary;
-3. score the cascade on ASAP so the notation layer has a real metric instead of
+3. adopt Transkun behind the existing offline model-adapter boundary;
+4. score the cascade on ASAP so the notation layer has a real metric instead of
    one subjective take;
-4. feed ground-truth MIDI and predicted MIDI through the same converter to
+5. feed ground-truth MIDI and predicted MIDI through the same converter to
    separate detection error from notation error;
-5. treat tie count, voices, measure splits, meter/downbeat/pickup, and
+6. treat tie count, voices, measure splits, meter/downbeat/pickup, and
    sight-readability as the decision metrics; and
-6. present each exact score snapshot in the responsive, artifact-pinned
-   reader defined by Tactical 020.
+7. exercise every derived variant in Tactical 020's responsive,
+   artifact-pinned reader.
 
 Verovio cannot repair bad score semantics, and renderer replacement remains
 deprioritized. Tactical 020 is a presentation and performance-usage slice
