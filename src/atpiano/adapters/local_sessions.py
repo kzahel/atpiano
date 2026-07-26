@@ -40,7 +40,10 @@ from atpiano.corrected_export import (
     query_history_index,
     query_materialized_index,
 )
-from atpiano.score_snapshot import score_snapshot_is_plausible
+from atpiano.score_snapshot import (
+    SCORE_SNAPSHOT_SCHEMA,
+    score_snapshot_is_plausible,
+)
 from atpiano.util import read_json, sha256_file
 
 LOCAL_WORKSPACE_ID = "local"
@@ -397,66 +400,123 @@ class LocalSessionStore:
             except (KeyError, OSError, TypeError, ValueError):
                 pass
         unique_paths = sorted({path.resolve() for path in paths if path.is_file()})
-        artifacts: list[tuple[Artifact, Path]] = []
-        for path in unique_paths:
-            digest = sha256_file(path)
-            media_type = mimetypes.guess_type(path.name)[0]
-            if path.suffix == ".jsonl":
-                media_type = "application/x-ndjson"
-            elif path.suffix in {".mid", ".midi"}:
-                media_type = "audio/midi"
-            elif path.suffix == ".musicxml":
-                media_type = "application/vnd.recordare.musicxml+xml"
-            media_type = media_type or "application/octet-stream"
-            kind = (
-                ArtifactKind.AUDIO
-                if path.suffix in {".wav", ".mp3"}
-                else ArtifactKind.EVENT_HISTORY
-                if path.suffix == ".jsonl"
-                else ArtifactKind.MIDI
-                if path.suffix in {".mid", ".midi"}
-                else ArtifactKind.MUSICXML
-                if path.suffix == ".musicxml"
-                else ArtifactKind.SCORE_ALIGNMENT
-                if path.name == "alignment.json"
-                else ArtifactKind.MANIFEST
-            )
-            relative = path.relative_to(directory).as_posix()
-            provenance = Provenance(
-                application_version=__version__,
-                schema_versions={
-                    "contract": CONTRACT_SCHEMA_VERSION,
-                    "source": CORRECTED_SESSION_SCHEMA,
-                },
-                adapter="legacy-corrected-session-v1",
-                execution_backend="local-filesystem",
-                source_artifact_sha256=(),
-            )
-            artifact = Artifact(
-                workspace_id=LOCAL_WORKSPACE_ID,
-                session_id=session_id,
-                artifact_id=f"artifact:{digest[:24]}",
-                kind=kind,
-                media_type=media_type,
-                filename=path.name,
-                sha256=digest,
-                byte_count=path.stat().st_size,
-                source_horizon_sample=audio_horizons.get(
+        artifacts = [
+            (
+                self._artifact(
+                    session_id,
                     path,
-                    score_horizons.get(
+                    source_horizon_sample=audio_horizons.get(
                         path,
-                        session.source_frame_count,
+                        score_horizons.get(
+                            path,
+                            session.source_frame_count,
+                        ),
                     ),
                 ),
-                created_at=datetime.fromtimestamp(
-                    path.stat().st_mtime,
-                    tz=timezone.utc,
-                ),
-                transcription_run_id=_legacy_run_id(session_id),
-                provenance=provenance,
+                path,
             )
-            artifacts.append((artifact, path))
+            for path in unique_paths
+        ]
         artifacts.sort(key=lambda pair: (pair[0].kind.value, pair[0].filename))
+        return artifacts
+
+    def _artifact(
+        self,
+        session_id: str,
+        path: Path,
+        *,
+        source_horizon_sample: int,
+    ) -> Artifact:
+        directory = self.resolve(session_id)
+        path = path.resolve()
+        if not path.is_relative_to(directory) or not path.is_file():
+            raise LocalSessionNotFoundError("artifact does not exist")
+        digest = sha256_file(path)
+        media_type = mimetypes.guess_type(path.name)[0]
+        if path.suffix == ".jsonl":
+            media_type = "application/x-ndjson"
+        elif path.suffix in {".mid", ".midi"}:
+            media_type = "audio/midi"
+        elif path.suffix == ".musicxml":
+            media_type = "application/vnd.recordare.musicxml+xml"
+        media_type = media_type or "application/octet-stream"
+        kind = (
+            ArtifactKind.AUDIO
+            if path.suffix in {".wav", ".mp3"}
+            else ArtifactKind.EVENT_HISTORY
+            if path.suffix == ".jsonl"
+            else ArtifactKind.MIDI
+            if path.suffix in {".mid", ".midi"}
+            else ArtifactKind.MUSICXML
+            if path.suffix == ".musicxml"
+            else ArtifactKind.SCORE_ALIGNMENT
+            if path.name == "alignment.json"
+            else ArtifactKind.MANIFEST
+        )
+        provenance = Provenance(
+            application_version=__version__,
+            schema_versions={
+                "contract": CONTRACT_SCHEMA_VERSION,
+                "source": CORRECTED_SESSION_SCHEMA,
+            },
+            adapter="legacy-corrected-session-v1",
+            execution_backend="local-filesystem",
+            source_artifact_sha256=(),
+        )
+        return Artifact(
+            workspace_id=LOCAL_WORKSPACE_ID,
+            session_id=session_id,
+            artifact_id=f"artifact:{digest[:24]}",
+            kind=kind,
+            media_type=media_type,
+            filename=path.name,
+            sha256=digest,
+            byte_count=path.stat().st_size,
+            source_horizon_sample=source_horizon_sample,
+            created_at=datetime.fromtimestamp(
+                path.stat().st_mtime,
+                tz=timezone.utc,
+            ),
+            transcription_run_id=_legacy_run_id(session_id),
+            provenance=provenance,
+        )
+
+    def _retained_score_artifacts(
+        self,
+        session_id: str,
+    ) -> list[tuple[Artifact, Path]]:
+        directory = self.resolve(session_id)
+        snapshots = directory / "score" / "snapshots"
+        artifacts: list[tuple[Artifact, Path]] = []
+        for path in sorted(snapshots.glob("*/score.musicxml")):
+            resolved = path.resolve()
+            if not resolved.is_relative_to(directory):
+                continue
+            try:
+                manifest = read_json(resolved.parent / "manifest.json")
+                if (
+                    manifest.get("schema_version") != SCORE_SNAPSHOT_SCHEMA
+                    or manifest.get("session_id") != session_id
+                    or not score_snapshot_is_plausible(manifest)
+                    or Path(str(manifest["musicxml"]["path"])).name
+                    != resolved.name
+                    or str(manifest["musicxml"]["sha256"])
+                    != sha256_file(resolved)
+                ):
+                    continue
+                commit_sample = int(manifest["commit_sample"])
+            except (KeyError, OSError, TypeError, ValueError):
+                continue
+            artifacts.append(
+                (
+                    self._artifact(
+                        session_id,
+                        resolved,
+                        source_horizon_sample=commit_sample,
+                    ),
+                    resolved,
+                )
+            )
         return artifacts
 
     def list_artifacts(
@@ -503,6 +563,10 @@ class LocalSessionStore:
         for artifact, path in self._artifact_candidates(session_id):
             if artifact.artifact_id == artifact_id:
                 return artifact, path
+        if re.fullmatch(r"artifact:[0-9a-f]{24}", artifact_id):
+            for artifact, path in self._retained_score_artifacts(session_id):
+                if artifact.artifact_id == artifact_id:
+                    return artifact, path
         raise LocalSessionNotFoundError("artifact does not exist")
 
     def trash_session(

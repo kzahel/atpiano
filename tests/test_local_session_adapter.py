@@ -14,7 +14,7 @@ from atpiano.adapters.local_sessions import (
 from atpiano.corrected import CORRECTED_EVENT_SCHEMA, CorrectedSession
 from atpiano.corrected_export import write_corrected_exports
 from atpiano.live import PcmBlock
-from atpiano.util import write_json
+from atpiano.util import sha256_file, write_json
 
 
 def _session(
@@ -135,6 +135,75 @@ def test_local_artifacts_are_explicit_and_path_safe(tmp_path: Path) -> None:
     assert path.is_relative_to(session.directory)
     with pytest.raises(LocalSessionNotFoundError):
         store.get_artifact_with_path(session_id, "artifact:missing")
+
+
+def test_exact_retained_score_artifact_survives_current_refresh(
+    tmp_path: Path,
+) -> None:
+    session_id = "20260726T100000-aaaaaaaaaaaa"
+    session = _session(tmp_path, session_id)
+    session.finalize()
+    score_root = session.directory / "score"
+
+    def snapshot(commit_sample: int, pitch: str) -> tuple[dict[str, object], Path]:
+        relative_root = Path("score") / "snapshots" / f"{commit_sample:016d}"
+        directory = session.directory / relative_root
+        directory.mkdir(parents=True)
+        musicxml = directory / "score.musicxml"
+        musicxml.write_text(
+            "<score-partwise version=\"4.0\">"
+            f"<part-list/><part id=\"P1\"><measure number=\"1\">{pitch}</measure>"
+            "</part></score-partwise>",
+            encoding="utf-8",
+        )
+        midi = directory / "committed.mid"
+        midi.write_bytes(b"MThd")
+        alignment = directory / "alignment.json"
+        write_json(alignment, {"snapshot": commit_sample})
+        manifest: dict[str, object] = {
+            "schema_version": "atpiano.committed-score-snapshot.v1",
+            "session_id": session_id,
+            "commit_sample": commit_sample,
+            "note_count": 1,
+            "midi": {
+                "path": (relative_root / midi.name).as_posix(),
+                "sha256": sha256_file(midi),
+            },
+            "musicxml": {
+                "path": (relative_root / musicxml.name).as_posix(),
+                "sha256": sha256_file(musicxml),
+                "summary": {"pitched_note_elements": 1},
+            },
+            "alignment": {
+                "path": (relative_root / alignment.name).as_posix(),
+                "sha256": sha256_file(alignment),
+            },
+        }
+        write_json(directory / "manifest.json", manifest)
+        return manifest, musicxml
+
+    _, first_path = snapshot(40, "<pitch>C4</pitch>")
+    second_manifest, second_path = snapshot(80, "<pitch>D4</pitch>")
+    write_json(score_root / "current.json", second_manifest)
+    store = LocalSessionStore(tmp_path)
+
+    current = next(
+        artifact
+        for artifact in store.list_artifacts(session_id).items
+        if artifact.kind.value == "musicxml"
+    )
+    first_id = f"artifact:{sha256_file(first_path)[:24]}"
+    retained, retained_path = store.get_artifact_with_path(session_id, first_id)
+
+    assert current.sha256 == sha256_file(second_path)
+    assert current.artifact_id != first_id
+    assert retained.sha256 == sha256_file(first_path)
+    assert retained.source_horizon_sample == 40
+    assert retained_path == first_path
+    assert all(
+        artifact.artifact_id != first_id
+        for artifact in store.list_artifacts(session_id).items
+    )
 
 
 def test_audio_artifacts_expose_each_segment_source_horizon(tmp_path: Path) -> None:
