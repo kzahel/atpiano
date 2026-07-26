@@ -3,9 +3,10 @@
 Topic: multi-tenant-hybrid-service-architecture
 
 Status: accepted master plan on 2026-07-26; Phases 1 and 2 are complete, R2
-is accepted, and Phase 3 is in progress. This document tracks the staged
-migration program and its human review gates. Each phase must create one or
-more smaller numbered tacticals before implementation.
+is accepted, and Phase 3 implementation is complete pending mandatory R3
+interaction review. This document tracks the staged migration program and
+its human review gates. Each phase must create one or more smaller numbered
+tacticals before implementation.
 
 ## Outcome
 
@@ -343,6 +344,12 @@ mental model, visualization usefulness, and whether the new app still feels
 like the useful proof of concept rather than a generic admin interface.
 Resolve substantive UX feedback before moving the same assumptions into the
 new Python application boundary.
+
+Phase 3 reached this hold on 2026-07-26. The launch commands, interaction map,
+intentional differences, golden evidence, screenshots, and decision request
+are in
+[`r3-interaction-review.md`](../r3-interaction-review.md). Do not open Phase 4
+until the user explicitly accepts R3.
 
 ## Phase 4 — Extract The Framework-Independent Python Application Core
 

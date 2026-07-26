@@ -6,8 +6,8 @@ Topic: multi-tenant-hybrid-service-architecture
 
 Topic: session-workspace-management
 
-Status: opened on 2026-07-26 after explicit R2 acceptance; implementation in
-progress. Phase 4 must not start before the mandatory R3 interaction review.
+Status: implementation complete on 2026-07-26; awaiting explicit R3
+interaction-review acceptance. Phase 4 must not start before that decision.
 
 ## Entry Evidence
 
@@ -165,5 +165,28 @@ changing established artifacts.
 
 ## Execution Record
 
-Implementation commits and final validation evidence will be recorded here as
-the slice lands.
+The implementation series began at `a9805fd` and is:
+
+- `a9805fd` opened Phase 3 after explicit R2 acceptance;
+- `5ab177b` built the fixture-driven React workspace;
+- `a6fe0ab` connected the shared application to the retained local engine;
+- `6509c79` completed score polling, bounded event reads, and runtime feedback;
+- `836ce69` covered score failure isolation; and
+- `d049fdf` restored actual committed-MusicXML rendering with pinned,
+  lazy-loaded OSMD.
+
+The real page-facing golden replay is recorded in
+[`r3-interaction-review.md`](../r3-interaction-review.md). Its 42-second
+source timeline, 946 revisions, 152 committed notes, 12 pedal intervals, and
+committed MIDI hash match the accepted v2 product run. Desktop and
+narrow-screen browser checks exercised New/history navigation, independent
+views, the score job, artifact refresh, and real SVG notation without browser
+alerts or page-level horizontal overflow.
+
+The final `uv run atpiano migration-regression` report at
+`results/migration-regression/20260726T111635Z/report.json` passed 78 Python
+tests, retained JavaScript tests, 14 application tests, contract drift,
+TypeScript, dependency audit, Ruff, syntax, and whitespace. Physical
+microphone permission and playing remain the explicit human lane at R3. The
+implementation range is `a9805fd^..HEAD` at this review handoff. Phase 4
+remains closed pending the user's interaction decision.

@@ -3,9 +3,11 @@
 Topic: session-workspace-management
 
 Status: accepted proposed foundation on 2026-07-26; Phase 2 is complete, R2
-is accepted, and the durable React New/history/selection UI is in progress
+is accepted, and the durable React New/history/selection UI is implemented
 under
-[`016-shared-react-application.md`](../tactical/016-shared-react-application.md).
+[`016-shared-react-application.md`](../tactical/016-shared-react-application.md)
+pending mandatory
+[`R3 interaction review`](../r3-interaction-review.md).
 Existing session artifacts remain authoritative while explicit catalog,
 session-addressed reads, capture identity, score targets, and recoverable
 deletion are exposed through additive `/api/v1` routes.
