@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 import type { Session, Workspace } from "../runtime/atpiano-runtime.js";
 import { formatClock, formatSessionDate } from "../lib/format.js";
 
@@ -7,25 +9,50 @@ export function SessionRail({
   selectedSessionId,
   activeSessionId,
   newIntent,
+  mobileOpen,
   onNew,
   onSelect,
+  onClose,
 }: {
   readonly workspace: Workspace | undefined;
   readonly sessions: readonly Session[];
   readonly selectedSessionId: string | null;
   readonly activeSessionId: string | null;
   readonly newIntent: boolean;
+  readonly mobileOpen: boolean;
   readonly onNew: () => void;
   readonly onSelect: (sessionId: string) => void;
+  readonly onClose: () => void;
 }) {
+  const closeButton = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (mobileOpen) closeButton.current?.focus();
+  }, [mobileOpen]);
+
   return (
-    <aside className="session-rail" aria-label="Session history">
+    <aside
+      className={`session-rail ${mobileOpen ? "mobile-open" : ""}`}
+      id="session-navigation"
+      role={mobileOpen ? "dialog" : undefined}
+      aria-modal={mobileOpen || undefined}
+      aria-label="Session history"
+    >
       <div className="brand">
         <span className="brand-mark" aria-hidden="true">A</span>
         <div>
           <strong>atpiano</strong>
           <small>{workspace?.name ?? "Connecting…"}</small>
         </div>
+        <button
+          className="rail-close"
+          ref={closeButton}
+          type="button"
+          aria-label="Close session history"
+          onClick={onClose}
+        >
+          <span aria-hidden="true">×</span>
+        </button>
       </div>
 
       <button

@@ -106,6 +106,42 @@ describe("shared application", () => {
     );
   });
 
+  it("opens mobile session history and closes it after navigation", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("heading", { name: "Morning progression" });
+
+    const trigger = screen.getByRole("button", { name: "Sessions" });
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+
+    await user.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(document.querySelector(".session-rail")?.classList).toContain(
+      "mobile-open",
+    );
+
+    await user.click(screen.getByRole("button", { name: /Nocturne sketch/ }));
+
+    expect(await screen.findByRole("heading", { name: "Nocturne sketch" }))
+      .toBeTruthy();
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(document.querySelector(".session-rail")?.classList).not.toContain(
+      "mobile-open",
+    );
+  });
+
+  it("dismisses mobile session history with Escape", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("heading", { name: "Morning progression" });
+
+    const trigger = screen.getByRole("button", { name: "Sessions" });
+    await user.click(trigger);
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+  });
+
   it("opens the exact score snapshot in a dedicated page reader", async () => {
     const user = userEvent.setup();
     renderApp();

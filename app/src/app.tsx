@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -107,6 +108,37 @@ export function App() {
     useState<string | null>(null);
   const [autoScoringSessionId, setAutoScoringSessionId] =
     useState<string | null>(null);
+  const [sessionNavOpen, setSessionNavOpen] = useState(false);
+  const sessionNavTrigger = useRef<HTMLButtonElement>(null);
+
+  const closeSessionNav = useCallback(() => {
+    setSessionNavOpen(false);
+    window.requestAnimationFrame(() => sessionNavTrigger.current?.focus());
+  }, []);
+
+  const selectFromSessionNav = useCallback((sessionId: string) => {
+    selectSession(sessionId);
+    closeSessionNav();
+  }, [closeSessionNav, selectSession]);
+
+  const beginNewFromSessionNav = useCallback(() => {
+    beginNew();
+    closeSessionNav();
+  }, [beginNew, closeSessionNav]);
+
+  useEffect(() => {
+    if (!sessionNavOpen) return;
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeSessionNav();
+    };
+    document.body.classList.add("session-nav-open");
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.classList.remove("session-nav-open");
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [closeSessionNav, sessionNavOpen]);
 
   const capabilities = useQuery({
     queryKey: ["capabilities"],
@@ -910,13 +942,38 @@ export function App() {
         selectedSessionId={selectedSessionId}
         activeSessionId={activeSession?.session_id ?? null}
         newIntent={newIntent}
-        onNew={beginNew}
-        onSelect={selectSession}
+        mobileOpen={sessionNavOpen}
+        onNew={beginNewFromSessionNav}
+        onSelect={selectFromSessionNav}
+        onClose={closeSessionNav}
       />
+      {sessionNavOpen && (
+        <button
+          className="session-rail-backdrop"
+          type="button"
+          aria-label="Close session history"
+          onClick={closeSessionNav}
+        />
+      )}
 
-      <main className="workspace">
+      <main className="workspace" inert={sessionNavOpen ? true : undefined}>
         <header className="workspace-topbar">
-          <div>
+          <div className="topbar-primary">
+            <button
+              className="mobile-session-trigger"
+              ref={sessionNavTrigger}
+              type="button"
+              aria-controls="session-navigation"
+              aria-expanded={sessionNavOpen}
+              onClick={() => setSessionNavOpen(true)}
+            >
+              <span className="menu-icon" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              Sessions
+            </button>
             <span className="runtime-badge">
               <i aria-hidden="true" />
               {capabilities.data?.runtime_mode === "fixture"

@@ -57,6 +57,7 @@ input:focus-visible {
 .session-rail {
   position: sticky;
   top: 0;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -64,6 +65,12 @@ input:focus-visible {
   overflow: hidden;
   border-right: 1px solid var(--line);
   background: rgba(8, 18, 15, 0.96);
+}
+
+.session-rail-backdrop,
+.mobile-session-trigger,
+.rail-close {
+  display: none;
 }
 
 .brand {
@@ -258,6 +265,12 @@ input:focus-visible {
   justify-content: space-between;
   height: 74px;
   border-bottom: 1px solid var(--line);
+}
+
+.topbar-primary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .runtime-badge {
@@ -1344,28 +1357,103 @@ input:focus-visible {
 }
 
 @media (max-width: 720px) {
+  body.session-nav-open {
+    overflow: hidden;
+  }
+
   .app-shell {
     display: block;
   }
 
   .session-rail {
-    position: static;
+    position: fixed;
+    z-index: 31;
+    inset: 0 auto 0 0;
+    width: min(86vw, 320px);
+    height: 100vh;
+    height: 100dvh;
+    padding:
+      max(18px, env(safe-area-inset-top))
+      18px
+      max(20px, env(safe-area-inset-bottom));
+    border-right: 1px solid #385048;
+    background: #08120f;
+    box-shadow: 24px 0 70px rgba(0, 0, 0, 0.52);
+    transform: translateX(-102%);
+    visibility: hidden;
+    transition:
+      transform 180ms ease,
+      visibility 180ms;
+  }
+
+  .session-rail.mobile-open {
+    transform: translateX(0);
+    visibility: visible;
+  }
+
+  .session-rail-backdrop {
+    position: fixed;
+    z-index: 30;
+    inset: 0;
     display: block;
     width: 100%;
-    height: auto;
-    padding: 14px;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: rgba(2, 8, 6, 0.7);
+    backdrop-filter: blur(2px);
   }
 
   .brand {
-    padding-bottom: 13px;
+    padding: 0 4px 20px;
   }
 
-  .history-heading,
-  .session-list,
-  .rail-note {
-    display: none;
+  .rail-close {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    margin-left: auto;
+    place-items: center;
+    padding: 0;
+    border: 1px solid #30473e;
+    border-radius: 50%;
+    color: #afc1ba;
+    background: #10201b;
+    cursor: pointer;
+  }
+
+  .rail-close span {
+    font-size: 24px;
+    font-weight: 300;
+    line-height: 1;
+  }
+
+  .mobile-session-trigger {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 11px;
+    border: 1px solid #345046;
+    border-radius: 7px;
+    color: #dce9e4;
+    background: #12241f;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .menu-icon {
+    display: grid;
+    width: 15px;
+    gap: 3px;
+  }
+
+  .menu-icon i {
+    display: block;
+    height: 1px;
+    border-radius: 1px;
+    background: var(--mint);
   }
 
   .workspace {
@@ -1373,7 +1461,15 @@ input:focus-visible {
   }
 
   .workspace-topbar {
-    height: 54px;
+    height: 62px;
+  }
+
+  .runtime-badge {
+    font-size: 0;
+  }
+
+  .runtime-badge i {
+    margin-left: 3px;
   }
 
   .session-hero,

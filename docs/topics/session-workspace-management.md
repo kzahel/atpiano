@@ -143,6 +143,12 @@ Selecting a historical session opens its timeline, keyboard, score, exports,
 and status read-only. The page clearly labels **Viewing completed session**
 instead of presenting old data as a live current session.
 
+On narrow mobile screens, history remains available from a persistent
+**Sessions** control in the workspace top bar. It opens the complete
+newest-first history in an overlaid drawer, supports explicit close, backdrop
+close, and Escape, and closes after New or historical-session navigation.
+Collapsing the desktop rail must never remove session navigation.
+
 On startup, select the active session when one exists. Otherwise show the most
 recent historical session with an explicit historical label and a prominent
 New action. Selection belongs in the URL or client state, not in the server,
