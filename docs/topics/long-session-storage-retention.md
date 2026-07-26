@@ -8,7 +8,13 @@ on 2026-07-26. The immediate product concern is that long sessions and local
 debug data must not consume surprising or unbounded disk space. Phase 4 will
 exercise the existing 128 kbps MP3 as the interim ordinary retained recording
 for new sessions, subject to measured R4 review. Permanent codec, concrete
-quota, and cleanup defaults remain unselected.
+quota, and cleanup defaults remain unselected. Slow-host evidence adds a
+retirement constraint: Tactical
+[`022-durable-capture-worker-isolation.md`](../tactical/022-durable-capture-worker-isolation.md)
+keeps lossless source addressable until every enabled model-read cursor has
+passed it, while Tactical
+[`023-backend-capability-degradation.md`](../tactical/023-backend-capability-degradation.md)
+makes the resulting delayed-correction backlog explicit.
 
 ## Purpose
 
@@ -172,7 +178,9 @@ The implementation should make the following behavior true:
 4. Debug data has a hard sub-budget and automatic expiry or rotation. Its
    cleanup never deletes the player's session data.
 5. Temporary raw and compressed copies may coexist only while a verified,
-   recoverable conversion is in progress.
+   recoverable conversion is in progress or an enabled transcription lane
+   still requires the raw source range. Raw retirement requires both verified
+   compaction and model-read-cursor advancement.
 6. A configurable free-space reserve protects the rest of the machine. The
    application warns before reaching it and stops capture explicitly if it
    cannot safely write another segment.
@@ -182,6 +190,9 @@ The implementation should make the following behavior true:
    windows, open files, or hidden caches.
 9. Old session formats remain readable until an explicit, recoverable
    migration policy says otherwise.
+10. Correction backlog storage is reported from durable source and cursor
+    horizons. It is not hidden as a bounded scheduler queue or deleted to
+    satisfy a spool-size assertion.
 
 The ordinary-session quota and cleanup policy are deliberately not specified
 yet. Automatically deleting a player's older recordings would be a separate

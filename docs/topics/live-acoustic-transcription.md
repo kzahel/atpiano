@@ -12,7 +12,12 @@ snapshots without claiming continuous progressive engraving. A later real
 x86_64 Linux Chrome fake-microphone run preserved and recovered all data but
 failed the live operational contract: same-process Transkun CPU inference
 allowed input backlog and Stop settlement to exceed the client's 90-second
-wait.
+wait. Tactical
+[`022-durable-capture-worker-isolation.md`](../tactical/022-durable-capture-worker-isolation.md)
+is now the first Phase 4 implementation slice; Tactical
+[`023-backend-capability-degradation.md`](../tactical/023-backend-capability-degradation.md)
+then selects an honest live, delayed, or after-Stop correction mode from
+isolated measurements.
 
 ## Scope And Relationship
 
@@ -207,6 +212,12 @@ high-water independently, and represent Stop settlement as durable
 reattachable work. Until that boundary lands and a real browser pass remains
 responsive, the corrected Linux microphone path is functionally durable but
 not operationally real-time.
+
+The implementation sequence is deliberately split. Tactical 022 owns the
+correctness boundary—durable PCM acceptance, bounded worker scheduling,
+process isolation, prompt Stop, and reattachable settlement—without changing
+model quality. Tactical 023 owns capability policy only after measurements no
+longer include synchronous-ingest contention.
 
 ## Desired Experience
 

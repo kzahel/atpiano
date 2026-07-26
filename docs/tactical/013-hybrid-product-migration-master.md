@@ -3,7 +3,9 @@
 Topic: multi-tenant-hybrid-service-architecture
 
 Status: accepted master plan on 2026-07-26; Phases 1 through 3 are complete,
-R2 and R3 are accepted, and Phase 4 is authorized but not started. This
+R2 and R3 are accepted, and Phase 4 is active through the slow-host
+prerequisites in Tacticals 022 and 023. The remaining application extraction
+in Tactical 017 follows their local implementation and Linux validation. This
 document tracks the staged migration program and its human review gates. Each
 phase must create one or more smaller numbered tacticals before implementation.
 
@@ -62,7 +64,7 @@ result, and commit range.
 | 1. Freeze and characterize | Complete (`3aabcda^..0bca270`) | [`014`](014-freeze-migration-baseline.md) | R1 accepted; no ambiguity |
 | 2. Contracts and structure | Complete (`e2c2b9d^..9f8dd16`) | [`015`](015-contracts-and-structure.md) | R2 accepted 2026-07-26 |
 | 3. Shared React application | Complete | [`016`](016-shared-react-application.md) | R3 accepted 2026-07-26 |
-| 4. Python application core | Planned; not started | [`017`](017-python-application-core.md) | **Required parity and storage review; hold before Phase 5** |
+| 4. Python application core | Active; slow-host boundary first | [`022`](022-durable-capture-worker-isolation.md), [`023`](023-backend-capability-degradation.md), then [`017`](017-python-application-core.md) | **Required parity and storage review; hold before Phase 5** |
 | 5. Early Tauri skeleton | Blocked by Phase 4 approval | Not created | Required desktop-boundary review |
 | 6. Complete local desktop | Blocked by Phase 5 | Not created | Required daily-use review |
 | 7. Hosted service | Blocked by Phase 6 | Not created | Required hosted and tenancy review |
@@ -397,6 +399,9 @@ bounded tactical; this acceptance record does not begin that work.
 ## Phase 4 — Extract The Framework-Independent Python Application Core
 
 Bounded implementation and acceptance details are in
+[`022-durable-capture-worker-isolation.md`](022-durable-capture-worker-isolation.md),
+[`023-backend-capability-degradation.md`](023-backend-capability-degradation.md),
+and
 [`017-python-application-core.md`](017-python-application-core.md).
 
 ### Purpose
@@ -404,6 +409,12 @@ Bounded implementation and acceptance details are in
 Replace proof-of-concept server composition with a clean Python application
 boundary while keeping Phase 3 behavior and its frontend runtime contract
 stable.
+
+The first executable slice corrects a newly demonstrated baseline defect:
+model inference must leave the PCM ingest and acknowledgement path, and Stop
+must durably separate capture completion from background settlement. The
+second selects live, delayed, or after-Stop correction from isolated backend
+evidence. Only then should the broader extraction preserve the behavior.
 
 ### Work
 

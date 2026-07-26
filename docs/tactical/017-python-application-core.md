@@ -9,8 +9,14 @@ Topic: session-workspace-management
 Topic: long-session-storage-retention
 
 Status: planned and authorized on 2026-07-26 after accepted R3 review and
-storage-direction clarification. Implementation has not started. R4 remains
-the mandatory parity and storage-behavior review before Phase 5.
+storage-direction clarification. Implementation has not started. The Linux
+browser evidence subsequently made
+[`022-durable-capture-worker-isolation.md`](022-durable-capture-worker-isolation.md)
+and
+[`023-backend-capability-degradation.md`](023-backend-capability-degradation.md)
+prerequisite Phase 4 slices. This tactical resumes after their local
+implementation and mandatory Linux evidence. R4 remains the combined parity
+and storage-behavior review before Phase 5.
 
 ## Entry Evidence
 
@@ -32,6 +38,10 @@ the mandatory parity and storage-behavior review before Phase 5.
   increases, rather than reduces, total disk use.
 - Detailed model windows and traces are useful for local failure diagnosis,
   not ordinary user-session content.
+- The current WebSocket ingest path invokes preview and commit lanes
+  synchronously. Slow Transkun inference on Linux blocked PCM acceptance and
+  exposed Stop settlement as transport failure. Tactical 022 owns correction
+  of that behavior before this broader extraction preserves it.
 
 ## User-Visible Outcome
 
@@ -160,17 +170,23 @@ recording format for new Phase 4 sessions:
 3. The compact representation records byte count, checksum, source start,
    source frame count, sample rate, media type, and encoder settings.
 4. Raw segments remain until the compact audio is decodable, covers the
-   declared source range, and is durably published.
+   declared source range, is durably published, and every enabled
+   transcription lane has advanced its earliest required read cursor beyond
+   the segment.
 5. Verified raw segments are retired without leaving an untracked duplicate.
 6. Stop finalizes a seekable complete-session playback view. The existing
    React transport must still play, seek, and move exact-sample inspection
    across the entire session.
 
 The adapter may use one recoverable encoder stream or bounded compact
-segments. Its raw spool, encoder backlog, and open file count must not grow
-with total session duration. Codec delay, padding, and segment boundaries
-must be represented well enough that playback remains aligned to the source
-sample clock.
+segments. Its encoder backlog and open file count must not grow with total
+session duration. Raw transcription source may grow with the explicitly
+reported `H_audio - H_commit` backlog on a delayed or after-Stop backend; it is
+not a decode-job queue and it cannot be retired merely because a playback MP3
+exists. After successful settlement, its temporary raw source must be retired
+without unexplained growth. Codec delay, padding, and segment boundaries must
+be represented well enough that playback remains aligned to the source sample
+clock.
 
 If the encoder is unavailable or finalization fails, preserve the raw audio,
 mark compaction incomplete in pipeline status, and keep WAV playback working.
@@ -284,8 +300,10 @@ runtime capability may expose it in the product UI.
   verbose window traces after successful finalization.
 - Final retained MP3 audio is approximately 57.6 MB/hour, with actual total
   and per-category bytes reported rather than inferred from nominal bitrate.
-- A multi-hour accelerated replay demonstrates bounded raw spool size,
-  encoder backlog, RSS, and open file count.
+- A multi-hour accelerated replay demonstrates bounded scheduler state,
+  encoder backlog, RSS, and open file count. Raw transcription-source growth
+  is explained by and reconciles with the measured correction backlog; it is
+  retired after successful settlement.
 - Playback and seeking cover the entire compacted session and remain aligned
   with source-sample inspection across every internal boundary.
 - Encoder-unavailable, encoder-failure, restart-mid-compaction, partial-file,
@@ -335,18 +353,20 @@ does not require a data migration.
 
 ## Planned Implementation Sequence
 
-1. Freeze Phase 4 service-level parity fixtures and add the application
+1. Land Tactical 022's durable ingest, worker isolation, and asynchronous Stop
+   contract, then Tactical 023's measured degradation policy.
+2. Freeze the remaining Phase 4 service-level parity fixtures and add the application
    package/dependency checks.
-2. Extract catalog, historical reads, artifact access, and recoverable
+3. Extract catalog, historical reads, artifact access, and recoverable
    deletion.
-3. Extract capture, settling, and score-job coordination.
-4. Add artifact classification, compact status, storage accounting, and debug
+4. Extract the proven capture, settling, and score-job coordination.
+5. Add artifact classification, compact status, storage accounting, and debug
    policy.
-5. Move recording finalization behind the application boundary and implement
+6. Move recording finalization behind the application boundary and implement
    bounded raw-spool compaction for new sessions.
-6. Thin the HTTP/replay adapters and run the React/local integration lanes.
-7. Run longevity, recovery, low-disk, and migration regression evidence.
-8. Prepare R4 and stop for explicit parity and retention approval.
+7. Thin the HTTP/replay adapters and run the React/local integration lanes.
+8. Run longevity, recovery, low-disk, and migration regression evidence.
+9. Prepare R4 and stop for explicit parity and retention approval.
 
 ## Execution Record
 

@@ -194,6 +194,15 @@ architecture already places model execution in separate worker processes;
 this result is direct evidence for enforcing that boundary in the local
 runtime too.
 
+Tactical
+[`022-durable-capture-worker-isolation.md`](../tactical/022-durable-capture-worker-isolation.md)
+now owns the local implementation and a mandatory rerun on this host.
+Tactical
+[`023-backend-capability-degradation.md`](../tactical/023-backend-capability-degradation.md)
+owns the measured product mode. Until isolated worker execution demonstrates
+otherwise, this host should run Basic Pitch provisionally during capture and
+defer Transkun until after Stop.
+
 ## Small Portability Fix
 
 Local workspace and v1 capture copy now say “this device” instead of claiming
