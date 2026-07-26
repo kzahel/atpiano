@@ -107,6 +107,47 @@ def build_parser() -> argparse.ArgumentParser:
         default="cpu",
         help="Transkun execution device (default: cpu)",
     )
+    backend_profile_parser = subparsers.add_parser(
+        "profile-backend",
+        help="measure an isolated Transkun worker for correction-mode selection",
+    )
+    backend_profile_parser.add_argument("input_manifest", type=Path)
+    backend_profile_parser.add_argument("output_directory", type=Path)
+    backend_profile_parser.add_argument(
+        "--repeat",
+        type=int,
+        default=2,
+        help="continuous-clock fixture repetitions (default: 2)",
+    )
+    backend_profile_parser.add_argument(
+        "--silence-seconds",
+        type=float,
+        default=0.0,
+        help="declared silence between repetitions (default: 0)",
+    )
+    backend_profile_parser.add_argument(
+        "--warmup-seconds",
+        type=float,
+        default=16.0,
+        help="unmeasured model warm-up source duration (default: 16)",
+    )
+    backend_profile_parser.add_argument(
+        "--commit-device",
+        default="cpu",
+        help="Transkun execution device (default: cpu)",
+    )
+    backend_profile_parser.add_argument(
+        "--commit-threads",
+        type=int,
+        default=2,
+        help="maximum Transkun CPU threads (default: 2)",
+    )
+    backend_profile_parser.add_argument(
+        "--minimum-free-gib",
+        type=float,
+        default=2.0,
+        help="stop before free space falls below this reserve (default: 2)",
+    )
     review_parser = subparsers.add_parser(
         "review",
         help="serve a local browser reviewer for a completed run",
@@ -192,9 +233,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     corrected_workbench_parser.add_argument(
         "--correction-mode",
-        choices=("live", "delayed", "after-stop", "unavailable"),
-        default="delayed",
-        help="when the corrected lane may run (default: delayed)",
+        choices=("auto", "live", "delayed", "after-stop", "unavailable"),
+        default="auto",
+        help="when the corrected lane may run (default: auto)",
+    )
+    corrected_workbench_parser.add_argument(
+        "--backend-profile",
+        type=Path,
+        default=Path("results/backend-profile/backend-profile.json"),
+        help="measured backend profile used by automatic correction mode",
     )
     corrected_workbench_parser.add_argument(
         "--score-runtime",
@@ -259,9 +306,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     shared_app_parser.add_argument(
         "--correction-mode",
-        choices=("live", "delayed", "after-stop", "unavailable"),
-        default="delayed",
-        help="when the corrected lane may run (default: delayed)",
+        choices=("auto", "live", "delayed", "after-stop", "unavailable"),
+        default="auto",
+        help="when the corrected lane may run (default: auto)",
+    )
+    shared_app_parser.add_argument(
+        "--backend-profile",
+        type=Path,
+        default=Path("results/backend-profile/backend-profile.json"),
+        help="measured backend profile used by automatic correction mode",
     )
     shared_app_parser.add_argument(
         "--score-runtime",
@@ -389,6 +442,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             open_browser=not args.no_open,
         )
         return 0
+    if args.command == "profile-backend":
+        from atpiano.backend_profile import profile_backend
+
+        profile = profile_backend(
+            args.input_manifest,
+            args.output_directory,
+            device=args.commit_device,
+            thread_limit=args.commit_threads,
+            repeat=args.repeat,
+            silence_s=args.silence_seconds,
+            warmup_s=args.warmup_seconds,
+            minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
+        )
+        print(args.output_directory / "backend-profile.json")
+        print(f"recommendation: {profile.recommendation.value}")
+        print(f"service ratio: {profile.timing.service_ratio:.3f}")
+        return 0
     if args.command == "workbench-v2":
         from atpiano.corrected_workbench import serve_corrected_workbench
 
@@ -399,6 +469,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             commit_device=args.commit_device,
             commit_threads=args.commit_threads,
             correction_mode=args.correction_mode,
+            backend_profile_path=args.backend_profile,
             minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
             replay_manifest=args.replay,
             replay_repeat=args.repeat,
@@ -417,6 +488,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             commit_device=args.commit_device,
             commit_threads=args.commit_threads,
             correction_mode=args.correction_mode,
+            backend_profile_path=args.backend_profile,
             minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
             replay_manifest=args.replay,
             replay_repeat=args.repeat,

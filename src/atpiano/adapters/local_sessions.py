@@ -14,8 +14,8 @@ from atpiano.contracts.schemas import (
     CONTRACT_SCHEMA_VERSION,
     Artifact,
     ArtifactKind,
-    CorrectionMode,
     ArtifactPage,
+    CorrectionMode,
     DeleteSessionResult,
     EventKind,
     EventLifecycle,
@@ -198,13 +198,17 @@ class LocalSessionStore:
         processing = manifest.get("processing")
         correction_mode: CorrectionMode | None = None
         correction_reason: str | None = None
+        correction_profile_id: str | None = None
         if isinstance(processing, dict):
             mode_value = processing.get("correction_mode")
             reason_value = processing.get("correction_reason")
+            profile_value = processing.get("correction_profile_id")
             if mode_value is not None:
                 correction_mode = CorrectionMode(str(mode_value))
             if reason_value is not None:
                 correction_reason = str(reason_value)
+            if profile_value is not None:
+                correction_profile_id = str(profile_value)
         started_at = _parse_time(manifest["started_at"], field="session.started_at")
         display_time = started_at.astimezone().strftime("%d %b %Y, %H:%M")
         return Session(
@@ -229,6 +233,7 @@ class LocalSessionStore:
             available_artifact_kinds=self._available_artifact_kinds(directory),
             correction_mode=correction_mode,
             correction_reason=correction_reason,
+            correction_profile_id=correction_profile_id,
         )
 
     def list_sessions(

@@ -218,6 +218,25 @@ Start the app without `--replay` to use its microphone Start/Stop controls:
 uv run atpiano workbench-v2
 ```
 
+The corrected lane defaults to automatic capability selection. With no
+matching local profile it conservatively waits until capture has stopped;
+Basic Pitch remains provisional while playing. Measure the fixed musical
+fixture on each host and execution configuration before requesting live or
+delayed correction:
+
+```text
+uv run atpiano profile-backend \
+  ../atpiano-artifacts/musical-loop-input/input.json \
+  results/backend-profile \
+  --commit-device cpu --commit-threads 2
+```
+
+This warms one isolated Transkun worker, runs two continuous-clock fixture
+repetitions without wall-clock delivery waits, and retains its session,
+per-decode evidence, host/model/scheduler identity, and recommendation. Pass
+`--correction-mode` to explicitly override the profile when diagnosing a
+mode; explicit live correction is not a throughput guarantee.
+
 Only the visible 15–120 second timeline range is queried. After Stop, MIDI
 contains the latest committed notes and pedal intervals, while Event history
 contains every append-only revision in global sequence order.

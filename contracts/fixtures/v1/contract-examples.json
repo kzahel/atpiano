@@ -42,6 +42,7 @@
         ],
         "completed_at": "2026-07-26T10:00:42Z",
         "correction_mode": "delayed",
+        "correction_profile_id": null,
         "correction_reason": "measured local backend profile",
         "current_transcription_run_id": "run-1",
         "display_name": "26 Jul 2026, replay",

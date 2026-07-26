@@ -17,6 +17,7 @@ const session: Session = {
   current_transcription_run_id: "run-local",
   display_name: "Local capture",
   correction_mode: null,
+  correction_profile_id: null,
   correction_reason: null,
   available_artifact_kinds: [],
 };

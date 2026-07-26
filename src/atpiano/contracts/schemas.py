@@ -195,6 +195,7 @@ class Session(VersionedContractModel):
         str,
         StringConstraints(min_length=1, max_length=500),
     ] | None = None
+    correction_profile_id: Sha256 | None = None
 
     @model_validator(mode="after")
     def validate_lifecycle(self) -> Session:

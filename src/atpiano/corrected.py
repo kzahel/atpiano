@@ -585,6 +585,7 @@ class CorrectedSession:
         horizon_snapshot_s: float = DEFAULT_HORIZON_SNAPSHOT_S,
         correction_mode: str = "delayed",
         correction_reason: str = "explicit local default",
+        correction_profile_id: str | None = None,
     ) -> None:
         if source not in {"replay", "microphone"}:
             raise ValueError("corrected session source is invalid")
@@ -606,6 +607,7 @@ class CorrectedSession:
         self.source = source
         self.correction_mode = correction_mode
         self.correction_reason = correction_reason
+        self.correction_profile_id = correction_profile_id
         self._stage_errors: dict[str, str] = {}
         self.realtime = realtime
         self.origin_monotonic_ns = time.perf_counter_ns()
@@ -657,6 +659,7 @@ class CorrectedSession:
             "processing": {
                 "correction_mode": self.correction_mode,
                 "correction_reason": self.correction_reason,
+                "correction_profile_id": self.correction_profile_id,
                 "stage_errors": dict(self._stage_errors),
             },
             "retention": {

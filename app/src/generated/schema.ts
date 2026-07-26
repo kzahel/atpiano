@@ -837,6 +837,11 @@ export interface components {
             /** @default null */
             correction_mode: components["schemas"]["CorrectionMode"] | null;
             /**
+             * Correction Profile Id
+             * @default null
+             */
+            correction_profile_id: string | null;
+            /**
              * Correction Reason
              * @default null
              */

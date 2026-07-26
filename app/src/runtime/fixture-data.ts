@@ -188,6 +188,7 @@ function session(
     current_transcription_run_id: `run:${sessionId}`,
     display_name: displayName,
     correction_mode: "delayed",
+    correction_profile_id: null,
     correction_reason: "deterministic fixture policy",
     available_artifact_kinds:
       status === "complete"

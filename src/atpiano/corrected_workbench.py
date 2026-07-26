@@ -29,6 +29,11 @@ from atpiano.adapters.local_sessions import (
     LocalSessionNotFoundError,
     LocalSessionStore,
 )
+from atpiano.backend_profile import (
+    BackendSchedulerIdentity,
+    read_backend_profile,
+    select_profile_mode,
+)
 from atpiano.contracts.schemas import (
     CONTRACT_SCHEMA_VERSION,
     PCM_PROTOCOL_VERSION,
@@ -50,7 +55,15 @@ from atpiano.corrected import (
     CorrectedSession,
     run_corrected_replay,
 )
-from atpiano.corrected_commit import CommitModel, CorrectedCommitLane
+from atpiano.corrected_commit import (
+    DEFAULT_COMMIT_BUFFER_S,
+    DEFAULT_COMMIT_GUARD_S,
+    DEFAULT_COMMIT_HOP_S,
+    DEFAULT_COMMIT_MAX_HOP_S,
+    DEFAULT_COMMIT_MIN_CONTEXT_S,
+    CommitModel,
+    CorrectedCommitLane,
+)
 from atpiano.corrected_export import (
     MAX_QUERY_LIMIT,
     ensure_materialized_index,
@@ -139,7 +152,8 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         application_mode: str = "corrected-workbench-v2",
         isolate_models: bool = True,
         commit_threads: int | None = 2,
-        correction_mode: str = "delayed",
+        correction_mode: str = "auto",
+        backend_profile_path: Path | None = None,
     ) -> None:
         if minimum_free_bytes < 0:
             raise ValueError("minimum free bytes cannot be negative")
@@ -154,6 +168,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             "delayed",
             "after-stop",
             "unavailable",
+            "auto",
         }:
             raise ValueError("local correction mode is invalid")
         self.workspace_directory = workspace_directory.resolve()
@@ -173,6 +188,11 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self.isolate_models = isolate_models
         self.commit_threads = commit_threads
         self.correction_mode = correction_mode
+        self.backend_profile_path = (
+            backend_profile_path.resolve()
+            if backend_profile_path is not None
+            else None
+        )
         self.state_lock = threading.Lock()
         self.model_lock = threading.Lock()
         self.score_lock = threading.Lock()
@@ -268,6 +288,49 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             if status is not None:
                 result.append(status())
         return result
+
+    @staticmethod
+    def correction_scheduler_identity() -> BackendSchedulerIdentity:
+        return BackendSchedulerIdentity(
+            buffer_s=DEFAULT_COMMIT_BUFFER_S,
+            base_hop_s=DEFAULT_COMMIT_HOP_S,
+            maximum_hop_s=DEFAULT_COMMIT_MAX_HOP_S,
+            guard_s=DEFAULT_COMMIT_GUARD_S,
+            minimum_context_s=DEFAULT_COMMIT_MIN_CONTEXT_S,
+        )
+
+    def resolve_correction_mode(
+        self,
+        commit_model: CommitModel,
+    ) -> tuple[str, str, str | None]:
+        if self.correction_mode != "auto":
+            return (
+                self.correction_mode,
+                "selected by explicit local configuration",
+                None,
+            )
+        if self.backend_profile_path is None:
+            return (
+                "after-stop",
+                "no backend profile is configured; using the conservative mode",
+                None,
+            )
+        try:
+            profile = read_backend_profile(self.backend_profile_path)
+        except (OSError, TypeError, ValueError, ValidationError) as error:
+            return (
+                "after-stop",
+                "backend profile is unavailable or invalid: "
+                f"{type(error).__name__}: {error}",
+                None,
+            )
+        selected, reason = select_profile_mode(
+            profile,
+            provenance=commit_model.provenance(),
+            thread_limit=self.commit_threads,
+            scheduler=self.correction_scheduler_identity(),
+        )
+        return selected.value, reason, profile.profile_id
 
     def server_close(self) -> None:
         with self.state_lock:
@@ -1499,13 +1562,19 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     session_id, directory = self.server.claim_session(source="microphone")
                     preview_model = self.server.get_preview_model()
                     correction_mode = self.server.correction_mode
-                    correction_reason = (
-                        "selected by explicit local configuration"
-                    )
+                    correction_reason = "commit correction is unavailable"
+                    correction_profile_id: str | None = None
                     commit_model: CommitModel | None = None
                     if correction_mode != "unavailable":
                         try:
                             commit_model = self.server.get_commit_model()
+                            (
+                                correction_mode,
+                                correction_reason,
+                                correction_profile_id,
+                            ) = self.server.resolve_correction_mode(
+                                commit_model
+                            )
                         except RuntimeError as error:
                             correction_mode = "unavailable"
                             correction_reason = (
@@ -1520,6 +1589,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                         minimum_free_bytes=self.server.minimum_free_bytes,
                         correction_mode=correction_mode,
                         correction_reason=correction_reason,
+                        correction_profile_id=correction_profile_id,
                     )
                     session.add_lane(CorrectedPreviewLane(session, model=preview_model))
                     if commit_model is not None:
@@ -1556,6 +1626,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                             "correction": {
                                 "mode": correction_mode,
                                 "reason": correction_reason,
+                                "profile_id": correction_profile_id,
                             },
                         }
                     )
@@ -1631,7 +1702,8 @@ def create_corrected_workbench_server(
     commit_device: str = "cpu",
     commit_threads: int | None = 2,
     isolate_models: bool = True,
-    correction_mode: str = "delayed",
+    correction_mode: str = "auto",
+    backend_profile_path: Path | None = None,
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
     replay_manifest: Path | None = None,
     replay_repeat: int = 1,
@@ -1655,6 +1727,7 @@ def create_corrected_workbench_server(
         commit_threads=commit_threads,
         isolate_models=isolate_models,
         correction_mode=correction_mode,
+        backend_profile_path=backend_profile_path,
         minimum_free_bytes=minimum_free_bytes,
         replay_manifest=replay_manifest,
         replay_repeat=replay_repeat,
@@ -1674,7 +1747,8 @@ def serve_corrected_workbench(
     open_browser: bool = True,
     commit_device: str = "cpu",
     commit_threads: int | None = 2,
-    correction_mode: str = "delayed",
+    correction_mode: str = "auto",
+    backend_profile_path: Path | None = None,
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
     replay_manifest: Path | None = None,
     replay_repeat: int = 1,
@@ -1691,6 +1765,7 @@ def serve_corrected_workbench(
         commit_device=commit_device,
         commit_threads=commit_threads,
         correction_mode=correction_mode,
+        backend_profile_path=backend_profile_path,
         minimum_free_bytes=minimum_free_bytes,
         replay_manifest=replay_manifest,
         replay_repeat=replay_repeat,
@@ -1723,7 +1798,8 @@ def serve_shared_application(
     open_browser: bool = True,
     commit_device: str = "cpu",
     commit_threads: int | None = 2,
-    correction_mode: str = "delayed",
+    correction_mode: str = "auto",
+    backend_profile_path: Path | None = None,
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
     replay_manifest: Path | None = None,
     replay_repeat: int = 1,
@@ -1745,6 +1821,7 @@ def serve_shared_application(
         commit_device=commit_device,
         commit_threads=commit_threads,
         correction_mode=correction_mode,
+        backend_profile_path=backend_profile_path,
         minimum_free_bytes=minimum_free_bytes,
         replay_manifest=replay_manifest,
         replay_repeat=replay_repeat,

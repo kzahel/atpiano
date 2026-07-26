@@ -1708,6 +1708,19 @@
             ],
             "default": null
           },
+          "correction_profile_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correction Profile Id"
+          },
           "correction_reason": {
             "anyOf": [
               {
