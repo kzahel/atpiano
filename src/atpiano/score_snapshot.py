@@ -18,7 +18,7 @@ from atpiano.notation import summarize_musicxml
 from atpiano.util import read_json, sha256_file, utc_now, write_json
 
 SCORE_SNAPSHOT_SCHEMA = "atpiano.committed-score-snapshot.v1"
-SCORE_RUNTIME_SCHEMA = "atpiano.midi2score-runtime.v1"
+SCORE_RUNTIME_SCHEMA = "atpiano.midi2score-runtime.v2"
 MIDI2SCORE_REPOSITORY = "https://github.com/TimFelixBeyer/MIDI2ScoreTransformer.git"
 MIDI2SCORE_COMMIT = "115432bda16ca16e0fec2e9465788f2ba369971f"
 MIDI2SCORE_CHECKPOINT_URL = (
@@ -149,6 +149,7 @@ def setup_score_runtime(runtime_directory: Path) -> dict[str, Any]:
             "numpy<2",
             "setuptools<81",
             "transformers==4.44.2",
+            "beautifulsoup4==4.13.4",
         ]
     )
     python_version = subprocess.check_output(
@@ -172,6 +173,7 @@ def setup_score_runtime(runtime_directory: Path) -> dict[str, Any]:
         },
         "execution": {
             "device": "cpu",
+            "beautifulsoup4": "4.13.4",
             "transformers": "4.44.2",
         },
     }
@@ -190,25 +192,29 @@ def run_score_adapter(
     paths = _runtime_paths(runtime_directory)
     adapter_path = Path(__file__).with_name("midi2score_adapter.py").resolve()
     started = time.perf_counter()
-    result = subprocess.run(
-        [
-            str(paths["python"]),
-            str(adapter_path),
-            "--repository",
-            str(paths["repository"]),
-            "--checkpoint",
-            str(paths["checkpoint"]),
-            "--input-midi",
-            str(input_midi.resolve()),
-            "--output-musicxml",
-            str(output_musicxml.resolve()),
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=SCORE_TIMEOUT_S,
-        env={**os.environ, "CUDA_VISIBLE_DEVICES": ""},
-    )
+    try:
+        result = subprocess.run(
+            [
+                str(paths["python"]),
+                str(adapter_path),
+                "--repository",
+                str(paths["repository"]),
+                "--checkpoint",
+                str(paths["checkpoint"]),
+                "--input-midi",
+                str(input_midi.resolve()),
+                "--output-musicxml",
+                str(output_musicxml.resolve()),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=SCORE_TIMEOUT_S,
+            env={**os.environ, "CUDA_VISIBLE_DEVICES": ""},
+        )
+    except subprocess.CalledProcessError as error:
+        detail = (error.stderr or error.stdout or str(error)).strip()
+        raise RuntimeError(f"score adapter failed: {detail[-4000:]}") from error
     lines = [line for line in result.stdout.splitlines() if line.strip()]
     if not lines:
         raise RuntimeError("score adapter returned no result")

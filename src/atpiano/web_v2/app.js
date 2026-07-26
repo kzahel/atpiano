@@ -188,8 +188,12 @@ function updateScore() {
     el("score-status").textContent = "Score render failed";
     el("score-detail").textContent = score.error || "The score job failed.";
   } else if (snapshot) {
+    const elapsedS = Number(snapshot.adapter?.subprocess_elapsed_s);
     el("score-status").textContent =
-      `${snapshot.note_count} notes · through ${formatClock(snapshot.commit_s, true)}`;
+      `${snapshot.note_count} notes · through ${formatClock(
+        snapshot.commit_s,
+        true
+      )}` + (Number.isFinite(elapsedS) ? ` · ${elapsedS.toFixed(1)} s render` : "");
     el("score-detail").textContent = score.stale
       ? `This score ends at ${formatClock(
           snapshot.commit_s,

@@ -106,30 +106,35 @@ def test_score_snapshot_selects_only_closed_committed_prefix(
             ),
         ]
     )
-    session.finalize()
+    try:
+        manifest = generate_score_snapshot(
+            session_directory,
+            tmp_path / "runtime",
+            commit_sample=1_000,
+            runner=_fake_runner,
+        )
 
-    manifest = generate_score_snapshot(
-        session_directory,
-        tmp_path / "runtime",
-        commit_sample=1_000,
-        runner=_fake_runner,
-    )
-
-    assert manifest["session_id"] == "score-test"
-    assert manifest["commit_sample"] == 1_000
-    assert manifest["note_count"] == 1
-    assert manifest["musicxml"]["summary"]["pitched_note_elements"] == 1
-    midi = mido.MidiFile(session_directory / manifest["midi"]["path"])
-    note_ons = [
-        message.note
-        for track in midi.tracks
-        for message in track
-        if message.type == "note_on" and message.velocity
-    ]
-    assert note_ons == [60]
-    assert (session_directory / "score" / "current.json").read_bytes() == (
-        session_directory / "score" / "snapshots" / "0000000000001000" / "manifest.json"
-    ).read_bytes()
+        assert manifest["session_id"] == "score-test"
+        assert manifest["commit_sample"] == 1_000
+        assert manifest["note_count"] == 1
+        assert manifest["musicxml"]["summary"]["pitched_note_elements"] == 1
+        midi = mido.MidiFile(session_directory / manifest["midi"]["path"])
+        note_ons = [
+            message.note
+            for track in midi.tracks
+            for message in track
+            if message.type == "note_on" and message.velocity
+        ]
+        assert note_ons == [60]
+        assert (session_directory / "score" / "current.json").read_bytes() == (
+            session_directory
+            / "score"
+            / "snapshots"
+            / "0000000000001000"
+            / "manifest.json"
+        ).read_bytes()
+    finally:
+        session.finalize()
 
 
 def test_score_snapshot_rejects_empty_committed_prefix(tmp_path: Path) -> None:
