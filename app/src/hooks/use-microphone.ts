@@ -4,6 +4,7 @@ import { requestId } from "../lib/format.js";
 import type {
   AtpianoRuntime,
   Capture,
+  Session,
 } from "../runtime/atpiano-runtime.js";
 import { useWorkspaceStore } from "../state/workspace-store.js";
 
@@ -54,10 +55,12 @@ export function useMicrophone({
   runtime,
   workspaceId,
   onChanged,
+  onStopped,
 }: {
   readonly runtime: AtpianoRuntime;
   readonly workspaceId: string | undefined;
   readonly onChanged: () => Promise<void>;
+  readonly onStopped: (session: Session) => void;
 }) {
   const browserCapture = useRef<BrowserCapture | null>(null);
   const beginCapture = useWorkspaceStore((state) => state.beginCapture);
@@ -191,7 +194,7 @@ export function useMicrophone({
       if (!complete || state.stoppedFrameCount !== state.frameCount) {
         throw new Error("The browser could not close a complete sample sequence.");
       }
-      await runtime.stopCapture(
+      const settledSession = await runtime.stopCapture(
         {
           schema_version: "atpiano.contract.v1",
           workspace_id: state.capture.workspace_id,
@@ -206,12 +209,20 @@ export function useMicrophone({
       browserCapture.current = null;
       completeCapture(state.operationId);
       await onChanged();
+      onStopped(settledSession);
     } catch (error) {
       await closeBrowserCapture(state);
       browserCapture.current = null;
       failCapture(state.operationId, error);
     }
-  }, [completeCapture, failCapture, markStopping, onChanged, runtime]);
+  }, [
+    completeCapture,
+    failCapture,
+    markStopping,
+    onChanged,
+    onStopped,
+    runtime,
+  ]);
 
   return { start, stop };
 }

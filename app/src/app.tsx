@@ -87,6 +87,10 @@ export function App() {
   const [scoreJob, setScoreJob] = useState<Job | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [routeReady, setRouteReady] = useState(false);
+  const [pendingAutoScoreSessionId, setPendingAutoScoreSessionId] =
+    useState<string | null>(null);
+  const [autoScoringSessionId, setAutoScoringSessionId] =
+    useState<string | null>(null);
 
   const capabilities = useQuery({
     queryKey: ["capabilities"],
@@ -244,12 +248,20 @@ export function App() {
     setScoreJob(result);
     if (result.status === "complete") {
       void queryClient.invalidateQueries({ queryKey: ["artifacts"] });
+      if (result.session_id === autoScoringSessionId) {
+        setNotice("Capture settled and the score snapshot is ready.");
+        setAutoScoringSessionId(null);
+      }
     }
     if (result.status === "failed") {
       setNotice(result.error?.message ?? "Score generation failed.");
+      if (result.session_id === autoScoringSessionId) {
+        setAutoScoringSessionId(null);
+      }
     }
   }, [
     queryClient,
+    autoScoringSessionId,
     scoreJobQuery.data,
     scoreJobQuery.dataUpdatedAt,
     selectedSessionId,
@@ -308,6 +320,7 @@ export function App() {
     runtime,
     workspaceId: workspace?.workspace_id,
     onChanged: invalidateWorkspace,
+    onStopped: (session) => setPendingAutoScoreSessionId(session.session_id),
   });
 
   const replay = useCallback(async () => {
@@ -406,9 +419,38 @@ export function App() {
       await queryClient.invalidateQueries({ queryKey: ["artifacts"] });
     } catch (error) {
       setScoreJob(null);
+      setAutoScoringSessionId((sessionId) =>
+        sessionId === target.session_id ? null : sessionId,
+      );
       setNotice(error instanceof Error ? error.message : String(error));
     }
   }, [horizon.data, queryClient, runtime, selectedSession.data]);
+
+  useEffect(() => {
+    const target = selectedSession.data;
+    if (
+      pendingAutoScoreSessionId === null ||
+      target?.session_id !== pendingAutoScoreSessionId ||
+      target.status !== "complete" ||
+      !horizon.data
+    ) {
+      return;
+    }
+    setPendingAutoScoreSessionId(null);
+    if (!capabilities.data?.score_available) {
+      setNotice("Capture settled. Score generation is not installed.");
+      return;
+    }
+    setAutoScoringSessionId(target.session_id);
+    setNotice("Capture settled. Generating the score snapshot…");
+    void generateScore();
+  }, [
+    capabilities.data?.score_available,
+    generateScore,
+    horizon.data,
+    pendingAutoScoreSessionId,
+    selectedSession.data,
+  ]);
 
   const downloadArtifact = useCallback(async (artifact: Artifact) => {
     try {
@@ -445,6 +487,11 @@ export function App() {
     (event) => event.kind === "note" && event.lifecycle === "committed",
   ).length;
   const selectedIsActive = selected?.session_id === activeSession?.session_id;
+  const settleAudioHead = horizon.data?.audio_head_sample ?? selectedFrames;
+  const settleCommit = horizon.data?.commit_sample ?? 0;
+  const settlePercent = settleAudioHead > 0
+    ? Math.min(100, Math.round((settleCommit / settleAudioHead) * 100))
+    : 0;
   const selectedScoreJob =
     scoreJob?.session_id === selected?.session_id ? scoreJob : null;
   const scoreStatus = selectedScoreJob?.status ?? (
@@ -535,8 +582,15 @@ export function App() {
               </div>
               <div className="session-actions">
                 {selectedIsActive && captureState.capture?.source === "microphone" && (
-                  <button className="button stop" type="button" onClick={() => void microphone.stop()}>
-                    Stop &amp; settle
+                  <button
+                    className="button stop"
+                    type="button"
+                    disabled={captureState.phase === "stopping"}
+                    onClick={() => void microphone.stop()}
+                  >
+                    {captureState.phase === "stopping"
+                      ? `Settling… ${settlePercent}%`
+                      : "Stop & settle"}
                   </button>
                 )}
                 {!selectedIsActive && (
@@ -583,6 +637,19 @@ export function App() {
                     ? "Deterministic musical fixture"
                     : "Physical microphone"}
                 </span>
+                {captureState.phase === "stopping" && (
+                  <div className="settle-progress">
+                    <span>
+                      Corrected {formatClock(settleCommit, selected.sample_rate_hz)}
+                      {" "}of {formatClock(settleAudioHead, selected.sample_rate_hz)}
+                    </span>
+                    <progress
+                      max={100}
+                      value={settlePercent}
+                      aria-label="Final correction progress"
+                    />
+                  </div>
+                )}
               </div>
             )}
 

@@ -34,6 +34,7 @@ export function CaptureDeck({
     captureState.phase,
   );
   const recording = captureState.phase === "recording";
+  const stopping = captureState.phase === "stopping";
   return (
     <section className="capture-deck" aria-labelledby="capture-title">
       <div>
@@ -63,9 +64,14 @@ export function CaptureDeck({
           <span aria-hidden="true">▶</span>
           Replay musical fixture
         </button>
-        {recording && captureState.capture?.source === "microphone" && (
-          <button className="button stop" type="button" onClick={onStop}>
-            Stop &amp; settle
+        {(recording || stopping) && captureState.capture?.source === "microphone" && (
+          <button
+            className="button stop"
+            type="button"
+            disabled={stopping}
+            onClick={onStop}
+          >
+            {stopping ? "Settling…" : "Stop & settle"}
           </button>
         )}
       </div>
