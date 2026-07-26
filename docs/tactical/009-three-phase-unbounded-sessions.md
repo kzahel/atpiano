@@ -2,8 +2,11 @@
 
 Topic: live-acoustic-transcription
 
-Status: plan sketch for a separate v2 successor. Nothing implemented. Slice 1
-is the only part scoped tightly enough to start.
+Status: accepted architecture. The user selected the stable corrected-note
+experience as the first v2 milestone on 2026-07-26. Its implementation is
+owned by
+[`010-corrected-note-workbench-v2.md`](010-corrected-note-workbench-v2.md);
+Lane C engraving remains deferred.
 
 ## Product And Version Boundary
 
@@ -253,8 +256,10 @@ loop audio and results stay outside Git.
 
 ## Slices
 
-Each becomes its own tactical when started. Only slice 1 is currently scoped
-tightly enough to begin.
+Each becomes its own tactical when started. The corrected-note milestone
+combines slices 1 and 2 plus the minimum review/export portion of slice 4 in
+tactical 010. Slice 3 remains a later independent research and implementation
+decision.
 
 1. **V2 foundation, horizons, and retention; Basic Pitch only.** Add the
    separate v2 entry point, frontend, schema, and artifact namespace. Add the

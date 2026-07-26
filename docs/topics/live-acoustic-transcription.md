@@ -2,12 +2,13 @@
 
 Topic: live-acoustic-transcription
 
-Status: the strict-onset v1 live decoder is accepted in initial subjective
-review and remains the runnable MVP. It works well enough to expose a narrower
-target-piano error: a lower-note strike can trigger an attack-synchronous
-octave overtone. The accepted next direction is a separate v2 successor with
-progressive correction, bounded-memory indefinite sessions, and deterministic
-WAV bring-up before microphone testing.
+Status: the strict-onset v1 live decoder remains the runnable MVP. On
+2026-07-26 the user selected a stable corrected-note experience as the first
+complete v2 milestone, excluding engraving. Implementation is active in
+[`010-corrected-note-workbench-v2.md`](../tactical/010-corrected-note-workbench-v2.md):
+a separate app with deterministic replay, bounded indefinite sessions,
+provisional Basic Pitch, trailing Transkun correction, pedal, review, and
+export.
 
 ## Scope And Relationship
 
@@ -537,6 +538,12 @@ The octave failure below no longer needs a dedicated Lane A fix if the trailing
 commit lane demonstrates that it corrects the error a few seconds later using
 a piano-specific model. That is a measured v2 acceptance criterion, not an
 assumption that every octave error disappears.
+
+The selected implementation milestone is
+[`010-corrected-note-workbench-v2.md`](../tactical/010-corrected-note-workbench-v2.md).
+It delivers the stable corrected-note experience end to end and deliberately
+stops before Lane C. This prevents unresolved score-inference quality and
+licensing from blocking a useful v2 transcript.
 
 Do not tune the absolute-volume gate or add a generic harmonic filter for this
 failure. The former cannot distinguish a new strike from loud resonance; the

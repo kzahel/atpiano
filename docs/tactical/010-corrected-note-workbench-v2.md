@@ -1,0 +1,316 @@
+# 010 — Corrected-Note Workbench v2
+
+Topic: live-acoustic-transcription
+
+Status: active. Implementation authorized on 2026-07-26. This tactical owns the
+first complete v2 milestone and becomes its execution record as slices land.
+
+## Outcome
+
+Build a separate local `atpiano workbench-v2` application that keeps immediate
+Basic Pitch feedback, replaces settled spans with a trailing piano-specific
+Transkun result, shows pedal, and can capture or replay indefinitely without
+session-length growth in RAM or per-tick work.
+
+The milestone is complete when one deterministic source can enter the v2
+session engine, appear provisionally in the browser, become corrected and
+committed through Lane B, persist in bounded storage, and export for review.
+The existing `atpiano workbench` v1 application remains runnable and unchanged.
+
+Readable engraving is not part of this milestone. The committed-note timeline
+is useful even if no score-inference lane is available.
+
+## Product Boundary
+
+V2 owns:
+
+- CLI command: `uv run atpiano workbench-v2`;
+- default workspace: `results/workbench-v2`;
+- frontend assets under a directory separate from `src/atpiano/web`;
+- session schema: `atpiano.corrected-session.v1`;
+- note-event schema: `atpiano.corrected-note-event.v1`;
+- horizon schema: `atpiano.corrected-horizons.v1`; and
+- artifact and export formats described below.
+
+V1 keeps its command, frontend, two-minute bound, schemas, final Basic Pitch
+pass, job layout, and review behavior. Shared low-level PCM framing, clock,
+MIDI, and model utilities are allowed, but every shared-code commit must pass
+the v1 test suite.
+
+V2 is loopback-only and local-hosted like v1. Public deployment,
+authentication, multi-user serving, and phone/LAN capture are excluded.
+
+## User Experience
+
+The new page has one horizontally seekable piano-roll timeline:
+
+- the newest Basic Pitch onsets are visibly provisional;
+- a moving `H_commit` line separates revisable and corrected material;
+- Transkun corrections retain a Lane A identity when pitch and onset match;
+- unmatched Lane A notes retract without remaining as stable false notes;
+- unmatched Lane B notes appear as committed additions;
+- committed notes show final pitch, onset, velocity, and a closed or still-open
+  duration;
+- sustain and soft-pedal intervals appear in their own band;
+- only the visible time range is queried and drawn; and
+- current horizon lag, source, model state, disk growth, and backpressure are
+  visible without opening debug artifacts.
+
+The page supports microphone Start/Stop and server-driven deterministic replay.
+Replay is the first acceptance input. Microphone use is final confirmation, not
+bring-up.
+
+## Source Contract
+
+Both source adapters deliver the existing versioned, contiguous PCM16 block
+contract to one `CorrectedSession` engine:
+
+```text
+WAV replay ──┐
+             ├─► sample-indexed PCM blocks ─► CorrectedSession
+microphone ──┘
+```
+
+Replay supports:
+
+- one pass or a declared repetition count;
+- optional wall-clock cadence or accelerated validation;
+- one continuous source sample clock across repetitions;
+- recorded repetition and inserted-silence boundaries; and
+- the same session, lane, persistence, horizon, delivery, and export code as
+  microphone capture below the source adapter.
+
+The server may start with a replay manifest and repetition count from the CLI
+so the live page can be exercised without microphone permission.
+
+## Aligned Musical Fixture
+
+Add `deterministic-musical-loop-v1` without changing the frozen
+`deterministic-midi-smoke-v2` fixture. Its exact composition and structural
+assertions are owned by tactical 009:
+
+- 16 bars in 4/4 at 96 BPM;
+- `C - G/B - Am - F - Dm - G7 - C - C`, repeated with different texture;
+- block chords and inversions in the first section;
+- low-high-middle-high Alberti bass in the second;
+- melody, repeated attacks, pedal changes, and useful register coverage; and
+- deterministic MIDI/WAV generation with manifest bar, harmony, and section
+  metadata.
+
+The generated audio and MIDI remain outside Git. Code, structure, acquisition
+recipe, expected hashes, and tests are tracked.
+
+## Active-State And Persistence Contract
+
+The in-memory working set is independent of session duration:
+
+| State | Bound |
+|---|---:|
+| source PCM ring | 40 seconds |
+| Lane A model/native window cache | most recent 32 windows |
+| Lane A materialized identities | newer than `H_commit`, plus open matches |
+| Lane B PCM input | one 28-second decode buffer |
+| Lane B native output | one decode |
+| browser event batch | one requested visible range |
+| live delivery retry buffer | fixed recent sequence count |
+
+Persistent layout:
+
+```text
+<workspace>/<session-id>/
+  session.json
+  horizons.jsonl
+  audio/000000.wav
+  audio/000001.wav
+  events/000000.jsonl
+  events/000001.jsonl
+  event-index.sqlite3
+  diagnostics/lane-a/
+  diagnostics/lane-b.jsonl
+  exports/session.mid
+  exports/session.jsonl
+```
+
+PCM and event logs are segmented by 60 seconds of source time. SQLite is a
+rebuildable range-query index, not the sole evidence store. Review and browser
+range queries must open only the relevant segments or indexed rows.
+
+The server never deletes a session automatically. Before accepting audio it
+checks available disk space, records disk growth, warns through session state,
+and fails explicitly before storage is exhausted. The minimum-free-space
+threshold is configurable. Stop closes the current segments and flushes Lane B
+without rereading the whole session.
+
+## Lane A Contract
+
+Start from the measured v1 algorithm without changing v1:
+
+- Basic Pitch 0.4.0;
+- 1.988-second native window;
+- 250 ms hop;
+- strict onset-head decoder at 0.6;
+- room-calibrated onset-energy gate;
+- the existing edge guards; and
+- stable provisional identities with explicit revisions and retractions.
+
+Lane A output remains provisional in the v2 product even after its own
+short-horizon reconciliation. Its native arrays use a fixed diagnostic window;
+older arrays are deleted after their manifest rows record the retention
+decision.
+
+`H_prov` is the greatest reliable source sample Lane A has decoded. It is
+monotonic and normally remains about one second behind the source head.
+
+## Lane B Contract
+
+Transkun 2.0.1 is an optional v2 dependency, pinned separately so ordinary v1
+installation does not acquire PyTorch or its 54 MiB checkpoint. Its code is
+MIT-licensed; the checkpoint remains in the external package cache and its
+hash is recorded in every session.
+
+Starting parameters:
+
+- maximum trailing audio: 28 seconds;
+- scheduler hop: 4 seconds;
+- right guard: 4 seconds until the 2-second alternative passes parity;
+- minimum real context before the first ordinary decode: 16 seconds; and
+- CPU as the known-good reference provider.
+
+The adapter invokes Transkun's own `transcribe` path, which uses
+`forcedStartPos`, `onsetBound`, and `mergeIncompleteEvent` inside its
+overlapping 16-second segmentation. V2 then reconciles overlapping outer
+decodes by committing only the newly settled onset band.
+
+`H_commit` is the end of that band and never regresses. For each band:
+
+1. match Lane B notes to active Lane A identities by pitch and onset distance;
+2. revise and commit matched identities;
+3. retract unmatched Lane A identities whose onsets are inside the band;
+4. create committed identities for unmatched Lane B notes; and
+5. append every decision before pruning its in-memory identity.
+
+Pitch and onset are immutable after `H_commit`. A note crossing the commit
+boundary is emitted with an open offset and closed by a later decode; its tail
+may change while the offset remains newer than `H_commit`. A boundary note
+must never be duplicated merely because two outer decodes observe it.
+
+Negative Transkun event pitches `-64` and `-67` become sustain and soft-pedal
+interval events. They are not coerced into piano notes.
+
+On Stop, Lane B decodes only the bounded tail with deterministic right padding,
+closes any remaining open events explicitly, and advances `H_commit` to the
+source head. It never runs a growing full-session pass.
+
+If Lane B falls behind:
+
+1. report lag without hiding provisional material;
+2. increase the scheduler hop up to a recorded maximum;
+3. reduce the trailing buffer only under an explicit recorded degraded mode;
+4. retain PCM and normalized provisional history on disk; and
+5. never grow the in-memory Lane A history or drop accepted source audio.
+
+## Event And Query Contract
+
+Every event has:
+
+- global append sequence;
+- session and stable event identity;
+- revision;
+- lane (`preview` or `commit`);
+- lifecycle (`provisional`, `committed`, or `retracted`);
+- pitch or pedal controller;
+- onset sample;
+- nullable offset sample and offset state (`open` or `closed`);
+- velocity and native confidence where available;
+- source and emission timestamps; and
+- the commit band and model decode that produced it.
+
+Browser queries use source-sample ranges plus an optional event-sequence
+cursor. The server returns the latest materialized revision for visible
+identities and any new lifecycle records needed for animation. Query cost is
+proportional to the visible span, not session age.
+
+The MIDI export contains only latest committed notes and pedal intervals. The
+JSONL export preserves the full append-only revision history. Neither export
+loads PCM into memory.
+
+## Commit Sequence
+
+Each numbered step should land as a coherent commit and update this tactical
+with tests and evidence:
+
+1. **Plan and boundary.** Add tactical 010 and link it from living docs.
+2. **Musical fixture.** Generate the aligned MIDI/WAV pair and structural
+   tests without changing the frozen smoke fixture.
+3. **Session foundation.** Add v2 schemas, PCM ring, segmented audio/event
+   storage, indexed queries, horizons, and deterministic replay.
+4. **Bounded preview.** Add Lane A behind `CorrectedSession`, fixed native
+   retention, provisional event persistence, and accelerated long-loop tests.
+5. **Trailing commit.** Add the optional Transkun adapter, band reconciliation,
+   pedal, open-tail handling, tail flush, parity tests, and lag evidence.
+6. **Separate web app.** Add the v2 server, microphone adapter, replay controls,
+   virtualized canvas timeline, horizon status, and range-query tests.
+7. **Review and export.** Add seek/reload recovery, MIDI/JSONL export, storage
+   warnings, and stopped-session review.
+8. **Validation record.** Run v1 regression, aligned single/loop replay,
+   golden-reference parity, bounded-state longevity, and local-page smoke
+   tests; record actual evidence and remaining gaps here.
+
+## Acceptance Gates
+
+### V1 preservation
+
+- the complete existing test suite passes;
+- `atpiano workbench` still serves its v1 configuration and assets; and
+- a retained v1 session still loads through the existing review path.
+
+### Deterministic correctness
+
+- both generated fixtures reproduce byte-identical MIDI and WAV hashes;
+- the musical fixture's progression, chord, Alberti, pedal, and timing
+  assertions pass;
+- one-pass and repeated playback preserve source-sample continuity; and
+- ordinary repetitions have the same aligned scoring distribution within a
+  declared tolerance, with loop boundaries reported separately.
+
+### Bounded operation
+
+- a test representing at least eight accelerated hours keeps PCM, active
+  identities, native windows, retry delivery, and query results within their
+  declared bounds;
+- 30-minute and longer representative runs record steady-state RSS, CPU, disk
+  growth, horizon lag, and queue high-water marks; and
+- review and export do not read the full PCM session into memory.
+
+### Correction quality
+
+- Lane B's finite full-file result is recorded as the control;
+- repeated commit bands meet a declared onset/pitch parity threshold against
+  that control;
+- boundary duplicates, dropped notes, false retractions, and open-tail closure
+  are counted;
+- pedal intervals survive band boundaries; and
+- Lane B replaces the v2 Stop-time final pass only after those gates pass.
+
+### User-facing behavior
+
+- provisional notes are visually distinct from committed notes;
+- corrections do not relight an already visible matched note;
+- retractions disappear from the materialized timeline;
+- the visible timeline can seek an hour-old range without loading the
+  intervening session;
+- horizon lag and degraded mode are visible; and
+- microphone capture uses the same engine after deterministic replay passes.
+
+## Excluded
+
+- engraving, beat inference, meter inference, MusicXML, or Lane C;
+- browser-only inference or public hosting;
+- authentication, multi-user scheduling, or remote audio;
+- model training or fine-tuning;
+- automatic deletion or cloud backup; and
+- claims of acoustic precision from the unaligned golden-reference WAV.
+
+## Execution Record
+
+No implementation commits yet.
