@@ -246,9 +246,41 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self._session_id = session_id
         self._session_directory = latest_path.parent
         persisted_status = str(latest.get("status", "failed"))
-        if persisted_status == "active":
+        if persisted_status in {"active", "stopping"}:
+            interrupted_stage = (
+                "capture"
+                if persisted_status == "active"
+                else "settlement"
+            )
+            interruption = (
+                "The prior process ended before this session stopped."
+                if persisted_status == "active"
+                else (
+                    "The prior process ended during correction settlement. "
+                    "Accepted audio is preserved, but correction must be rerun."
+                )
+            )
+            processing = latest.get("processing")
+            if not isinstance(processing, dict):
+                processing = {}
+            stage_errors = processing.get("stage_errors")
+            if not isinstance(stage_errors, dict):
+                stage_errors = {}
+            processing["stage_errors"] = {
+                **stage_errors,
+                interrupted_stage: interruption,
+            }
+            latest.update(
+                {
+                    "status": "failed",
+                    "completed_at": utc_now(),
+                    "error": interruption,
+                    "processing": processing,
+                }
+            )
+            write_json(latest_path, latest)
             self._status = "failed"
-            self._error = "The prior process ended before this session stopped."
+            self._error = interruption
         else:
             self._status = persisted_status
             self._error = latest.get("error")
@@ -1644,6 +1676,48 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                         or block_count != session.next_sequence
                     ):
                         raise ValueError("microphone Stop counts do not match accepted PCM")
+                    transport = message.get("transport")
+                    if transport is not None:
+                        if not isinstance(transport, dict):
+                            raise ValueError(
+                                "microphone transport evidence must be an object"
+                            )
+                        expected_transport = {
+                            "sent_frame_count": frame_count,
+                            "sent_block_count": block_count,
+                        }
+                        if any(
+                            transport.get(name) != expected
+                            for name, expected in expected_transport.items()
+                        ):
+                            raise ValueError(
+                                "microphone transport evidence does not match Stop"
+                            )
+                        numeric_fields = (
+                            "acknowledged_frame_count",
+                            "acknowledged_block_count",
+                            "socket_buffered_bytes_at_stop",
+                            "socket_buffered_bytes_high_water",
+                        )
+                        if any(
+                            not isinstance(transport.get(name), int)
+                            or isinstance(transport.get(name), bool)
+                            or int(transport[name]) < 0
+                            for name in numeric_fields
+                        ):
+                            raise ValueError(
+                                "microphone transport evidence is invalid"
+                            )
+                        write_json(
+                            session.directory / "transport.json",
+                            {
+                                "schema_version": (
+                                    "atpiano.corrected-transport.v1"
+                                ),
+                                "recorded_at": utc_now(),
+                                **transport,
+                            },
+                        )
                     self.server.begin_stop()
                     stopped = True
                     if pipeline is None:

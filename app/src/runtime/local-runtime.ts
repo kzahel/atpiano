@@ -37,6 +37,7 @@ interface StreamMessage {
   readonly session_id?: string;
   readonly sample_rate_hz?: number;
   readonly received_source_frames?: number;
+  readonly sequence?: number;
   readonly error?: string;
 }
 
@@ -49,6 +50,11 @@ interface PendingSocket {
   resolveStopped(): void;
   rejectStopped(error: Error): void;
   capture: Capture | null;
+  sentFrameCount: number;
+  sentBlockCount: number;
+  acknowledgedFrameCount: number;
+  acknowledgedBlockCount: number;
+  bufferedAmountHighWater: number;
 }
 
 function abortOptions(request: RuntimeRequest): { signal?: AbortSignal } {
@@ -270,6 +276,11 @@ export class LocalRuntime implements AtpianoRuntime {
       resolveStopped,
       rejectStopped,
       capture: null,
+      sentFrameCount: 0,
+      sentBlockCount: 0,
+      acknowledgedFrameCount: 0,
+      acknowledgedBlockCount: 0,
+      bufferedAmountHighWater: 0,
     };
     this.#pendingSocket = pending;
     socket.binaryType = "arraybuffer";
@@ -311,6 +322,13 @@ export class LocalRuntime implements AtpianoRuntime {
         pending.capture = capture;
         pending.resolveReady(capture);
       } else if (message.type === "block_ack" && pending.capture) {
+        pending.acknowledgedFrameCount =
+          message.received_source_frames ??
+          pending.acknowledgedFrameCount;
+        pending.acknowledgedBlockCount = Math.max(
+          pending.acknowledgedBlockCount,
+          (message.sequence ?? -1) + 1,
+        );
         pending.capture = {
           ...pending.capture,
           accepted_through_sample:
@@ -364,7 +382,19 @@ export class LocalRuntime implements AtpianoRuntime {
     ) {
       throw new Error("PCM target does not match the active local capture");
     }
+    if (
+      block.envelope.sequence !== pending.sentBlockCount ||
+      block.envelope.first_sample !== pending.sentFrameCount
+    ) {
+      throw new Error("PCM does not continue the local transport sample clock");
+    }
     pending.socket.send(packPcmBlock(block));
+    pending.sentBlockCount += 1;
+    pending.sentFrameCount += block.envelope.frame_count;
+    pending.bufferedAmountHighWater = Math.max(
+      pending.bufferedAmountHighWater,
+      pending.socket.bufferedAmount,
+    );
   }
 
   async stopCapture(
@@ -380,12 +410,23 @@ export class LocalRuntime implements AtpianoRuntime {
     ) {
       throw new Error("Stop target does not match the active local capture");
     }
+    if (input.accepted_frame_count !== pending.sentFrameCount) {
+      throw new Error("Stop frame count does not match sent PCM");
+    }
     pending.socket.send(
       JSON.stringify({
         schema_version: streamSchema,
         type: "stop",
-        frame_count: input.accepted_frame_count,
-        block_count: Math.ceil(input.accepted_frame_count / 2_048),
+        frame_count: pending.sentFrameCount,
+        block_count: pending.sentBlockCount,
+        transport: {
+          sent_frame_count: pending.sentFrameCount,
+          sent_block_count: pending.sentBlockCount,
+          acknowledged_frame_count: pending.acknowledgedFrameCount,
+          acknowledged_block_count: pending.acknowledgedBlockCount,
+          socket_buffered_bytes_at_stop: pending.socket.bufferedAmount,
+          socket_buffered_bytes_high_water: pending.bufferedAmountHighWater,
+        },
       }),
     );
     const timeout = new Promise<never>((_, reject) => {

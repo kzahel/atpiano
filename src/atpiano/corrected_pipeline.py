@@ -109,12 +109,14 @@ class CorrectedSessionPipeline:
             if self._stopping or self._aborted:
                 raise RuntimeError("corrected capture Stop is already active")
             self._stopping = True
-        manifest = self.session.begin_settling()
+        self.session.begin_settling()
         with self._condition:
             self._condition.notify_all()
             all_completed = all(
                 state.completed for state in self._states.values()
             )
+        manifest = self.session.record_pipeline_status(self.status())
+        assert manifest is not None
         if not self.session.lanes or all_completed:
             self._finish_settlement()
         return manifest
@@ -125,6 +127,7 @@ class CorrectedSessionPipeline:
                 return
             self._aborted = True
             self._condition.notify_all()
+        self.session.record_pipeline_status(self.status(), persist=False)
         self.session.abort(error)
         self._settled.set()
         self._send_failure(error)
@@ -210,6 +213,12 @@ class CorrectedSessionPipeline:
         try:
             if self._finalizer is not None:
                 self._finalizer(self.session)
+            final_status = self.status()
+            final_status["state"] = "complete"
+            self.session.record_pipeline_status(
+                final_status,
+                persist=False,
+            )
             manifest = self.session.complete_settlement()
         except Exception as error:
             self.abort(error)

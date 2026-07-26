@@ -24,7 +24,7 @@ from atpiano.corrected_workbench import (
 )
 from atpiano.fixture import generate_fixture
 from atpiano.live import LiveModelOutput, PcmBlock, pack_pcm_block
-from atpiano.util import sha256_file, write_json
+from atpiano.util import read_json, sha256_file, write_json
 
 
 class _FakePreviewModel:
@@ -298,6 +298,51 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
     assert profile.commit_threads == 2
 
 
+def test_corrected_workbench_marks_interrupted_settlement_recoverable(
+    tmp_path: Path,
+) -> None:
+    session = CorrectedSession(
+        tmp_path / "session",
+        session_id="20260726T000000-abcdef123456",
+        sample_rate_hz=8_000,
+        source="microphone",
+        minimum_free_bytes=0,
+    )
+    session.accept_pcm(
+        PcmBlock(
+            sequence=0,
+            first_sample=0,
+            frame_count=4,
+            sample_rate_hz=8_000,
+            page_sent_ms=0.0,
+            worklet_time_s=0.0,
+            pcm_s16le=bytes(8),
+        ),
+        received_ns=1,
+    )
+    session.begin_settling()
+    session.events.close()
+    server = create_corrected_workbench_server(
+        tmp_path,
+        port=0,
+        preview_model_factory=_FakePreviewModel,
+        commit_model_factory=_FakeCommitModel,
+        minimum_free_bytes=0,
+        isolate_models=False,
+    )
+    try:
+        state = server.public_state()
+        manifest = read_json(session.directory / "session.json")
+    finally:
+        server.server_close()
+
+    assert state["status"] == "failed"
+    assert "Accepted audio is preserved" in state["error"]
+    assert manifest["status"] == "failed"
+    assert manifest["source_frame_count"] == 4
+    assert "settlement" in manifest["processing"]["stage_errors"]
+
+
 def test_corrected_workbench_can_serve_the_shared_app_shell(
     tmp_path: Path,
 ) -> None:
@@ -512,6 +557,14 @@ def test_microphone_websocket_uses_corrected_session_and_exports(
                 "type": "stop",
                 "frame_count": 6,
                 "block_count": 1,
+                "transport": {
+                    "sent_frame_count": 6,
+                    "sent_block_count": 1,
+                    "acknowledged_frame_count": 6,
+                    "acknowledged_block_count": 1,
+                    "socket_buffered_bytes_at_stop": 0,
+                    "socket_buffered_bytes_high_water": 128,
+                },
             },
         )
         _, payload = _server_frame(stream)
@@ -522,6 +575,10 @@ def test_microphone_websocket_uses_corrected_session_and_exports(
         assert stopped["session"]["source"] == "microphone"
         assert stopped["session"]["source_frame_count"] == 6
         assert stopped["exports"] == {}
+        session_directory = server.current_directory()
+        assert session_directory is not None
+        transport = read_json(session_directory / "transport.json")
+        assert transport["socket_buffered_bytes_high_water"] == 128
 
         base_url = f"http://127.0.0.1:{port}"
         deadline = time.monotonic() + 2

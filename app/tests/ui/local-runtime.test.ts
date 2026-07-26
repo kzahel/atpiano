@@ -57,6 +57,7 @@ class FakeWebSocket {
   readonly sent: (string | ArrayBufferLike | Blob | ArrayBufferView)[] = [];
   readonly listeners = new Map<string, Listener[]>();
   readyState = FakeWebSocket.OPEN;
+  bufferedAmount = 0;
   binaryType: BinaryType = "blob";
 
   constructor(readonly url: string) {
@@ -177,6 +178,12 @@ describe("local runtime", () => {
       type: "stop",
       frame_count: 4,
       block_count: 1,
+      transport: {
+        sent_frame_count: 4,
+        sent_block_count: 1,
+        acknowledged_frame_count: 0,
+        acknowledged_block_count: 0,
+      },
     });
     socket.message({
       schema_version: "atpiano.corrected-stream.v1",

@@ -609,6 +609,8 @@ class CorrectedSession:
         self.correction_reason = correction_reason
         self.correction_profile_id = correction_profile_id
         self._stage_errors: dict[str, str] = {}
+        self._pipeline_status: dict[str, Any] | None = None
+        self._manifest_status = "active"
         self.realtime = realtime
         self.origin_monotonic_ns = time.perf_counter_ns()
         self.started_at = utc_now()
@@ -643,6 +645,7 @@ class CorrectedSession:
         self._record_horizons(force=True)
 
     def _write_session(self, *, status: str, error: str | None = None) -> None:
+        self._manifest_status = status
         document = {
             "schema_version": CORRECTED_SESSION_SCHEMA,
             "session_id": self.session_id,
@@ -662,6 +665,7 @@ class CorrectedSession:
                 "correction_profile_id": self.correction_profile_id,
                 "stage_errors": dict(self._stage_errors),
             },
+            "pipeline": self._pipeline_status,
             "retention": {
                 "pcm_ring_frames": self.ring.capacity_frames,
                 "audio_segment_frames": self.audio.segment_frames,
@@ -678,6 +682,19 @@ class CorrectedSession:
             },
         }
         write_json(self.directory / "session.json", document)
+
+    def record_pipeline_status(
+        self,
+        status: dict[str, Any],
+        *,
+        persist: bool = True,
+    ) -> dict[str, Any] | None:
+        with self._state_lock:
+            self._pipeline_status = dict(status)
+            if not persist:
+                return None
+            self._write_session(status=self._manifest_status)
+            return read_json(self.directory / "session.json")
 
     def record_stage_error(self, stage: str, error: Exception) -> None:
         with self._state_lock:

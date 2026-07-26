@@ -153,7 +153,10 @@ def test_blocked_lane_does_not_block_pcm_or_other_lane(tmp_path: Path) -> None:
     assert not pipeline.wait(0.05)
     blocking.release.set()
     assert pipeline.wait(1)
-    assert read_json(session.directory / "session.json")["status"] == "complete"
+    manifest = read_json(session.directory / "session.json")
+    assert manifest["status"] == "complete"
+    assert manifest["pipeline"]["state"] == "complete"
+    assert manifest["pipeline"]["accepted_frames"] == 8
 
 
 def test_pipeline_abort_preserves_accepted_audio(tmp_path: Path) -> None:
