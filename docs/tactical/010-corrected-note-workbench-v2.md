@@ -360,3 +360,46 @@ continuity, and bounded retention.
 No acoustic model is connected in this foundation commit. `replay-v2` at this
 point validates source and persistence behavior only; the next execution step
 adds bounded Lane A.
+
+### Bounded provisional Lane A
+
+Implemented Lane A on 2026-07-26 with the measured v1 Basic Pitch model,
+strict-onset decoder, edge guards, hop, and energy gate while leaving v1 code
+paths behaviorally intact. V2 translates Lane A's internally settled notes to
+product-level provisional events until Lane B corrects them.
+
+The v2 implementation:
+
+- prepares each model window from the absolute-sample 40-second ring;
+- resamples the 48 kHz source to Basic Pitch's native 22.05 kHz boundary;
+- preserves stable identities and append-only revisions;
+- advances a monotonic `H_prov`;
+- retains exactly the most recent 32 native model windows and records every
+  eviction; and
+- prunes in-memory identities older than `H_commit` or the fixed fallback
+  retention window after their event history is durable.
+
+Actual accelerated replay of the 42-second musical fixture produced:
+
+```text
+model windows: 161
+native windows retained / evicted: 32 / 129
+event emissions: 703
+distinct preview identities: 196
+latest non-retracted identities: 181
+H_prov lag at Stop: 1.101 s
+onset F1 at 50 ms: 0.860 (163 matches)
+onset F1 at 25 ms: 0.850 (161 matches)
+note-with-offset F1: 0.274
+```
+
+The weak offsets are expected from the onset-first lane and are one reason
+Lane B owns settled durations. The ignored run is
+`results/workbench-v2-preview/`.
+
+A separate accelerated eight-hour source-clock test uses a low-rate fake model
+to test state shape rather than model throughput. Across 480 scheduled windows
+it holds the PCM ring to 40 source seconds, native evidence to three configured
+windows, and active identities to one configured working-set identity. Actual
+RSS, CPU, 48 kHz disk growth, and model-duty evidence still require the later
+representative longevity run.

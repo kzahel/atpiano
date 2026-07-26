@@ -149,6 +149,8 @@ class OnsetEnergyGate:
         self,
         note: MidiNote,
         pcm_s16le: bytes | bytearray,
+        *,
+        first_sample: int = 0,
     ) -> tuple[bool, float | None, str]:
         self.native_candidate_count += 1
         if note.onset_s < self.calibration_s:
@@ -158,13 +160,21 @@ class OnsetEnergyGate:
             self.rejected_calibration_count += 1
             return False, None, "uncalibrated"
         onset_sample = round(note.onset_s * self.sample_rate_hz)
-        start = max(0, onset_sample - round(self.lookbehind_s * self.sample_rate_hz))
+        retained_end = first_sample + len(pcm_s16le) // 2
+        start = max(
+            first_sample,
+            onset_sample - round(self.lookbehind_s * self.sample_rate_hz),
+        )
         end = min(
-            len(pcm_s16le) // 2,
+            retained_end,
             onset_sample + round(self.lookahead_s * self.sample_rate_hz),
         )
         samples = np.frombuffer(
-            bytes(pcm_s16le[start * 2 : end * 2]),
+            bytes(
+                pcm_s16le[
+                    (start - first_sample) * 2 : (end - first_sample) * 2
+                ]
+            ),
             dtype="<i2",
         ).astype(np.float64)
         level_dbfs = _rms_dbfs(samples / 32768.0)

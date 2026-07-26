@@ -56,9 +56,15 @@ model-independent v2 session foundation now exist. `atpiano replay-v2` feeds a
 WAV through one continuous source clock into a fixed 40-second PCM ring,
 60-second WAV and event segments, monotonic horizon evidence, and an indexed
 range-query store. A two-repeat 84-second source check preserved all 4,032,000
-frames across the expected two repetition boundaries. Lane A, Lane B, and the
-separate browser app remain in progress, so this command is not yet a
-corrected transcription path.
+frames across the expected two repetition boundaries. At that foundation
+checkpoint no model was connected.
+
+The bounded v2 Lane A has since landed behind `replay-v2 --preview`. On the
+aligned 42-second musical fixture it processed 161 real Basic Pitch windows,
+retained the configured final 32 after 129 evictions, and ended with `H_prov`
+1.101 seconds behind capture. Its 181 latest non-retracted identities score
+0.860 onset F1 at 50 ms and 0.850 at 25 ms. This is provisional evidence:
+Lane B and the separate browser application are still in progress.
 
 ## Desired Experience
 

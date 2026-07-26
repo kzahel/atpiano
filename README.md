@@ -157,6 +157,16 @@ uv run atpiano replay-v2 \
   --repeat 2 --no-wait
 ```
 
+Add `--preview` to run the bounded Basic Pitch provisional lane through the
+same v2 session:
+
+```text
+uv run atpiano replay-v2 \
+  ../atpiano-artifacts/musical-loop-input/input.json \
+  ../atpiano-artifacts/workbench-v2-preview-check \
+  --no-wait --preview
+```
+
 Run the untouched Basic Pitch file path:
 
 ```text

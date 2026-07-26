@@ -11,7 +11,7 @@ import wave
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from atpiano.fixture import INPUT_SCHEMA
 from atpiano.live import MAX_PCM_BLOCK_FRAMES, PcmBlock
@@ -82,6 +82,29 @@ class PcmRing:
         relative_start = (start_sample - self.start_sample) * 2
         relative_end = (end_sample - self.start_sample) * 2
         return bytes(self._pcm[relative_start:relative_end])
+
+
+@dataclass(frozen=True)
+class LaneUpdate:
+    events: tuple[dict[str, Any], ...] = ()
+    provisional_sample: int | None = None
+    commit_sample: int | None = None
+
+
+class CorrectedSessionLane(Protocol):
+    name: str
+
+    def accept_block(
+        self,
+        session: CorrectedSession,
+        block: PcmBlock,
+        *,
+        received_ns: int,
+    ) -> LaneUpdate: ...
+
+    def finalize(self, session: CorrectedSession) -> LaneUpdate: ...
+
+    def status(self) -> dict[str, Any]: ...
 
 
 class SegmentedAudioLog:
@@ -432,6 +455,7 @@ class CorrectedSession:
             segment_s=segment_s,
         )
         self.horizons = CorrectedHorizons()
+        self.lanes: list[CorrectedSessionLane] = []
         self.horizons_path = self.directory / "horizons.jsonl"
         self.boundaries_path = self.directory / "boundaries.jsonl"
         self._snapshot_interval_frames = max(
@@ -460,6 +484,7 @@ class CorrectedSession:
                 "event_segment_frames": self.events.segment_frames,
                 "minimum_free_bytes": self.audio.minimum_free_bytes,
             },
+            "lanes": [lane.status() for lane in self.lanes],
             "artifacts": {
                 "audio_index": "audio/segments.jsonl",
                 "event_segments": "events/",
@@ -469,6 +494,24 @@ class CorrectedSession:
             },
         }
         write_json(self.directory / "session.json", document)
+
+    def add_lane(self, lane: CorrectedSessionLane) -> None:
+        if self.closed:
+            raise RuntimeError("corrected session is closed")
+        if self.horizons.audio_head_sample:
+            raise RuntimeError("corrected lanes must attach before audio")
+        if any(existing.name == lane.name for existing in self.lanes):
+            raise ValueError(f"corrected lane already attached: {lane.name}")
+        self.lanes.append(lane)
+        self._write_session(status="active")
+
+    def _apply_lane_update(self, update: LaneUpdate) -> list[dict[str, Any]]:
+        assigned = self.events.append(update.events)
+        if update.provisional_sample is not None:
+            self.advance_provisional(update.provisional_sample)
+        if update.commit_sample is not None:
+            self.advance_commit(update.commit_sample)
+        return assigned
 
     def _record_horizons(self, *, force: bool = False) -> None:
         state = (
@@ -486,7 +529,6 @@ class CorrectedSession:
         self._last_snapshot = state
 
     def accept_block(self, block: PcmBlock, *, received_ns: int) -> None:
-        del received_ns
         if self.closed:
             raise RuntimeError("corrected session is closed")
         if block.sample_rate_hz != self.sample_rate_hz:
@@ -509,6 +551,9 @@ class CorrectedSession:
         self.ring.append(block.first_sample, block.pcm_s16le)
         self.next_sequence += 1
         self.horizons.audio_head_sample += block.frame_count
+        for lane in self.lanes:
+            update = lane.accept_block(self, block, received_ns=received_ns)
+            self._apply_lane_update(update)
         if self.horizons.audio_head_sample >= self._next_head_snapshot:
             self._record_horizons()
             self._next_head_snapshot = (
@@ -564,6 +609,8 @@ class CorrectedSession:
     def finalize(self) -> dict[str, Any]:
         if self.closed:
             raise RuntimeError("corrected session is already closed")
+        for lane in self.lanes:
+            self._apply_lane_update(lane.finalize(self))
         self.audio.close()
         self._record_horizons(force=True)
         self.events.close()
@@ -606,6 +653,7 @@ def run_corrected_replay(
     pcm_ring_s: float = DEFAULT_PCM_RING_S,
     segment_s: float = DEFAULT_SEGMENT_S,
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
+    preview_model: Any | None = None,
 ) -> dict[str, Any]:
     if repeat <= 0:
         raise ValueError("corrected replay repetition count must be positive")
@@ -634,6 +682,10 @@ def run_corrected_replay(
         segment_s=segment_s,
         minimum_free_bytes=minimum_free_bytes,
     )
+    if preview_model is not None:
+        from atpiano.corrected_preview import CorrectedPreviewLane
+
+        session.add_lane(CorrectedPreviewLane(session, model=preview_model))
     sequence = 0
     session_origin_ns = time.perf_counter_ns()
     try:
