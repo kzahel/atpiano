@@ -4,17 +4,18 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../src/app.js";
+import type { AtpianoRuntime } from "../../src/runtime/atpiano-runtime.js";
 import { createFixtureRuntime } from "../../src/runtime/fixture-data.js";
 import { RuntimeProvider } from "../../src/runtime/runtime-context.js";
 import { useWorkspaceStore } from "../../src/state/workspace-store.js";
 
-function renderApp() {
+function renderApp(runtime: AtpianoRuntime = createFixtureRuntime()) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <RuntimeProvider runtime={createFixtureRuntime()}>
+      <RuntimeProvider runtime={runtime}>
         <App />
       </RuntimeProvider>
     </QueryClientProvider>,
@@ -90,5 +91,31 @@ describe("shared application", () => {
       expect(screen.queryByRole("button", { name: /Nocturne sketch/ })).toBeNull();
     });
     expect(screen.getByRole("button", { name: /Morning progression/ })).toBeTruthy();
+  });
+
+  it("isolates a failed score job from session review", async () => {
+    const user = userEvent.setup();
+    const fixture = createFixtureRuntime();
+    const runtime = new Proxy(fixture, {
+      get(target, property) {
+        if (property === "startScoreJob") {
+          return async () => {
+            throw new Error("Score runtime unavailable");
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) satisfies AtpianoRuntime;
+    renderApp(runtime);
+    expect(await screen.findByRole("heading", { name: "Morning progression" }))
+      .toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Refresh score" }));
+
+    expect(await screen.findByText("Score runtime unavailable")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Morning progression" }))
+      .toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Piano roll" })).toBeTruthy();
   });
 });
