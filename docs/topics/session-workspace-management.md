@@ -3,12 +3,12 @@
 Topic: session-workspace-management
 
 Status: accepted proposed foundation on 2026-07-26; Phase 2 contract and local
-compatibility work is in progress under
+compatibility implementation is complete and awaiting R2 review under
 [`015-product-contracts-and-structure.md`](../tactical/015-product-contracts-and-structure.md).
 Existing session artifacts remain authoritative while explicit catalog,
 session-addressed reads, capture identity, score targets, and recoverable
-deletion are introduced. The durable React New/history/selection UI remains a
-later phase.
+deletion are exposed through additive product routes. The durable React
+New/history/selection UI remains Phase 3 and has not started.
 
 ## Scope And Relationship
 
@@ -192,26 +192,31 @@ workspace may retain one CPU score job at a time initially, but its status and
 publication remain keyed to that target ID. Selecting another session cannot
 retarget or hide the job.
 
-The target API shape is:
+Phase 2 established the versioned ordinary HTTP shape:
 
 ```text
-GET    /api/sessions
-GET    /api/sessions/{id}
-GET    /api/sessions/{id}/events
-GET    /api/sessions/{id}/score
-POST   /api/sessions/{id}/score
-GET    /api/sessions/{id}/artifacts/...
-DELETE /api/sessions/{id}
-
-GET    /api/capture
-WS     /api/live
-POST   /api/replay
+GET    /api/product/v1/workspaces
+GET    /api/product/v1/workspaces/{workspace-id}/sessions
+GET    /api/product/v1/workspaces/{workspace-id}/sessions/{session-id}
+GET    /api/product/v1/workspaces/{workspace-id}/sessions/{session-id}/horizon
+GET    /api/product/v1/workspaces/{workspace-id}/sessions/{session-id}/events
+GET    /api/product/v1/workspaces/{workspace-id}/sessions/{session-id}/artifacts
+POST   /api/product/v1/workspaces/{workspace-id}/sessions/{session-id}/score-jobs
+DELETE /api/product/v1/workspaces/{workspace-id}/sessions/{session-id}
+GET    /api/product/v1/jobs/{job-id}
 ```
 
 List responses are bounded and cursor-paginated. Resource responses include
 the resolved session ID so the client can reject a late response after its
 selection changes. Mutating requests retain the loopback host, same-origin,
 single-flight, and exact-path checks already used by v2.
+
+Capture Start, sample-indexed PCM, Stop, and fixture replay are behavioral
+operations on `AtpianoRuntime`, with `atpiano.pcm.v1` as the envelope. They
+are not ordinary generated HTTP routes because hosted and local providers may
+use different WebSocket, loopback, sidecar, or Tauri transports. The
+deterministic fixture provider exercises those methods now; Phase 3 supplies
+the current-local compatibility provider.
 
 The existing unqualified `/api/session`, `/api/events`, `/api/score`, and
 artifact routes may remain as short-lived compatibility aliases while the

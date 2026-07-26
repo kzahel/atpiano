@@ -2,14 +2,13 @@
 
 Topic: multi-tenant-hybrid-service-architecture
 
-Status: **accepted target architecture as of 2026-07-26; Phase 1 baseline
-characterization is complete and Phase 2 contracts are next.** The product
-will use one shared React/TypeScript application with two first-class
-execution modes: a zero-install hosted service and an auto-updating Tauri
-desktop application that works locally and offline. Hosted collaboration and
-optional local-to-cloud transfer build on the same versioned domain
-contracts. Existing v1 and v2 applications remain intact while this
-architecture is introduced through bounded tacticals.
+Status: **accepted target architecture as of 2026-07-26; Phase 1 is complete
+and Phase 2 implementation awaits mandatory R2 review.** Versioned Pydantic
+domain products, generated OpenAPI/TypeScript, the `AtpianoRuntime` boundary,
+an executable fixture provider, and explicit local compatibility paths now
+exist. The shared React application has not started. The target remains a
+zero-install hosted service and auto-updating offline-capable Tauri desktop
+application over the same contracts.
 
 ## Scope And Relationship
 
@@ -767,6 +766,13 @@ lanes, known platform constraints, and deliberate non-parity are summarized
 in [`migration-baseline.md`](../migration-baseline.md). R1 found no ambiguous
 useful behavior requiring a product decision, so the next bounded slice may
 establish contracts and structure.
+
+Phase 2 implementation completed in
+[`015-product-contracts-and-structure.md`](../tactical/015-product-contracts-and-structure.md).
+Its actual tree, public vocabulary, dependency map, runtime interface,
+examples, generation workflow, compatibility policy, and evidence are in
+[`r2-structure-contracts-review.md`](../r2-structure-contracts-review.md).
+Do not open Phase 3 until R2 is explicitly accepted or revised.
 
 Each phase gets one or more numbered tacticals with entry conditions,
 migrations, validation, rollback or compatibility behavior, and an execution
