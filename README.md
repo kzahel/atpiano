@@ -1,14 +1,13 @@
 # atpiano
 
-Atpiano is an experimental acoustic-piano transcription service. It listens to
-a nearby piano, turns the captured audio into timestamped note events, and
-makes those events available to a piano roll or other consumers with useful
-quality at real-ish latency.
+Atpiano is an experimental acoustic-piano transcription and performance-review
+workspace. It listens to a nearby piano, turns the captured audio into
+timestamped note events, and presents the performance through synchronized
+audio, a piano roll, a keyboard, and optional engraved notation.
 
-The first goal is not to select a permanent model or build the final user
-interface. It is to measure the latency/quality frontier of available
-transcription models and the effects of windowing, overlap, look-ahead,
-batching, post-processing, execution backend, and recording conditions.
+The v3 shared React workspace is the primary application. Model selection,
+streaming behavior, correction, notation quality, and deployment remain active
+research concerns, supported by reproducible benchmarks and retained evidence.
 
 ## Project Boundary
 
@@ -20,39 +19,78 @@ Atpiano owns:
 - reconciliation of overlapping or revised model output; and
 - a normalized, timestamped note-event stream.
 
-A separate visualization and analysis program will consume those events. It
-will also accept direct MIDI from an enabled keyboard, so harmonic, chord, and
-piano-roll behavior does not depend on acoustic transcription.
+The v3 workspace consumes that stream through an explicit runtime boundary and
+keeps the source audio sample clock authoritative. The same contracts are
+intended to support future hosted and desktop runtimes without coupling the
+musical views to one execution backend.
 
-The first implementation should be a deterministic live-replay benchmark. It
-will replay aligned recordings at wall-clock cadence, exercise models as if
-audio were arriving live, and report both transcription quality and
-capture-to-event latency. Live Mac microphone and phone streaming are later
-input adapters to the same pipeline.
+The reproducible foundation is a deterministic live-replay benchmark. It
+replays aligned recordings at wall-clock cadence, exercises models as if audio
+were arriving live, and reports both transcription quality and
+capture-to-event latency. Local browser microphone capture uses the same
+pipeline; phone capture remains future work.
 
 ## Project Status
 
-The project is in discovery. Python and Spotify Basic Pitch are the first
-prototype stack, not permanent selections. A deterministic MIDI-derived
-fixture, untouched offline reference, wall-clock replay benchmark, and local
-browser live-transcription workbench are runnable on Apple Silicon. The
-ordinary locked environment, automated regression lanes, production frontend
-build, and Basic Pitch offline and rolling TFLite paths are also validated on
-x86_64 Linux. Native PortAudio capture, the optional Transkun-corrected lane,
-and a complete shared-workbench replay are validated there as well. Chrome's
-fake-microphone path exposed slow correction blocking capture and exceeding
-the old Stop timeout. Model work is now isolated from durable PCM ingest,
-Stop promptly enters background settlement, and correction defaults to a
-measured capability profile or conservative after-Stop mode. Those changes
-pass local fake-worker and real Transkun checks but still require the Linux
-browser rerun. A consentful human browser-microphone review and Linux latency
-parity have not been validated. The internal score runtime installs, but its
-current source-to-score alignment guard exposes an ordering defect on the
-Linux result.
+The v3 `workbench-v3` application is the authoritative user-facing version.
+The v1 and v2 applications were prototypes. Their standalone interfaces remain
+runnable as compatibility surfaces, regression oracles, and implementation
+evidence. New product work should target v3 unless a task explicitly concerns
+an earlier prototype.
+
+The project is still in discovery. Python, Spotify Basic Pitch, and Transkun
+are research choices rather than permanent selections. A deterministic
+MIDI-derived fixture, untouched offline reference, wall-clock replay
+benchmark, and local browser live-transcription workspace are runnable on
+Apple Silicon. The ordinary locked environment, automated regression lanes,
+production frontend build, and Basic Pitch offline and rolling TFLite paths
+are also validated on x86_64 Linux. Native PortAudio capture, the optional
+Transkun-corrected lane, and a complete shared-workbench replay are validated
+there as well. Chrome's fake-microphone path exposed slow correction blocking
+capture and exceeding the old Stop timeout. Model work is now isolated from
+durable PCM ingest, Stop promptly enters background settlement, and correction
+defaults to a measured capability profile or conservative after-Stop mode.
+Those changes pass local fake-worker and real Transkun checks but still require
+the Linux browser rerun. A consentful human browser-microphone review and Linux
+latency parity have not been validated. The internal score runtime installs,
+but its current source-to-score alignment guard exposes an ordering defect on
+the Linux result.
 
 Current direction and research questions live in [`docs/topics/`](docs/topics/README.md).
 Acoustic-model benchmarking, live browser transcription, and downstream
 performance-to-notation conversion have separate owners there.
+
+## Authoritative Performance Workspace (v3)
+
+Install the corrected-note Python dependencies and the pinned frontend
+dependencies, then launch the primary local application:
+
+```text
+uv sync --extra corrected
+npm ci --prefix app
+uv run atpiano workbench-v3
+```
+
+The command builds and opens the v3 React application, using
+`results/workbench-v3/` as its local workspace by default. Select **New
+session**, start the microphone, and use **Stop & settle** when finished. The
+workspace keeps active capture distinct from the selected historical session
+and provides synchronized recorded-audio playback, provisional and corrected
+notes, piano-roll and keyboard inspection, session history, artifacts, and
+recoverable deletion.
+
+Engraved score snapshots are optional and isolated from capture. To enable the
+current internal score experiment, install its runtime once:
+
+```text
+uv run atpiano setup-midi2score
+```
+
+That integration has no confirmed upstream license and is for private internal
+experimentation only. Capture, playback, the piano roll, keyboard, and exports
+remain usable without it. See
+[`docs/r3-interaction-review.md`](docs/r3-interaction-review.md) for the
+accepted v3 interaction contract and deterministic replay command.
 
 ## Development Validation
 
@@ -78,11 +116,16 @@ long-soak lanes remain explicit rather than being counted as unattended
 passes. Current Linux evidence and limits are tracked in
 [`docs/topics/linux-development-portability.md`](docs/topics/linux-development-portability.md).
 
-## Browser Workbench (v1 MVP)
+## Retained Prototype Workbenches
 
-The current workbench remains the runnable v1 MVP. The planned three-phase v2
-is a separate live web application; it may reuse proven internals but does not
-replace this command, its session artifacts, or its review path. See
+The following applications document the two prototype generations. They remain
+available for compatibility and regression work, but they are not the primary
+Atpiano interface and should not receive new product features by default.
+
+### Browser Workbench v1
+
+The v1 browser workbench was the first runnable MVP. Its command, session
+artifacts, and review path remain intact. See
 [`docs/tactical/009-three-phase-unbounded-sessions.md`](docs/tactical/009-three-phase-unbounded-sessions.md).
 
 Use the pinned Python 3.10 environment:
@@ -142,8 +185,8 @@ download, so importing its result currently requires a paid plan.
 The first target-piano review found the local Partitura score technically
 valid but unreadable, while the Ivory preview was easy for the user to sight
 read. Treat notation as a diagnostic experiment, not a current product
-capability. The current workbench therefore emphasizes live pitch onsets and
-broad chord shape rather than score notation.
+capability. The v1 workbench therefore emphasizes live pitch onsets and broad
+chord shape rather than score notation.
 
 The workbench binds only to `127.0.0.1` and stores generated artifacts under
 the ignored `results/workbench` directory by default. Browser takes are
@@ -167,12 +210,14 @@ are retained so an actual page session can also report delivery latency.
 Notation remains a separate artifact consumer and does not change the
 acoustic model output.
 
-## Corrected-note Workbench v2
+### Corrected-note Workbench v2
 
-The v1 MVP remains available as `atpiano workbench`. The separate v2
-application keeps immediate Basic Pitch notes provisional, replaces settled
-spans with the bounded trailing Transkun lane, shows sustain and soft pedal,
-and stores indefinite sessions as segmented audio plus indexed events.
+The v2 application was the corrected-note prototype and still provides the
+local engine composed by v3. It keeps immediate Basic Pitch notes provisional,
+replaces settled spans with the bounded trailing Transkun lane, shows sustain
+and soft pedal, and stores indefinite sessions as segmented audio plus indexed
+events. Use the v2 page itself only for compatibility, diagnosis, or regression
+work.
 
 Install the optional corrected-note dependencies, generate the musical
 fixture, install the isolated internal score runtime once, and open v2 with
