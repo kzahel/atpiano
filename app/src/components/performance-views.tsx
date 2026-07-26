@@ -1,7 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type {
-  OpenSheetMusicDisplay as OsmdRenderer,
-} from "opensheetmusicdisplay";
+import { useMemo } from "react";
 
 import {
   AudioPlayback,
@@ -12,10 +9,9 @@ import { noteDisplaySegments } from "../lib/note-display.js";
 import { pedalDisplaySegment } from "../lib/pedal-display.js";
 import { pianoLayout } from "../lib/piano-layout.js";
 import {
-  moveScoreCursor,
-  scoreAttackAtSample,
   type ScoreAlignment,
 } from "../lib/score-alignment.js";
+import { MusicXmlScore } from "./musicxml-score.js";
 import type {
   EventRevision,
   Horizon,
@@ -264,6 +260,7 @@ function ScorePreview({
   scoreHorizonSample,
   inspectionSample,
   onGenerate,
+  onOpenReader,
 }: {
   readonly session: Session;
   readonly scoreStatus: string | null;
@@ -275,6 +272,7 @@ function ScorePreview({
   readonly scoreHorizonSample: number | undefined;
   readonly inspectionSample: number | null;
   readonly onGenerate: () => void;
+  readonly onOpenReader: () => void;
 }) {
   return (
     <section className="view-card score-card">
@@ -283,14 +281,25 @@ function ScorePreview({
           <p className="eyebrow">Stable notation snapshot</p>
           <h3>Committed score</h3>
         </div>
-        <button
-          className="button small"
-          type="button"
-          disabled={!scoreAvailable || scoreStatus === "running"}
-          onClick={onGenerate}
-        >
-          {scoreXml ? "Refresh score" : "Render committed score"}
-        </button>
+        <div className="score-heading-actions">
+          {scoreXml && (
+            <button
+              className="button small secondary"
+              type="button"
+              onClick={onOpenReader}
+            >
+              Open score reader
+            </button>
+          )}
+          <button
+            className="button small"
+            type="button"
+            disabled={!scoreAvailable || scoreStatus === "running"}
+            onClick={onGenerate}
+          >
+            {scoreXml ? "Refresh score" : "Render committed score"}
+          </button>
+        </div>
       </div>
       <p className={`score-state ${scoreStatus ?? "idle"}`}>
         {!scoreAvailable
@@ -341,98 +350,6 @@ function ScorePreview({
   );
 }
 
-function MusicXmlScore({
-  xml,
-  alignment,
-  inspectionSample,
-  scoreHorizonSample,
-}: {
-  readonly xml: string;
-  readonly alignment: ScoreAlignment | undefined;
-  readonly inspectionSample: number | null;
-  readonly scoreHorizonSample: number | undefined;
-}) {
-  const target = useRef<HTMLDivElement>(null);
-  const renderer = useRef<OsmdRenderer | null>(null);
-  const priorTargetQuarter = useRef<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [renderVersion, setRenderVersion] = useState(0);
-
-  useEffect(() => {
-    const container = target.current;
-    if (!container) return;
-    let cancelled = false;
-    let currentRenderer: OsmdRenderer | null = null;
-    renderer.current = null;
-    priorTargetQuarter.current = null;
-    setError(null);
-    void import("opensheetmusicdisplay")
-      .then(async ({ OpenSheetMusicDisplay }) => {
-        if (cancelled) return;
-        const next = new OpenSheetMusicDisplay(container, {
-          autoResize: true,
-          backend: "svg",
-          drawTitle: false,
-          drawingParameters: "compacttight",
-          followCursor: true,
-          cursorsOptions: [
-            {
-              type: 1,
-              color: "#2fbe8c",
-              alpha: 0.82,
-              follow: true,
-            },
-          ],
-        });
-        currentRenderer = next;
-        await next.load(xml);
-        if (!cancelled) {
-          next.render();
-          next.cursor.SkipInvisibleNotes = true;
-          next.cursor.hide();
-          renderer.current = next;
-          setRenderVersion((value) => value + 1);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setError("Notation rendering failed.");
-      });
-    return () => {
-      cancelled = true;
-      if (renderer.current === currentRenderer) renderer.current = null;
-      currentRenderer?.clear();
-      container.replaceChildren();
-    };
-  }, [xml]);
-
-  useEffect(() => {
-    const cursor = renderer.current?.cursor;
-    if (!cursor) return;
-    const targetQuarter = scoreAttackAtSample(
-      alignment,
-      inspectionSample,
-      scoreHorizonSample,
-    );
-    priorTargetQuarter.current = moveScoreCursor(
-      cursor,
-      targetQuarter,
-      priorTargetQuarter.current,
-    );
-  }, [
-    alignment,
-    inspectionSample,
-    renderVersion,
-    scoreHorizonSample,
-  ]);
-
-  return (
-    <div className="score-paper rendered">
-      <div ref={target} aria-label="Rendered committed MusicXML score" />
-      {error && <p className="score-render-error" role="status">{error}</p>}
-    </div>
-  );
-}
-
 export function PerformanceViews({
   session,
   events,
@@ -452,6 +369,7 @@ export function PerformanceViews({
   audioUnavailableReason,
   onInspect,
   onGenerateScore,
+  onOpenScoreReader,
 }: {
   readonly session: Session;
   readonly events: readonly EventRevision[];
@@ -471,6 +389,7 @@ export function PerformanceViews({
   readonly audioUnavailableReason: string;
   readonly onInspect: (sample: number | null) => void;
   readonly onGenerateScore: () => void;
+  readonly onOpenScoreReader: () => void;
 }) {
   return (
     <div className="performance-views">
@@ -494,6 +413,7 @@ export function PerformanceViews({
           scoreHorizonSample={scoreHorizonSample}
           inspectionSample={inspectionSample}
           onGenerate={onGenerateScore}
+          onOpenReader={onOpenScoreReader}
         />
       )}
       {showRoll && (

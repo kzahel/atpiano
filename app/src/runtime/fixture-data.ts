@@ -18,6 +18,132 @@ const workspaceId = "local";
 const sampleRate = 48_000;
 const primarySessionId = "20260726T100000-abcdef123456";
 const hash = "d".repeat(64);
+const scoreHash = "8ad10edb9214c4c428225789d5eb6b6f7611c87f48cc8526b42bf5ea5c411e1d";
+const fixtureSteps = ["C", "E", "G", "B", "A", "F", "D", "G"] as const;
+const fixtureAdditionalMeasures = Array.from({ length: 104 }, (_, index) => {
+  const number = index + 17;
+  const step = fixtureSteps[index % fixtureSteps.length]!;
+  const authoredBreak = number === 61
+    ? "<print new-page=\"yes\"/>"
+    : "";
+  const finalBarline = number === 120
+    ? "<barline location=\"right\"><bar-style>light-heavy</bar-style></barline>"
+    : "";
+  return `    <measure number="${number}">
+      ${authoredBreak}
+      <note><pitch><step>${step}</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>${step}</step><octave>3</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+      ${finalBarline}
+    </measure>`;
+}).join("\n");
+
+export const fixtureScoreMusicXml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <work><work-title>Morning progression</work-title></work>
+  <part-list>
+    <score-part id="P1">
+      <part-name>Piano</part-name>
+      <score-instrument id="P1-I1"><instrument-name>Piano</instrument-name></score-instrument>
+      <midi-instrument id="P1-I1"><midi-channel>1</midi-channel><midi-program>1</midi-program></midi-instrument>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <key><fifths>0</fifths></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <staves>2</staves>
+        <clef number="1"><sign>G</sign><line>2</line></clef>
+        <clef number="2"><sign>F</sign><line>4</line></clef>
+      </attributes>
+      <direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>72</per-minute></metronome></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>C</step><octave>3</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+    <measure number="2">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>E</step><octave>3</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>G</step><octave>2</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+    <measure number="4">
+      <note><pitch><step>C</step><octave>5</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>C</step><octave>3</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+    <measure number="5">
+      <print new-system="yes"/>
+      <note><pitch><step>A</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>A</step><octave>2</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+    <measure number="6">
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>F</step><octave>3</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+    <measure number="7">
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>D</step><octave>3</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+    <measure number="8">
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>G</step><octave>2</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+    <measure number="9">
+      <print new-system="yes"/>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>F</step><octave>2</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+    <measure number="10">
+      <note><pitch><step>A</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>A</step><octave>2</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+    <measure number="11">
+      <note><pitch><step>B</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>B</step><octave>2</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+    <measure number="12">
+      <note><pitch><step>E</step><octave>5</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>E</step><octave>3</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+    <measure number="13">
+      <print new-system="yes"/>
+      <note><pitch><step>D</step><octave>5</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>D</step><octave>3</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+    <measure number="14">
+      <note><pitch><step>C</step><octave>5</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>C</step><octave>3</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+    <measure number="15">
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>G</step><octave>2</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+    <measure number="16">
+      <note><pitch><step>C</step><octave>5</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>C</step><octave>3</octave></pitch><duration>16</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+    </measure>
+${fixtureAdditionalMeasures}
+  </part>
+</score-partwise>`;
 
 const workspace: Workspace = {
   schema_version: schemaVersion,
@@ -158,7 +284,7 @@ function artifact(target: Session, kind: Artifact["kind"], filename: string): Ar
           ? "audio/midi"
           : "application/json",
     filename,
-    sha256: hash,
+    sha256: kind === "musicxml" ? scoreHash : hash,
     byte_count: kind === "musicxml" ? 82_104 : 4_096,
     source_horizon_sample:
       kind === "musicxml" || kind === "score-alignment"
@@ -215,12 +341,8 @@ function record(
           (right.offset_sample! - right.onset_sample) ||
         left.event_id.localeCompare(right.event_id),
     );
-  const alignment = {
-    schema_version: "atpiano.score-alignment.v1",
-    session_id: value.session_id,
-    sample_rate_hz: value.sample_rate_hz,
-    musicxml: { sha256: hash },
-    rows: mappedNotes.map((event, index) => ({
+  const alignmentRows = [
+    ...mappedNotes.map((event, index) => ({
       source_index: index,
       event_id: event.event_id,
       pitch: event.pitch,
@@ -228,10 +350,33 @@ function record(
       offset_sample: event.offset_sample,
       status: "mapped",
       score_time_quarters: {
-        numerator: Math.floor(index / 3),
+        numerator: index * 4,
         denominator: 1,
       },
     })),
+    ...Array.from({ length: 104 }, (_, index) => {
+      const sourceIndex = mappedNotes.length + index;
+      const onsetSample = 1_152_000 + index * 7_000;
+      return {
+        source_index: sourceIndex,
+        event_id: `fixture-score-note:${value.session_id}:${sourceIndex}`,
+        pitch: 48 + (index % 24),
+        onset_sample: onsetSample,
+        offset_sample: onsetSample + 4_000,
+        status: "mapped",
+        score_time_quarters: {
+          numerator: sourceIndex * 4,
+          denominator: 1,
+        },
+      };
+    }),
+  ];
+  const alignment = {
+    schema_version: "atpiano.score-alignment.v1",
+    session_id: value.session_id,
+    sample_rate_hz: value.sample_rate_hz,
+    musicxml: { sha256: scoreHash },
+    rows: alignmentRows,
   };
   const access = Object.fromEntries(
     artifacts.map((item): [string, ArtifactAccess] => [
@@ -244,7 +389,9 @@ function record(
         media_type: item.media_type,
         download_name: item.filename,
         url:
-          item.kind === "score-alignment"
+          item.kind === "musicxml"
+            ? `data:application/vnd.recordare.musicxml+xml,${encodeURIComponent(fixtureScoreMusicXml)}`
+          : item.kind === "score-alignment"
             ? `data:application/json,${encodeURIComponent(JSON.stringify(alignment))}`
             : `data:text/plain,Deterministic%20${encodeURIComponent(item.filename)}`,
         expires_at: null,

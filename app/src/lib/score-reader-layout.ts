@@ -13,6 +13,7 @@ export interface ScoreReaderLayout {
 export interface ScorePageAnchor {
   readonly pageIndex: number;
   readonly firstMeasureOrdinal: number;
+  readonly firstScoreQuarter: number | null;
 }
 
 const a4Width = 210;
@@ -102,6 +103,23 @@ export function pageForMeasure(
   let page = 0;
   for (const candidate of pages) {
     if (candidate.firstMeasureOrdinal > measureOrdinal) break;
+    page = candidate.pageIndex;
+  }
+  return page;
+}
+
+export function pageForScoreQuarter(
+  pages: readonly ScorePageAnchor[],
+  scoreQuarter: number,
+): number {
+  let page = 0;
+  for (const candidate of pages) {
+    if (
+      candidate.firstScoreQuarter !== null &&
+      candidate.firstScoreQuarter > scoreQuarter
+    ) {
+      break;
+    }
     page = candidate.pageIndex;
   }
   return page;

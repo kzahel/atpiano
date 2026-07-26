@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   pageForMeasure,
+  pageForScoreQuarter,
   scoreReaderLayout,
   spreadStart,
 } from "../../src/lib/score-reader-layout.js";
@@ -37,13 +38,14 @@ describe("score reader layout", () => {
 
   it("restores the page containing a measure anchor", () => {
     const pages = [
-      { pageIndex: 0, firstMeasureOrdinal: 0 },
-      { pageIndex: 1, firstMeasureOrdinal: 4 },
-      { pageIndex: 2, firstMeasureOrdinal: 9 },
+      { pageIndex: 0, firstMeasureOrdinal: 0, firstScoreQuarter: 0 },
+      { pageIndex: 1, firstMeasureOrdinal: 4, firstScoreQuarter: 16 },
+      { pageIndex: 2, firstMeasureOrdinal: 9, firstScoreQuarter: 36 },
     ];
 
     expect(pageForMeasure(pages, 0)).toBe(0);
     expect(pageForMeasure(pages, 7)).toBe(1);
     expect(pageForMeasure(pages, 99)).toBe(2);
+    expect(pageForScoreQuarter(pages, 20)).toBe(1);
   });
 });

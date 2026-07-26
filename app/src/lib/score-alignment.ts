@@ -210,6 +210,22 @@ export function scoreAttackAtSample(
   return null;
 }
 
+export function sourceSampleAtScoreQuarter(
+  alignment: ScoreAlignment | undefined,
+  scoreQuarter: number | null,
+): number | null {
+  if (alignment === undefined || scoreQuarter === null) return null;
+  let lastMappedSample: number | null = null;
+  for (const row of alignment.rows) {
+    if (row.status !== "mapped" || row.score_time_quarters === null) continue;
+    lastMappedSample = row.onset_sample;
+    if (scoreRationalValue(row.score_time_quarters) >= scoreQuarter) {
+      return row.onset_sample;
+    }
+  }
+  return lastMappedSample;
+}
+
 function cursorQuarter(cursor: ScoreCursorLike): number {
   return cursor.Iterator.CurrentSourceTimestamp.RealValue * 4;
 }

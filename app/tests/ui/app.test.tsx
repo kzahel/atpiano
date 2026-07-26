@@ -25,6 +25,7 @@ function renderApp(runtime: AtpianoRuntime = createFixtureRuntime()) {
 describe("shared application", () => {
   beforeEach(() => {
     window.history.replaceState(null, "", "/");
+    window.localStorage.removeItem("atpiano.score-reader-density");
     useWorkspaceStore.setState({
       selectedSessionId: null,
       newIntent: false,
@@ -96,6 +97,180 @@ describe("shared application", () => {
       expect(new URL(window.location.href).searchParams.get("session")).toBe(
         "20260725T201500-bbbbbbbbbbbb",
       ),
+    );
+  });
+
+  it("opens the exact score snapshot in a dedicated page reader", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("heading", { name: "Morning progression" });
+
+    await user.click(
+      await screen.findByRole("button", { name: "Open score reader" }),
+    );
+
+    expect(screen.getByRole("button", { name: /Workspace/ })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Piano roll" })).toBeNull();
+    expect(screen.getByText("Page 1 of 4")).toBeTruthy();
+    const route = new URL(window.location.href).searchParams;
+    expect(route.get("view")).toBe("score");
+    expect(route.get("score")).toBe(
+      "artifact:20260726T100000-abcdef123456:musicxml",
+    );
+    expect(route.get("score_sha")).toMatch(/^[0-9a-f]{64}$/);
+    expect(route.get("score_horizon")).toBe(String(48_000 * 41));
+    expect(route.get("alignment")).toBe(
+      "artifact:20260726T100000-abcdef123456:score-alignment",
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Next score page" }),
+    );
+    expect(screen.getByText("Page 2 of 4")).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "PageDown" });
+    expect(screen.getByText("Page 3 of 4")).toBeTruthy();
+
+    const density = screen.getByLabelText("Density");
+    await user.selectOptions(density, "compact");
+    await waitFor(() =>
+      expect(screen.getByText("Page 3 of 4")).toBeTruthy()
+    );
+    expect(
+      window.localStorage.getItem("atpiano.score-reader-density"),
+    ).toBe("compact");
+
+    fireEvent.keyDown(density, { key: "PageDown" });
+    expect(screen.getByText("Page 3 of 4")).toBeTruthy();
+
+    const reader = screen.getByLabelText("Score page reader");
+    fireEvent.pointerDown(reader, { clientX: 180 });
+    fireEvent.pointerUp(reader, { clientX: 260 });
+    expect(screen.getByText("Page 2 of 4")).toBeTruthy();
+
+    await user.click(
+      screen.getByRole("button", { name: "Enter fullscreen" }),
+    );
+    expect(
+      await screen.findByText("Browser fullscreen is unavailable."),
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: /Workspace/ }));
+    expect(
+      await screen.findByRole("heading", { name: "Piano roll" }),
+    ).toBeTruthy();
+    expect(new URL(window.location.href).searchParams.get("view")).toBeNull();
+  });
+
+  it("reloads a pinned score route without resolving it as current", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/?session=20260726T100000-abcdef123456" +
+        "&view=score" +
+        "&score=artifact%3A20260726T100000-abcdef123456%3Amusicxml" +
+        "&score_sha=8ad10edb9214c4c428225789d5eb6b6f7611c87f48cc8526b42bf5ea5c411e1d" +
+        `&score_horizon=${48_000 * 41}` +
+        "&alignment=artifact%3A20260726T100000-abcdef123456%3Ascore-alignment",
+    );
+
+    renderApp();
+
+    expect(
+      await screen.findByRole("button", { name: /Workspace/ }),
+    ).toBeTruthy();
+    expect(await screen.findByText("Page 1 of 4")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Piano roll" })).toBeNull();
+  });
+
+  it("returns from reader mode with ordinary browser Back", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("heading", { name: "Morning progression" });
+    await user.click(
+      await screen.findByRole("button", { name: "Open score reader" }),
+    );
+    expect(await screen.findByText("Page 1 of 4")).toBeTruthy();
+
+    window.history.back();
+
+    expect(
+      await screen.findByRole("heading", { name: "Piano roll" }),
+    ).toBeTruthy();
+    expect(new URL(window.location.href).searchParams.get("view")).toBeNull();
+  });
+
+  it("refuses pinned MusicXML whose bytes do not match the route", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/?session=20260726T100000-abcdef123456" +
+        "&view=score" +
+        "&score=artifact%3A20260726T100000-abcdef123456%3Amusicxml" +
+        `&score_sha=${"0".repeat(64)}` +
+        `&score_horizon=${48_000 * 41}`,
+    );
+
+    renderApp();
+
+    expect(
+      await screen.findByText("The pinned score could not load."),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Workspace/ })).toBeTruthy();
+  });
+
+  it("keeps a pinned score visible until a newer one is chosen", async () => {
+    const fixture = createFixtureRuntime();
+    const runtime = new Proxy(fixture, {
+      get(target, property) {
+        if (property === "listArtifacts") {
+          return async (
+            ...args: Parameters<AtpianoRuntime["listArtifacts"]>
+          ) => {
+            const page = await target.listArtifacts(...args);
+            return {
+              ...page,
+              items: page.items.map((artifact) =>
+                artifact.kind === "musicxml"
+                  ? {
+                      ...artifact,
+                      artifact_id: "artifact:newer-score",
+                      sha256: "1".repeat(64),
+                    }
+                  : artifact,
+              ),
+            };
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) satisfies AtpianoRuntime;
+    window.history.replaceState(
+      null,
+      "",
+      "/?session=20260726T100000-abcdef123456" +
+        "&view=score" +
+        "&score=artifact%3A20260726T100000-abcdef123456%3Amusicxml" +
+        "&score_sha=8ad10edb9214c4c428225789d5eb6b6f7611c87f48cc8526b42bf5ea5c411e1d" +
+        `&score_horizon=${48_000 * 41}`,
+    );
+    const user = userEvent.setup();
+
+    renderApp(runtime);
+
+    expect(await screen.findByText("Page 1 of 4")).toBeTruthy();
+    const update = await screen.findByRole("button", {
+      name: /A newer committed score is available/,
+    });
+    expect(new URL(window.location.href).searchParams.get("score")).not.toBe(
+      "artifact:newer-score",
+    );
+
+    await user.click(update);
+
+    expect(new URL(window.location.href).searchParams.get("score")).toBe(
+      "artifact:newer-score",
     );
   });
 

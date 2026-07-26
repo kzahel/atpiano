@@ -14,12 +14,21 @@ import { ArtifactPanel } from "./components/artifact-panel.js";
 import type { AudioPlaybackSource } from "./components/audio-playback.js";
 import { CaptureDeck } from "./components/capture-deck.js";
 import { PerformanceViews } from "./components/performance-views.js";
+import { ScoreReader } from "./components/score-reader.js";
 import { SessionRail } from "./components/session-rail.js";
 import { useMicrophone } from "./hooks/use-microphone.js";
+import { artifactText } from "./lib/artifact-content.js";
 import { eventWindow, liveFrameCount } from "./lib/event-window.js";
 import { formatClock, formatSessionDate, requestId } from "./lib/format.js";
 import { parseScoreAlignment } from "./lib/score-alignment.js";
-import { sessionIdFromUrl, urlForSession } from "./lib/session-url.js";
+import {
+  scoreReaderRouteFromUrl,
+  sessionIdFromUrl,
+  urlForScoreReader,
+  urlForSession,
+  urlWithoutScoreReader,
+  type ScoreReaderRoute,
+} from "./lib/session-url.js";
 import type {
   Artifact,
   EventPage,
@@ -89,6 +98,10 @@ export function App() {
   const [scoreJob, setScoreJob] = useState<Job | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [routeReady, setRouteReady] = useState(false);
+  const [scoreReaderRoute, setScoreReaderRoute] =
+    useState<ScoreReaderRoute | null>(() =>
+      scoreReaderRouteFromUrl(window.location.href)
+    );
   const [pendingAutoScoreSessionId, setPendingAutoScoreSessionId] =
     useState<string | null>(null);
   const [autoScoringSessionId, setAutoScoringSessionId] =
@@ -138,6 +151,16 @@ export function App() {
     const requestedSession = sessionIdFromUrl(window.location.href);
     if (requestedSession) selectSession(requestedSession);
     setRouteReady(true);
+  }, [selectSession]);
+
+  useEffect(() => {
+    const restoreRoute = () => {
+      const requestedSession = sessionIdFromUrl(window.location.href);
+      if (requestedSession) selectSession(requestedSession);
+      setScoreReaderRoute(scoreReaderRouteFromUrl(window.location.href));
+    };
+    window.addEventListener("popstate", restoreRoute);
+    return () => window.removeEventListener("popstate", restoreRoute);
   }, [selectSession]);
 
   useEffect(() => {
@@ -265,22 +288,15 @@ export function App() {
   });
   const scoreXml = useQuery({
     queryKey: ["artifact-content", scoreArtifact?.artifact_id],
-    queryFn: async ({ signal }) => {
-      const access = await runtime.getArtifactAccess(
+    queryFn: ({ signal }) =>
+      artifactText(
+        runtime,
         scoreArtifact!.workspace_id,
         scoreArtifact!.session_id,
         scoreArtifact!.artifact_id,
-        { requestId: requestId("score-content"), signal },
-      );
-      const response = await fetch(
-        new URL(access.url, window.location.origin),
-        { signal },
-      );
-      if (!response.ok) {
-        throw new Error(`MusicXML download failed: HTTP ${response.status}`);
-      }
-      return response.text();
-    },
+        scoreArtifact!.sha256,
+        signal,
+      ),
     enabled: scoreArtifact !== undefined,
     staleTime: Infinity,
   });
@@ -314,6 +330,65 @@ export function App() {
     enabled:
       scoreArtifact !== undefined &&
       scoreAlignmentArtifact !== undefined,
+    staleTime: Infinity,
+  });
+  const readerScoreXml = useQuery({
+    queryKey: [
+      "reader-score-content",
+      workspace?.workspace_id,
+      selectedSessionId,
+      scoreReaderRoute?.artifactId,
+      scoreReaderRoute?.sha256,
+    ],
+    queryFn: ({ signal }) =>
+      artifactText(
+        runtime,
+        workspace!.workspace_id,
+        selectedSessionId!,
+        scoreReaderRoute!.artifactId,
+        scoreReaderRoute!.sha256,
+        signal,
+      ),
+    enabled:
+      workspace !== undefined &&
+      selectedSessionId !== null &&
+      scoreReaderRoute !== null,
+    staleTime: Infinity,
+  });
+  const readerScoreAlignment = useQuery({
+    queryKey: [
+      "reader-score-alignment",
+      workspace?.workspace_id,
+      selectedSessionId,
+      scoreReaderRoute?.artifactId,
+      scoreReaderRoute?.alignmentArtifactId,
+    ],
+    queryFn: async ({ signal }) => {
+      const access = await runtime.getArtifactAccess(
+        workspace!.workspace_id,
+        selectedSessionId!,
+        scoreReaderRoute!.alignmentArtifactId!,
+        { requestId: requestId("reader-score-alignment"), signal },
+      );
+      const response = await fetch(
+        new URL(access.url, window.location.origin),
+        { signal },
+      );
+      if (!response.ok) {
+        throw new Error(
+          `Score alignment download failed: HTTP ${response.status}`,
+        );
+      }
+      return parseScoreAlignment(await response.json(), {
+        sessionId: selectedSessionId!,
+        musicXmlSha256: scoreReaderRoute!.sha256,
+      });
+    },
+    enabled:
+      workspace !== undefined &&
+      selectedSessionId !== null &&
+      scoreReaderRoute?.alignmentArtifactId !== null &&
+      scoreReaderRoute?.alignmentArtifactId !== undefined,
     staleTime: Infinity,
   });
   const scoreJobQuery = useQuery({
@@ -590,6 +665,67 @@ export function App() {
     }
   }, [runtime]);
 
+  const downloadPinnedScore = useCallback(async () => {
+    if (!workspace || !selectedSessionId || !scoreReaderRoute) return;
+    try {
+      const access = await runtime.getArtifactAccess(
+        workspace.workspace_id,
+        selectedSessionId,
+        scoreReaderRoute.artifactId,
+        { requestId: requestId("reader-score-download") },
+      );
+      const link = document.createElement("a");
+      link.href = new URL(access.url, window.location.origin).href;
+      link.download = access.download_name;
+      link.click();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error));
+    }
+  }, [runtime, scoreReaderRoute, selectedSessionId, workspace]);
+
+  const currentScoreRoute = useMemo<ScoreReaderRoute | null>(
+    () =>
+      scoreArtifact
+        ? {
+            artifactId: scoreArtifact.artifact_id,
+            sha256: scoreArtifact.sha256,
+            sourceHorizonSample: scoreArtifact.source_horizon_sample,
+            alignmentArtifactId:
+              scoreAlignmentArtifact?.artifact_id ?? null,
+          }
+        : null,
+    [scoreAlignmentArtifact?.artifact_id, scoreArtifact],
+  );
+
+  const openScoreReader = useCallback(() => {
+    if (!currentScoreRoute) return;
+    window.history.pushState(
+      null,
+      "",
+      urlForScoreReader(window.location.href, currentScoreRoute),
+    );
+    setScoreReaderRoute(currentScoreRoute);
+  }, [currentScoreRoute]);
+
+  const useCurrentScore = useCallback(() => {
+    if (!currentScoreRoute) return;
+    window.history.replaceState(
+      null,
+      "",
+      urlForScoreReader(window.location.href, currentScoreRoute),
+    );
+    setScoreReaderRoute(currentScoreRoute);
+  }, [currentScoreRoute]);
+
+  const closeScoreReader = useCallback(() => {
+    window.history.replaceState(
+      null,
+      "",
+      urlWithoutScoreReader(window.location.href),
+    );
+    setScoreReaderRoute(null);
+  }, []);
+
   const selected = selectedSession.data;
   const selectedFrames = selected
     ? liveFrameCount(
@@ -618,6 +754,39 @@ export function App() {
   const scoreStatus = selectedScoreJob?.status ?? (
     selected?.available_artifact_kinds.includes("musicxml") ? "complete" : null
   );
+
+  if (scoreReaderRoute !== null) {
+    if (!selected) {
+      return (
+        <div className="score-reader reader-boot" role="status">
+          <strong>Opening pinned score…</strong>
+          <span>
+            Loading its session and exact MusicXML snapshot.
+          </span>
+          {(selectedSession.isError || workspaces.isError) && (
+            <button type="button" onClick={closeScoreReader}>
+              Return to workspace
+            </button>
+          )}
+        </div>
+      );
+    }
+    return (
+      <ScoreReader
+        route={scoreReaderRoute}
+        session={selected}
+        xml={readerScoreXml.data}
+        xmlError={readerScoreXml.error}
+        alignment={readerScoreAlignment.data}
+        alignmentError={readerScoreAlignment.error}
+        inspectionSample={inspectionSample}
+        currentArtifactId={scoreArtifact?.artifact_id}
+        onClose={closeScoreReader}
+        onUseCurrent={useCurrentScore}
+        onDownload={() => void downloadPinnedScore()}
+      />
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -838,6 +1007,7 @@ export function App() {
               }
               onInspect={setInspectionSample}
               onGenerateScore={() => void generateScore()}
+              onOpenScoreReader={openScoreReader}
             />
 
             <ArtifactPanel

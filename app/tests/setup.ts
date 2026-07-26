@@ -14,3 +14,93 @@ Object.defineProperty(window, "matchMedia", {
     removeEventListener: vi.fn(),
   })),
 });
+
+const localValues = new Map<string, string>();
+Object.defineProperty(window, "localStorage", {
+  configurable: true,
+  value: {
+    getItem(key: string) {
+      return localValues.get(key) ?? null;
+    },
+    setItem(key: string, value: string) {
+      localValues.set(key, String(value));
+    },
+    removeItem(key: string) {
+      localValues.delete(key);
+    },
+    clear() {
+      localValues.clear();
+    },
+  },
+});
+
+vi.mock("opensheetmusicdisplay", () => ({
+  OpenSheetMusicDisplay: class {
+    readonly #container: HTMLElement;
+    Zoom = 1;
+    readonly EngravingRules = {
+      NewPageAtXMLNewPageAttribute: false,
+      NewSystemAtXMLNewPageAttribute: false,
+      NewSystemAtXMLNewSystemAttribute: false,
+    };
+    readonly cursor = {
+      SkipInvisibleNotes: true,
+      Iterator: {
+        CurrentSourceTimestamp: { RealValue: 0 },
+        EndReached: false,
+      },
+      reset() {
+        this.Iterator.CurrentSourceTimestamp.RealValue = 0;
+        this.Iterator.EndReached = false;
+      },
+      next() {
+        this.Iterator.CurrentSourceTimestamp.RealValue += 1;
+        if (this.Iterator.CurrentSourceTimestamp.RealValue >= 16) {
+          this.Iterator.EndReached = true;
+        }
+      },
+      show() {},
+      hide() {},
+    };
+    readonly GraphicSheet = {
+      MusicPages: [0, 4, 8, 12].map((measure) => ({
+        MusicSystems: [{
+          GraphicalMeasures: [[{
+            parentSourceMeasure: { measureListIndex: measure },
+          }]],
+          GetSystemsFirstTimeStamp: () => ({ RealValue: measure }),
+        }],
+      })),
+    };
+
+    constructor(container: HTMLElement) {
+      this.#container = container;
+    }
+
+    setPageFormat() {}
+
+    setCustomPageFormat() {}
+
+    async load() {}
+
+    render() {
+      this.#container.replaceChildren(
+        ...this.GraphicSheet.MusicPages.map((_, index) => {
+          const page = document.createElement("div");
+          page.id = `osmdCanvasPage${index}`;
+          const svg = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "svg",
+          );
+          svg.setAttribute("aria-label", `Fixture score page ${index + 1}`);
+          page.append(svg);
+          return page;
+        }),
+      );
+    }
+
+    clear() {
+      this.#container.replaceChildren();
+    }
+  },
+}));

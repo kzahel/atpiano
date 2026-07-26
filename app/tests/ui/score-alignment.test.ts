@@ -4,6 +4,7 @@ import {
   moveScoreCursor,
   parseScoreAlignment,
   scoreAttackAtSample,
+  sourceSampleAtScoreQuarter,
   type ScoreCursorLike,
 } from "../../src/lib/score-alignment.js";
 
@@ -68,6 +69,9 @@ describe("score playback alignment", () => {
     expect(scoreAttackAtSample(alignment, 80_000, 144_000)).toBe(2);
     expect(scoreAttackAtSample(alignment, 96_000, 144_000)).toBe(3.5);
     expect(scoreAttackAtSample(alignment, 144_001, 144_000)).toBeNull();
+    expect(sourceSampleAtScoreQuarter(alignment, 2)).toBe(48_000);
+    expect(sourceSampleAtScoreQuarter(alignment, 3)).toBe(96_000);
+    expect(sourceSampleAtScoreQuarter(alignment, 99)).toBe(96_000);
   });
 
   it("rejects alignment from another MusicXML snapshot", () => {
