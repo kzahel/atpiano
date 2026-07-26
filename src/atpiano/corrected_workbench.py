@@ -503,7 +503,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                     and self._score_commit_sample == commit_sample
                 ):
                     self._score_status = "failed"
-                    self._score_error = f"{type(error).__name__}: {error}"
+                    self._score_error = str(error)
                     self._score_completed_at = datetime.now(timezone.utc)
         else:
             with self.score_lock:

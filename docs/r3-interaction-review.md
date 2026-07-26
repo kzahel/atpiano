@@ -240,8 +240,8 @@ unchanged.
 The exact screenshot session now demonstrates the guard end to end:
 
 ```text
-RuntimeError: score output failed sanity check:
-491 pitched notes from 13 input notes
+Generated score was rejected because it expanded 13 input notes into 491
+notation notes. The recording and committed MIDI are unchanged.
 ```
 
 No engraving or MusicXML download is shown for that rejected result.

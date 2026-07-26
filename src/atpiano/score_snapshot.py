@@ -63,8 +63,9 @@ def _validate_score_output(note_count: int, summary: dict[str, Any]) -> None:
         return
     output_notes = summary.get("pitched_note_elements")
     raise RuntimeError(
-        "score output failed sanity check: "
-        f"{output_notes} pitched notes from {note_count} input notes"
+        "Generated score was rejected because it expanded "
+        f"{note_count} input notes into {output_notes} notation notes. "
+        "The recording and committed MIDI are unchanged."
     )
 
 
