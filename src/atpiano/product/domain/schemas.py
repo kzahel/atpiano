@@ -185,9 +185,8 @@ class Session(ProductModel):
 
     @model_validator(mode="after")
     def validate_lifecycle(self) -> Session:
-        if self.status in {SessionStatus.COMPLETE, SessionStatus.FAILED}:
-            if self.completed_at is None:
-                raise ValueError("completed or failed session requires completed_at")
+        if self.status is SessionStatus.COMPLETE and self.completed_at is None:
+            raise ValueError("completed session requires completed_at")
         if self.status in {SessionStatus.ACTIVE, SessionStatus.STOPPING}:
             if self.completed_at is not None:
                 raise ValueError("active or stopping session cannot have completed_at")
