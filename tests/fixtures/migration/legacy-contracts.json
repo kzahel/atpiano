@@ -1,0 +1,165 @@
+{
+  "fixture": {
+    "audio": {
+      "channels": 1,
+      "duration_s": 42.0,
+      "first_sample_index": 0,
+      "format": "wav-pcm-s16le",
+      "frame_count": 2016000,
+      "path": "fixture.wav",
+      "sample_rate_hz": 48000,
+      "sha256": "0eab5d787cb482735dc840daaed2abfb6d00ad6ff7a7058fdd217522905aaa89"
+    },
+    "reference": {
+      "control_interval_count": 17,
+      "format": "standard-midi-file",
+      "note_count": 198,
+      "path": "reference.mid",
+      "sha256": "d24635a3f75d83dd8ff40e9513475dc43064e1dbb29fd836345f2057da0ec7d9"
+    },
+    "renderer": {
+      "name": "atpiano deterministic musical harmonic synthesizer",
+      "release_s": 0.08,
+      "sample_rate_hz": 48000,
+      "version": "musical-harmonic-v1"
+    },
+    "structure": {
+      "lead_s": 1.0,
+      "meter": {
+        "denominator": 4,
+        "numerator": 4
+      },
+      "music_s": 40.0,
+      "progression": [
+        "C",
+        "G/B",
+        "Am",
+        "F",
+        "Dm",
+        "G7",
+        "C",
+        "C"
+      ],
+      "tail_s": 1.0,
+      "tempo_bpm": 96
+    }
+  },
+  "schema_version": "atpiano.migration-legacy-contracts.v1",
+  "v1_config": {
+    "live": {
+      "commit_horizon_s": 1.0,
+      "enabled": true,
+      "hop_s": 0.25,
+      "schema_version": "atpiano.live-stream.v1",
+      "transport": "same-origin loopback WebSocket PCM16"
+    },
+    "max_upload_bytes": 67108864,
+    "mode": "workbench",
+    "schema_version": "atpiano.workbench-config.v1"
+  },
+  "v2_config": {
+    "max_visible_range_s": 120.0,
+    "mode": "corrected-workbench-v2",
+    "replay": {
+      "configured": false,
+      "manifest": null,
+      "realtime": true,
+      "repeat": 1,
+      "silence_s": 0.0
+    },
+    "schema_version": "atpiano.corrected-workbench.v1",
+    "score": {
+      "available": true,
+      "injected_runner": true
+    },
+    "stream_schema": "atpiano.corrected-stream.v1"
+  },
+  "v2_events": {
+    "history": [],
+    "history_truncated": false,
+    "materialized": [],
+    "next_sequence": 0,
+    "range": {
+      "end_sample": 8,
+      "start_sample": 0
+    },
+    "schema_version": "atpiano.corrected-stream.v1",
+    "session_id": "20260726T000000-012345abcdef"
+  },
+  "v2_exports": {
+    "jsonl": {
+      "event_count": 0,
+      "history": "all append-only revisions in global sequence order",
+      "path": "session.jsonl"
+    },
+    "midi": {
+      "note_count": 0,
+      "path": "session.mid",
+      "pedal_interval_count": 0,
+      "selection": "latest committed revision per identity"
+    },
+    "schema_version": "atpiano.corrected-exports.v1",
+    "session_id": "20260726T000000-012345abcdef",
+    "source_timeline": {
+      "frame_count": 8,
+      "sample_rate_hz": 8000
+    }
+  },
+  "v2_score": {
+    "can_generate": false,
+    "commit_sample": 0,
+    "error": null,
+    "job": {
+      "commit_sample": null,
+      "session_id": null
+    },
+    "runtime": {
+      "available": true,
+      "injected_runner": true
+    },
+    "schema_version": "atpiano.corrected-score-state.v1",
+    "session_id": "20260726T000000-012345abcdef",
+    "snapshot": null,
+    "stale": false,
+    "status": "idle"
+  },
+  "v2_session": {
+    "duration_s": 0.001,
+    "error": null,
+    "exports_ready": true,
+    "horizons": {
+      "audio_head_sample": 8,
+      "commit_sample": 0,
+      "lag_s": {
+        "commit": 0.001,
+        "provisional": 0.001
+      },
+      "provisional_sample": 0,
+      "sample_rate_hz": 8000,
+      "schema_version": "atpiano.corrected-horizons.v1"
+    },
+    "lanes": [],
+    "schema_version": "atpiano.corrected-workbench.v1",
+    "session": {
+      "error": null,
+      "realtime": false,
+      "sample_rate_hz": 8000,
+      "schema_version": "atpiano.corrected-session.v1",
+      "session_id": "20260726T000000-012345abcdef",
+      "source": "replay",
+      "source_frame_count": 8,
+      "status": "complete"
+    },
+    "session_id": "20260726T000000-012345abcdef",
+    "status": "complete",
+    "storage": {
+      "audio_pcm_bytes": 16,
+      "minimum_free_bytes": 0
+    },
+    "transport": {
+      "last_event_sequence": 0,
+      "received_blocks": 0,
+      "recovery": "bounded indexed sequence query"
+    }
+  }
+}
