@@ -2,9 +2,10 @@
 
 Topic: performance-to-notation
 
-Status: planned on 2026-07-26; implementation has not started. Build on
-Tactical 020's implemented shared score component and exact pinned-artifact
-reader identity.
+Status: implemented on 2026-07-26. Builds on Tactical 020's shared score
+component and exact pinned-artifact reader identity. Physical piano-profile
+review and an independent MuseScore import remain manual validation rather
+than implementation blockers.
 
 ## Motivation
 
@@ -466,4 +467,99 @@ alignment evidence.
 
 ## Execution Record
 
-No implementation commits yet.
+Implemented as a four-commit series:
+
+- `e7052e9` planned the bounded semantic and product contract;
+- `8d32118` added the dependency-light clef cost, paired-key spelling,
+  semantic-invariant, and variant-identity engine;
+- `d473821` retained immutable baseline MusicXML/alignment and added the
+  isolated `music21` model-output and model-free variant adapters; and
+- `ec35bfd` exposed exact variant contracts, local HTTP operations,
+  historical artifact retention, legacy-snapshot promotion, and the shared
+  UI controls.
+
+The ordinary Python environment still does not depend on `music21`. Pure
+policy tests run there, while both semantic adapters import `music21` lazily
+inside the pinned Python 3.11 score runtime. The variant adapter accepts only
+baseline MusicXML/alignment and therefore cannot load or invoke
+MIDI2ScoreTransformer.
+
+New inference now writes:
+
+```text
+score/snapshots/<H_commit>/
+  baseline/
+    score.musicxml
+    alignment.json
+  variants/
+    score-variant-<identity>/
+      score.musicxml
+      alignment.json
+      manifest.json
+  manifest.json
+```
+
+`score/current.json` selects one immutable record without changing its bytes.
+Existing baseline-only layouts remain readable and are promoted in place on
+their first deterministic variant request; their baseline files are not
+rewritten. Repeating the same baseline/options request selects and returns the
+existing identity.
+
+The score card now:
+
+- selects the automatic clef variant by default for a new inference;
+- lists baseline, automatic, and created enharmonic variants;
+- offers **Apply automatic clefs** for a legacy baseline;
+- offers **Enharmonic key** only when the semantic report identifies a safe
+  ordinary paired signature;
+- reports `needs_review` when severe ledger lines remain; and
+- keeps the model baseline selectable and directly downloadable.
+
+The retained session was validated through the product
+`generate_score_variant` path in a copied session, leaving the original
+session untouched. Results:
+
+- baseline MusicXML remained byte-identical at SHA-256
+  `7e1b00fde0c648b79229df423ff4da6a6cff72169ae89f98d945439f827a511f`;
+- automatic variant `score-variant:3a732b1ff452b20e38b17126` reduced total
+  weighted ledger cost from 258 to 34;
+- its second part changed from bass throughout, cost 249, to treble in
+  measures 1–10 and bass in measures 11–26, cost 25, with one change;
+- six-sharp variant `score-variant:a20789374026deccc3815a22` serialized at
+  SHA-256
+  `63c983dd8e0fc54d1d07cc33aa8b8d12f6c51ac1f37eb0470356025b27dc4433`;
+- all 281 pitched elements preserved their ordered MIDI pitches and received
+  281 unique, nonempty alignment IDs;
+- the six-sharp opening includes D-sharp, A-sharp, B, G-sharp, F-sharp, and
+  E-sharp spellings;
+- both alignment artifacts independently validated all 272 source rows and
+  281 MusicXML elements;
+- the inferred 3/4 meter remained exactly 3/4 in both parts; and
+- OSMD 1.9.9 rendered automatic and enharmonic variants at a 1200 x 900
+  viewport as SVG with no horizontal overflow.
+
+The retained result correctly remains `needs_review`: one mixed-register
+measure contains both D-sharp 3 and pitches through G-sharp 4, so either
+ordinary clef requires three or more ledger lines. Mid-measure clef changes
+or staff reassignment remain outside this slice. The automatic policy still
+removes the sustained opening failure rather than claiming the entire
+model-inferred score is publication-ready.
+
+Validation commands:
+
+```text
+uv run pytest tests/test_score_postprocess.py
+uv run pytest tests/test_score_snapshot.py tests/test_score_alignment.py
+uv run pytest tests/test_api_routes.py tests/test_local_session_adapter.py
+uv run atpiano generate-contracts --check
+npm run typecheck --prefix app
+npm test --prefix app
+npm run build --prefix app
+```
+
+Focused validation passed with 12 policy tests and 21
+contract/snapshot/API tests. The complete Python regression passed 120 tests,
+Ruff passed the repository, generated contracts matched, 5 Node
+contract/runtime tests and 40 browser-component tests passed, and the
+production build succeeded. The build retains the pre-existing warning for
+the large OSMD chunk.

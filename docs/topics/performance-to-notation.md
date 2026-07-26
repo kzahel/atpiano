@@ -14,6 +14,10 @@ clock. Source identities follow the actual serialized MIDI tick, pitch, and
 duration order consumed by the transformer; the browser normalizes validated
 rows back onto raw source-sample order for playback lookup. Historical
 snapshots without alignment still render without a cursor.
+Tactical 021 now retains the model baseline and publishes deterministic
+`music21` score variants: automatic measure-span clef cleanup is the default,
+and a safe paired enharmonic signature can be selected without rerunning the
+transformer.
 This is not yet progressive engraving or a permanent consumer-stack
 selection, and the leading score converter has no published license. See
 [`008-score-pipeline-bakeoff.md`](../tactical/008-score-pipeline-bakeoff.md)
@@ -181,20 +185,25 @@ request. It must not be called an append-only engraving lane. Continuous
 notation still needs bounded musical chunks with overlap, reconciliation,
 barline ownership, and a monotonic `H_engrave`.
 
-### Deterministic score post-processing direction
+### Deterministic score post-processing
 
 [`021-deterministic-score-postprocessing.md`](../tactical/021-deterministic-score-postprocessing.md)
-owns the planned score-semantic cleanup boundary between model inference and
-MusicXML publication. The existing adapter already constructs an in-memory
-`music21.Score`; the planned pass preserves a baseline artifact, creates
-hash-addressed derived variants, and validates every result against its exact
-source alignment.
+is the implemented score-semantic cleanup boundary between model inference
+and MusicXML publication. The model adapter preserves its post-upstream
+baseline before transforming a deep copy. Baseline, automatic, and
+enharmonic interpretations have hash-derived identities and exact alignment
+hashes. Selecting another interpretation changes only `score/current.json`;
+it never mutates a pinned artifact.
 
-The first automatic policy minimizes ledger-line cost across stable treble-
-and bass-clef spans without moving notes between parts or voices. A separate
-user action creates a pitch-preserving enharmonic key variant when one
-ordinary global signature has a safe `fifths ± 12` alternative. It respells
-notes and the signature together and is explicitly not transposition.
+The automatic policy minimizes ledger-line cost across stable treble- and
+bass-clef spans without moving notes between parts or voices. Clef changes
+occur only at measure boundaries, empty measures inherit the active clef, and
+tied boundaries are blocked. A separate user action creates a
+pitch-preserving enharmonic key variant when one ordinary global signature has
+a safe `fifths ± 12` alternative. It respells notes and the signature together
+and is explicitly not transposition. The application exposes baseline and
+derived interpretations, makes the baseline downloadable, and promotes an
+older baseline-only snapshot on its first cleanup request.
 
 Retained session `20260726T142937-d49ef33ca321` motivates the slice. Its
 second part opens in sustained treble-clef range but receives the upstream
@@ -202,6 +211,20 @@ detokenizer's unconditional bass clef, and its six-flat spelling differs from
 the performer's intended six-sharp spelling for the BWV 853 fugue. Its wrong
 3/4 inference remains a separate model-quality issue and is deliberately not
 hidden by the post-processor.
+
+The retained result proves the implemented boundary. The baseline remained
+byte-identical. Automatic cleanup changed the lower part from bass throughout
+to treble for measures 1–10 and bass for 11–26, reducing its weighted ledger
+cost from 249 to 25 with one change. The six-sharp variant preserved all 281
+ordered MIDI pitches, 281 unique MusicXML IDs, 272 validated source mappings,
+and 3/4 meter while producing the expected D-sharp-minor spelling. OSMD 1.9.9
+rendered both derived files without horizontal overflow at 1200 pixels.
+
+One mixed-register measure still requires three ledger lines under the least
+bad ordinary clef, so the variant truthfully carries `needs_review`. Fixing
+that case would require a separately designed mid-measure clef or staff/voice
+operation; the current pass does not hide it or move notes between inferred
+parts.
 
 ### Responsive score reader direction
 
