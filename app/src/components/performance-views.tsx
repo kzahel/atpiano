@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { formatClock, noteName } from "../lib/format.js";
 import { pianoLayout } from "../lib/piano-layout.js";
@@ -193,12 +193,16 @@ function ScorePreview({
   session,
   scoreStatus,
   scoreAvailable,
+  scoreXml,
+  scoreXmlError,
   onGenerate,
 }: {
   readonly events: readonly EventRevision[];
   readonly session: Session;
   readonly scoreStatus: string | null;
   readonly scoreAvailable: boolean;
+  readonly scoreXml: string | undefined;
+  readonly scoreXmlError: Error | null;
   readonly onGenerate: () => void;
 }) {
   const notes = events
@@ -236,27 +240,78 @@ function ScorePreview({
                 ? "Score snapshot is current for the committed horizon."
                 : "Only closed corrected notes enter this snapshot."}
       </p>
-      <div className="score-paper" aria-label="Orientation preview of committed notes">
-        <div className="staff-lines" aria-hidden="true" />
-        <strong className="treble-clef" aria-hidden="true">𝄞</strong>
-        {notes.map((note, index) => (
-          <i
-            key={note.event_id}
-            className="score-note"
-            style={{
-              left: `${13 + index * (78 / Math.max(1, notes.length))}%`,
-              bottom: `${34 + ((note.pitch! - 48) % 18) * 2.2}%`,
-            }}
-          >
-            ●
-          </i>
-        ))}
-        {!notes.length && <span>Corrected notes will appear here.</span>}
-      </div>
+      {scoreXml ? (
+        <MusicXmlScore xml={scoreXml} />
+      ) : (
+        <div className="score-paper" aria-label="Orientation preview of committed notes">
+          <div className="staff-lines" aria-hidden="true" />
+          <strong className="treble-clef" aria-hidden="true">𝄞</strong>
+          {notes.map((note, index) => (
+            <i
+              key={note.event_id}
+              className="score-note"
+              style={{
+                left: `${13 + index * (78 / Math.max(1, notes.length))}%`,
+                bottom: `${34 + ((note.pitch! - 48) % 18) * 2.2}%`,
+              }}
+            >
+              ●
+            </i>
+          ))}
+          {!notes.length && <span>Corrected notes will appear here.</span>}
+        </div>
+      )}
+      {scoreXmlError && (
+        <p className="score-render-error" role="status">
+          The notation preview could not load. The MusicXML download remains
+          available.
+        </p>
+      )}
       <small>
         Snapshot target · {session.display_name ?? session.session_id}
       </small>
     </section>
+  );
+}
+
+function MusicXmlScore({ xml }: { readonly xml: string }) {
+  const target = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const container = target.current;
+    if (!container) return;
+    let cancelled = false;
+    let renderer: { clear(): void } | null = null;
+    setError(null);
+    void import("opensheetmusicdisplay")
+      .then(async ({ OpenSheetMusicDisplay }) => {
+        if (cancelled) return;
+        const next = new OpenSheetMusicDisplay(container, {
+          autoResize: true,
+          backend: "svg",
+          drawTitle: false,
+          drawingParameters: "compacttight",
+        });
+        renderer = next;
+        await next.load(xml);
+        if (!cancelled) next.render();
+      })
+      .catch(() => {
+        if (!cancelled) setError("Notation rendering failed.");
+      });
+    return () => {
+      cancelled = true;
+      renderer?.clear();
+      container.replaceChildren();
+    };
+  }, [xml]);
+
+  return (
+    <div className="score-paper rendered">
+      <div ref={target} aria-label="Rendered committed MusicXML score" />
+      {error && <p className="score-render-error" role="status">{error}</p>}
+    </div>
   );
 }
 
@@ -270,6 +325,8 @@ export function PerformanceViews({
   showScore,
   scoreStatus,
   scoreAvailable,
+  scoreXml,
+  scoreXmlError,
   onInspect,
   onGenerateScore,
 }: {
@@ -282,6 +339,8 @@ export function PerformanceViews({
   readonly showScore: boolean;
   readonly scoreStatus: string | null;
   readonly scoreAvailable: boolean;
+  readonly scoreXml: string | undefined;
+  readonly scoreXmlError: Error | null;
   readonly onInspect: (sample: number | null) => void;
   readonly onGenerateScore: () => void;
 }) {
@@ -293,6 +352,8 @@ export function PerformanceViews({
           session={session}
           scoreStatus={scoreStatus}
           scoreAvailable={scoreAvailable}
+          scoreXml={scoreXml}
+          scoreXmlError={scoreXmlError}
           onGenerate={onGenerateScore}
         />
       )}

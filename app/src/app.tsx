@@ -168,6 +168,30 @@ export function App() {
       }),
     enabled: workspace !== undefined && selectedSessionId !== null,
   });
+  const scoreArtifact = artifacts.data?.items.find(
+    (artifact) => artifact.kind === "musicxml",
+  );
+  const scoreXml = useQuery({
+    queryKey: ["artifact-content", scoreArtifact?.artifact_id],
+    queryFn: async ({ signal }) => {
+      const access = await runtime.getArtifactAccess(
+        scoreArtifact!.workspace_id,
+        scoreArtifact!.session_id,
+        scoreArtifact!.artifact_id,
+        { requestId: requestId("score-content"), signal },
+      );
+      const response = await fetch(
+        new URL(access.url, window.location.origin),
+        { signal },
+      );
+      if (!response.ok) {
+        throw new Error(`MusicXML download failed: HTTP ${response.status}`);
+      }
+      return response.text();
+    },
+    enabled: scoreArtifact !== undefined,
+    staleTime: Infinity,
+  });
   const scoreJobQuery = useQuery({
     queryKey: ["job", scoreJob?.job_id],
     queryFn: ({ signal }) =>
@@ -562,6 +586,8 @@ export function App() {
               showScore={showScore}
               scoreStatus={scoreStatus}
               scoreAvailable={capabilities.data?.score_available ?? false}
+              scoreXml={scoreXml.data}
+              scoreXmlError={scoreXml.error}
               onInspect={setInspectionSample}
               onGenerateScore={() => void generateScore()}
             />

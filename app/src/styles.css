@@ -843,6 +843,24 @@ input:focus-visible {
   background: #eeece3;
 }
 
+.score-paper.rendered {
+  height: auto;
+  min-height: 220px;
+  max-height: 620px;
+  overflow: auto;
+  padding: 10px;
+}
+
+.score-paper.rendered > div {
+  min-height: 200px;
+}
+
+.score-render-error {
+  margin: 9px 0 0;
+  color: #d58e84;
+  font-size: 10px;
+}
+
 .staff-lines {
   position: absolute;
   inset: 46px 4% 42px;
