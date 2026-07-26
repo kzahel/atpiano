@@ -29,6 +29,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="replace fixture files in the target directory",
     )
+    musical_fixture_parser = subparsers.add_parser(
+        "musical-fixture",
+        help="generate the aligned deterministic musical-loop fixture",
+    )
+    musical_fixture_parser.add_argument("output_directory", type=Path)
+    musical_fixture_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="replace fixture files in the target directory",
+    )
     offline_parser = subparsers.add_parser(
         "offline",
         help="run the untouched Basic Pitch offline reference",
@@ -124,6 +134,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         from atpiano.fixture import generate_fixture
 
         manifest = generate_fixture(args.output_directory, force=args.force)
+        print(args.output_directory / "input.json")
+        print(f"audio sha256: {manifest['audio']['sha256']}")
+        print(f"midi sha256:  {manifest['reference']['sha256']}")
+        return 0
+    if args.command == "musical-fixture":
+        from atpiano.musical_fixture import generate_musical_fixture
+
+        manifest = generate_musical_fixture(
+            args.output_directory,
+            force=args.force,
+        )
         print(args.output_directory / "input.json")
         print(f"audio sha256: {manifest['audio']['sha256']}")
         print(f"midi sha256:  {manifest['reference']['sha256']}")

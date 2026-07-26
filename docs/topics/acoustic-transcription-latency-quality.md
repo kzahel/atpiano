@@ -77,7 +77,7 @@ not acoustic-piano quality evidence.
 
 That 19-note `deterministic-midi-smoke-v2` fixture is now frozen because later
 decoder choices and recorded measurements depend on its exact MIDI and WAV
-hashes. V2 integration will add, rather than replace it with, a second aligned
+hashes. V2 integration added, rather than replaced it with, a second aligned
 `deterministic-musical-loop-v1` fixture. The new fixture is a 16-bar C-major
 phrase in 4/4 at 96 BPM with an explicit I-V-vi-IV / ii-V7-I progression,
 block chords and inversions, a second-section Alberti bass, melody, repeated
@@ -86,6 +86,12 @@ music exceed the proposed 28-second Transkun context window. Its MIDI, rendered
 WAV, bar and harmony metadata, and expected musical structures are
 deterministic and objectively testable. It remains synthetic correctness
 evidence, not a substitute for the target-piano golden reference.
+
+The resulting 42-second file contains 198 aligned notes, 16 sustain intervals,
+and one soft-pedal interval. The MIDI SHA-256 is
+`d24635a3f75d83dd8ff40e9513475dc43064e1dbb29fd836345f2057da0ec7d9`;
+the mono 48 kHz PCM16 WAV SHA-256 is
+`0eab5d787cb482735dc840daaed2abfb6d00ad6ff7a7058fdd217522905aaa89`.
 
 The rolling adapter retains every native probability window with explicit
 source-sample coordinates. It uses a deterministic 10-frame left guard and

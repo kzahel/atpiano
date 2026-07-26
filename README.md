@@ -140,6 +140,13 @@ Generate a deterministic MIDI-derived WAV and aligned reference:
 uv run atpiano fixture ../atpiano-artifacts/smoke-input
 ```
 
+Generate the longer aligned musical loop used by v2 integration:
+
+```text
+uv run atpiano musical-fixture \
+  ../atpiano-artifacts/musical-loop-input
+```
+
 Run the untouched Basic Pitch file path:
 
 ```text

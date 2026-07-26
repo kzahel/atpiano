@@ -313,4 +313,24 @@ with tests and evidence:
 
 ## Execution Record
 
-No implementation commits yet.
+### Aligned musical fixture
+
+Implemented `deterministic-musical-loop-v1` on 2026-07-26 without changing the
+frozen smoke fixture:
+
+```text
+duration: 42.0 s (1.0 s lead, 40.0 s music, 1.0 s tail)
+format: mono PCM16 WAV, 48,000 Hz
+notes: 198
+control intervals: 17 (16 sustain, 1 soft pedal)
+MIDI SHA-256:
+d24635a3f75d83dd8ff40e9513475dc43064e1dbb29fd836345f2057da0ec7d9
+WAV SHA-256:
+0eab5d787cb482735dc840daaed2abfb6d00ad6ff7a7058fdd217522905aaa89
+```
+
+The generated files are under the ignored
+`results/musical-loop-validation/` directory. Focused fixture tests pass
+byte-deterministic regeneration plus the declared form, block-chord density,
+Alberti order, repeated attacks, register coverage, tempo, meter, sustain,
+soft pedal, and WAV format assertions.
