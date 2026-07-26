@@ -263,6 +263,17 @@ def _write_midi(
     return note_count, pedal_count
 
 
+def write_midi(
+    path: Path,
+    events: Iterable[dict[str, Any]],
+    *,
+    sample_rate_hz: int,
+) -> tuple[int, int]:
+    """Write normalized note/controller events to a source-time MIDI file."""
+
+    return _write_midi(path, events, sample_rate_hz=sample_rate_hz)
+
+
 def write_corrected_exports(session_directory: Path) -> dict[str, Any]:
     """Write full JSONL history and latest committed MIDI from the event index."""
 

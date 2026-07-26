@@ -16,6 +16,7 @@ import pytest
 
 import atpiano.corrected_workbench as corrected_workbench_module
 from atpiano.cli import build_parser
+from atpiano.corrected import CORRECTED_EVENT_SCHEMA, CorrectedSession
 from atpiano.corrected_commit import CommitModelOutput
 from atpiano.corrected_workbench import (
     CORRECTED_STREAM_SCHEMA,
@@ -63,6 +64,27 @@ class _FakeCommitModel:
         return {"name": "fake-commit"}
 
 
+def _fake_score_runner(
+    input_midi: Path,
+    output_musicxml: Path,
+    runtime_directory: Path,
+) -> dict[str, Any]:
+    assert input_midi.is_file()
+    output_musicxml.write_text(
+        """<score-partwise version="4.0">
+<part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+<part id="P1"><measure number="1"><note><pitch><step>C</step>
+<octave>4</octave></pitch><duration>1</duration></note></measure></part>
+</score-partwise>
+""",
+        encoding="utf-8",
+    )
+    return {
+        "schema_version": "test-score-runner.v1",
+        "runtime_directory": str(runtime_directory),
+    }
+
+
 def _client_frame(payload: bytes, *, opcode: int) -> bytes:
     mask = b"\x11\x22\x33\x44"
     length = len(payload)
@@ -90,9 +112,7 @@ def _server_frame(stream: Any) -> tuple[int, bytes]:
 
 
 def _send_json(connection: socket.socket, value: dict[str, Any]) -> None:
-    connection.sendall(
-        _client_frame(json.dumps(value).encode("utf-8"), opcode=0x1)
-    )
+    connection.sendall(_client_frame(json.dumps(value).encode("utf-8"), opcode=0x1))
 
 
 def test_corrected_workbench_is_separate_loopback_app(tmp_path: Path) -> None:
@@ -116,12 +136,10 @@ def test_corrected_workbench_is_separate_loopback_app(tmp_path: Path) -> None:
         assert b"Corrected notes" in page
         assert b"notation" not in page.lower()
         html = page.decode("utf-8")
-        app = (Path(__file__).parents[1] / "src/atpiano/web_v2/app.js").read_text(
+        app = (Path(__file__).parents[1] / "src/atpiano/web_v2/app.js").read_text(encoding="utf-8")
+        styles = (Path(__file__).parents[1] / "src/atpiano/web_v2/styles.css").read_text(
             encoding="utf-8"
         )
-        styles = (
-            Path(__file__).parents[1] / "src/atpiano/web_v2/styles.css"
-        ).read_text(encoding="utf-8")
         requested_ids = set(re.findall(r'el\("([^"]+)"\)', app))
         assert requested_ids
         assert all(f'id="{requested_id}"' in html for requested_id in requested_ids)
@@ -165,6 +183,99 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
     assert v2.repeat == 3
     assert v2.silence_seconds == 1.5
     assert v2.no_wait is True
+
+
+def test_corrected_workbench_generates_committed_score_in_background(
+    tmp_path: Path,
+) -> None:
+    session_id = "20260726T000000-abcdef123456"
+    session = CorrectedSession(
+        tmp_path / session_id,
+        session_id=session_id,
+        sample_rate_hz=8_000,
+        source="replay",
+        minimum_free_bytes=0,
+    )
+    pcm = np.zeros(800, dtype="<i2").tobytes()
+    session.accept_block(
+        PcmBlock(
+            sequence=0,
+            first_sample=0,
+            frame_count=800,
+            sample_rate_hz=8_000,
+            page_sent_ms=0.0,
+            worklet_time_s=0.1,
+            pcm_s16le=pcm,
+        ),
+        received_ns=1,
+    )
+    session.append_events(
+        [
+            {
+                "schema_version": CORRECTED_EVENT_SCHEMA,
+                "session_id": session_id,
+                "event_id": "committed-c4",
+                "revision": 1,
+                "lane": "commit",
+                "lifecycle": "committed",
+                "pitch": 60,
+                "onset_sample": 100,
+                "offset_sample": 400,
+                "offset_state": "closed",
+                "velocity": 80,
+                "confidence": 0.9,
+            }
+        ]
+    )
+    session.advance_provisional(600)
+    session.advance_commit(500)
+    session.finalize()
+
+    server = create_corrected_workbench_server(
+        tmp_path,
+        port=0,
+        preview_model_factory=_FakePreviewModel,
+        commit_model_factory=_FakeCommitModel,
+        minimum_free_bytes=0,
+        score_runtime=tmp_path / "runtime",
+        score_runner=_fake_score_runner,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        request = urllib.request.Request(
+            f"{base_url}/api/score",
+            data=b"",
+            headers={"Origin": base_url},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=2) as response:
+            assert response.status == 202
+        deadline = time.monotonic() + 2
+        score: dict[str, Any] = {}
+        while time.monotonic() < deadline:
+            with urllib.request.urlopen(
+                f"{base_url}/api/score",
+                timeout=2,
+            ) as response:
+                score = json.load(response)
+            if score["status"] != "running":
+                break
+            time.sleep(0.01)
+        assert score["status"] == "complete"
+        assert score["snapshot"]["commit_sample"] == 500
+        assert score["snapshot"]["note_count"] == 1
+        assert score["stale"] is False
+        with urllib.request.urlopen(
+            f"{base_url}/api/artifacts/score/current.musicxml",
+            timeout=2,
+        ) as response:
+            assert b"score-partwise" in response.read()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
 
 
 def test_microphone_websocket_uses_corrected_session_and_exports(
@@ -263,8 +374,7 @@ def test_microphone_websocket_uses_corrected_session_and_exports(
             ),
         )
         with urllib.request.urlopen(
-            f"{base_url}/api/events?"
-            "start_sample=0&end_sample=6&include_history=0",
+            f"{base_url}/api/events?start_sample=0&end_sample=6&include_history=0",
             timeout=2,
         ) as response:
             visible_only = json.load(response)
@@ -311,16 +421,12 @@ def test_server_driven_replay_uses_same_review_and_export_surface(
             time.sleep(0.05)
         assert status["status"] == "complete", status.get("error")
         assert status["session"]["source"] == "replay"
-        assert status["session"]["source_frame_count"] == (
-            fixture["audio"]["frame_count"] * 2
-        )
+        assert status["session"]["source_frame_count"] == (fixture["audio"]["frame_count"] * 2)
         assert status["exports_ready"] is True
         session_directory = server.current_directory()
         assert session_directory is not None
         boundaries = (
-            (session_directory / "boundaries.jsonl")
-            .read_text(encoding="utf-8")
-            .splitlines()
+            (session_directory / "boundaries.jsonl").read_text(encoding="utf-8").splitlines()
         )
         assert len(boundaries) == 2
         sample_rate_hz = status["session"]["sample_rate_hz"]

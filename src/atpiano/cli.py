@@ -184,6 +184,22 @@ def build_parser() -> argparse.ArgumentParser:
         default="cpu",
         help="Transkun execution device (default: cpu)",
     )
+    corrected_workbench_parser.add_argument(
+        "--score-runtime",
+        type=Path,
+        default=Path("results/midi2score-runtime"),
+        help="isolated MIDI2ScoreTransformer runtime directory",
+    )
+    score_setup_parser = subparsers.add_parser(
+        "setup-midi2score",
+        help="install the internal MIDI2ScoreTransformer runtime",
+    )
+    score_setup_parser.add_argument(
+        "--runtime",
+        type=Path,
+        default=Path("results/midi2score-runtime"),
+        help="isolated runtime directory (default: results/midi2score-runtime)",
+    )
     subparsers.add_parser(
         "devices",
         help="list audio devices available for microphone capture",
@@ -289,7 +305,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             replay_repeat=args.repeat,
             replay_silence_s=args.silence_seconds,
             replay_realtime=not args.no_wait,
+            score_runtime=args.score_runtime,
         )
+        return 0
+    if args.command == "setup-midi2score":
+        from atpiano.score_snapshot import setup_score_runtime
+
+        manifest = setup_score_runtime(args.runtime)
+        print(args.runtime / "runtime.json")
+        print(f"repository: {manifest['repository']['commit']}")
+        print(f"checkpoint: {manifest['checkpoint']['sha256']}")
         return 0
     if args.command == "devices":
         from atpiano.capture import list_input_devices
@@ -363,9 +388,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         for case in args.cases:
             label, separator, run_directory = case.partition("=")
             if not separator or not label or not run_directory:
-                parser.error(
-                    "decoder-study cases must use LABEL=RUN_DIRECTORY"
-                )
+                parser.error("decoder-study cases must use LABEL=RUN_DIRECTORY")
             cases.append((label, Path(run_directory)))
         run_decoder_study(args.output_directory, cases)
         print(args.output_directory / "report.md")

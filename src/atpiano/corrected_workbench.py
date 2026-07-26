@@ -33,6 +33,12 @@ from atpiano.corrected_export import (
 )
 from atpiano.corrected_preview import CorrectedPreviewLane
 from atpiano.live import LiveWindowModel, parse_pcm_block
+from atpiano.score_snapshot import (
+    SCORE_SNAPSHOT_SCHEMA,
+    ScoreRunner,
+    generate_score_snapshot,
+    inspect_score_runtime,
+)
 from atpiano.util import read_json, utc_now, write_json
 from atpiano.websocket import encode_frame, encode_json, read_frame, websocket_accept
 
@@ -54,6 +60,10 @@ EXPORT_ASSETS = {
     "/api/artifacts/exports/session.mid": "session.mid",
     "/api/artifacts/exports/session.jsonl": "session.jsonl",
     "/api/artifacts/exports/manifest.json": "manifest.json",
+}
+SCORE_ASSETS = {
+    "/api/artifacts/score/current.musicxml": ("musicxml", "path"),
+    "/api/artifacts/score/current.mid": ("midi", "path"),
 }
 SESSION_ID_PATTERN = re.compile(r"\d{8}T\d{6}-[0-9a-f]{12}")
 
@@ -93,6 +103,8 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         replay_repeat: int = 1,
         replay_silence_s: float = 0.0,
         replay_realtime: bool = True,
+        score_runtime: Path = Path("results/midi2score-runtime"),
+        score_runner: ScoreRunner | None = None,
     ) -> None:
         if minimum_free_bytes < 0:
             raise ValueError("minimum free bytes cannot be negative")
@@ -109,8 +121,11 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self.replay_repeat = replay_repeat
         self.replay_silence_s = replay_silence_s
         self.replay_realtime = replay_realtime
+        self.score_runtime = score_runtime.resolve()
+        self.score_runner = score_runner
         self.state_lock = threading.Lock()
         self.model_lock = threading.Lock()
+        self.score_lock = threading.Lock()
         self._preview_model: LiveWindowModel | None = None
         self._commit_model: CommitModel | None = None
         self._active_session: CorrectedSession | None = None
@@ -120,6 +135,10 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self._error: str | None = None
         self._received_blocks = 0
         self._last_event_sequence = 0
+        self._score_status = "idle"
+        self._score_error: str | None = None
+        self._score_session_id: str | None = None
+        self._score_commit_sample: int | None = None
         self._load_latest_session()
         super().__init__(("127.0.0.1", port), CorrectedWorkbenchHandler)
 
@@ -176,7 +195,12 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             self._error = None
             self._received_blocks = 0
             self._last_event_sequence = 0
-            return session_id, directory
+        with self.score_lock:
+            self._score_status = "idle"
+            self._score_error = None
+            self._score_session_id = None
+            self._score_commit_sample = None
+        return session_id, directory
 
     def set_active(self, session: CorrectedSession) -> None:
         with self.state_lock:
@@ -227,9 +251,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         horizons: dict[str, Any] | None = None
         lanes: list[dict[str, Any]] = []
         if active is not None:
-            horizons = active.horizons.document(
-                sample_rate_hz=active.sample_rate_hz
-            )
+            horizons = active.horizons.document(sample_rate_hz=active.sample_rate_hz)
             session = {
                 "session_id": active.session_id,
                 "status": status,
@@ -247,9 +269,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                 horizon_path = directory / "horizons.json"
                 horizons = read_json(horizon_path) if horizon_path.is_file() else None
                 lanes = list(session.get("lanes", []))
-                minimum_free_bytes = int(
-                    session.get("retention", {}).get("minimum_free_bytes", 0)
-                )
+                minimum_free_bytes = int(session.get("retention", {}).get("minimum_free_bytes", 0))
             except (OSError, TypeError, ValueError):
                 session = None
                 minimum_free_bytes = self.minimum_free_bytes
@@ -281,14 +301,142 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                 "last_event_sequence": last_event_sequence,
                 "recovery": "bounded indexed sequence query",
             },
-            "duration_s": (
-                audio_frames / sample_rate_hz if sample_rate_hz else 0.0
-            ),
+            "duration_s": (audio_frames / sample_rate_hz if sample_rate_hz else 0.0),
             "exports_ready": bool(
-                directory is not None
-                and (directory / "exports" / "manifest.json").is_file()
+                directory is not None and (directory / "exports" / "manifest.json").is_file()
             ),
         }
+
+    def _runtime_state(self) -> dict[str, Any]:
+        if self.score_runner is not None:
+            return {
+                "available": True,
+                "directory": str(self.score_runtime),
+                "injected_runner": True,
+            }
+        return inspect_score_runtime(self.score_runtime)
+
+    def public_score_state(self) -> dict[str, Any]:
+        state = self.public_state()
+        directory = self.current_directory()
+        session = state.get("session")
+        current_session_id = (
+            str(session.get("session_id"))
+            if isinstance(session, dict) and session.get("session_id")
+            else None
+        )
+        horizons = state.get("horizons")
+        current_commit_sample = (
+            int(horizons.get("commit_sample", 0)) if isinstance(horizons, dict) else 0
+        )
+        snapshot: dict[str, Any] | None = None
+        if directory is not None:
+            snapshot_path = directory / "score" / "current.json"
+            if snapshot_path.is_file():
+                try:
+                    candidate = read_json(snapshot_path)
+                    if (
+                        candidate.get("schema_version") == SCORE_SNAPSHOT_SCHEMA
+                        and candidate.get("session_id") == current_session_id
+                    ):
+                        snapshot = candidate
+                except (OSError, ValueError):
+                    pass
+        with self.score_lock:
+            job_status = self._score_status
+            job_error = self._score_error
+            job_session_id = self._score_session_id
+            job_commit_sample = self._score_commit_sample
+        if (
+            job_status == "idle"
+            and snapshot is not None
+            and snapshot.get("session_id") == current_session_id
+        ):
+            job_status = "complete"
+        runtime = self._runtime_state()
+        running = job_status == "running" and job_session_id == current_session_id
+        return {
+            "schema_version": SCORE_SNAPSHOT_SCHEMA,
+            "status": job_status,
+            "error": job_error,
+            "runtime": runtime,
+            "session_id": current_session_id,
+            "commit_sample": current_commit_sample,
+            "job": {
+                "session_id": job_session_id,
+                "commit_sample": job_commit_sample,
+            },
+            "snapshot": snapshot,
+            "stale": bool(
+                snapshot is not None
+                and int(snapshot.get("commit_sample", -1)) != current_commit_sample
+            ),
+            "can_generate": bool(
+                runtime["available"]
+                and current_session_id
+                and current_commit_sample > 0
+                and not running
+            ),
+        }
+
+    def start_score(self) -> None:
+        runtime = self._runtime_state()
+        if not runtime["available"]:
+            raise RuntimeError(str(runtime["error"]))
+        state = self.public_state()
+        directory = self.current_directory()
+        session = state.get("session")
+        horizons = state.get("horizons")
+        if directory is None or not isinstance(session, dict) or not isinstance(horizons, dict):
+            raise ValueError("no corrected session is available to score")
+        session_id = str(session["session_id"])
+        commit_sample = int(horizons.get("commit_sample", 0))
+        if commit_sample <= 0:
+            raise ValueError("the session has no committed prefix to score yet")
+        with self.score_lock:
+            if self._score_status == "running":
+                raise RuntimeError("a committed score snapshot is already running")
+            self._score_status = "running"
+            self._score_error = None
+            self._score_session_id = session_id
+            self._score_commit_sample = commit_sample
+        thread = threading.Thread(
+            target=self._run_score,
+            args=(session_id, directory, commit_sample),
+            name=f"atpiano-score-{session_id}",
+            daemon=True,
+        )
+        thread.start()
+
+    def _run_score(
+        self,
+        session_id: str,
+        directory: Path,
+        commit_sample: int,
+    ) -> None:
+        try:
+            generate_score_snapshot(
+                directory,
+                self.score_runtime,
+                commit_sample=commit_sample,
+                runner=self.score_runner,
+            )
+        except Exception as error:
+            with self.score_lock:
+                if (
+                    self._score_session_id == session_id
+                    and self._score_commit_sample == commit_sample
+                ):
+                    self._score_status = "failed"
+                    self._score_error = f"{type(error).__name__}: {error}"
+        else:
+            with self.score_lock:
+                if (
+                    self._score_session_id == session_id
+                    and self._score_commit_sample == commit_sample
+                ):
+                    self._score_status = "complete"
+                    self._score_error = None
 
     def start_replay(self) -> None:
         if self.replay_manifest is None:
@@ -357,9 +505,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         value: dict[str, Any],
         status: HTTPStatus = HTTPStatus.OK,
     ) -> None:
-        body = (
-            json.dumps(value, sort_keys=True, allow_nan=False) + "\n"
-        ).encode("utf-8")
+        body = (json.dumps(value, sort_keys=True, allow_nan=False) + "\n").encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -401,6 +547,22 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             return None
         return directory / "exports" / name
 
+    def _current_score_asset(self, request_path: str) -> Path | None:
+        selector = SCORE_ASSETS.get(request_path)
+        directory = self.server.current_directory()
+        if selector is None or directory is None:
+            return None
+        try:
+            manifest = read_json(directory / "score" / "current.json")
+            section, field = selector
+            relative_path = Path(str(manifest[section][field]))
+            candidate = (directory / relative_path).resolve()
+        except (KeyError, OSError, TypeError, ValueError):
+            return None
+        if directory.resolve() not in candidate.parents:
+            return None
+        return candidate
+
     def do_GET(self) -> None:
         if not self._require_local_host():
             return
@@ -430,11 +592,15 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                         "silence_s": self.server.replay_silence_s,
                         "realtime": self.server.replay_realtime,
                     },
+                    "score": self.server._runtime_state(),
                 }
             )
             return
         if request_path == "/api/session":
             self._send_json(self.server.public_state())
+            return
+        if request_path == "/api/score":
+            self._send_json(self.server.public_score_state())
             return
         if request_path == "/api/events":
             self._get_events(parse_qs(parsed.query))
@@ -442,6 +608,10 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         export_path = self._current_export(request_path)
         if export_path is not None:
             self._send_file(export_path, include_body=True)
+            return
+        score_path = self._current_score_asset(request_path)
+        if score_path is not None:
+            self._send_file(score_path, include_body=True)
             return
         self.send_error(HTTPStatus.NOT_FOUND)
 
@@ -456,6 +626,10 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         if export_path is not None:
             self._send_file(export_path, include_body=False)
             return
+        score_path = self._current_score_asset(request_path)
+        if score_path is not None:
+            self._send_file(score_path, include_body=False)
+            return
         self.send_error(HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:
@@ -468,15 +642,28 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             )
             return
         request_path = unquote(urlsplit(self.path).path)
-        if request_path != "/api/replay":
+        if request_path == "/api/replay":
+            try:
+                self.server.start_replay()
+            except (OSError, RuntimeError, ValueError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.CONFLICT)
+                return
+            self._send_json(self.server.public_state(), HTTPStatus.ACCEPTED)
+            return
+        if request_path == "/api/score":
+            try:
+                self.server.start_score()
+            except (OSError, RuntimeError, ValueError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.CONFLICT)
+                return
+            self._send_json(
+                self.server.public_score_state(),
+                HTTPStatus.ACCEPTED,
+            )
+            return
+        else:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
-        try:
-            self.server.start_replay()
-        except (OSError, RuntimeError, ValueError) as error:
-            self._send_json({"error": str(error)}, HTTPStatus.CONFLICT)
-            return
-        self._send_json(self.server.public_state(), HTTPStatus.ACCEPTED)
 
     def _get_events(self, query: dict[str, list[str]]) -> None:
         state = self.server.public_state()
@@ -631,9 +818,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     encoded_metadata = json.dumps(metadata, allow_nan=False).encode()
                     if len(encoded_metadata) > MAX_CLIENT_METADATA_BYTES:
                         raise ValueError("microphone client metadata is too large")
-                    session_id, directory = self.server.claim_session(
-                        source="microphone"
-                    )
+                    session_id, directory = self.server.claim_session(source="microphone")
                     preview_model, commit_model = self.server.get_models()
                     session = CorrectedSession(
                         directory,
@@ -642,12 +827,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                         source="microphone",
                         minimum_free_bytes=self.server.minimum_free_bytes,
                     )
-                    session.add_lane(
-                        CorrectedPreviewLane(session, model=preview_model)
-                    )
-                    session.add_lane(
-                        CorrectedCommitLane(session, model=commit_model)
-                    )
+                    session.add_lane(CorrectedPreviewLane(session, model=preview_model))
+                    session.add_lane(CorrectedCommitLane(session, model=commit_model))
                     write_json(
                         directory / "client.json",
                         {
@@ -731,10 +912,10 @@ def create_corrected_workbench_server(
     replay_repeat: int = 1,
     replay_silence_s: float = 0.0,
     replay_realtime: bool = True,
+    score_runtime: Path = Path("results/midi2score-runtime"),
+    score_runner: ScoreRunner | None = None,
 ) -> CorrectedWorkbenchServer:
-    factory = commit_model_factory or (
-        lambda: _default_commit_model(device=commit_device)
-    )
+    factory = commit_model_factory or (lambda: _default_commit_model(device=commit_device))
     return CorrectedWorkbenchServer(
         workspace_directory,
         port=port,
@@ -745,6 +926,8 @@ def create_corrected_workbench_server(
         replay_repeat=replay_repeat,
         replay_silence_s=replay_silence_s,
         replay_realtime=replay_realtime,
+        score_runtime=score_runtime,
+        score_runner=score_runner,
     )
 
 
@@ -759,6 +942,7 @@ def serve_corrected_workbench(
     replay_repeat: int = 1,
     replay_silence_s: float = 0.0,
     replay_realtime: bool = True,
+    score_runtime: Path = Path("results/midi2score-runtime"),
 ) -> None:
     server = create_corrected_workbench_server(
         workspace_directory,
@@ -769,6 +953,7 @@ def serve_corrected_workbench(
         replay_repeat=replay_repeat,
         replay_silence_s=replay_silence_s,
         replay_realtime=replay_realtime,
+        score_runtime=score_runtime,
     )
     actual_port = server.server_address[1]
     url = f"http://127.0.0.1:{actual_port}/"
