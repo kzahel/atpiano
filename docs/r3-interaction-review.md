@@ -1,13 +1,8 @@
 # R3 Interaction And Frontend Review
 
-Status: human review remains unaccepted on 2026-07-26. `8a9a78e` fixed notes
-not appearing until Stop; follow-up review found corrected bars crossing the
-commit horizon and a misleading synthetic score placeholder. `7423159`
-addresses both findings. Further review exposed pathological score-model
-expansion and non-addressable browser state; `f8d096e` and `f39179a` address
-those findings. Follow-up requested visible Stop progress and automatic score
-generation; `938a15b` implements and validates that workflow. R3 awaits
-re-review, and Phase 4 remains closed.
+Status: **R3 accepted by the user on 2026-07-26 after the complete feedback
+cycle below. Phase 3 is complete and Phase 4 may open in a separate
+implementation step.**
 
 This packet reviews the shared React application while its visual hierarchy,
 controls, and session mental model are still inexpensive to change. The
@@ -156,13 +151,10 @@ The browser pass used 1440×1000 and 390×844 viewports. Both had no alert,
 connection error, or page-level horizontal overflow. Screenshots orient the
 review; the live application is authoritative.
 
-## Decision Requested
+## Decision Recorded
 
-Please respond with either:
-
-- **R3 accepted** — Phase 4 may open; or
-- requested changes — Phase 3 remains open and the feedback is resolved
-  before any Python application-service extraction.
+The user accepted the current milestone as good on 2026-07-26. This closes
+R3 and authorizes, but does not itself begin, Phase 4.
 
 ## R3 Feedback Cycle
 
@@ -318,3 +310,7 @@ The exact 37.6-second screenshot session was converted to a 602,540-byte MP3.
 A real Chrome check sought to 18.79 seconds, showed a seekable range through
 37.589 seconds, updated the keyboard from the same sample position, and
 continued playback to 19.63 seconds. The original WAV remained unchanged.
+
+After reviewing that final playback revision, the user explicitly accepted
+the current milestone. No Phase 4 implementation was included in the
+acceptance-record commit.

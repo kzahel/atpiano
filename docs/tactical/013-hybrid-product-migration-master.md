@@ -2,15 +2,10 @@
 
 Topic: multi-tenant-hybrid-service-architecture
 
-Status: accepted master plan on 2026-07-26; Phases 1 and 2 are complete, R2
-is accepted, and Phase 3 is being revised through mandatory R3 feedback.
-Live microphone feedback, commit-horizon presentation, and misleading
-placeholder engraving have been corrected. Pathological score expansion is
-now rejected, browser URLs carry selected session IDs, and Stop exposes
-settling progress before automatically generating the score. The result
-awaits R3 re-review. This document tracks the staged migration program and its
-human review gates. Each phase must create one or more smaller numbered
-tacticals before implementation.
+Status: accepted master plan on 2026-07-26; Phases 1 through 3 are complete,
+R2 and R3 are accepted, and Phase 4 is authorized but not started. This
+document tracks the staged migration program and its human review gates. Each
+phase must create one or more smaller numbered tacticals before implementation.
 
 ## Outcome
 
@@ -365,7 +360,7 @@ Follow-up R3 feedback rejected corrected bars visually crossing `H_commit`
 and the synthetic pitch-dot staff shown before real score generation.
 `7423159` restores horizon clipping and dashed open-note tails, removes the
 placeholder staff entirely, and labels actual MusicXML as a generated frozen
-snapshot rather than live notation. R3 remains open.
+snapshot rather than live notation. R3 remained open at that review point.
 
 Further R3 evidence isolated a score transformer failure: 13 committed input
 notes became 491 pitched MusicXML elements. `f8d096e` rejects gross note
@@ -375,7 +370,8 @@ their exact session. Neither change opens Phase 4.
 
 `938a15b` responds to further R3 feedback by disabling Stop during final
 correction, showing source-horizon settling progress, and automatically
-starting the settled session's score job. Phase 4 remains closed.
+starting the settled session's score job. Phase 4 remained closed at that
+review point.
 
 Further review found a scrollbar-like lane labelled sustain despite no pedal
 use. The exact session showed that React had merged CC64 sustain and CC67
@@ -383,7 +379,8 @@ soft-pedal estimates under one label; its dominant interval was a long
 soft-pedal false positive. `dab105b` restores separate inferred controller
 lanes, visually marks unusually long estimates for verification, and clips
 committed gestures at the commit horizon. This is a Phase 3 presentation
-correction and does not claim improved pedal inference. R3 remains open.
+correction and does not claim improved pedal inference. R3 remained open at
+that review point.
 
 The next R3 review requested actual audio playback from the existing
 inspection range. `097af58` adds a session-wide Play/Pause and seek transport
@@ -391,7 +388,11 @@ whose source-sample position drives exact-key inspection. It crosses bounded
 audio segments, serves byte ranges for real browser seeking, and prefers a
 post-Stop 128 kbps MP3 derivative while retaining WAV as the lossless
 transcription source and compatibility fallback. This does not select the
-long-term archival codec. Phase 4 remains closed.
+long-term archival codec. Phase 4 remained closed until the decision below.
+
+The user accepted the revised Phase 3 milestone on 2026-07-26 after testing
+the final interaction changes. R3 is closed. Phase 4 may now open under a new
+bounded tactical; this acceptance record does not begin that work.
 
 ## Phase 4 — Extract The Framework-Independent Python Application Core
 

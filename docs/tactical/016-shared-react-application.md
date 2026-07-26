@@ -6,15 +6,11 @@ Topic: multi-tenant-hybrid-service-architecture
 
 Topic: session-workspace-management
 
-Status: implementation revised after R3 exposed live-event range, horizon
-presentation, and misleading score-placeholder defects. The fixes are
-validated. Pathological score expansion and missing session-addressed URLs
-were subsequently corrected. Stop progress and automatic post-settle score
-generation are now implemented. Inferred sustain and soft-pedal gestures are
-also distinct after a merged lane misreported a long soft-pedal false positive
-as stuck sustain. Saved sessions now have synchronized, seekable audio
-playback with a compressed delivery derivative. The revisions await explicit
-R3 re-review. Phase 4 must not start before that decision.
+Status: **complete and accepted at R3 on 2026-07-26.** The review cycle
+corrected live-event range, horizon presentation, placeholder engraving,
+pathological score publication, selected-session URLs, Stop progress,
+automatic scoring, inferred pedal presentation, and synchronized seekable
+audio playback. Phase 4 is now authorized but has not begun.
 
 ## Entry Evidence
 
@@ -204,10 +200,8 @@ alerts or page-level horizontal overflow.
 The final `uv run atpiano migration-regression` report at
 `results/migration-regression/20260726T123136Z/report.json` passed 83 Python
 tests, retained JavaScript tests, 28 application tests, contract drift,
-TypeScript, dependency audit, Ruff, syntax, and whitespace. Physical
-microphone permission and playing remain the explicit human lane at R3. The
-implementation range is `a9805fd^..HEAD` at this review handoff. Phase 4
-remains closed pending the user's interaction decision.
+TypeScript, dependency audit, Ruff, syntax, and whitespace. The implementation
+range began at `a9805fd`.
 
 The first R3 review was not accepted: microphone results appeared only after
 Stop. The captured sessions contained final notes, isolating the failure to
@@ -258,3 +252,7 @@ segmented lossless WAV source. React prefers that compressed artifact and
 falls back to WAV when conversion is unavailable. The exact review session
 sought to 18.79 seconds in Chrome, continued from that position, and exposed
 the full 37.589-second seekable range.
+
+The user accepted the revised milestone on 2026-07-26. This closes tactical
+016 and R3. It authorizes the master track to open Phase 4 separately; this
+tactical does not perform that extraction.

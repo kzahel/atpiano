@@ -2,8 +2,8 @@
 
 Topic: multi-tenant-hybrid-service-architecture
 
-Status: **accepted target architecture as of 2026-07-26; Phases 1 and 2 are
-complete, R2 is accepted, and Phase 3 implementation is complete under
+Status: **accepted target architecture as of 2026-07-26; Phases 1 through 3
+are complete, R2 and R3 are accepted, and Phase 3 is recorded under
 [`016-shared-react-application.md`](../tactical/016-shared-react-application.md)
 with its live-feedback, horizon presentation, score publication sanity, and
 session-addressed review URLs corrected through R3 feedback. Stop progress and
@@ -12,8 +12,8 @@ distinct inferred sustain and soft-pedal lanes and flags unusually long
 controller estimates instead of merging them as apparent stuck sustain,
 and it provides seekable recorded-audio playback synchronized to exact
 source-sample inspection. Playback prefers a replaceable MP3 derivative while
-the current local adapter retains segmented WAV source audio, pending mandatory
-[`R3 re-review`](../r3-interaction-review.md).**
+the current local adapter retains segmented WAV source audio. Phase 4 is
+authorized but has not started.**
 Versioned Pydantic contracts, generated OpenAPI/TypeScript, the
 `AtpianoRuntime` boundary, an executable fixture provider, and explicit local
 compatibility paths exist. R2 feedback removed the generic `product`
