@@ -117,7 +117,7 @@ describe("shared application", () => {
 
     expect(screen.getByRole("button", { name: /Workspace/ })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Piano roll" })).toBeNull();
-    expect(screen.getByText("Page 1 of 4")).toBeTruthy();
+    expect(await screen.findByText("Page 1 of 4")).toBeTruthy();
     const route = new URL(window.location.href).searchParams;
     expect(route.get("view")).toBe("score");
     expect(route.get("score")).toBe(
