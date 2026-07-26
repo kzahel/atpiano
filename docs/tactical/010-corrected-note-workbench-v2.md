@@ -498,6 +498,20 @@ marks `H_commit`, follows the source head, and can seek an old range. It also
 shows both horizon lags, lane decode state, source duration, received blocks,
 PCM disk growth, free-space warnings, and export readiness.
 
+The first manual replay exposed a display-only failure: inference and storage
+completed with 152 committed notes, but the piano roll remained at its initial
+empty drawing. The first empty viewport response had been cached by a key that
+advanced only with its history cursor; server-driven replay did not send the
+microphone acknowledgement that invalidated that key. The key now includes
+the audio head and session status, so source progress and final settlement
+both refresh the viewport even when the prior response was empty. The live
+viewport requests materialized rows without also scanning append history,
+ignores stale responses after a session change, reports its visible note/pedal
+count, and displays range-load errors next to the canvas. Its empty overlay
+has an explicit `[hidden]` rule so author CSS cannot override the HTML hidden
+state. Append-history paging remains available through the same API for
+recovery and export.
+
 The event index now maintains one current materialized row per identity in
 addition to append-only evidence. This avoids grouping the full revision
 history for every browser poll and prevents an older revision from
@@ -521,6 +535,7 @@ distinct v1 and v2 CLI branches and static assets
 microphone WebSocket PCM continuity, Stop, and exports
 accelerated two-repeat server-driven WAV replay
 bounded range and sequence queries
+materialized-only live viewport queries that skip append history
 latest-revision viewport crossing and interval overlap
 JSONL history order and committed MIDI note/pedal selection
 frontend DOM contract and pure timeline materialization/geometry

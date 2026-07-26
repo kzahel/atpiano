@@ -14,6 +14,7 @@ from typing import Any
 import numpy as np
 import pytest
 
+import atpiano.corrected_workbench as corrected_workbench_module
 from atpiano.cli import build_parser
 from atpiano.corrected_commit import CommitModelOutput
 from atpiano.corrected_workbench import (
@@ -118,9 +119,14 @@ def test_corrected_workbench_is_separate_loopback_app(tmp_path: Path) -> None:
         app = (Path(__file__).parents[1] / "src/atpiano/web_v2/app.js").read_text(
             encoding="utf-8"
         )
+        styles = (
+            Path(__file__).parents[1] / "src/atpiano/web_v2/styles.css"
+        ).read_text(encoding="utf-8")
         requested_ids = set(re.findall(r'el\("([^"]+)"\)', app))
         assert requested_ids
         assert all(f'id="{requested_id}"' in html for requested_id in requested_ids)
+        assert ".timeline-empty[hidden]" in styles
+        assert "include_history=0" in app
         foreign = urllib.request.Request(
             f"{base_url}/api/session",
             headers={"Host": "example.test"},
@@ -163,6 +169,7 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
 
 def test_microphone_websocket_uses_corrected_session_and_exports(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     server = create_corrected_workbench_server(
         tmp_path,
@@ -248,6 +255,21 @@ def test_microphone_websocket_uses_corrected_session_and_exports(
         ) as response:
             events = json.load(response)
         assert events["materialized"] == []
+        monkeypatch.setattr(
+            corrected_workbench_module,
+            "query_history_index",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("history query should be skipped")
+            ),
+        )
+        with urllib.request.urlopen(
+            f"{base_url}/api/events?"
+            "start_sample=0&end_sample=6&include_history=0",
+            timeout=2,
+        ) as response:
+            visible_only = json.load(response)
+        assert visible_only["materialized"] == []
+        assert visible_only["history"] == []
         with urllib.request.urlopen(
             f"{base_url}/api/artifacts/exports/session.mid",
             timeout=2,

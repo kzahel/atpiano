@@ -317,10 +317,20 @@ button:disabled,
   gap: 9px;
 }
 
-.timeline-controls output {
+.timeline-readout {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   margin-left: auto;
+}
+
+.timeline-readout output {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
+}
+
+#visible-count {
+  color: var(--muted);
 }
 
 select {
@@ -368,6 +378,24 @@ input[type="range"] {
   font-family: Georgia, "Times New Roman", serif;
   font-size: 1.1rem;
   pointer-events: none;
+}
+
+.timeline-empty[hidden] {
+  display: none;
+}
+
+.timeline-error {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgb(255 129 108 / 45%);
+  border-radius: 8px;
+  background: rgb(255 129 108 / 8%);
+  color: var(--coral);
+  font-size: 0.78rem;
+}
+
+.timeline-error[hidden] {
+  display: none;
 }
 
 .pedal-label {
@@ -451,6 +479,12 @@ input[type="range"] {
   .timeline-controls {
     align-items: start;
     flex-direction: column;
+  }
+
+  .timeline-readout {
+    width: 100%;
+    justify-content: space-between;
+    margin-left: 0;
   }
 
   .timeline-controls output {

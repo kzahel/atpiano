@@ -96,7 +96,10 @@
               <input id="follow-head" type="checkbox" checked />
               Follow live edge
             </label>
-            <output id="range-label">00:00 — 00:30</output>
+            <div class="timeline-readout">
+              <output id="visible-count">0 visible events</output>
+              <output id="range-label">00:00 — 00:30</output>
+            </div>
           </div>
 
           <div class="seek-row">
@@ -117,6 +120,7 @@
               Start the fixture replay or microphone to fill the timeline.
             </div>
           </div>
+          <p id="timeline-error" class="timeline-error" role="alert" hidden></p>
           <div class="pedal-label">PEDAL · sustain 64 / soft 67</div>
         </section>
 

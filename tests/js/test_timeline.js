@@ -48,6 +48,16 @@ assert.deepEqual(timeline.visibleWindow(3700, 60, 120, false), {
   maximumStart: 3640,
 });
 
+const emptyReplayKey = timeline.viewportQueryKey("replay", 0, 100, 0, 0, "active");
+assert.notEqual(
+  emptyReplayKey,
+  timeline.viewportQueryKey("replay", 0, 100, 0, 50, "active")
+);
+assert.notEqual(
+  emptyReplayKey,
+  timeline.viewportQueryKey("replay", 0, 100, 0, 0, "complete")
+);
+
 const geometry = timeline.noteGeometry(
   { onset_sample: 100, offset_sample: 200, pitch: 60 },
   100,

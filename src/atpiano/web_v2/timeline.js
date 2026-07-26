@@ -31,6 +31,24 @@
     return { startS: start, endS: start + span, spanS: span, maximumStart };
   }
 
+  function viewportQueryKey(
+    sessionId,
+    startSample,
+    endSample,
+    eventSequence,
+    audioHead,
+    status
+  ) {
+    return [
+      sessionId,
+      startSample,
+      endSample,
+      eventSequence,
+      audioHead,
+      status,
+    ].join(":");
+  }
+
   function noteGeometry(
     event,
     sampleRate,
@@ -57,5 +75,5 @@
     };
   }
 
-  return { materialize, visibleWindow, noteGeometry };
+  return { materialize, visibleWindow, viewportQueryKey, noteGeometry };
 });

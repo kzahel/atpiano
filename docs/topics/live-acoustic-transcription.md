@@ -86,6 +86,16 @@ index, shows both horizons and pedal bands, and writes committed MIDI plus
 full revision-history JSONL without reading PCM. The v1 command and frontend
 remain separate.
 
+Live viewport reads explicitly skip append-history paging, which the display
+does not consume; recovery clients can still request bounded history pages.
+Replay viewport invalidation follows the audio head and session status rather
+than relying on the microphone-only block acknowledgement. The canvas reports
+visible note and pedal counts and places range-load errors beside the
+timeline. This followed a manual replay where all 152 committed notes were
+present in the index and exports while the first empty viewport response
+remained cached, confirming a presentation failure rather than an inference
+or fixture failure.
+
 Final page-facing acceptance used both aligned and target-piano WAV loops. Two
 musical-fixture repetitions differed by 0.009 aligned-reference onset F1 and
 scored 0.939 directly against each other. Two repetitions of the retained

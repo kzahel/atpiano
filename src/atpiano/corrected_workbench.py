@@ -490,6 +490,10 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             end_sample = int(query.get("end_sample", ["0"])[0])
             after = int(query.get("after", ["0"])[0])
             limit = int(query.get("limit", ["1024"])[0])
+            include_history_value = query.get("include_history", ["1"])[0]
+            if include_history_value not in {"0", "1"}:
+                raise ValueError("include_history must be 0 or 1")
+            include_history = include_history_value == "1"
             sample_rate_hz = int(session["sample_rate_hz"])
             if end_sample - start_sample > round(MAX_VISIBLE_RANGE_S * sample_rate_hz):
                 raise ValueError("visible event range exceeds the configured bound")
@@ -499,10 +503,14 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                 start_sample=start_sample,
                 end_sample=end_sample,
             )
-            history = query_history_index(
-                database_path,
-                after_sequence=after,
-                limit=limit,
+            history = (
+                query_history_index(
+                    database_path,
+                    after_sequence=after,
+                    limit=limit,
+                )
+                if include_history
+                else []
             )
         except (FileNotFoundError, sqlite3.Error, TypeError, ValueError) as error:
             self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)

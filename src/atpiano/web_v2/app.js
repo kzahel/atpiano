@@ -25,6 +25,7 @@ const state = {
   queryKey: "",
   capture: null,
   pollTimer: null,
+  eventRequestId: 0,
 };
 
 function el(id) {
@@ -49,6 +50,12 @@ function formatBytes(bytes) {
 
 function showError(error) {
   el("error-message").textContent = error ? error.message || String(error) : "";
+}
+
+function showTimelineError(error) {
+  const message = error ? error.message || String(error) : "";
+  el("timeline-error").textContent = message;
+  el("timeline-error").hidden = !message;
 }
 
 async function fetchJson(url, options) {
@@ -163,7 +170,9 @@ function updateStatus() {
 async function loadVisibleEvents(force = false) {
   const session = state.session?.session;
   if (!session || !state.session?.horizons) {
+    state.eventRequestId += 1;
     state.events = [];
+    state.queryKey = "";
     drawTimeline();
     return;
   }
@@ -171,18 +180,49 @@ async function loadVisibleEvents(force = false) {
   const sampleRate = Number(session.sample_rate_hz);
   const startSample = Math.max(0, Math.floor(range.startS * sampleRate));
   const endSample = Math.max(startSample + 1, Math.ceil(range.endS * sampleRate));
-  const queryKey = `${session.session_id}:${startSample}:${endSample}:${
-    state.nextSequence
-  }`;
-  if (!force && queryKey === state.queryKey) return;
-  const payload = await fetchJson(
-    `/api/events?start_sample=${startSample}&end_sample=${endSample}` +
-      `&after=${state.nextSequence}&limit=1024`
+  const eventSequence = Number(
+    state.session?.transport?.last_event_sequence || 0
   );
-  state.events = payload.materialized;
-  state.nextSequence = payload.next_sequence;
-  state.queryKey = queryKey;
-  drawTimeline();
+  const audioHead = Number(state.session?.horizons?.audio_head_sample || 0);
+  const queryKey = TIMELINE.viewportQueryKey(
+    session.session_id,
+    startSample,
+    endSample,
+    eventSequence,
+    audioHead,
+    state.session?.status || "idle"
+  );
+  if (!force && queryKey === state.queryKey) {
+    drawTimeline();
+    return;
+  }
+  const requestId = ++state.eventRequestId;
+  try {
+    const payload = await fetchJson(
+      `/api/events?start_sample=${startSample}&end_sample=${endSample}` +
+        "&include_history=0"
+    );
+    if (
+      requestId !== state.eventRequestId ||
+      payload.session_id !== state.session?.session?.session_id
+    ) {
+      return;
+    }
+    if (!Array.isArray(payload.materialized)) {
+      throw new Error("Timeline response did not contain visible events.");
+    }
+    state.events = payload.materialized;
+    state.nextSequence = eventSequence;
+    state.queryKey = queryKey;
+    showTimelineError(null);
+    drawTimeline();
+  } catch (error) {
+    if (requestId !== state.eventRequestId) return;
+    showTimelineError(
+      new Error(`Timeline could not load visible events: ${error.message || error}`)
+    );
+    throw error;
+  }
 }
 
 async function poll() {
@@ -197,6 +237,7 @@ async function poll() {
     await loadVisibleEvents();
   } catch (error) {
     showError(error);
+    if (el("timeline-error").hidden) showTimelineError(error);
   } finally {
     state.pollTimer = window.setTimeout(poll, 750);
   }
@@ -242,7 +283,10 @@ function drawTimeline() {
 
   const sampleRate = Number(state.session?.session?.sample_rate_hz || 1);
   const notes = state.events.filter(
-    (event) => Number.isInteger(event.pitch) && event.pitch >= PITCH_MIN
+    (event) =>
+      Number.isInteger(event.pitch) &&
+      event.pitch >= PITCH_MIN &&
+      event.pitch <= PITCH_MAX
   );
   for (const event of notes) {
     const geometry = TIMELINE.noteGeometry(
@@ -304,6 +348,12 @@ function drawTimeline() {
   el("timeline-seek").disabled = windowState.maximumStart === 0;
   el("range-label").textContent =
     `${formatClock(windowState.startS)} — ${formatClock(windowState.endS)}`;
+  const pedalCount = state.events.filter((item) =>
+    Number.isInteger(item.controller)
+  ).length;
+  el("visible-count").textContent =
+    `${notes.length} ${notes.length === 1 ? "note" : "notes"}` +
+    (pedalCount ? ` · ${pedalCount} pedal` : "");
   el("timeline-empty").hidden = state.events.length > 0;
 }
 
