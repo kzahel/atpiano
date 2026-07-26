@@ -385,6 +385,14 @@ lanes, visually marks unusually long estimates for verification, and clips
 committed gestures at the commit horizon. This is a Phase 3 presentation
 correction and does not claim improved pedal inference. R3 remains open.
 
+The next R3 review requested actual audio playback from the existing
+inspection range. `097af58` adds a session-wide Play/Pause and seek transport
+whose source-sample position drives exact-key inspection. It crosses bounded
+audio segments, serves byte ranges for real browser seeking, and prefers a
+post-Stop 128 kbps MP3 derivative while retaining WAV as the lossless
+transcription source and compatibility fallback. This does not select the
+long-term archival codec. Phase 4 remains closed.
+
 ## Phase 4 — Extract The Framework-Independent Python Application Core
 
 ### Purpose

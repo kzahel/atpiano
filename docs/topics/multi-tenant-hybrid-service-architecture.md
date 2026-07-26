@@ -10,7 +10,9 @@ session-addressed review URLs corrected through R3 feedback. Stop progress and
 automatic post-settle scoring are also implemented. React now preserves
 distinct inferred sustain and soft-pedal lanes and flags unusually long
 controller estimates instead of merging them as apparent stuck sustain,
-pending mandatory
+and it provides seekable recorded-audio playback synchronized to exact
+source-sample inspection. Playback prefers a replaceable MP3 derivative while
+the current local adapter retains segmented WAV source audio, pending mandatory
 [`R3 re-review`](../r3-interaction-review.md).**
 Versioned Pydantic contracts, generated OpenAPI/TypeScript, the
 `AtpianoRuntime` boundary, an executable fixture provider, and explicit local

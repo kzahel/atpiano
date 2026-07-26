@@ -126,6 +126,18 @@ inferred and visibly flags unusually long estimates for verification; it does
 not silently suppress them or claim acoustic correctness. Committed
 controller gestures, like committed notes, stop at `H_commit`.
 
+Saved-session review now uses the same source clock for recorded audio,
+scrubbing, roll inspection, and the detected keyboard. The React transport
+plays and seeks across the session rather than treating the prior inspection
+range as a permanently paused control. Local artifact delivery supports byte
+ranges so a seek addresses the requested audio time.
+
+After Stop, the current local workflow derives one 128 kbps MP3 from the
+complete bounded WAV segment sequence. MP3 is a seekable browser-delivery
+cache, not the transcription source: segmented PCM16 WAV remains intact and
+is also the playback fallback when FFmpeg is unavailable. This does not
+resolve the separate archival-codec and storage-retention decision.
+
 V2 now also has an independently toggleable committed Score view. It is an
 explicit, on-demand downstream snapshot rather than part of either acoustic
 lane: the server freezes one `H_commit`, selects only closed committed notes,

@@ -12,8 +12,9 @@ validated. Pathological score expansion and missing session-addressed URLs
 were subsequently corrected. Stop progress and automatic post-settle score
 generation are now implemented. Inferred sustain and soft-pedal gestures are
 also distinct after a merged lane misreported a long soft-pedal false positive
-as stuck sustain. The revisions await explicit R3 re-review. Phase 4 must not
-start before that decision.
+as stuck sustain. Saved sessions now have synchronized, seekable audio
+playback with a compressed delivery derivative. The revisions await explicit
+R3 re-review. Phase 4 must not start before that decision.
 
 ## Entry Evidence
 
@@ -188,7 +189,9 @@ The implementation series began at `a9805fd` and is:
 - `f39179a` put the selected session ID in copyable browser URLs; and
 - `938a15b` added settling progress and automatic post-capture scoring; and
 - `dab105b` separated inferred sustain and soft-pedal gestures and marked
-  unusually long estimates for verification.
+  unusually long estimates for verification; and
+- `097af58` added compressed session playback, source-time seeking, and
+  synchronized keyboard inspection.
 
 The real page-facing golden replay is recorded in
 [`r3-interaction-review.md`](../r3-interaction-review.md). Its 42-second
@@ -199,8 +202,8 @@ views, the score job, artifact refresh, and real SVG notation without browser
 alerts or page-level horizontal overflow.
 
 The final `uv run atpiano migration-regression` report at
-`results/migration-regression/20260726T120958Z/report.json` passed 81 Python
-tests, retained JavaScript tests, 27 application tests, contract drift,
+`results/migration-regression/20260726T123136Z/report.json` passed 83 Python
+tests, retained JavaScript tests, 28 application tests, contract drift,
 TypeScript, dependency audit, Ruff, syntax, and whitespace. Physical
 microphone permission and playing remain the explicit human lane at R3. The
 implementation range is `a9805fd^..HEAD` at this review handoff. Phase 4
@@ -243,3 +246,15 @@ inferred, gives them distinct capped gesture styling, hatches unusually long
 estimates, and clips committed controller intervals at `H_commit`. The
 performer identified the long CC67 interval as false; the UI now exposes that
 uncertainty without silently discarding controller output.
+
+The next review found that the inspection range had no audio transport.
+`097af58` adds Play/Pause and a session-wide seek bar over the bounded source
+segments. Playback time and manual seeking drive the same exact inspection
+sample as roll clicks, so the detected keyboard follows what is heard. The
+server supports byte-range reads required by browser seeking.
+
+Stop now derives one 128 kbps MP3 for browser delivery without replacing the
+segmented lossless WAV source. React prefers that compressed artifact and
+falls back to WAV when conversion is unavailable. The exact review session
+sought to 18.79 seconds in Chrome, continued from that position, and exposed
+the full 37.589-second seekable range.

@@ -141,8 +141,8 @@ its artifact access handle, and rendered it as SVG. Automated tests also
 cover score failure isolation.
 
 The final `uv run atpiano migration-regression` passed at
-`results/migration-regression/20260726T120958Z/report.json`: 81 Python tests,
-the retained JavaScript suites, 27 application tests, contract drift,
+`results/migration-regression/20260726T123136Z/report.json`: 83 Python tests,
+the retained JavaScript suites, 28 application tests, contract drift,
 TypeScript, dependency audit, Ruff, JavaScript syntax, and whitespace all
 passed. The dependency audit found zero vulnerabilities.
 
@@ -295,3 +295,26 @@ bounded-context pedal-quality gap. The UI now identifies that uncertainty
 instead of misreporting it as stuck sustain. A Chrome check of the exact
 session displayed nine separate sustain gestures, one hatched soft-pedal
 estimate, and no merged sustain bar.
+
+The next review asked for actual recording playback instead of an inspection
+slider that could only remain paused. Commit `097af58` adds one source-time
+transport above the musical views:
+
+- Play and Pause operate on the selected session's recorded audio;
+- one seek bar spans the complete session, including multiple bounded source
+  segments;
+- playback and seeking update the exact inspection sample, so the keyboard
+  follows the audible position;
+- seeking uses HTTP byte ranges rather than restarting the file at zero; and
+- active capture explains that playback becomes available after Stop.
+
+Stopped sessions now derive one seekable 128 kbps MP3 for delivery while
+retaining the segmented PCM16 WAVs as the lossless transcription source.
+The browser prefers MP3 and falls back to WAV when FFmpeg conversion is
+unavailable. This chooses a replaceable playback derivative; it does not
+settle the longer-term archival codec or retention policy.
+
+The exact 37.6-second screenshot session was converted to a 602,540-byte MP3.
+A real Chrome check sought to 18.79 seconds, showed a seekable range through
+37.589 seconds, updated the keyboard from the same sample position, and
+continued playback to 19.63 seconds. The original WAV remained unchanged.
