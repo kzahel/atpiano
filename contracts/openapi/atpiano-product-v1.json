@@ -1,0 +1,2761 @@
+{
+  "components": {
+    "schemas": {
+      "Artifact": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "byte_count": {
+            "minimum": 0,
+            "title": "Byte Count",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "filename": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Filename",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ArtifactKind"
+          },
+          "media_type": {
+            "maxLength": 127,
+            "minLength": 3,
+            "pattern": "^[a-z0-9][a-z0-9.+-]+/[a-z0-9][a-z0-9.+-]+$",
+            "title": "Media Type",
+            "type": "string"
+          },
+          "producing_job_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Producing Job Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "source_horizon_sample": {
+            "minimum": 0,
+            "title": "Source Horizon Sample",
+            "type": "integer"
+          },
+          "transcription_run_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Transcription Run Id"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "artifact_id",
+          "kind",
+          "media_type",
+          "filename",
+          "sha256",
+          "byte_count",
+          "source_horizon_sample",
+          "created_at",
+          "provenance"
+        ],
+        "title": "Artifact",
+        "type": "object"
+      },
+      "ArtifactAccess": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "download_name": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Download Name",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expires At"
+          },
+          "media_type": {
+            "maxLength": 127,
+            "minLength": 3,
+            "pattern": "^[a-z0-9][a-z0-9.+-]+/[a-z0-9][a-z0-9.+-]+$",
+            "title": "Media Type",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "url": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "artifact_id",
+          "media_type",
+          "download_name",
+          "url"
+        ],
+        "title": "ArtifactAccess",
+        "type": "object"
+      },
+      "ArtifactKind": {
+        "enum": [
+          "audio",
+          "event-history",
+          "midi",
+          "musicxml",
+          "score-input-midi",
+          "manifest",
+          "diagnostic"
+        ],
+        "title": "ArtifactKind",
+        "type": "string"
+      },
+      "ArtifactPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Artifact"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Next Cursor"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "items"
+        ],
+        "title": "ArtifactPage",
+        "type": "object"
+      },
+      "Capture": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted_through_sample": {
+            "minimum": 0,
+            "title": "Accepted Through Sample",
+            "type": "integer"
+          },
+          "capture_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Capture Id",
+            "type": "string"
+          },
+          "error_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error Id"
+          },
+          "sample_rate_hz": {
+            "maximum": 384000,
+            "minimum": 8000,
+            "title": "Sample Rate Hz",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceKind"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CaptureStatus"
+          },
+          "stopped_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Stopped At"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "capture_id",
+          "status",
+          "source",
+          "sample_rate_hz",
+          "accepted_through_sample",
+          "started_at"
+        ],
+        "title": "Capture",
+        "type": "object"
+      },
+      "CaptureStart": {
+        "additionalProperties": false,
+        "properties": {
+          "request_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "sample_rate_hz": {
+            "maximum": 384000,
+            "minimum": 8000,
+            "title": "Sample Rate Hz",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source": {
+            "const": "microphone",
+            "title": "Source",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "source",
+          "sample_rate_hz",
+          "request_id"
+        ],
+        "title": "CaptureStart",
+        "type": "object"
+      },
+      "CaptureStatus": {
+        "enum": [
+          "requesting",
+          "warming",
+          "recording",
+          "stopping",
+          "complete",
+          "failed"
+        ],
+        "title": "CaptureStatus",
+        "type": "string"
+      },
+      "CaptureStop": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted_frame_count": {
+            "minimum": 0,
+            "title": "Accepted Frame Count",
+            "type": "integer"
+          },
+          "capture_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Capture Id",
+            "type": "string"
+          },
+          "request_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "capture_id",
+          "accepted_frame_count",
+          "request_id"
+        ],
+        "title": "CaptureStop",
+        "type": "object"
+      },
+      "DeleteSessionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmation": {
+            "const": "recoverable-delete",
+            "title": "Confirmation",
+            "type": "string"
+          },
+          "request_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "request_id",
+          "confirmation"
+        ],
+        "title": "DeleteSessionRequest",
+        "type": "object"
+      },
+      "DeleteSessionResult": {
+        "additionalProperties": false,
+        "properties": {
+          "recoverable": {
+            "const": true,
+            "default": true,
+            "title": "Recoverable",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "trashed_at": {
+            "format": "date-time",
+            "title": "Trashed At",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "trashed_at"
+        ],
+        "title": "DeleteSessionResult",
+        "type": "object"
+      },
+      "ErrorCode": {
+        "enum": [
+          "invalid-request",
+          "incompatible-version",
+          "not-found",
+          "conflict",
+          "capture-busy",
+          "score-busy",
+          "session-active",
+          "job-active",
+          "storage-unavailable",
+          "model-unavailable",
+          "cancelled",
+          "internal"
+        ],
+        "title": "ErrorCode",
+        "type": "string"
+      },
+      "ErrorResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ProductError"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "EventKind": {
+        "enum": [
+          "note",
+          "sustain",
+          "soft-pedal"
+        ],
+        "title": "EventKind",
+        "type": "string"
+      },
+      "EventLifecycle": {
+        "enum": [
+          "provisional",
+          "committed",
+          "retracted"
+        ],
+        "title": "EventLifecycle",
+        "type": "string"
+      },
+      "EventPage": {
+        "additionalProperties": false,
+        "properties": {
+          "end_sample": {
+            "minimum": 0,
+            "title": "End Sample",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EventRevision"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Next Cursor"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "start_sample": {
+            "minimum": 0,
+            "title": "Start Sample",
+            "type": "integer"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "start_sample",
+          "end_sample",
+          "items"
+        ],
+        "title": "EventPage",
+        "type": "object"
+      },
+      "EventRevision": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Confidence"
+          },
+          "event_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EventKind"
+          },
+          "lane": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Lane",
+            "type": "string"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/EventLifecycle"
+          },
+          "offset_sample": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset Sample"
+          },
+          "offset_state": {
+            "$ref": "#/components/schemas/OffsetState"
+          },
+          "onset_sample": {
+            "minimum": 0,
+            "title": "Onset Sample",
+            "type": "integer"
+          },
+          "pitch": {
+            "anyOf": [
+              {
+                "maximum": 108,
+                "minimum": 21,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Pitch"
+          },
+          "revision": {
+            "minimum": 1,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "supersedes_revision": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Supersedes Revision"
+          },
+          "transcription_run_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Transcription Run Id",
+            "type": "string"
+          },
+          "velocity": {
+            "anyOf": [
+              {
+                "maximum": 127,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Velocity"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "transcription_run_id",
+          "event_id",
+          "revision",
+          "lane",
+          "kind",
+          "lifecycle",
+          "onset_sample",
+          "offset_sample",
+          "offset_state"
+        ],
+        "title": "EventRevision",
+        "type": "object"
+      },
+      "Horizon": {
+        "additionalProperties": false,
+        "properties": {
+          "audio_head_sample": {
+            "minimum": 0,
+            "title": "Audio Head Sample",
+            "type": "integer"
+          },
+          "commit_sample": {
+            "minimum": 0,
+            "title": "Commit Sample",
+            "type": "integer"
+          },
+          "provisional_sample": {
+            "minimum": 0,
+            "title": "Provisional Sample",
+            "type": "integer"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "sample_rate_hz": {
+            "maximum": 384000,
+            "minimum": 8000,
+            "title": "Sample Rate Hz",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "transcription_run_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Transcription Run Id",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "transcription_run_id",
+          "sample_rate_hz",
+          "audio_head_sample",
+          "provisional_sample",
+          "commit_sample",
+          "recorded_at"
+        ],
+        "title": "Horizon",
+        "type": "object"
+      },
+      "Job": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "title": "Artifact Ids",
+            "type": "array"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProductError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "input_horizon_sample": {
+            "minimum": 0,
+            "title": "Input Horizon Sample",
+            "type": "integer"
+          },
+          "job_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/JobKind"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Started At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "job_id",
+          "kind",
+          "status",
+          "input_horizon_sample",
+          "created_at"
+        ],
+        "title": "Job",
+        "type": "object"
+      },
+      "JobKind": {
+        "enum": [
+          "transcription",
+          "score",
+          "export",
+          "upload"
+        ],
+        "title": "JobKind",
+        "type": "string"
+      },
+      "Membership": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/MembershipRole"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "user_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "User Id",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "user_id",
+          "role",
+          "created_at"
+        ],
+        "title": "Membership",
+        "type": "object"
+      },
+      "MembershipRole": {
+        "enum": [
+          "owner",
+          "editor",
+          "viewer"
+        ],
+        "title": "MembershipRole",
+        "type": "string"
+      },
+      "OffsetState": {
+        "enum": [
+          "open",
+          "closed"
+        ],
+        "title": "OffsetState",
+        "type": "string"
+      },
+      "PcmEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "capture_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Capture Id",
+            "type": "string"
+          },
+          "channel_count": {
+            "maximum": 8,
+            "minimum": 1,
+            "title": "Channel Count",
+            "type": "integer"
+          },
+          "first_sample": {
+            "minimum": 0,
+            "title": "First Sample",
+            "type": "integer"
+          },
+          "frame_count": {
+            "maximum": 1048576,
+            "minimum": 1,
+            "title": "Frame Count",
+            "type": "integer"
+          },
+          "payload_byte_count": {
+            "minimum": 2,
+            "title": "Payload Byte Count",
+            "type": "integer"
+          },
+          "protocol_version": {
+            "const": "atpiano.pcm.v1",
+            "default": "atpiano.pcm.v1",
+            "title": "Protocol Version",
+            "type": "string"
+          },
+          "sample_format": {
+            "const": "pcm-s16le",
+            "default": "pcm-s16le",
+            "title": "Sample Format",
+            "type": "string"
+          },
+          "sample_rate_hz": {
+            "maximum": 384000,
+            "minimum": 8000,
+            "title": "Sample Rate Hz",
+            "type": "integer"
+          },
+          "sequence": {
+            "minimum": 0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "stream_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Stream Id",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "capture_id",
+          "stream_id",
+          "sequence",
+          "first_sample",
+          "frame_count",
+          "sample_rate_hz",
+          "channel_count",
+          "payload_byte_count"
+        ],
+        "title": "PcmEnvelope",
+        "type": "object"
+      },
+      "ProductError": {
+        "additionalProperties": false,
+        "properties": {
+          "capture_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Capture Id"
+          },
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "details": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Details",
+            "type": "object"
+          },
+          "error_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Error Id",
+            "type": "string"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Job Id"
+          },
+          "message": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Session Id"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Workspace Id"
+          }
+        },
+        "required": [
+          "error_id",
+          "code",
+          "message",
+          "retryable"
+        ],
+        "title": "ProductError",
+        "type": "object"
+      },
+      "Provenance": {
+        "additionalProperties": false,
+        "properties": {
+          "adapter": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Adapter",
+            "type": "string"
+          },
+          "application_version": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Application Version",
+            "type": "string"
+          },
+          "checkpoint_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Checkpoint Sha256"
+          },
+          "execution_backend": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Execution Backend",
+            "type": "string"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model Id"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "schema_versions": {
+            "additionalProperties": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Schema Versions",
+            "type": "object"
+          },
+          "settings_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Settings Sha256"
+          },
+          "source_artifact_sha256": {
+            "default": [],
+            "items": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "title": "Source Artifact Sha256",
+            "type": "array"
+          }
+        },
+        "required": [
+          "application_version",
+          "schema_versions",
+          "adapter",
+          "execution_backend"
+        ],
+        "title": "Provenance",
+        "type": "object"
+      },
+      "ReplayStart": {
+        "additionalProperties": false,
+        "properties": {
+          "fixture_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Fixture Id",
+            "type": "string"
+          },
+          "realtime": {
+            "default": true,
+            "title": "Realtime",
+            "type": "boolean"
+          },
+          "repeat": {
+            "default": 1,
+            "maximum": 10000,
+            "minimum": 1,
+            "title": "Repeat",
+            "type": "integer"
+          },
+          "request_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "silence_samples": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Silence Samples",
+            "type": "integer"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "fixture_id",
+          "request_id"
+        ],
+        "title": "ReplayStart",
+        "type": "object"
+      },
+      "RunStatus": {
+        "enum": [
+          "pending",
+          "running",
+          "complete",
+          "failed",
+          "cancelled"
+        ],
+        "title": "RunStatus",
+        "type": "string"
+      },
+      "RuntimeCapabilities": {
+        "additionalProperties": false,
+        "properties": {
+          "capture_sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceKind"
+            },
+            "title": "Capture Sources",
+            "type": "array"
+          },
+          "max_event_range_samples": {
+            "minimum": 1,
+            "title": "Max Event Range Samples",
+            "type": "integer"
+          },
+          "max_pcm_block_frames": {
+            "minimum": 1,
+            "title": "Max Pcm Block Frames",
+            "type": "integer"
+          },
+          "recoverable_delete": {
+            "title": "Recoverable Delete",
+            "type": "boolean"
+          },
+          "runtime_mode": {
+            "$ref": "#/components/schemas/RuntimeMode"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "score_available": {
+            "title": "Score Available",
+            "type": "boolean"
+          },
+          "supported_pcm_protocol_versions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Supported Pcm Protocol Versions",
+            "type": "array"
+          },
+          "supported_schema_versions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Supported Schema Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "runtime_mode",
+          "supported_schema_versions",
+          "supported_pcm_protocol_versions",
+          "capture_sources",
+          "score_available",
+          "recoverable_delete",
+          "max_pcm_block_frames",
+          "max_event_range_samples"
+        ],
+        "title": "RuntimeCapabilities",
+        "type": "object"
+      },
+      "RuntimeMode": {
+        "enum": [
+          "local",
+          "hosted",
+          "fixture"
+        ],
+        "title": "RuntimeMode",
+        "type": "string"
+      },
+      "ScoreJobStart": {
+        "additionalProperties": false,
+        "properties": {
+          "commit_sample": {
+            "minimum": 0,
+            "title": "Commit Sample",
+            "type": "integer"
+          },
+          "request_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "transcription_run_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Transcription Run Id",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "transcription_run_id",
+          "commit_sample",
+          "request_id"
+        ],
+        "title": "ScoreJobStart",
+        "type": "object"
+      },
+      "ScoreSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_ids": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "title": "Artifact Ids",
+            "type": "array"
+          },
+          "commit_sample": {
+            "minimum": 0,
+            "title": "Commit Sample",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "note_count": {
+            "minimum": 0,
+            "title": "Note Count",
+            "type": "integer"
+          },
+          "producing_job_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Producing Job Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "score_snapshot_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Score Snapshot Id",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "transcription_run_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Transcription Run Id",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "score_snapshot_id",
+          "producing_job_id",
+          "transcription_run_id",
+          "commit_sample",
+          "note_count",
+          "artifact_ids",
+          "created_at"
+        ],
+        "title": "ScoreSnapshot",
+        "type": "object"
+      },
+      "Session": {
+        "additionalProperties": false,
+        "properties": {
+          "active_capture_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Active Capture Id"
+          },
+          "available_artifact_kinds": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ArtifactKind"
+            },
+            "title": "Available Artifact Kinds",
+            "type": "array"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Completed At"
+          },
+          "current_transcription_run_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Current Transcription Run Id"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Display Name"
+          },
+          "sample_rate_hz": {
+            "maximum": 384000,
+            "minimum": 8000,
+            "title": "Sample Rate Hz",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceKind"
+          },
+          "source_frame_count": {
+            "minimum": 0,
+            "title": "Source Frame Count",
+            "type": "integer"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SessionStatus"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "status",
+          "source",
+          "sample_rate_hz",
+          "source_frame_count",
+          "started_at"
+        ],
+        "title": "Session",
+        "type": "object"
+      },
+      "SessionPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Session"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Next Cursor"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "items"
+        ],
+        "title": "SessionPage",
+        "type": "object"
+      },
+      "SessionStatus": {
+        "enum": [
+          "active",
+          "stopping",
+          "complete",
+          "failed",
+          "trashed"
+        ],
+        "title": "SessionStatus",
+        "type": "string"
+      },
+      "SourceKind": {
+        "enum": [
+          "microphone",
+          "replay",
+          "upload"
+        ],
+        "title": "SourceKind",
+        "type": "string"
+      },
+      "TranscriptionRun": {
+        "additionalProperties": false,
+        "properties": {
+          "commit_model": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Commit Model"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "preview_model": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Preview Model"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "transcription_run_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Transcription Run Id",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "transcription_run_id",
+          "status",
+          "created_at"
+        ],
+        "title": "TranscriptionRun",
+        "type": "object"
+      },
+      "User": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "display_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "user_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "display_name",
+          "created_at"
+        ],
+        "title": "User",
+        "type": "object"
+      },
+      "Workspace": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/WorkspaceMode"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Owner User Id"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "name",
+          "mode",
+          "created_at"
+        ],
+        "title": "Workspace",
+        "type": "object"
+      },
+      "WorkspaceMode": {
+        "enum": [
+          "local",
+          "cloud",
+          "synced"
+        ],
+        "title": "WorkspaceMode",
+        "type": "string"
+      },
+      "WorkspacePage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Workspace"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Next Cursor"
+          },
+          "schema_version": {
+            "const": "atpiano.product.v1",
+            "default": "atpiano.product.v1",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "WorkspacePage",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Platform-neutral product operations. Musical time is always expressed in source-audio samples.",
+    "title": "atpiano product contract",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/product/v1/capabilities": {
+      "get": {
+        "operationId": "getCapabilities",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeCapabilities"
+                }
+              }
+            },
+            "description": "RuntimeCapabilities"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured product error"
+          }
+        }
+      }
+    },
+    "/api/product/v1/captures": {
+      "post": {
+        "operationId": "startCapture",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaptureStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Capture"
+                }
+              }
+            },
+            "description": "Capture"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured product error"
+          }
+        }
+      }
+    },
+    "/api/product/v1/captures/{capture_id}/stop": {
+      "post": {
+        "operationId": "stopCapture",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capture_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaptureStop"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            },
+            "description": "Session"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured product error"
+          }
+        }
+      }
+    },
+    "/api/product/v1/jobs/{job_id}": {
+      "get": {
+        "operationId": "getJob",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Job"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured product error"
+          }
+        }
+      }
+    },
+    "/api/product/v1/replays": {
+      "post": {
+        "operationId": "startReplay",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplayStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Capture"
+                }
+              }
+            },
+            "description": "Capture"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured product error"
+          }
+        }
+      }
+    },
+    "/api/product/v1/workspaces": {
+      "get": {
+        "operationId": "listWorkspaces",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 4096,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspacePage"
+                }
+              }
+            },
+            "description": "WorkspacePage"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured product error"
+          }
+        }
+      }
+    },
+    "/api/product/v1/workspaces/{workspace_id}/sessions": {
+      "get": {
+        "operationId": "listSessions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 4096,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionPage"
+                }
+              }
+            },
+            "description": "SessionPage"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured product error"
+          }
+        }
+      }
+    },
+    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}": {
+      "delete": {
+        "operationId": "deleteSession",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteSessionResult"
+                }
+              }
+            },
+            "description": "DeleteSessionResult"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured product error"
+          }
+        }
+      },
+      "get": {
+        "operationId": "getSession",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            },
+            "description": "Session"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured product error"
+          }
+        }
+      }
+    },
+    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/artifacts": {
+      "get": {
+        "operationId": "listArtifacts",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 4096,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactPage"
+                }
+              }
+            },
+            "description": "ArtifactPage"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured product error"
+          }
+        }
+      }
+    },
+    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/artifacts/{artifact_id}/access": {
+      "get": {
+        "operationId": "getArtifactAccess",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactAccess"
+                }
+              }
+            },
+            "description": "ArtifactAccess"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured product error"
+          }
+        }
+      }
+    },
+    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/events": {
+      "get": {
+        "operationId": "listEvents",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_sample",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_sample",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 4096,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventPage"
+                }
+              }
+            },
+            "description": "EventPage"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured product error"
+          }
+        }
+      }
+    },
+    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/horizon": {
+      "get": {
+        "operationId": "getHorizon",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Horizon"
+                }
+              }
+            },
+            "description": "Horizon"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured product error"
+          }
+        }
+      }
+    },
+    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/score-jobs": {
+      "post": {
+        "operationId": "startScoreJob",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScoreJobStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Job"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured product error"
+          }
+        }
+      }
+    }
+  }
+}

@@ -238,6 +238,15 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="report path (default: timestamped path under results/)",
     )
+    contracts_parser = subparsers.add_parser(
+        "generate-contracts",
+        help="generate the product OpenAPI document and TypeScript wire types",
+    )
+    contracts_parser.add_argument(
+        "--check",
+        action="store_true",
+        help="fail instead of writing when generated contracts have drifted",
+    )
     return parser
 
 
@@ -410,6 +419,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(output_path)
         print(f"migration regression: {report['status']}")
         return 0 if report["status"] == "passed" else 1
+    if args.command == "generate-contracts":
+        from atpiano.product.contract_generation import generate_contracts
+
+        outputs = generate_contracts(check=args.check)
+        for output in outputs:
+            print(output)
+        return 0
     if not args.version:
         parser.print_help()
     return 0
