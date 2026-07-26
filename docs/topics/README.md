@@ -26,6 +26,10 @@ normally reuse the document slug in its `Topic:` trailers.
   browser prototype whose strict-onset decoder, room gate, physical keyboard,
   grand-staff stream, confidence controls, and source-timing guides are
   validated for initial subjective use; target-piano octave overtones remain.
+- [`linux-development-portability.md`](linux-development-portability.md):
+  reproducible x86_64 Linux development and inference evidence, current
+  platform-neutral fixes, and the unresolved CPU-only Transkun packaging and
+  same-process live-scheduling gaps.
 - [`long-session-storage-retention.md`](long-session-storage-retention.md):
   policy and validation work for predictable long-session disk use, with
   ordinary session data separated from bounded, disposable local debug data

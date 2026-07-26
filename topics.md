@@ -18,3 +18,6 @@
 - `practice-companion-product-vision` — musical-notebook product framing,
   moment-centered reflection, engraving, tool-backed analysis, trusted
   collaboration, and teacher review
+- `linux-development-portability` — reproducible Linux development gates,
+  platform-neutral local copy, real model execution, optional-model dependency
+  gaps, and local live-scheduling evidence

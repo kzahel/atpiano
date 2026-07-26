@@ -1560,7 +1560,7 @@ async function pollJob(jobId) {
       document.querySelector("#job-detail").textContent =
         "The local workbench runs one transcription at a time.";
     } else if (job.status === "transcribing") {
-      document.querySelector("#job-title").textContent = "Transcribing on this Mac";
+      document.querySelector("#job-title").textContent = "Transcribing on this device";
       document.querySelector("#job-detail").textContent =
         "Basic Pitch is decoding the complete recording. This usually takes a few seconds.";
     } else if (job.status === "failed") {

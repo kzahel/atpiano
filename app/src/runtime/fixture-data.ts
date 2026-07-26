@@ -22,7 +22,7 @@ const hash = "d".repeat(64);
 const workspace: Workspace = {
   schema_version: schemaVersion,
   workspace_id: workspaceId,
-  name: "On this Mac",
+  name: "On this device",
   mode: "local",
   created_at: "2026-07-26T09:12:00Z",
   owner_user_id: null,

@@ -40,7 +40,7 @@ def _provenance() -> Provenance:
 def test_representative_contract_objects_round_trip_strictly() -> None:
     workspace = Workspace(
         workspace_id="local",
-        name="On this Mac",
+        name="On this device",
         mode=WorkspaceMode.LOCAL,
         created_at=NOW,
     )
@@ -81,7 +81,7 @@ def test_schema_version_and_unknown_fields_fail_explicitly() -> None:
     valid = {
         "schema_version": CONTRACT_SCHEMA_VERSION,
         "workspace_id": "local",
-        "name": "On this Mac",
+        "name": "On this device",
         "mode": "local",
         "created_at": NOW.isoformat(),
     }

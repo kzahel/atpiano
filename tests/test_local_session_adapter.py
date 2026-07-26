@@ -70,7 +70,9 @@ def test_local_catalog_paginates_and_reads_explicit_sessions(
     assert [item.session_id for item in second.items] == [older_id]
     assert second.next_cursor is None
     assert store.get_session(older_id).source_frame_count == 8
-    assert store.workspace().mode.value == "local"
+    workspace = store.workspace()
+    assert workspace.mode.value == "local"
+    assert workspace.name == "On this device"
 
 
 def test_local_reader_converts_events_and_horizons_to_contract(

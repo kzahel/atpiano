@@ -1,13 +1,37 @@
 from __future__ import annotations
 
+import builtins
 import json
 import wave
 from pathlib import Path
 
 import numpy as np
+import pytest
 
-from atpiano.capture import write_capture_artifacts
+from atpiano.capture import _sounddevice, write_capture_artifacts
 from atpiano.util import sha256_file
+
+
+def test_sounddevice_reports_missing_portaudio_actionably(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_import = builtins.__import__
+
+    def import_without_portaudio(
+        name: str,
+        globals: dict[str, object] | None = None,
+        locals: dict[str, object] | None = None,
+        fromlist: tuple[str, ...] = (),
+        level: int = 0,
+    ) -> object:
+        if name == "sounddevice":
+            raise OSError("PortAudio library not found")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", import_without_portaudio)
+
+    with pytest.raises(RuntimeError, match="install libportaudio2"):
+        _sounddevice()
 
 
 def test_capture_writer_produces_unaligned_input_manifest(tmp_path: Path) -> None:

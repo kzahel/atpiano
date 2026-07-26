@@ -126,7 +126,7 @@ class LocalSessionStore:
             )
         return Workspace(
             workspace_id=LOCAL_WORKSPACE_ID,
-            name="On this Mac",
+            name="On this device",
             mode=WorkspaceMode.LOCAL,
             created_at=created_at,
         )

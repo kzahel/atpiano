@@ -2,7 +2,10 @@
 
 Topic: performance-to-notation
 
-Status: **active.**
+Status: **active. A real x86_64 Linux checkpoint run on 2026-07-26 exposed a
+pre-inference ordering mismatch when distinct source attacks quantize to the
+same MIDI tick. The alignment guard correctly blocked publication; the input
+ordering contract must be corrected before further real snapshot evidence.**
 
 ## Motivation
 
@@ -107,6 +110,34 @@ continuous tempo reconstruction between attacks.
 - The known real score snapshot follows audible attacks in manual review.
 - Focused tests, TypeScript checks, application build, Python checks, and the
   migration regression pass.
+
+## Current Real-Runtime Evidence
+
+The pinned Python 3.11 runtime, upstream commit, and 389,829,880-byte
+checkpoint installed successfully on x86_64 Linux. A complete 42-second
+shared-workbench session supplied 151 closed committed notes at a full
+2,016,000-sample horizon. Snapshot creation wrote `source-notes.json` and
+`committed.mid`, then the adapter rejected them before model inference:
+
+```text
+ValueError: score input-note order differs from MIDI
+```
+
+The first mismatch is deterministic and cross-platform. Exact source attacks
+at samples 47,497 and 47,507 are ordered as pitches 64 then 60. Both round to
+the same MIDI tick; the pinned transformer's `midi_to_list` then orders that
+attack as pitches 60 then 64. `score_input_notes_document` currently sorts by
+exact onset sample, pitch, duration, and event ID, so it does not always
+fulfill its stated “transformer's MIDI-note order” contract. Linux exposed
+the first retained collision, but there is no evidence that operating-system
+iteration order or model nondeterminism caused it; the same input conversion
+has the same ordering conflict on macOS.
+
+Do not remove or relax `_verify_midi_order`. Correct the source-note ordering
+to account for the exact MIDI tick conversion while retaining the original
+sample coordinates and event IDs. Add focused coverage for attacks that
+collide only after tick rounding, then repeat the real checkpoint run before
+continuing to browser cursor evidence.
 
 ## Deliberate Exclusions
 

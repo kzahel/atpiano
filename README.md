@@ -35,11 +35,45 @@ input adapters to the same pipeline.
 The project is in discovery. Python and Spotify Basic Pitch are the first
 prototype stack, not permanent selections. A deterministic MIDI-derived
 fixture, untouched offline reference, wall-clock replay benchmark, and local
-browser live-transcription workbench are runnable on Apple Silicon.
+browser live-transcription workbench are runnable on Apple Silicon. The
+ordinary locked environment, automated regression lanes, production frontend
+build, and Basic Pitch offline and rolling TFLite paths are also validated on
+x86_64 Linux. Native PortAudio capture, the optional Transkun-corrected lane,
+and a complete shared-workbench replay are validated there as well. Chrome's
+fake-microphone path exercises the real browser capture stack, but slow CPU
+correction can exceed the client's Stop timeout even though the server later
+completes and recovers the session. A consentful human browser-microphone
+review and Linux latency parity have not been validated. The internal score
+runtime installs, but its current source-to-score alignment guard exposes an
+ordering defect on the Linux result.
 
 Current direction and research questions live in [`docs/topics/`](docs/topics/README.md).
 Acoustic-model benchmarking, live browser transcription, and downstream
 performance-to-notation conversion have separate owners there.
+
+## Development Validation
+
+From a fresh clone, install the locked Python and frontend dependencies and
+run the complete unattended gate:
+
+```text
+uv sync --frozen
+npm ci --prefix app
+uv run atpiano migration-regression
+npm run build --prefix app
+```
+
+The regression command writes a machine-readable report below the ignored
+`results/migration-regression/` directory. It covers Python and JavaScript
+tests, generated-contract drift, TypeScript, the frontend tests, dependency
+audit, Ruff, JavaScript syntax, and Git whitespace. The separate production
+build is included because it is a Phase 3 acceptance gate but is not currently
+part of `migration-regression`.
+
+Machine-dependent microphone, real Transkun, internal score-runtime, and
+long-soak lanes remain explicit rather than being counted as unattended
+passes. Current Linux evidence and limits are tracked in
+[`docs/topics/linux-development-portability.md`](docs/topics/linux-development-portability.md).
 
 ## Browser Workbench (v1 MVP)
 
@@ -265,6 +299,10 @@ experiments:
 uv sync --extra capture
 uv run atpiano record ../atpiano-artifacts/my-piano --seconds 30
 ```
+
+The `sounddevice` adapter also needs the host PortAudio shared library. On
+Debian or Ubuntu, install the `libportaudio2` package before running `devices`
+or `record`.
 
 Generated inputs, checkpoints, recordings, and run results do not belong in
 Git. Each run records hashes, runtime/model versions, parameters, stage timing,

@@ -24,6 +24,11 @@ def _sounddevice() -> Any:
         raise RuntimeError(
             "microphone capture requires: uv sync --extra capture"
         ) from error
+    except OSError as error:
+        raise RuntimeError(
+            "microphone capture requires the PortAudio shared library "
+            "(Debian/Ubuntu: install libportaudio2)"
+        ) from error
     return sounddevice
 
 

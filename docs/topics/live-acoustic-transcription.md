@@ -8,7 +8,11 @@ the separate stable corrected-note v2 milestone completed in
 a separate app with deterministic replay, bounded indefinite sessions,
 provisional Basic Pitch, trailing Transkun correction, pedal, review, and
 export. Tactical 012 subsequently added optional bounded committed-score
-snapshots without claiming continuous progressive engraving.
+snapshots without claiming continuous progressive engraving. A later real
+x86_64 Linux Chrome fake-microphone run preserved and recovered all data but
+failed the live operational contract: same-process Transkun CPU inference
+allowed input backlog and Stop settlement to exceed the client's 90-second
+wait.
 
 ## Scope And Relationship
 
@@ -169,6 +173,40 @@ proves that v2 exposes degraded mode and raises the hop no farther than eight
 seconds. A physical browser microphone audition and multi-hour real-model soak
 remain recommended evidence; no ambient microphone was activated
 automatically.
+
+The first x86_64 Linux Chrome fake-microphone run adds necessary negative
+evidence. At 24 displayed seconds, the real React/AudioWorklet/WebSocket path
+showed 98 notes with 44 corrected and no page error. Under CPU contention,
+however, seven Transkun decodes totaled 148.85 seconds, browser audio queued
+ahead of the server, and the completed artifact reached 63.21 seconds. The
+server eventually flushed the full commit horizon and exports, but the
+frontend's 90-second Stop wait expired first and left a stale failure state.
+A reload correctly recovered 228 committed notes, 20 pedal intervals, six
+artifacts, seekable MP3 playback, and synchronized key inspection.
+
+The retained timing evidence distinguishes slow inference from the scheduling
+defect. Two earlier Linux executions of the 42-second fixture averaged 10.87
+and 11.14 seconds per commit decode; a later instrumented repeat averaged
+16.90 seconds and peaked at 23.16. This host is slower than the M4 Pro record,
+and its non-isolated results are variable enough that a controlled benchmark
+is still needed. The browser run averaged 21.26 seconds and peaked at 23.65.
+
+Regardless of that performance variance, all seven browser commit decodes
+blocked ingest. The horizon log has seven fixed-audio-head gaps of 16.30 to
+23.71 seconds, each matching one decode wall time to within about 40 ms. It
+took 168.63 wall seconds to accept 63.21 source seconds and 192.35 seconds to
+reach the final commit horizon. The WebSocket handler synchronously calls
+`CorrectedSession.accept_block`, which synchronously invokes Lane B `_decode`,
+before acknowledging the block or reading another PCM frame. This is direct
+evidence for the worker boundary: faster inference reduces each plateau but
+does not make the current ingest path independent.
+
+This is not a request for a longer timeout. It shows that the local runtime
+must isolate model execution from ingest, measure transport and worker queue
+high-water independently, and represent Stop settlement as durable
+reattachable work. Until that boundary lands and a real browser pass remains
+responsive, the corrected Linux microphone path is functionally durable but
+not operationally real-time.
 
 ## Desired Experience
 
