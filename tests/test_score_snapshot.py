@@ -336,7 +336,13 @@ def test_score_snapshot_rejects_empty_committed_prefix(tmp_path: Path) -> None:
     )
     session.finalize()
 
-    with pytest.raises(ValueError, match="no closed committed notes"):
+    with pytest.raises(
+        ValueError,
+        match=(
+            "No completed piano notes were detected, "
+            "so there is nothing to score"
+        ),
+    ):
         generate_score_snapshot(
             session_directory,
             tmp_path / "runtime",

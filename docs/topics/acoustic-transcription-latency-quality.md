@@ -306,6 +306,23 @@ This is one unaligned take, so it is comparative evidence and not precision or
 recall. It does support promoting a piano-specific offline adapter above
 further Basic Pitch decoder tuning.
 
+### Humming is outside the corrected piano lane
+
+Retained microphone session `20260726T180605-f9d34a1edc29` is a 13.096-second
+hummed melody, recorded through the public browser path on 2026-07-26. Basic
+Pitch produced 18 provisional note identities in MIDI range 46–53. The
+after-Stop Transkun decode completed normally in 3.12 seconds but returned
+zero native events, then retracted all 16 provisional identities still active
+at the commit boundary. The final MIDI therefore contains zero notes.
+
+This is expected domain behavior rather than proof of a crash. The provisional
+[Basic Pitch](https://github.com/spotify/basic-pitch) lane is
+instrument-agnostic, while the corrected
+[Transkun](https://github.com/yujia-yan/transkun) lane is trained and evaluated
+for piano transcription. Humming support is not a current acceptance
+criterion. The product must still explain the empty corrected result clearly
+and must not imply that the downstream notation converter failed.
+
 ### Transkun does not survive short context
 
 Transkun is an offline adapter, not a live one. Its shipped 2.0 configuration

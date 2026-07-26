@@ -164,6 +164,14 @@ the resulting MusicXML with OSMD and states its exact committed-through time,
 note count, generation duration, and stale/current state. Capture and both
 transcription lanes continue if setup, inference, or rendering fails.
 
+An empty committed prefix is an expected model outcome, not a notation-runtime
+diagnosis. If the frozen prefix contains no completed piano notes, the score
+job now reports **No completed piano notes were detected, so there is nothing
+to score.** The score card displays that preserved job message instead of
+collapsing every job error into a generic rendering-failed label. Genuine
+converter, runtime, transport, and rendering failures retain their own error
+messages.
+
 The pinned runtime uses upstream commit
 `115432bda16ca16e0fec2e9465788f2ba369971f` and the v0.0.1 checkpoint with
 SHA-256

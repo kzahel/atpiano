@@ -142,6 +142,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self,
         workspace_directory: Path,
         *,
+        bind: str = "127.0.0.1",
         port: int,
         preview_model_factory: PreviewModelFactory = _default_preview_model,
         commit_model_factory: CommitModelFactory,
@@ -159,6 +160,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         commit_threads: int | None = 2,
         correction_mode: str = "auto",
         backend_profile_path: Path | None = None,
+        public_origin: str | None = None,
     ) -> None:
         if minimum_free_bytes < 0:
             raise ValueError("minimum free bytes cannot be negative")
@@ -176,6 +178,23 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             "auto",
         }:
             raise ValueError("local correction mode is invalid")
+        if public_origin is not None:
+            parsed_public_origin = urlsplit(public_origin)
+            if (
+                parsed_public_origin.scheme != "https"
+                or not parsed_public_origin.netloc
+                or parsed_public_origin.path
+                or parsed_public_origin.query
+                or parsed_public_origin.fragment
+                or public_origin
+                != (
+                    f"{parsed_public_origin.scheme}://"
+                    f"{parsed_public_origin.netloc}"
+                )
+            ):
+                raise ValueError(
+                    "public origin must be an HTTPS origin without a path"
+                )
         self.workspace_directory = workspace_directory.resolve()
         self.workspace_directory.mkdir(parents=True, exist_ok=True)
         self.session_store = LocalSessionStore(self.workspace_directory)
@@ -194,6 +213,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self.isolate_models = isolate_models
         self.commit_threads = commit_threads
         self.correction_mode = correction_mode
+        self.public_origin = public_origin
         self.backend_profile_path = (
             backend_profile_path.resolve()
             if backend_profile_path is not None
@@ -221,7 +241,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self._score_started_at: datetime | None = None
         self._score_completed_at: datetime | None = None
         self._load_latest_session()
-        super().__init__(("127.0.0.1", port), CorrectedWorkbenchHandler)
+        super().__init__((bind, port), CorrectedWorkbenchHandler)
 
     def asset_path(self, request_path: str) -> Path | None:
         relative = "index.html" if request_path == "/" else request_path.lstrip("/")
@@ -919,19 +939,25 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             return False
         return True
 
-    def _host_is_local(self) -> bool:
+    def _host_is_trusted(self) -> bool:
         port = self.server.server_address[1]
-        return self.headers.get("Host", "") in {
+        trusted_hosts = {
             f"127.0.0.1:{port}",
             f"localhost:{port}",
         }
+        if self.server.public_origin is not None:
+            trusted_hosts.add(urlsplit(self.server.public_origin).netloc)
+        return self.headers.get("Host", "") in trusted_hosts
 
-    def _origin_is_local(self) -> bool:
+    def _origin_is_trusted(self) -> bool:
         port = self.server.server_address[1]
-        return self.headers.get("Origin") in {
+        trusted_origins = {
             f"http://127.0.0.1:{port}",
             f"http://localhost:{port}",
         }
+        if self.server.public_origin is not None:
+            trusted_origins.add(self.server.public_origin)
+        return self.headers.get("Origin") in trusted_origins
 
     def _send_json(
         self,
@@ -947,7 +973,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         self._write_body(body)
 
     def _require_local_host(self) -> bool:
-        if self._host_is_local():
+        if self._host_is_trusted():
             return True
         self._send_json(
             {"error": "corrected workbench requests require the local address"},
@@ -1355,16 +1381,16 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         if not self._require_local_host():
             return
         request_path = unquote(urlsplit(self.path).path)
-        if not self._origin_is_local():
+        if not self._origin_is_trusted():
             if request_path.startswith("/api/v1/"):
                 self._send_api_error(
-                    "API actions require the local origin",
+                    "API actions require a trusted origin",
                     code=ErrorCode.INVALID_REQUEST,
                     status=HTTPStatus.FORBIDDEN,
                 )
             else:
                 self._send_json(
-                    {"error": "corrected workbench actions require the local origin"},
+                    {"error": "corrected workbench actions require a trusted origin"},
                     HTTPStatus.FORBIDDEN,
                 )
             return
@@ -1523,9 +1549,9 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         workspace_id, session_id = match.groups()
-        if not self._origin_is_local():
+        if not self._origin_is_trusted():
             self._send_api_error(
-                "API actions require the local origin",
+                "API actions require a trusted origin",
                 code=ErrorCode.INVALID_REQUEST,
                 status=HTTPStatus.FORBIDDEN,
                 workspace_id=workspace_id,
@@ -1646,9 +1672,9 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         self.connection.sendall(encode_frame(payload, opcode=0x8))
 
     def _upgrade_websocket(self) -> bool:
-        if not self._origin_is_local():
+        if not self._origin_is_trusted():
             self._send_json(
-                {"error": "microphone capture requires the local origin"},
+                {"error": "microphone capture requires a trusted origin"},
                 HTTPStatus.FORBIDDEN,
             )
             return False
@@ -1921,6 +1947,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
 def create_corrected_workbench_server(
     workspace_directory: Path,
     *,
+    bind: str = "127.0.0.1",
     port: int = 8001,
     preview_model_factory: PreviewModelFactory = _default_preview_model,
     commit_model_factory: CommitModelFactory | None = None,
@@ -1939,6 +1966,7 @@ def create_corrected_workbench_server(
     score_variant_runner: ScoreVariantRunner | None = None,
     web_root: Path = WEB_ROOT,
     application_mode: str = "corrected-workbench-v2",
+    public_origin: str | None = None,
 ) -> CorrectedWorkbenchServer:
     factory = commit_model_factory or partial(
         _default_commit_model,
@@ -1947,6 +1975,7 @@ def create_corrected_workbench_server(
     )
     return CorrectedWorkbenchServer(
         workspace_directory,
+        bind=bind,
         port=port,
         preview_model_factory=preview_model_factory,
         commit_model_factory=factory,
@@ -1964,12 +1993,14 @@ def create_corrected_workbench_server(
         score_variant_runner=score_variant_runner,
         web_root=web_root,
         application_mode=application_mode,
+        public_origin=public_origin,
     )
 
 
 def serve_corrected_workbench(
     workspace_directory: Path,
     *,
+    bind: str = "127.0.0.1",
     port: int = 8001,
     open_browser: bool = True,
     commit_device: str = "cpu",
@@ -1985,9 +2016,11 @@ def serve_corrected_workbench(
     web_root: Path = WEB_ROOT,
     application_mode: str = "corrected-workbench-v2",
     application_label: str = "Corrected-note workspace",
+    public_origin: str | None = None,
 ) -> None:
     server = create_corrected_workbench_server(
         workspace_directory,
+        bind=bind,
         port=port,
         commit_device=commit_device,
         commit_threads=commit_threads,
@@ -2001,9 +2034,11 @@ def serve_corrected_workbench(
         score_runtime=score_runtime,
         web_root=web_root,
         application_mode=application_mode,
+        public_origin=public_origin,
     )
     actual_port = server.server_address[1]
-    url = f"http://127.0.0.1:{actual_port}/"
+    local_host = "127.0.0.1" if bind in {"", "0.0.0.0"} else bind
+    url = f"http://{local_host}:{actual_port}/"
     print(f"{application_label}: {server.workspace_directory}")
     print(url)
     if open_browser:
@@ -2021,6 +2056,7 @@ def serve_corrected_workbench(
 def serve_shared_application(
     workspace_directory: Path,
     *,
+    bind: str = "127.0.0.1",
     port: int = 8002,
     open_browser: bool = True,
     commit_device: str = "cpu",
@@ -2033,6 +2069,7 @@ def serve_shared_application(
     replay_silence_s: float = 0.0,
     replay_realtime: bool = True,
     score_runtime: Path = Path("results/midi2score-runtime"),
+    public_origin: str | None = None,
 ) -> None:
     repository_root = Path(__file__).resolve().parents[2]
     app_root = repository_root / "app"
@@ -2043,6 +2080,7 @@ def serve_shared_application(
     )
     serve_corrected_workbench(
         workspace_directory,
+        bind=bind,
         port=port,
         open_browser=open_browser,
         commit_device=commit_device,
@@ -2058,4 +2096,5 @@ def serve_shared_application(
         web_root=app_root / "dist",
         application_mode="shared-react-v3",
         application_label="Atpiano performance workspace",
+        public_origin=public_origin,
     )

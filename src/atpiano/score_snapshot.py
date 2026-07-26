@@ -435,7 +435,9 @@ def _selected_notes(
         ):
             selected.append(event)
     if not selected:
-        raise ValueError("no closed committed notes are available to score")
+        raise ValueError(
+            "No completed piano notes were detected, so there is nothing to score."
+        )
     if len(selected) > MAX_SCORE_NOTES:
         raise ValueError(f"committed score snapshot exceeds {MAX_SCORE_NOTES} notes")
     return selected

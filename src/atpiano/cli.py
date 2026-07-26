@@ -259,11 +259,23 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("results/workbench-v3"),
         help="segmented session directory (default: results/workbench-v3)",
     )
+    shared_app_parser.add_argument(
+        "--bind",
+        default="127.0.0.1",
+        help="address for the shared application server (default: 127.0.0.1)",
+    )
     shared_app_parser.add_argument("--port", type=int, default=8002)
     shared_app_parser.add_argument(
         "--no-open",
         action="store_true",
         help="do not open the shared application in the default browser",
+    )
+    shared_app_parser.add_argument(
+        "--public-origin",
+        help=(
+            "exact HTTPS origin trusted for a temporary public tunnel "
+            "(example: https://atpiano.example.com)"
+        ),
     )
     shared_app_parser.add_argument(
         "--replay",
@@ -483,6 +495,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         serve_shared_application(
             args.workspace,
+            bind=args.bind,
             port=args.port,
             open_browser=not args.no_open,
             commit_device=args.commit_device,
@@ -495,6 +508,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             replay_silence_s=args.silence_seconds,
             replay_realtime=not args.no_wait,
             score_runtime=args.score_runtime,
+            public_origin=args.public_origin,
         )
         return 0
     if args.command == "setup-midi2score":

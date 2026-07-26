@@ -358,6 +358,67 @@ describe("shared application", () => {
     expect(screen.getByRole("heading", { name: "Piano roll" })).toBeTruthy();
   });
 
+  it("explains when the committed model detected no piano notes", async () => {
+    const user = userEvent.setup();
+    const fixture = createFixtureRuntime();
+    const message =
+      "No completed piano notes were detected, so there is nothing to score.";
+    const runtime = new Proxy(fixture, {
+      get(target, property) {
+        if (property === "startScoreJob") {
+          return async (
+            ...args: Parameters<AtpianoRuntime["startScoreJob"]>
+          ) => {
+            const job = await target.startScoreJob(...args);
+            return {
+              ...job,
+              status: "running" as const,
+              completed_at: null,
+              artifact_ids: [],
+              error: null,
+            };
+          };
+        }
+        if (property === "getJob") {
+          return async (
+            ...args: Parameters<AtpianoRuntime["getJob"]>
+          ) => {
+            const job = await target.getJob(...args);
+            return {
+              ...job,
+              status: "failed" as const,
+              completed_at: "2026-07-26T10:00:45Z",
+              artifact_ids: [],
+              error: {
+                schema_version: "atpiano.contract.v1" as const,
+                error_id: `error:${job.job_id}`,
+                code: "internal" as const,
+                message,
+                retryable: true,
+                workspace_id: job.workspace_id,
+                session_id: job.session_id,
+                capture_id: null,
+                job_id: job.job_id,
+                details: {},
+              },
+            };
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) satisfies AtpianoRuntime;
+    renderApp(runtime);
+    await screen.findByRole("heading", { name: "Morning progression" });
+
+    await user.click(screen.getByRole("button", { name: "Refresh score" }));
+
+    expect(await screen.findAllByText(message)).toHaveLength(2);
+    expect(
+      screen.queryByText("Score rendering failed. Your performance is still safe."),
+    ).toBeNull();
+  });
+
   it("leaves rendering state when score-job polling fails", async () => {
     const user = userEvent.setup();
     const fixture = createFixtureRuntime();
@@ -392,10 +453,9 @@ describe("shared application", () => {
 
     await user.click(screen.getByRole("button", { name: "Refresh score" }));
 
-    expect(await screen.findByText("Score job status unavailable")).toBeTruthy();
     expect(
-      screen.getByText("Score rendering failed. Your performance is still safe."),
-    ).toBeTruthy();
+      await screen.findAllByText("Score job status unavailable"),
+    ).toHaveLength(2);
     expect(
       screen.getByRole("button", { name: "Refresh score" }),
     ).not.toHaveProperty("disabled", true);

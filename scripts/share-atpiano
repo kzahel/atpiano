@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+bind_address="${ATPIANO_BIND_ADDRESS:-192.168.1.104}"
+port="${ATPIANO_PORT:-8002}"
+public_origin="${ATPIANO_PUBLIC_ORIGIN:-https://atpiano.graehlarts.com}"
+
+exec caffeinate -im uv run atpiano workbench-v3 \
+  --bind "${bind_address}" \
+  --port "${port}" \
+  --public-origin "${public_origin}" \
+  --no-open \
+  "$@"

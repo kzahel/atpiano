@@ -35,3 +35,5 @@ execution record; continuing status and direction belong in the relevant
 | [`022-durable-capture-worker-isolation.md`](022-durable-capture-worker-isolation.md) | Awaiting Linux | Durable PCM ingest, bounded isolated preview/commit workers, prompt Stop, and reattachable settlement |
 | [`023-backend-capability-degradation.md`](023-backend-capability-degradation.md) | Awaiting Linux | Measured live, delayed, after-Stop, and unavailable correction modes |
 | [`024-score-reader-engraving-density.md`](024-score-reader-engraving-density.md) | Implemented | Visible system spacing and meaningful Large, Comfortable, and Compact reader engraving profiles |
+| [`025-public-live-caddy.md`](025-public-live-caddy.md) | Implemented | Temporary Caddy sharing of the real local React and Python/model application over the LAN through the Pi |
+| [`026-empty-score-feedback.md`](026-empty-score-feedback.md) | Implemented | Explicit no-piano-notes score feedback with preserved job-error details in the shared application |

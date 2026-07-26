@@ -253,6 +253,7 @@ function PianoRoll({
 function ScorePreview({
   session,
   scoreStatus,
+  scoreErrorMessage,
   scoreAvailable,
   scoreXml,
   scoreXmlError,
@@ -272,6 +273,7 @@ function ScorePreview({
 }: {
   readonly session: Session;
   readonly scoreStatus: string | null;
+  readonly scoreErrorMessage: string | null;
   readonly scoreAvailable: boolean;
   readonly scoreXml: string | undefined;
   readonly scoreXmlError: Error | null;
@@ -322,7 +324,8 @@ function ScorePreview({
           : scoreStatus === "running"
             ? "Rendering the frozen committed prefix…"
             : scoreStatus === "failed"
-              ? "Score rendering failed. Your performance is still safe."
+              ? scoreErrorMessage ??
+                "Score rendering failed. Your performance is still safe."
               : scoreXml && scoreHorizonSample !== undefined
                 ? `Generated score through ${formatClock(scoreHorizonSample, session.sample_rate_hz)}.`
                 : "Only closed corrected notes enter this snapshot."}
@@ -441,6 +444,7 @@ export function PerformanceViews({
   showKeyboard,
   showScore,
   scoreStatus,
+  scoreErrorMessage,
   scoreAvailable,
   scoreXml,
   scoreXmlError,
@@ -468,6 +472,7 @@ export function PerformanceViews({
   readonly showKeyboard: boolean;
   readonly showScore: boolean;
   readonly scoreStatus: string | null;
+  readonly scoreErrorMessage: string | null;
   readonly scoreAvailable: boolean;
   readonly scoreXml: string | undefined;
   readonly scoreXmlError: Error | null;
@@ -501,6 +506,7 @@ export function PerformanceViews({
         <ScorePreview
           session={session}
           scoreStatus={scoreStatus}
+          scoreErrorMessage={scoreErrorMessage}
           scoreAvailable={scoreAvailable}
           scoreXml={scoreXml}
           scoreXmlError={scoreXmlError}

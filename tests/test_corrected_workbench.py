@@ -251,6 +251,61 @@ def test_corrected_workbench_is_separate_loopback_app(tmp_path: Path) -> None:
         thread.join(timeout=2)
 
 
+def test_corrected_workbench_accepts_one_configured_public_origin(
+    tmp_path: Path,
+) -> None:
+    public_origin = "https://atpiano.kzahel.com"
+    server = create_corrected_workbench_server(
+        tmp_path,
+        port=0,
+        preview_model_factory=_FakePreviewModel,
+        commit_model_factory=_FakeCommitModel,
+        minimum_free_bytes=0,
+        isolate_models=False,
+        public_origin=public_origin,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        trusted = urllib.request.Request(
+            f"{base_url}/api/config",
+            headers={"Host": "atpiano.kzahel.com"},
+        )
+        with urllib.request.urlopen(trusted, timeout=2) as response:
+            assert response.status == 200
+
+        action = urllib.request.Request(
+            f"{base_url}/api/replay",
+            data=b"",
+            headers={
+                "Host": "atpiano.kzahel.com",
+                "Origin": public_origin,
+            },
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(action, timeout=2)
+        assert error.value.code == 409
+
+        foreign = urllib.request.Request(
+            f"{base_url}/api/replay",
+            data=b"",
+            headers={
+                "Host": "atpiano.kzahel.com",
+                "Origin": "https://other.example",
+            },
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(foreign, timeout=2)
+        assert error.value.code == 403
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
 def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
     parser = build_parser()
 
@@ -275,6 +330,8 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
             "--repeat",
             "2",
             "--no-wait",
+            "--public-origin",
+            "https://atpiano.kzahel.com",
         ]
     )
     profile = parser.parse_args(
@@ -299,11 +356,13 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
         "results/backend-profile/backend-profile.json"
     )
     assert v3.command == "workbench-v3"
+    assert v3.bind == "127.0.0.1"
     assert v3.port == 8102
     assert v3.repeat == 2
     assert v3.workspace == Path("results/workbench-v3")
     assert v3.commit_threads == 2
     assert v3.correction_mode == "auto"
+    assert v3.public_origin == "https://atpiano.kzahel.com"
     assert profile.repeat == 2
     assert profile.warmup_seconds == 16.0
     assert profile.commit_threads == 2

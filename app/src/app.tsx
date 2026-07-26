@@ -1131,6 +1131,7 @@ export function App() {
               showKeyboard={showKeyboard}
               showScore={showScore}
               scoreStatus={scoreStatus}
+              scoreErrorMessage={selectedScoreJob?.error?.message ?? null}
               scoreAvailable={capabilities.data?.score_available ?? false}
               scoreXml={scoreXml.data}
               scoreXmlError={scoreXml.error}

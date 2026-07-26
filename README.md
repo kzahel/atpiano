@@ -111,6 +111,21 @@ audit, Ruff, JavaScript syntax, and Git whitespace. The separate production
 build is included because it is a Phase 3 acceptance gate but is not currently
 part of `migration-regression`.
 
+## Temporary Public Trial
+
+The Pi's live Caddy service proxies `https://atpiano.graehlarts.com` over the
+LAN to this Mac. Start the authoritative v3 application on the configured
+address and port:
+
+```text
+scripts/share-atpiano
+```
+
+The URL works only while this Mac and the command are running. The application
+binds to this Mac's LAN address; its explicit `--public-origin` option
+trusts only the configured HTTPS hostname for browser actions and microphone
+WebSockets.
+
 Machine-dependent microphone, real Transkun, internal score-runtime, and
 long-soak lanes remain explicit rather than being counted as unattended
 passes. Current Linux evidence and limits are tracked in
