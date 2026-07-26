@@ -40,12 +40,15 @@ ordinary locked environment, automated regression lanes, production frontend
 build, and Basic Pitch offline and rolling TFLite paths are also validated on
 x86_64 Linux. Native PortAudio capture, the optional Transkun-corrected lane,
 and a complete shared-workbench replay are validated there as well. Chrome's
-fake-microphone path exercises the real browser capture stack, but slow CPU
-correction can exceed the client's Stop timeout even though the server later
-completes and recovers the session. A consentful human browser-microphone
-review and Linux latency parity have not been validated. The internal score
-runtime installs, but its current source-to-score alignment guard exposes an
-ordering defect on the Linux result.
+fake-microphone path exposed slow correction blocking capture and exceeding
+the old Stop timeout. Model work is now isolated from durable PCM ingest,
+Stop promptly enters background settlement, and correction defaults to a
+measured capability profile or conservative after-Stop mode. Those changes
+pass local fake-worker and real Transkun checks but still require the Linux
+browser rerun. A consentful human browser-microphone review and Linux latency
+parity have not been validated. The internal score runtime installs, but its
+current source-to-score alignment guard exposes an ordering defect on the
+Linux result.
 
 Current direction and research questions live in [`docs/topics/`](docs/topics/README.md).
 Acoustic-model benchmarking, live browser transcription, and downstream

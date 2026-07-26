@@ -8,9 +8,9 @@ Topic: live-acoustic-transcription
 
 Topic: linux-development-portability
 
-Status: planned on 2026-07-26. Implement the policy and deterministic tests
-after Tactical 022 supplies isolated worker measurements. Linux measurement
-and product-mode acceptance remain mandatory.
+Status: **profile artifact, automatic selection, explicit modes, and local
+real-model validation implemented on 2026-07-26. Linux measurement, browser
+acceptance, and runtime-pressure demotion remain open.**
 
 ## Outcome
 
@@ -100,4 +100,49 @@ That default is a conservative initial direction, not a processor-name rule.
 
 ## Execution Record
 
-No implementation commits yet.
+`16e5864` added explicit session behavior for live, delayed, after-Stop, and
+unavailable correction. After-Stop starts no commit inference during capture;
+unavailable preserves recording and Basic Pitch preview. The selected mode
+and reason are visible in the shared application and retained with the
+session.
+
+`8fad2a3` added `atpiano.backend-profile.v1` and the
+`atpiano profile-backend` command. A profile records:
+
+- model, version, adapter, checkpoint and configuration hashes, device, and
+  thread limit;
+- operating-system, machine, processor, and logical-CPU host class;
+- fixture manifest and audio hashes, sample rate, source length, repetitions,
+  silence, and warm-up duration;
+- commit buffer, base and maximum hop, guard, and minimum context; and
+- every decode wall-time sample plus total, mean, p95, maximum, service
+  ratio, and maximum-to-base-hop ratio.
+
+The command warms one isolated Transkun worker, runs the fixed musical
+fixture through the ordinary corrected replay, and retains the full session
+and per-decode evidence beside the compact profile. The profile ID is a
+SHA-256 digest of its versioned contents.
+
+Automatic mode is now the local default. A missing, invalid, wrong-host,
+wrong-model, wrong-checkpoint, wrong-device, wrong-thread, or wrong-scheduler
+profile selects after-Stop. A matching profile selects live only when
+measured total service ratio is at most 0.75 and the maximum decode is at most
+0.85 of the four-second base hop. Sustainable throughput below source rate
+without that headroom selects delayed; service ratio at or above one selects
+after-Stop. Explicit configuration remains available for diagnosis and is
+recorded as such.
+
+The local Apple Silicon validation used the 42-second musical fixture,
+Transkun 2.0.1, CPU execution, and two Torch threads. After an unmeasured
+16-second-source warm-up, eight decodes took 27.991 seconds total, 3.499
+seconds mean, 3.843 seconds p95 and maximum. The 0.666 service ratio was
+sustainable, but the 0.961 maximum-to-base-hop ratio lacked live headroom, so
+the matching profile selected **delayed**. This establishes the command and
+selector on this host; it is not a Linux capability claim.
+
+The remaining Linux packet must generate its own profile under controlled
+load, retain thread and worker evidence, and run the real Chrome capture in
+the selected conservative mode. Runtime pressure currently changes the
+commit lane's bounded scheduler hop but does not demote an already selected
+session mode; that acceptance item remains open and should not be hidden by
+calling scheduler degradation a product-mode transition.

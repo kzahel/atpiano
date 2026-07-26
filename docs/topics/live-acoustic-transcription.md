@@ -17,7 +17,8 @@ wait. Tactical
 is now the first Phase 4 implementation slice; Tactical
 [`023-backend-capability-degradation.md`](../tactical/023-backend-capability-degradation.md)
 then selects an honest live, delayed, or after-Stop correction mode from
-isolated measurements.
+isolated measurements. Their host-independent implementation now passes
+locally; the real Linux browser acceptance remains open.
 
 ## Scope And Relationship
 
@@ -218,6 +219,22 @@ correctness boundary—durable PCM acceptance, bounded worker scheduling,
 process isolation, prompt Stop, and reattachable settlement—without changing
 model quality. Tactical 023 owns capability policy only after measurements no
 longer include synchronous-ingest contention.
+
+That split is now implemented locally. Microphone PCM acceptance and
+acknowledgement perform no inference. Preview and commit each own one bounded
+scheduler thread and one separately spawned model process; commit reads old
+source ranges from segmented audio when it falls beyond the memory ring.
+Stop persists `stopping` and returns before background correction and exports
+complete. Ordinary session reads make browser reload reattachable, and a
+host-process interruption becomes an explicit failed-but-preserved stage
+rather than an orphan that blocks future capture.
+
+Sessions record live, delayed, after-Stop, or unavailable correction behavior.
+Automatic selection requires an exact matching versioned backend profile and
+otherwise uses after-Stop. A real two-thread Apple Silicon profile selected
+delayed; no inference about Linux follows from that result. The next action is
+the fixed Linux Chrome and capability-profile packet, not broader feature or
+application-core refactoring.
 
 ## Desired Experience
 

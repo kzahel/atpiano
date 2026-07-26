@@ -9,7 +9,9 @@ replay pass on x86_64 Linux as of 2026-07-26. The isolated internal score
 runtime installs, but real score generation is blocked by a source-note/MIDI
 ordering mismatch owned by the active score-alignment tactical. A real Chrome
 fake-microphone run also exposes correction backlog and a client Stop timeout
-when CPU inference shares the local server process.**
+when CPU inference shares the local server process. The host-independent
+worker, Stop, and measured-degradation changes now pass on macOS, but their
+mandatory Linux rerun has not happened.**
 
 ## Scope
 
@@ -171,7 +173,8 @@ advanced. Those plateaus match the seven recorded decode wall times to within
 about 40 ms. Outside a decode plateau, the largest horizon-record gap that
 also advanced the audio head was 0.423 seconds.
 
-This is explained by the current call graph, not inferred from CPU speed:
+This is explained by the captured pre-fix call graph, not inferred from CPU
+speed:
 the WebSocket loop reads one PCM frame, calls
 `CorrectedSession.accept_block`, and only acknowledges and reads the next
 frame after that call returns. `CorrectedSession.accept_block` invokes every
@@ -202,6 +205,36 @@ Tactical
 owns the measured product mode. Until isolated worker execution demonstrates
 otherwise, this host should run Basic Pitch provisionally during capture and
 defer Transkun until after Stop.
+
+## Host-Independent Remediation Awaiting Linux
+
+The local implementation now keeps model calls out of the microphone ingest
+path. PCM is validated and durably appended before acknowledgement; bounded
+preview and commit scheduler threads call separately spawned, warmed model
+processes. A commit worker is limited to an explicit Torch thread count.
+Commit work that falls behind reads source ranges from segmented audio rather
+than relying on the memory ring.
+
+Stop now persists capture-complete `stopping` state and responds before
+correction or exports finish. Browser reload observes that same settlement
+through ordinary session and horizon APIs. The session retains pipeline lag
+and timing summaries, while browser Stop records sent and acknowledged
+frames and WebSocket buffered-byte high-water separately. A full server exit
+during settlement produces an explicit failed-but-recording-preserved session
+on restart; automatic continuation across process exit is not yet claimed.
+
+Automatic correction selection is conservative. With no exact matching
+versioned profile, the runtime starts Transkun only after Stop. The new
+profiling command records fixture, host, model/checkpoint, scheduler, thread
+limit, and raw decode timing samples. A real Apple Silicon run exercised the
+command and selected delayed correction, but a profile is host-specific and
+does not alter the Linux direction.
+
+These changes remove the known synchronous call path by inspection and pass
+blocked-lane, durable-catch-up, worker-exit, prompt-Stop, transport-evidence,
+and frontend tests. Only the real Linux Chrome rerun can establish that
+native dependencies start, OS scheduling preserves preview responsiveness,
+and the browser source head no longer develops decode-shaped plateaus.
 
 ## Small Portability Fix
 
@@ -272,12 +305,18 @@ produced.
 
 ## Remaining Validation
 
-- Run a consentful human browser-microphone audition against an actual piano
-  after capture ingest and model execution no longer contend in one process.
+- Run the fixed Chrome fake-microphone acceptance first, then a consentful
+  human browser-microphone audition against an actual piano.
 - Measure capture-to-event latency by stage on Linux; the accelerated checks
   above intentionally publish no latency claim.
-- Measure browser/worklet, WebSocket, ingest, and correction queue high-water
-  separately and make Stop restart-safe beyond one client timeout.
+- Generate a Linux backend profile with a controlled thread count and
+  competing load recorded; confirm that it selects after-Stop unless new
+  evidence supports a less conservative mode.
+- Compare browser sent/acknowledged and WebSocket high-water with ingest
+  append timing, worker utilization, and correction lag.
+- Decide whether interrupted settlement must resume automatically across a
+  full server-process restart; it is currently preserved as an explicit
+  recoverable stage failure.
 - Correct and revalidate the score-input ordering contract before claiming
   real score generation passes.
 - Resolve the CPU-only corrected and score-runtime dependency distribution.

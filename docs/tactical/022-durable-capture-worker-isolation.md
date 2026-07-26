@@ -8,9 +8,9 @@ Topic: multi-tenant-hybrid-service-architecture
 
 Topic: long-session-storage-retention
 
-Status: planned on 2026-07-26 from the retained x86_64 Linux browser
-evidence. This is the first Phase 4 implementation slice and must land before
-the remaining extraction in
+Status: **implemented and locally validated on 2026-07-26; mandatory x86_64
+Linux acceptance remains open.** This is the first Phase 4 implementation
+slice and must pass that host review before the remaining extraction in
 [`017-python-application-core.md`](017-python-application-core.md).
 
 ## Entry Evidence
@@ -210,4 +210,70 @@ artifacts must remain readable after rollback.
 
 ## Execution Record
 
-No implementation commits yet.
+The host-independent implementation landed as a bounded series:
+
+1. `4a37604` split durable PCM acceptance from synchronous lane work and
+   allowed lanes to read ranges older than the memory ring.
+2. `0d741bf` added independent bounded lane schedulers, immediate block
+   acknowledgement, and prompt background Stop settlement.
+3. `92d0c9d` moved Basic Pitch and Transkun behind portable spawned worker
+   processes and limited Transkun to an explicit thread budget.
+4. `16e5864` added live, delayed, after-Stop, and unavailable correction
+   behavior without changing decoder or reconciliation policy.
+5. `677106a` retained compact pipeline and browser transport high-water
+   evidence and made process-interrupted sessions explicit recoverable
+   failures rather than permanent workspace blockers.
+6. `bbdd548` added durable catch-up, killed-worker, and malformed-result
+   acceptance tests.
+
+The React microphone path now sends every binary block through
+`CorrectedSessionPipeline.accept_block`. That call only validates and appends
+PCM, advances the audio horizon, and wakes the two lane threads. Each thread
+owns one synchronous request to its separately spawned model process, so
+there is no queue of future PCM objects or decode jobs. Commit catch-up reads
+the named source range from segmented WAV when the range has left the
+40-second memory ring.
+
+Stop closes and indexes accepted audio, persists `stopping`, responds on the
+capture socket, and lets lane finalization and exports continue under the
+server-owned pipeline. The shared runtime waits ten seconds only for this
+acknowledgement; it no longer treats background correction as a 90-second
+capture operation. Ordinary session and horizon requests expose settlement,
+so a browser reload reattaches without the capture socket.
+
+The final session manifest retains accepted block/frame counts, ingest
+append time, per-lane run counts and wall time, lane errors, and the two
+correction lags. Browser Stop evidence separately retains sent and
+acknowledged frames/blocks plus WebSocket buffered-byte current and
+high-water values. Worker status reports process ID, liveness, request count,
+thread limit, and wall-time aggregates.
+
+Local validation includes:
+
+- blocked commit inference while later PCM is acknowledged within the test
+  bound and preview advances independently;
+- after-Stop commit catch-up from source ranges older than the PCM ring;
+- prompt Stop followed by observable completion;
+- browser transport evidence and pipeline evidence persistence;
+- spawned-process startup, abrupt exit, and malformed result rejection;
+- lane failure preserving accepted audio and completing with an explicit
+  stage error;
+- a simulated server restart changing orphaned active or stopping work to an
+  explicit failed-but-preserved session rather than blocking new capture;
+- 104 passing Python tests, generated-contract parity, TypeScript validation,
+  40 focused frontend tests, and a successful production build.
+
+The full migration command's application lane is intermittently blocked by
+the separate in-progress score-reader test expecting four pages before its
+render observer updates. Python, contracts, lint, syntax, and whitespace
+lanes passed; this tactical did not modify that notation path.
+
+Automatic continuation after a full host-process exit is not implemented.
+Such an interruption now preserves and labels the recording but requires
+correction to be rerun. Browser reload while the server remains alive does
+continue to observe healthy settlement.
+
+Do not mark this tactical complete or resume Tactical 017 until the mandatory
+Linux checks above establish that the real browser head no longer develops
+decode-shaped ingest plateaus and that Basic Pitch remains responsive while
+the isolated Transkun worker is saturated.

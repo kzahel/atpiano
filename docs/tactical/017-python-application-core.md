@@ -9,14 +9,14 @@ Topic: session-workspace-management
 Topic: long-session-storage-retention
 
 Status: planned and authorized on 2026-07-26 after accepted R3 review and
-storage-direction clarification. Implementation has not started. The Linux
-browser evidence subsequently made
+storage-direction clarification. Its application-core implementation has not
+started. The Linux browser evidence subsequently made
 [`022-durable-capture-worker-isolation.md`](022-durable-capture-worker-isolation.md)
 and
 [`023-backend-capability-degradation.md`](023-backend-capability-degradation.md)
-prerequisite Phase 4 slices. This tactical resumes after their local
-implementation and mandatory Linux evidence. R4 remains the combined parity
-and storage-behavior review before Phase 5.
+prerequisite Phase 4 slices. Their host-independent work has landed; this
+tactical remains paused for their mandatory Linux evidence. R4 remains the
+combined parity and storage-behavior review before Phase 5.
 
 ## Entry Evidence
 
@@ -38,10 +38,11 @@ and storage-behavior review before Phase 5.
   increases, rather than reduces, total disk use.
 - Detailed model windows and traces are useful for local failure diagnosis,
   not ordinary user-session content.
-- The current WebSocket ingest path invokes preview and commit lanes
+- The former WebSocket ingest path invoked preview and commit lanes
   synchronously. Slow Transkun inference on Linux blocked PCM acceptance and
-  exposed Stop settlement as transport failure. Tactical 022 owns correction
-  of that behavior before this broader extraction preserves it.
+  exposed Stop settlement as transport failure. Tactical 022 has corrected
+  that call path locally; its mandatory Linux rerun must pass before this
+  broader extraction preserves the new behavior.
 
 ## User-Visible Outcome
 

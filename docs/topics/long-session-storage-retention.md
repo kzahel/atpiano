@@ -201,6 +201,14 @@ rotation.
 
 ## Next Bounded Implementation Slice
 
+The slow-host prerequisite has now supplied part of this contract. Accepted
+PCM is durable before worker scheduling, commit catch-up reads ranges older
+than the memory ring, Stop settlement retains a compact pipeline summary, and
+browser transport high-water is stored separately. A process interruption
+marks an explicit preserved failure instead of leaving a permanent stopping
+session. This does not complete the category inventory, debug budgets, raw
+retirement policy, or automatic settlement continuation described below.
+
 Storage ownership and the first compact-retention implementation are folded
 into Phase 4 rather than landing in the proof-of-concept HTTP server. The
 bounded execution plan is
