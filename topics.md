@@ -6,6 +6,8 @@
   and sheet-music rendering
 - `live-acoustic-transcription` — browser audio streaming, revisable live note
   feedback, measured delivery, and final backfill
+- `long-session-storage-retention` — predictable long-session disk use,
+  bounded local debug data, cleanup, and measured recording formats
 - `browser-only-wasm-deployment` — static browser execution, local
   persistence, offline packaging, and serverless deployment
 - `session-workspace-management` — v2 session catalog, explicit New and
@@ -13,3 +15,6 @@
 - `multi-tenant-hybrid-service-architecture` — shared React application,
   hosted Python service and workers, multi-user tenancy, offline Tauri
   runtime, observability, and explicit session-oriented sync
+- `practice-companion-product-vision` — musical-notebook product framing,
+  moment-centered reflection, engraving, tool-backed analysis, trusted
+  collaboration, and teacher review

@@ -13,7 +13,9 @@ controller estimates instead of merging them as apparent stuck sustain,
 and it provides seekable recorded-audio playback synchronized to exact
 source-sample inspection. Playback prefers a replaceable MP3 derivative while
 the current local adapter retains segmented WAV source audio. Phase 4 is
-authorized but has not started.**
+planned under
+[`017-python-application-core.md`](../tactical/017-python-application-core.md)
+but has not started.**
 Versioned Pydantic contracts, generated OpenAPI/TypeScript, the
 `AtpianoRuntime` boundary, an executable fixture provider, and explicit local
 compatibility paths exist. R2 feedback removed the generic `product`
@@ -46,6 +48,10 @@ first local refactor: explicit New, history, selected-versus-active session
 identity, and recoverable deletion. It should establish useful domain
 boundaries without prematurely implementing accounts, cloud persistence, or
 sync.
+[`long-session-storage-retention.md`](long-session-storage-retention.md) owns
+ordinary local disk growth and bounded debug data. Its first implementation
+is part of the Phase 4 application-service extraction so storage policy,
+artifact finalization, accounting, and deletion share one owner.
 
 [`live-acoustic-transcription.md`](live-acoustic-transcription.md) continues
 to own sample-clocked capture, provisional and committed event lifecycles,

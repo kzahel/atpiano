@@ -61,8 +61,8 @@ result, and commit range.
 | --- | --- | --- | --- |
 | 1. Freeze and characterize | Complete (`3aabcda^..0bca270`) | [`014`](014-freeze-migration-baseline.md) | R1 accepted; no ambiguity |
 | 2. Contracts and structure | Complete (`e2c2b9d^..9f8dd16`) | [`015`](015-contracts-and-structure.md) | R2 accepted 2026-07-26 |
-| 3. Shared React application | In progress | [`016`](016-shared-react-application.md) | **Required interaction review** |
-| 4. Python application core | Not started | Not created | **Required parity review; hold before Phase 5** |
+| 3. Shared React application | Complete | [`016`](016-shared-react-application.md) | R3 accepted 2026-07-26 |
+| 4. Python application core | Planned; not started | [`017`](017-python-application-core.md) | **Required parity and storage review; hold before Phase 5** |
 | 5. Early Tauri skeleton | Blocked by Phase 4 approval | Not created | Required desktop-boundary review |
 | 6. Complete local desktop | Blocked by Phase 5 | Not created | Required daily-use review |
 | 7. Hosted service | Blocked by Phase 6 | Not created | Required hosted and tenancy review |
@@ -396,6 +396,9 @@ bounded tactical; this acceptance record does not begin that work.
 
 ## Phase 4 — Extract The Framework-Independent Python Application Core
 
+Bounded implementation and acceptance details are in
+[`017-python-application-core.md`](017-python-application-core.md).
+
 ### Purpose
 
 Replace proof-of-concept server composition with a clean Python application
@@ -407,6 +410,9 @@ stable.
 - Extract session catalog, capture coordination, historical reads,
   transcription-run coordination, score jobs, artifact publication, and
   provenance into framework-independent application services.
+- Put ordinary recording finalization, storage accounting, bounded debug
+  retention, low-disk behavior, and recoverable deletion in those same
+  application services rather than in HTTP routes or ad hoc cleanup helpers.
 - Keep model adapters, source-clock scheduling, reconciliation, score
   selection, and persistence evidence reusable rather than reimplementing
   them.
@@ -427,13 +433,15 @@ stable.
 - domain and application tests do not start an HTTP server;
 - the golden fixture matches Phase 1 normalized outputs and artifacts;
 - long-loop replay preserves bounded memory and monotonic horizons;
+- an ordinary long replay demonstrates bounded raw spooling, compact retained
+  audio, per-category disk accounting, and no default diagnostic archive;
 - restart, stale capture, failed worker, partial artifact, and busy-score
   recovery tests pass;
 - new frontend replay, microphone, Stop, history, deletion, export, and score
   behavior pass against the extracted core; and
 - the current v1 and v2 applications still pass their regression lanes.
 
-### Human review gate R4 — Basic application parity
+### Human review gate R4 — Basic application parity and local storage
 
 This is the required hold before Phase 5. Provide a compact review build and:
 
@@ -443,6 +451,8 @@ This is the required hold before Phase 5. Provide a compact review build and:
 - explicit New and session history;
 - timeline, keyboard, and score review;
 - MIDI, JSONL, WAV where applicable, and score artifact access;
+- compact playback across a new long session, an old WAV session, and
+  before/after per-category disk usage;
 - a comparison report against the frozen baseline;
 - known differences and deferred polish;
 - a code map showing the React/runtime/application/adapter boundaries; and

@@ -26,6 +26,11 @@ normally reuse the document slug in its `Topic:` trailers.
   browser prototype whose strict-onset decoder, room gate, physical keyboard,
   grand-staff stream, confidence controls, and source-timing guides are
   validated for initial subjective use; target-piano octave overtones remain.
+- [`long-session-storage-retention.md`](long-session-storage-retention.md):
+  policy and validation work for predictable long-session disk use, with
+  ordinary session data separated from bounded, disposable local debug data
+  and an interim MP3-retention path scheduled inside Phase 4 for measured R4
+  review.
 - [`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md):
   accepted target architecture for one shared React application, hosted
   FastAPI service and Python workers, multi-user cloud workspaces, an offline
@@ -33,6 +38,10 @@ normally reuse the document slug in its `Topic:` trailers.
 - [`performance-to-notation.md`](performance-to-notation.md):
   evaluated downstream conversion prototype whose artifacts are inspectable
   but whose first target-piano score failed the readability goal.
+- [`practice-companion-product-vision.md`](practice-companion-product-vision.md):
+  proposed musical-notebook direction joining quiet practice capture,
+  moment-centered reflection, readable engraving, cautious tool-backed
+  analysis, trusted collaboration, and teacher review.
 - [`session-workspace-management.md`](session-workspace-management.md):
   accepted v2 foundation for explicit New, session history, separate
   active/selected identities, recoverable deletion, and future continuation.

@@ -2,12 +2,10 @@
 
 Topic: session-workspace-management
 
-Status: accepted proposed foundation on 2026-07-26; Phase 2 is complete, R2
-is accepted, and the durable React New/history/selection UI is implemented
-under
-[`016-shared-react-application.md`](../tactical/016-shared-react-application.md)
-pending mandatory
-[`R3 interaction review`](../r3-interaction-review.md).
+Status: accepted foundation on 2026-07-26; Phase 3 and R3 are complete under
+[`016-shared-react-application.md`](../tactical/016-shared-react-application.md).
+The Phase 4 extraction is planned under
+[`017-python-application-core.md`](../tactical/017-python-application-core.md).
 Existing session artifacts remain authoritative while explicit catalog,
 session-addressed reads, capture identity, score targets, and recoverable
 deletion are exposed through additive `/api/v1` routes.
@@ -29,6 +27,15 @@ own capture transport, sample clocks, lane scheduling, revisions, horizons,
 and latency. [`performance-to-notation.md`](performance-to-notation.md)
 continues to own score inference and rendering quality. This topic owns how
 the workspace selects and addresses those session-bound products.
+[`long-session-storage-retention.md`](long-session-storage-retention.md) owns
+ordinary-session disk growth, bounded local debug retention, disk budgets, and
+the still-open recording-codec decision; session history and deletion apply
+that policy without redefining it.
+
+Phase 4 moves catalog, capture coordination, historical reads, score jobs,
+artifacts, retention, and deletion into one framework-independent application
+boundary. The React runtime contract and accepted selected-versus-active
+behavior remain stable during that extraction.
 
 [`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md)
 owns the accepted hosted-plus-Tauri product architecture, including accounts,
