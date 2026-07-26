@@ -65,6 +65,25 @@ class _FakeCommitModel:
         return {"name": "fake-commit"}
 
 
+class _BlockingCommitModel(_FakeCommitModel):
+    started = threading.Event()
+    release = threading.Event()
+
+    def transcribe(
+        self,
+        pcm_s16le: bytes,
+        *,
+        source_sample_rate_hz: int,
+    ) -> CommitModelOutput:
+        self.started.set()
+        if not self.release.wait(2):
+            raise TimeoutError("blocking commit model was not released")
+        return super().transcribe(
+            pcm_s16le,
+            source_sample_rate_hz=source_sample_rate_hz,
+        )
+
+
 def _fake_score_runner(
     input_midi: Path,
     input_notes: Path,
@@ -472,13 +491,24 @@ def test_microphone_websocket_uses_corrected_session_and_exports(
         _, payload = _server_frame(stream)
         stopped = json.loads(payload)
         assert stopped["type"] == "stopped"
+        assert stopped["settling"] is True
+        assert stopped["session"]["status"] == "stopping"
         assert stopped["session"]["source"] == "microphone"
         assert stopped["session"]["source_frame_count"] == 6
-        assert stopped["exports"]["midi"]["note_count"] == 0
+        assert stopped["exports"] == {}
 
         base_url = f"http://127.0.0.1:{port}"
-        with urllib.request.urlopen(f"{base_url}/api/session", timeout=2) as response:
-            status = json.load(response)
+        deadline = time.monotonic() + 2
+        status: dict[str, Any] = {}
+        while time.monotonic() < deadline:
+            with urllib.request.urlopen(
+                f"{base_url}/api/session",
+                timeout=2,
+            ) as response:
+                status = json.load(response)
+            if status["status"] == "complete":
+                break
+            time.sleep(0.01)
         assert status["status"] == "complete"
         assert status["exports_ready"] is True
         with urllib.request.urlopen(
@@ -507,6 +537,110 @@ def test_microphone_websocket_uses_corrected_session_and_exports(
         ) as response:
             assert response.read(4) == b"MThd"
     finally:
+        stream.close()
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_microphone_acknowledges_pcm_while_commit_lane_is_blocked(
+    tmp_path: Path,
+) -> None:
+    _BlockingCommitModel.started.clear()
+    _BlockingCommitModel.release.clear()
+    server = create_corrected_workbench_server(
+        tmp_path,
+        port=0,
+        preview_model_factory=_FakePreviewModel,
+        commit_model_factory=_BlockingCommitModel,
+        minimum_free_bytes=0,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    port = server.server_address[1]
+    connection = socket.create_connection(("127.0.0.1", port), timeout=2)
+    stream = connection.makefile("rb")
+    try:
+        request = (
+            "GET /api/live HTTP/1.1\r\n"
+            f"Host: 127.0.0.1:{port}\r\n"
+            f"Origin: http://127.0.0.1:{port}\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            "Sec-WebSocket-Version: 13\r\n"
+            "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+            "\r\n"
+        )
+        connection.sendall(request.encode("ascii"))
+        assert stream.readline().startswith(b"HTTP/1.0 101")
+        while stream.readline() not in {b"\r\n", b""}:
+            pass
+        _send_json(
+            connection,
+            {
+                "schema_version": CORRECTED_STREAM_SCHEMA,
+                "type": "start",
+                "sample_rate_hz": 8_000,
+                "client_metadata": {"capture": "blocked-commit-test"},
+            },
+        )
+        _, payload = _server_frame(stream)
+        assert json.loads(payload)["type"] == "ready"
+
+        first_frames = 16 * 8_000
+        block_frames = 16_000
+        for sequence in range(first_frames // block_frames):
+            first_sample = sequence * block_frames
+            block = PcmBlock(
+                sequence=sequence,
+                first_sample=first_sample,
+                frame_count=block_frames,
+                sample_rate_hz=8_000,
+                page_sent_ms=1.0,
+                worklet_time_s=(first_sample + block_frames) / 8_000,
+                pcm_s16le=bytes(block_frames * 2),
+            )
+            connection.sendall(
+                _client_frame(pack_pcm_block(block), opcode=0x2)
+            )
+            _, payload = _server_frame(stream)
+            assert (
+                json.loads(payload)["received_source_frames"]
+                == first_sample + block_frames
+            )
+        assert _BlockingCommitModel.started.wait(1)
+
+        second = PcmBlock(
+            sequence=8,
+            first_sample=first_frames,
+            frame_count=8,
+            sample_rate_hz=8_000,
+            page_sent_ms=2.0,
+            worklet_time_s=16.001,
+            pcm_s16le=bytes(16),
+        )
+        connection.sendall(_client_frame(pack_pcm_block(second), opcode=0x2))
+        connection.settimeout(0.5)
+        _, payload = _server_frame(stream)
+        acknowledgement = json.loads(payload)
+        assert acknowledgement["type"] == "block_ack"
+        assert acknowledgement["received_source_frames"] == first_frames + 8
+
+        _BlockingCommitModel.release.set()
+        _send_json(
+            connection,
+            {
+                "schema_version": CORRECTED_STREAM_SCHEMA,
+                "type": "stop",
+                "frame_count": first_frames + 8,
+                "block_count": 9,
+            },
+        )
+        _, payload = _server_frame(stream)
+        assert json.loads(payload)["session"]["status"] == "stopping"
+    finally:
+        _BlockingCommitModel.release.set()
         stream.close()
         connection.close()
         server.shutdown()

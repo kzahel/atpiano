@@ -288,15 +288,31 @@ def write_midi(
     return _write_midi(path, events, sample_rate_hz=sample_rate_hz)
 
 
-def write_corrected_exports(session_directory: Path) -> dict[str, Any]:
+def write_corrected_exports(
+    session_directory: Path,
+    *,
+    allow_settling: bool = False,
+) -> dict[str, Any]:
     """Write full JSONL history and latest committed MIDI from the event index."""
 
     session_directory = session_directory.resolve()
     session = read_json(session_directory / "session.json")
     if session.get("schema_version") != CORRECTED_SESSION_SCHEMA:
         raise ValueError("corrected export requires a corrected-session manifest")
-    if session.get("status") != "complete":
+    status = session.get("status")
+    if status != "complete" and not (
+        allow_settling and status == "stopping"
+    ):
         raise ValueError("corrected export requires a stopped session")
+    if status == "stopping":
+        horizons = read_json(session_directory / "horizons.json")
+        if int(horizons.get("commit_sample", -1)) != int(
+            session["source_frame_count"]
+        ):
+            raise ValueError(
+                "corrected export requires the stopping commit horizon "
+                "to cover accepted audio"
+            )
     sample_rate_hz = int(session["sample_rate_hz"])
     database_path = session_directory / "event-index.sqlite3"
     export_directory = session_directory / "exports"

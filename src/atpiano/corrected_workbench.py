@@ -57,6 +57,7 @@ from atpiano.corrected_export import (
     query_materialized_index,
     write_corrected_exports,
 )
+from atpiano.corrected_pipeline import CorrectedSessionPipeline
 from atpiano.corrected_preview import CorrectedPreviewLane
 from atpiano.live import LiveWindowModel, parse_pcm_block
 from atpiano.score_snapshot import (
@@ -154,6 +155,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self._preview_model: LiveWindowModel | None = None
         self._commit_model: CommitModel | None = None
         self._active_session: CorrectedSession | None = None
+        self._active_pipeline: CorrectedSessionPipeline | None = None
         self._session_id: str | None = None
         self._session_directory: Path | None = None
         self._status = "idle"
@@ -233,11 +235,16 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             self._last_event_sequence = 0
         return session_id, directory
 
-    def set_active(self, session: CorrectedSession) -> None:
+    def set_active(
+        self,
+        session: CorrectedSession,
+        pipeline: CorrectedSessionPipeline | None = None,
+    ) -> None:
         with self.state_lock:
             if session.session_id != self._session_id:
                 raise RuntimeError("corrected session claim changed during startup")
             self._active_session = session
+            self._active_pipeline = pipeline
             self._status = "active"
 
     def record_delivery(self, events: list[dict[str, Any]]) -> None:
@@ -252,12 +259,14 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
     def complete_session(self) -> None:
         with self.state_lock:
             self._active_session = None
+            self._active_pipeline = None
             self._status = "complete"
             self._error = None
 
     def fail_session(self, error: Exception) -> None:
         with self.state_lock:
             self._active_session = None
+            self._active_pipeline = None
             self._status = "failed"
             self._error = f"{type(error).__name__}: {error}"
 
@@ -284,6 +293,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             session_id = self._session_id
             directory = self._session_directory
             active = self._active_session
+            pipeline = self._active_pipeline
             received_blocks = self._received_blocks
             last_event_sequence = self._last_event_sequence
         session: dict[str, Any] | None = None
@@ -340,11 +350,42 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                 "last_event_sequence": last_event_sequence,
                 "recovery": "bounded indexed sequence query",
             },
+            "pipeline": pipeline.status() if pipeline is not None else None,
             "duration_s": (audio_frames / sample_rate_hz if sample_rate_hz else 0.0),
             "exports_ready": bool(
                 directory is not None and (directory / "exports" / "manifest.json").is_file()
             ),
         }
+
+    def _finalize_microphone_session(
+        self,
+        session: CorrectedSession,
+    ) -> None:
+        write_corrected_exports(
+            session.directory,
+            allow_settling=True,
+        )
+
+    def _microphone_session_settled(
+        self,
+        session: CorrectedSession,
+        manifest: dict[str, Any],
+    ) -> None:
+        del manifest
+        with self.state_lock:
+            active = self._active_session
+        if active is session:
+            self.complete_session()
+
+    def _microphone_session_failed(
+        self,
+        session: CorrectedSession,
+        error: Exception,
+    ) -> None:
+        with self.state_lock:
+            active = self._active_session
+        if active is session:
+            self.fail_session(error)
 
     def _runtime_state(self) -> dict[str, Any]:
         if self.score_runner is not None:
@@ -1324,6 +1365,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         if not self._upgrade_websocket():
             return
         session: CorrectedSession | None = None
+        pipeline: CorrectedSessionPipeline | None = None
         stopped = False
         try:
             while True:
@@ -1337,10 +1379,15 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     if session is None:
                         raise ValueError("microphone PCM arrived before Start")
                     block = parse_pcm_block(frame.payload)
-                    events = session.accept_block(
+                    if pipeline is None:
+                        raise RuntimeError(
+                            "microphone capture pipeline is unavailable"
+                        )
+                    pipeline.accept_block(
                         block,
                         received_ns=time.perf_counter_ns(),
                     )
+                    events: list[dict[str, Any]] = []
                     self.server.record_delivery(events)
                     self._send_websocket_json(
                         {
@@ -1392,6 +1439,12 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     )
                     session.add_lane(CorrectedPreviewLane(session, model=preview_model))
                     session.add_lane(CorrectedCommitLane(session, model=commit_model))
+                    pipeline = CorrectedSessionPipeline(
+                        session,
+                        finalizer=self.server._finalize_microphone_session,
+                        on_settled=self.server._microphone_session_settled,
+                        on_failed=self.server._microphone_session_failed,
+                    )
                     write_json(
                         directory / "client.json",
                         {
@@ -1400,7 +1453,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                             "metadata": metadata,
                         },
                     )
-                    self.server.set_active(session)
+                    self.server.set_active(session, pipeline)
                     self._send_websocket_json(
                         {
                             "schema_version": CORRECTED_STREAM_SCHEMA,
@@ -1425,16 +1478,19 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     ):
                         raise ValueError("microphone Stop counts do not match accepted PCM")
                     self.server.begin_stop()
-                    manifest = session.finalize()
-                    exports = write_corrected_exports(session.directory)
                     stopped = True
-                    self.server.complete_session()
+                    if pipeline is None:
+                        raise RuntimeError(
+                            "microphone capture pipeline is unavailable"
+                        )
+                    manifest = pipeline.begin_stop()
                     self._send_websocket_json(
                         {
                             "schema_version": CORRECTED_STREAM_SCHEMA,
                             "type": "stopped",
                             "session": manifest,
-                            "exports": exports,
+                            "exports": {},
+                            "settling": True,
                         }
                     )
                     self._send_websocket_close()
@@ -1442,9 +1498,13 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                 else:
                     raise ValueError(f"unsupported microphone control type: {message_type}")
         except (ConnectionError, OSError, RuntimeError, ValueError) as error:
-            if session is not None and not session.closed:
+            if pipeline is not None:
+                pipeline.abort(error)
+            elif session is not None and not session.closed:
                 session.abort(error)
-            self.server.fail_session(error)
+                self.server.fail_session(error)
+            else:
+                self.server.fail_session(error)
             try:
                 self._send_websocket_json(
                     {
@@ -1459,8 +1519,11 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         finally:
             if session is not None and not stopped and not session.closed:
                 error = RuntimeError("microphone WebSocket closed before Stop")
-                session.abort(error)
-                self.server.fail_session(error)
+                if pipeline is not None:
+                    pipeline.abort(error)
+                else:
+                    session.abort(error)
+                    self.server.fail_session(error)
 
 
 def create_corrected_workbench_server(

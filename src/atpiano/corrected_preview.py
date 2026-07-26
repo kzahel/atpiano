@@ -271,21 +271,27 @@ class CorrectedPreviewLane:
             len(self.reconciler.tracks),
         )
 
-    def accept_block(
+    def has_pending_work(self, session: CorrectedSession) -> bool:
+        _, source_end = self._source_window_bounds()
+        return max(0, source_end) <= session.horizons.audio_head_sample
+
+    def process_available(
         self,
         session: CorrectedSession,
-        block: PcmBlock,
         *,
         received_ns: int,
+        max_work_items: int | None = None,
     ) -> LaneUpdate:
-        del block
         self._retain_calibration(session)
         events: list[dict[str, Any]] = []
         timing_rows: list[dict[str, Any]] = []
         gate_rows: list[dict[str, Any]] = []
+        processed = 0
         while True:
             source_start, source_end = self._source_window_bounds()
             if max(0, source_end) > session.horizons.audio_head_sample:
+                break
+            if max_work_items is not None and processed >= max_work_items:
                 break
             prepare_start_ns = time.perf_counter_ns()
             model_audio = self._prepare_window(session, source_start, source_end)
@@ -399,6 +405,7 @@ class CorrectedPreviewLane:
             )
             self._window_index += 1
             self._next_window_start_s += self.hop_s
+            processed += 1
         self._emission_count += len(events)
         _append_jsonl(self.timing_path, timing_rows)
         _append_jsonl(self.gate_path, gate_rows)
@@ -406,6 +413,20 @@ class CorrectedPreviewLane:
         return LaneUpdate(
             events=tuple(events),
             provisional_sample=self._last_provisional_sample,
+        )
+
+    def accept_block(
+        self,
+        session: CorrectedSession,
+        block: PcmBlock,
+        *,
+        received_ns: int,
+    ) -> LaneUpdate:
+        del block
+        return self.process_available(
+            session,
+            received_ns=received_ns,
+            max_work_items=None,
         )
 
     def finalize(self, session: CorrectedSession) -> LaneUpdate:

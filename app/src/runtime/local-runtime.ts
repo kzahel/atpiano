@@ -390,8 +390,8 @@ export class LocalRuntime implements AtpianoRuntime {
     );
     const timeout = new Promise<never>((_, reject) => {
       window.setTimeout(
-        () => reject(new Error("The local engine did not finish Stop in time.")),
-        90_000,
+        () => reject(new Error("The local engine did not acknowledge Stop.")),
+        10_000,
       );
     });
     try {

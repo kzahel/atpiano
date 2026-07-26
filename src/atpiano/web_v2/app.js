@@ -866,7 +866,7 @@ async function stopMicrophone() {
     showError(new Error("The browser could not close a complete sample sequence."));
     capture.socket.close();
   } else {
-    el("action-status").textContent = "Settling the bounded correction tail…";
+    el("action-status").textContent = "Closing capture; correction may continue…";
     const serverStopped = new Promise((resolve) => {
       capture.stopResolver = resolve;
     });
@@ -876,9 +876,9 @@ async function stopMicrophone() {
     });
     const result = await Promise.race([
       serverStopped,
-      new Promise((resolve) => window.setTimeout(() => resolve(null), 90000)),
+      new Promise((resolve) => window.setTimeout(() => resolve(null), 10000)),
     ]);
-    if (!result) showError(new Error("The local server did not finish Stop in time."));
+    if (!result) showError(new Error("The local server did not acknowledge Stop."));
   }
   capture.stream.getTracks().forEach((track) => track.stop());
   capture.source.disconnect();

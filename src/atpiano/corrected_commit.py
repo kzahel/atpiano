@@ -695,17 +695,23 @@ class CorrectedCommitLane:
             commit_sample=self._commit_sample,
         )
 
-    def accept_block(
+    def has_pending_work(self, session: CorrectedSession) -> bool:
+        return session.horizons.audio_head_sample >= self._next_decode_head
+
+    def process_available(
         self,
         session: CorrectedSession,
-        block: PcmBlock,
         *,
         received_ns: int,
+        max_work_items: int | None = None,
     ) -> LaneUpdate:
-        del block, received_ns
+        del received_ns
         events: list[dict[str, Any]] = []
         commit_sample: int | None = None
+        processed = 0
         while session.horizons.audio_head_sample >= self._next_decode_head:
+            if max_work_items is not None and processed >= max_work_items:
+                break
             update = self._decode(
                 session,
                 decode_head=self._next_decode_head,
@@ -714,7 +720,22 @@ class CorrectedCommitLane:
             events.extend(update.events)
             commit_sample = update.commit_sample
             self._next_decode_head += self.hop_frames
+            processed += 1
         return LaneUpdate(events=tuple(events), commit_sample=commit_sample)
+
+    def accept_block(
+        self,
+        session: CorrectedSession,
+        block: PcmBlock,
+        *,
+        received_ns: int,
+    ) -> LaneUpdate:
+        del block
+        return self.process_available(
+            session,
+            received_ns=received_ns,
+            max_work_items=None,
+        )
 
     def finalize(self, session: CorrectedSession) -> LaneUpdate:
         update = self._decode(

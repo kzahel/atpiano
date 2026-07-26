@@ -94,6 +94,16 @@ class LaneUpdate:
 class CorrectedSessionLane(Protocol):
     name: str
 
+    def has_pending_work(self, session: CorrectedSession) -> bool: ...
+
+    def process_available(
+        self,
+        session: CorrectedSession,
+        *,
+        received_ns: int,
+        max_work_items: int | None = None,
+    ) -> LaneUpdate: ...
+
     def accept_block(
         self,
         session: CorrectedSession,
@@ -614,6 +624,7 @@ class CorrectedSession:
         self._last_snapshot: tuple[int, int, int] | None = None
         self._state_lock = threading.RLock()
         self._latest_block: PcmBlock | None = None
+        self._capture_closed = False
         self._write_session(status="active")
         self._record_horizons(force=True)
 
@@ -626,7 +637,9 @@ class CorrectedSession:
             "realtime": self.realtime,
             "sample_rate_hz": self.sample_rate_hz,
             "started_at": self.started_at,
-            "completed_at": utc_now() if status != "active" else None,
+            "completed_at": (
+                utc_now() if status in {"complete", "failed"} else None
+            ),
             "error": error,
             "source_frame_count": self.horizons.audio_head_sample,
             "retention": {
@@ -689,7 +702,7 @@ class CorrectedSession:
         """Accept and persist one PCM block without executing a model lane."""
         del received_ns
         with self._state_lock:
-            if self.closed:
+            if self.closed or self._capture_closed:
                 raise RuntimeError("corrected session is closed")
             if block.sample_rate_hz != self.sample_rate_hz:
                 raise ValueError("corrected session sample rate changed")
@@ -726,6 +739,7 @@ class CorrectedSession:
         lane: CorrectedSessionLane,
         *,
         received_ns: int,
+        max_work_items: int | None = None,
     ) -> list[dict[str, Any]]:
         """Advance one lane over all currently eligible accepted audio."""
         with self._state_lock:
@@ -734,7 +748,11 @@ class CorrectedSession:
             block = self._latest_block
         if block is None:
             return []
-        update = lane.accept_block(self, block, received_ns=received_ns)
+        update = lane.process_available(
+            self,
+            received_ns=received_ns,
+            max_work_items=max_work_items,
+        )
         return self._apply_lane_update(update)
 
     def accept_block(
@@ -747,7 +765,13 @@ class CorrectedSession:
         self.accept_pcm(block, received_ns=received_ns)
         assigned: list[dict[str, Any]] = []
         for lane in self.lanes:
-            assigned.extend(self.process_lane(lane, received_ns=received_ns))
+            assigned.extend(
+                self.process_lane(
+                    lane,
+                    received_ns=received_ns,
+                    max_work_items=None,
+                )
+            )
         return assigned
 
     def read_pcm(self, start_sample: int, end_sample: int) -> bytes:
@@ -763,6 +787,43 @@ class CorrectedSession:
             ):
                 return self.ring.read(start_sample, end_sample)
             return self.audio.read(start_sample, end_sample)
+
+    def begin_settling(self) -> dict[str, Any]:
+        with self._state_lock:
+            if self.closed or self._capture_closed:
+                raise RuntimeError("corrected session capture is already closed")
+            self._capture_closed = True
+            self.audio.close()
+            self._record_horizons(force=True)
+            self._write_session(status="stopping")
+            return read_json(self.directory / "session.json")
+
+    def finalize_lane(
+        self,
+        lane: CorrectedSessionLane,
+    ) -> list[dict[str, Any]]:
+        with self._state_lock:
+            if self.closed:
+                raise RuntimeError("corrected session is closed")
+            if not self._capture_closed:
+                raise RuntimeError(
+                    "corrected session cannot finalize a lane during capture"
+                )
+        return self._apply_lane_update(lane.finalize(self))
+
+    def complete_settlement(self) -> dict[str, Any]:
+        with self._state_lock:
+            if self.closed:
+                raise RuntimeError("corrected session is already closed")
+            if not self._capture_closed:
+                raise RuntimeError(
+                    "corrected session capture is still accepting audio"
+                )
+            self._record_horizons(force=True)
+            self.events.close()
+            self.closed = True
+            self._write_session(status="complete")
+            return read_json(self.directory / "session.json")
 
     def append_events(self, events: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
         if self.closed:
@@ -817,18 +878,16 @@ class CorrectedSession:
     def finalize(self) -> dict[str, Any]:
         if self.closed:
             raise RuntimeError("corrected session is already closed")
+        if not self._capture_closed:
+            self.begin_settling()
         for lane in self.lanes:
-            self._apply_lane_update(lane.finalize(self))
-        self.audio.close()
-        self._record_horizons(force=True)
-        self.events.close()
-        self.closed = True
-        self._write_session(status="complete")
-        return read_json(self.directory / "session.json")
+            self.finalize_lane(lane)
+        return self.complete_settlement()
 
     def abort(self, error: Exception) -> None:
         if self.closed:
             return
+        self._capture_closed = True
         self.audio.close()
         self.events.close()
         self.closed = True

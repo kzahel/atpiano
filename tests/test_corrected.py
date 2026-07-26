@@ -175,6 +175,22 @@ def test_corrected_session_accepts_pcm_before_processing_lanes(
         def __init__(self) -> None:
             self.calls = 0
 
+        def has_pending_work(self, session: CorrectedSession) -> bool:
+            return self.calls == 0 and session.horizons.audio_head_sample > 0
+
+        def process_available(
+            self,
+            session: CorrectedSession,
+            *,
+            received_ns: int,
+            max_work_items: int | None = None,
+        ) -> LaneUpdate:
+            del received_ns, max_work_items
+            self.calls += 1
+            return LaneUpdate(
+                provisional_sample=session.horizons.audio_head_sample
+            )
+
         def accept_block(
             self,
             session: CorrectedSession,
@@ -182,10 +198,10 @@ def test_corrected_session_accepts_pcm_before_processing_lanes(
             *,
             received_ns: int,
         ) -> LaneUpdate:
-            del block, received_ns
-            self.calls += 1
-            return LaneUpdate(
-                provisional_sample=session.horizons.audio_head_sample
+            del block
+            return self.process_available(
+                session,
+                received_ns=received_ns,
             )
 
         def finalize(self, session: CorrectedSession) -> LaneUpdate:

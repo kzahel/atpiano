@@ -177,7 +177,10 @@ class LocalSessionStore:
         persisted_status = str(manifest.get("status", "failed"))
         status = (
             SessionStatus.ACTIVE
-            if session_id == active_session_id
+            if (
+                session_id == active_session_id
+                and persisted_status == "active"
+            )
             else (
                 SessionStatus.FAILED
                 if persisted_status == "active"
@@ -203,7 +206,12 @@ class LocalSessionStore:
             started_at=started_at,
             completed_at=completed_at,
             active_capture_id=(
-                f"capture:{session_id}" if session_id == active_session_id else None
+                f"capture:{session_id}"
+                if (
+                    session_id == active_session_id
+                    and persisted_status == "active"
+                )
+                else None
             ),
             current_transcription_run_id=_legacy_run_id(session_id),
             display_name=f"{display_time}, {source.value}",
