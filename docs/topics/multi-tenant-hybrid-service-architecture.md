@@ -728,40 +728,42 @@ work after database commit without making an ephemeral broker authoritative.
 
 ## Implementation Sequence
 
-Land the architecture through bounded, reversible tacticals:
+The master sequence and human review gates are tracked in
+[`013-hybrid-product-migration-master.md`](../tactical/013-hybrid-product-migration-master.md).
+Land it through bounded, reversible child tacticals:
 
-1. **Local session foundation.** Complete the catalog, explicit New,
-   selected-versus-active separation, session-addressed routes, history,
-   recoverable deletion, and responsibility split described in
-   [`session-workspace-management.md`](session-workspace-management.md).
-2. **Schemas and runtime boundary.** Extract versioned domain schemas,
-   capture/error vocabulary, generated-client workflow, and the frontend
-   runtime-provider contract without moving inference.
-3. **Shared React application.** Migrate v2 behavior to React, TypeScript, and
-   Vite with TanStack Query, a small Zustand store, replay regressions, and no
-   v1 behavior change.
-4. **Hosted control plane.** Add managed identity integration, users,
-   workspaces, roles, memberships, PostgreSQL repositories, object manifests,
-   authorization, audit, and object storage in a FastAPI modular monolith.
-5. **Worker execution boundary.** Move preview, commit, and score adapters
-   behind versioned worker contracts with provenance, bounded queues, and
-   accelerator-neutral replay validation.
-6. **Hosted vertical slice.** Deliver one secure browser microphone-to-cloud
-   session path including capture lease, PCM ingest, durable recording,
-   live revisions, committed output, score job where licensed, history, and
-   observability.
-7. **Desktop vertical slice.** Package the same frontend in Tauri, add the
-   authenticated local Python sidecar, SQLite catalog, local artifacts,
-   signed application update, model-pack handshake, and network-disabled
-   validation.
-8. **Explicit transfer and limited sync.** Add idempotent immutable session
-   upload, opt-in audio transfer, local/cloud identity mapping, retry,
-   tombstones, and narrowly defined mutable-metadata conflict behavior.
+1. **Freeze and characterize.** Turn v1, v2, the aligned fixture, retained
+   recordings, microphone behavior, sessions, exports, and score snapshots
+   into a reproducible migration baseline.
+2. **Contracts and structure.** Establish versioned domain schemas, the
+   runtime-provider boundary, generated-client workflow, explicit local
+   session services, and repository dependency directions.
+3. **Shared React application.** Migrate useful v2 behavior to React,
+   TypeScript, and Vite over fixture and compatibility/local runtime adapters.
+   Review the product interaction before further backend extraction.
+4. **Python application core.** Extract framework-independent session,
+   capture, transcription, score-job, artifact, and provenance services while
+   preserving deterministic and microphone behavior. Stop for explicit human
+   parity review before Phase 5.
+5. **Early Tauri walking skeleton.** Package the shared frontend, launch and
+   authenticate a versioned Python sidecar, perform compatibility handshake,
+   and run the golden replay. This early proof prevents later hosted
+   assumptions from making the shared application browser-only.
+6. **Complete local desktop vertical slice.** Add durable SQLite/local
+   artifacts, microphone and review parity, model packs, signed update
+   infrastructure, diagnostics, and network-disabled validation.
+7. **Hosted service vertical slice.** Add managed identity, cloud workspaces,
+   memberships, PostgreSQL, object storage, worker boundaries, secure PCM
+   ingest, collaboration, authorization, and observability.
+8. **Collaboration, distribution, and limited sync.** Harden both products and
+   add explicit idempotent immutable-session transfer before considering
+   broader offline reconciliation.
 
-Each step gets its own numbered tactical with entry conditions, migrations,
-validation, rollback or compatibility behavior, and an execution record.
-Do not combine cloud accounts, frontend migration, worker extraction,
-desktop packaging, and sync into one rewrite.
+Each phase gets one or more numbered tacticals with entry conditions,
+migrations, validation, rollback or compatibility behavior, and an execution
+record. The structure, interaction, and pre-Tauri parity reviews are explicit
+holds rather than status updates. Do not combine cloud accounts, frontend
+migration, worker extraction, desktop packaging, and sync into one rewrite.
 
 ## Validation Gates
 
@@ -836,11 +838,14 @@ choosing a queue does not authorize sending raw PCM through it.
 
 ## Recommended Direction
 
-Treat this topic as the architecture gate for productization. Begin with the
-bounded local session refactor, then extract contracts and migrate the shared
-frontend before adding cloud or desktop deployment. Future tacticals should
-name the specific architecture stage they advance and update this topic when
-evidence changes a contract, gate, or recommended sequence.
+Treat this topic as the architecture gate for productization and
+[`013-hybrid-product-migration-master.md`](../tactical/013-hybrid-product-migration-master.md)
+as its execution tracker. Freeze the current baseline, establish contracts,
+migrate the shared frontend, and extract the Python application core. After
+explicit parity review, prove the Tauri/sidecar boundary before building out
+the hosted service. Future tacticals should name the specific architecture
+phase they advance and update this topic when evidence changes a contract,
+gate, or recommended sequence.
 
 Avoid creating parallel hosted and desktop products, putting model runtimes in
 the API process, adding a TypeScript control plane only for shared language,

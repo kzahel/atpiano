@@ -216,7 +216,13 @@ target is ambiguous.
 
 ## Frontend Shape
 
-Replace the single overloaded `state.session` with explicit state:
+The shared React application planned in
+[`013-hybrid-product-migration-master.md`](../tactical/013-hybrid-product-migration-master.md)
+owns the durable New/history/delete UI. Do not invest in a feature-complete
+framework-free rewrite of the proof-of-concept frontend immediately before
+that migration.
+
+Replace the single overloaded `state.session` concept with explicit state:
 
 ```text
 catalog
@@ -239,17 +245,21 @@ Timeline, keyboard, score, and export requests always use
 `selectedSessionId`. Capture acknowledgements update `activeSessionId`; they
 update the selected visualization only when the two IDs match.
 
-Keep the frontend framework-free for this milestone, but split the current
-application into focused modules after characterization tests exist:
+Keep the current framework-free application runnable as a
+compatibility/reference client. Backend session catalog and
+explicit-addressing work may add only the smallest compatibility changes
+required there. The React migration must preserve focused responsibilities
+for:
 
-- API client and response cancellation;
-- session store and selection controller;
+- runtime/API client behavior and response cancellation;
+- session state and selection control;
 - microphone capture;
 - timeline and keyboard views;
 - score view; and
-- a small composition root for wiring controls and polling.
+- a small composition root.
 
-This is a responsibility split, not a visual redesign or framework migration.
+This is a responsibility split and migration, not an unrelated visual
+redesign.
 
 ## Continuation And Resumption Boundary
 
@@ -272,8 +282,8 @@ write-lease boundaries if the value justifies the complexity.
 
 ## Bounded Refactor Plan
 
-Implement this through small behavior-preserving slices rather than rewriting
-the workbench at once:
+Implement this through the master migration's small behavior-preserving
+slices rather than rewriting the workbench at once:
 
 1. Add characterization tests for current session creation, restart recovery,
    event reads, score publication, exports, and v1 separation.
@@ -282,18 +292,20 @@ the workbench at once:
 3. Extract the capture coordinator and remove viewed-session selection from
    server-global state.
 4. Move score jobs and artifact resolution to explicit session IDs.
-5. Add frontend catalog, selected/active state separation, history, and the
-   unpersisted New state.
+5. Add catalog, selected/active state separation, history, and the unpersisted
+   New state in the shared React application.
 6. Add recoverable Delete with active/job guards and traversal tests.
-7. Split the server handler and browser application by responsibility, then
-   remove ambiguous compatibility routes after all consumers migrate.
+7. Remove ambiguous compatibility routes only after the shared application
+   and retained old consumers no longer require them.
 
 Likely backend boundaries are a catalog/repository module, capture coordinator,
 score-job coordinator, and a thinner HTTP handler. Exact filenames belong in
 the bounded tactical written when implementation begins.
 
-No first slice should add a frontend framework, central authoritative
-database, permanent purge, editable labels, or resumption.
+No initial backend slice should add a central authoritative database,
+permanent purge, editable labels, or resumption. React belongs to the
+separately reviewed shared-application phase, not an incidental part of a
+backend route refactor.
 
 ## Validation Contract
 
@@ -317,13 +329,14 @@ The implementation tactical must prove:
 
 ## Recommended Direction
 
-The next implementation milestone should create one tactical for the catalog,
-explicit resource addressing, New/history UI, recoverable Delete, and the
-responsibility split required to land those behaviors safely. Treat
-same-session resumption, labeling, trash restoration, permanent purge, and a
-larger visual redesign as later tacticals unless implementation uncovers a
-blocking contract issue. Preserve the explicit IDs, immutable artifacts, and
-selected-versus-active split needed by the accepted
+Follow Phases 1–4 and their human gates in
+[`013-hybrid-product-migration-master.md`](../tactical/013-hybrid-product-migration-master.md).
+Establish characterization, contracts, the session backend boundary, and the
+shared React UI through bounded tacticals rather than landing the entire
+refactor at once. Treat same-session resumption, labeling, trash restoration,
+permanent purge, and a larger visual redesign as later tacticals unless
+implementation uncovers a blocking contract issue. Preserve the explicit IDs,
+immutable artifacts, and selected-versus-active split needed by the accepted
 [`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md),
-but do not pull accounts, React migration, cloud storage, or sync into this
-first local slice.
+but do not pull accounts, cloud storage, or sync into the local session
+foundation.
