@@ -116,6 +116,16 @@ that exact sample-clock time. This exact-pitch view does not infer score
 rhythm, meter, key, spelling, hands, or chord names; those remain Lane C
 concerns.
 
+The shared React successor must preserve the controller distinction already
+present in v2. Sustain (CC64) and soft pedal (CC67) are separate
+model-estimated lanes, not one generic sustain state. Long intervals remain
+possible model errors: the Phase 3 review session
+`20260726T113845-517f8d425847` produced a false 25.5-second soft-pedal
+interval when the performer used no pedal. The UI labels controller output as
+inferred and visibly flags unusually long estimates for verification; it does
+not silently suppress them or claim acoustic correctness. Committed
+controller gestures, like committed notes, stop at `H_commit`.
+
 V2 now also has an independently toggleable committed Score view. It is an
 explicit, on-demand downstream snapshot rather than part of either acoustic
 lane: the server freezes one `H_commit`, selects only closed committed notes,

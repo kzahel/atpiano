@@ -377,6 +377,14 @@ their exact session. Neither change opens Phase 4.
 correction, showing source-horizon settling progress, and automatically
 starting the settled session's score job. Phase 4 remains closed.
 
+Further review found a scrollbar-like lane labelled sustain despite no pedal
+use. The exact session showed that React had merged CC64 sustain and CC67
+soft-pedal estimates under one label; its dominant interval was a long
+soft-pedal false positive. `dab105b` restores separate inferred controller
+lanes, visually marks unusually long estimates for verification, and clips
+committed gestures at the commit horizon. This is a Phase 3 presentation
+correction and does not claim improved pedal inference. R3 remains open.
+
 ## Phase 4 — Extract The Framework-Independent Python Application Core
 
 ### Purpose

@@ -10,8 +10,10 @@ Status: implementation revised after R3 exposed live-event range, horizon
 presentation, and misleading score-placeholder defects. The fixes are
 validated. Pathological score expansion and missing session-addressed URLs
 were subsequently corrected. Stop progress and automatic post-settle score
-generation are now implemented and await explicit R3 re-review. Phase 4 must
-not start before that decision.
+generation are now implemented. Inferred sustain and soft-pedal gestures are
+also distinct after a merged lane misreported a long soft-pedal false positive
+as stuck sustain. The revisions await explicit R3 re-review. Phase 4 must not
+start before that decision.
 
 ## Entry Evidence
 
@@ -184,7 +186,9 @@ The implementation series began at `a9805fd` and is:
   synthetic placeholder engraving after follow-up review;
 - `f8d096e` rejected and hid pathological score-model note expansion; and
 - `f39179a` put the selected session ID in copyable browser URLs; and
-- `938a15b` added settling progress and automatic post-capture scoring.
+- `938a15b` added settling progress and automatic post-capture scoring; and
+- `dab105b` separated inferred sustain and soft-pedal gestures and marked
+  unusually long estimates for verification.
 
 The real page-facing golden replay is recorded in
 [`r3-interaction-review.md`](../r3-interaction-review.md). Its 42-second
@@ -195,8 +199,8 @@ views, the score job, artifact refresh, and real SVG notation without browser
 alerts or page-level horizontal overflow.
 
 The final `uv run atpiano migration-regression` report at
-`results/migration-regression/20260726T120101Z/report.json` passed 81 Python
-tests, retained JavaScript tests, 24 application tests, contract drift,
+`results/migration-regression/20260726T120958Z/report.json` passed 81 Python
+tests, retained JavaScript tests, 27 application tests, contract drift,
 TypeScript, dependency audit, Ruff, syntax, and whitespace. Physical
 microphone permission and playing remain the explicit human lane at R3. The
 implementation range is `a9805fd^..HEAD` at this review handoff. Phase 4
@@ -230,3 +234,12 @@ commit-to-audio-head progress, and automatically starts scoring once the
 settled session and final horizon are available. A real 20.5-second browser
 capture moved from 60% settling to a ready rendered score without another
 click.
+
+The next screenshot's scrollbar-like **SUSTAIN** bar was a presentation bug
+over a known quality limitation. The session contains nine CC64 intervals and
+one long CC67 interval, but React had merged both kinds under one sustain
+label. `dab105b` restores the separate v2 meanings, labels both lanes as
+inferred, gives them distinct capped gesture styling, hatches unusually long
+estimates, and clips committed controller intervals at `H_commit`. The
+performer identified the long CC67 interval as false; the UI now exposes that
+uncertainty without silently discarding controller output.

@@ -141,8 +141,8 @@ its artifact access handle, and rendered it as SVG. Automated tests also
 cover score failure isolation.
 
 The final `uv run atpiano migration-regression` passed at
-`results/migration-regression/20260726T120101Z/report.json`: 81 Python tests,
-the retained JavaScript suites, 24 application tests, contract drift,
+`results/migration-regression/20260726T120958Z/report.json`: 81 Python tests,
+the retained JavaScript suites, 27 application tests, contract drift,
 TypeScript, dependency audit, Ruff, JavaScript syntax, and whitespace all
 passed. The dependency audit found zero vulnerabilities.
 
@@ -271,3 +271,27 @@ The real browser, AudioWorklet, WebSocket, and local engine path showed
 `Settling… 60%` with `Corrected 00:12.0 of 00:20.0`, then transitioned without
 another click to score generation and a rendered valid snapshot through
 00:20.5. The selected session remained in the URL throughout.
+
+The next review found a long gray lane labelled **SUSTAIN** even though no
+sustain pedal was used. The exact screenshot session,
+`20260726T113845-517f8d425847`, contains nine short CC64 sustain estimates and
+one 25.5-second CC67 soft-pedal estimate. The React view had collapsed both
+controller kinds into one sustain lane, unlike v2, and rendered every interval
+as an unlabeled solid gray bar.
+
+Commit `dab105b` restores two distinct, explicitly inferred lanes:
+
+- sustain and soft-pedal estimates retain their controller meaning;
+- blue and purple capped gestures replace the scrollbar-like gray track;
+- an estimate lasting at least ten seconds and half the session is hatched
+  and described as unusually long rather than presented as certain;
+- committed pedal intervals are defensively clipped at `H_commit`; and
+- accessible labels report the pedal kind and exact source-time interval.
+
+This does not claim that the model's estimates are acoustically correct. In
+particular, the screenshot's long soft-pedal interval is a model false
+positive according to the performer and remains evidence for the known
+bounded-context pedal-quality gap. The UI now identifies that uncertainty
+instead of misreporting it as stuck sustain. A Chrome check of the exact
+session displayed nine separate sustain gestures, one hatched soft-pedal
+estimate, and no merged sustain bar.
