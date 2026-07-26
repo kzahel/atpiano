@@ -311,3 +311,74 @@ def test_lane_failure_preserves_capture_and_completes_with_stage_error(
     assert "intentional lane failure" in (
         manifest["processing"]["stage_errors"]["failing"]
     )
+
+
+def test_commit_pressure_demotes_one_way_and_persists_reason(
+    tmp_path: Path,
+) -> None:
+    session = CorrectedSession(
+        tmp_path / "session",
+        session_id="session",
+        sample_rate_hz=8_000,
+        source="microphone",
+        minimum_free_bytes=0,
+        correction_mode="live",
+        correction_reason="measured profile",
+    )
+    delayed = session.observe_lane_pressure(
+        "commit",
+        {
+            "scheduler": {
+                "degraded_mode": True,
+                "maximum_hop_frames": 64_000,
+            },
+            "decode_wall_s": {"max": 4.5},
+        },
+    )
+    after_stop = session.observe_lane_pressure(
+        "commit",
+        {
+            "scheduler": {
+                "degraded_mode": True,
+                "maximum_hop_frames": 64_000,
+            },
+            "decode_wall_s": {"max": 9.0},
+        },
+    )
+    no_promotion = session.observe_lane_pressure(
+        "commit",
+        {
+            "scheduler": {
+                "degraded_mode": False,
+                "maximum_hop_frames": 64_000,
+            },
+            "decode_wall_s": {"max": 1.0},
+        },
+    )
+
+    manifest = read_json(session.directory / "session.json")
+    assert delayed == "delayed"
+    assert after_stop == "after-stop"
+    assert no_promotion is None
+    assert manifest["processing"]["correction_mode"] == "after-stop"
+    assert "exceeded maximum scheduler hop" in (
+        manifest["processing"]["correction_reason"]
+    )
+
+
+def test_commit_stage_failure_demotes_to_unavailable(tmp_path: Path) -> None:
+    session = CorrectedSession(
+        tmp_path / "session",
+        session_id="session",
+        sample_rate_hz=8_000,
+        source="microphone",
+        minimum_free_bytes=0,
+        correction_mode="delayed",
+        correction_reason="measured profile",
+    )
+
+    session.record_stage_error("commit", RuntimeError("worker exited"))
+
+    manifest = read_json(session.directory / "session.json")
+    assert manifest["processing"]["correction_mode"] == "unavailable"
+    assert "worker exited" in manifest["processing"]["correction_reason"]

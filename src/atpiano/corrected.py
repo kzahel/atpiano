@@ -698,10 +698,68 @@ class CorrectedSession:
 
     def record_stage_error(self, stage: str, error: Exception) -> None:
         with self._state_lock:
-            self._stage_errors[stage] = f"{type(error).__name__}: {error}"
+            error_text = f"{type(error).__name__}: {error}"
+            self._stage_errors[stage] = error_text
+            if stage == "commit":
+                self.correction_mode = "unavailable"
+                self.correction_reason = (
+                    f"commit correction failed: {error_text}"
+                )[:500]
             self._write_session(
                 status="stopping" if self._capture_closed else "active"
             )
+
+    def observe_lane_pressure(
+        self,
+        lane_name: str,
+        lane_status: dict[str, Any],
+    ) -> str | None:
+        if lane_name != "commit":
+            return None
+        scheduler = lane_status.get("scheduler")
+        timing = lane_status.get("decode_wall_s")
+        if not isinstance(scheduler, dict) or not isinstance(timing, dict):
+            return None
+        try:
+            degraded = bool(scheduler["degraded_mode"])
+            maximum_hop_frames = int(scheduler["maximum_hop_frames"])
+            maximum_decode_s = float(timing["max"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        if maximum_hop_frames <= 0 or maximum_decode_s < 0:
+            return None
+        maximum_hop_s = maximum_hop_frames / self.sample_rate_hz
+        selected: str | None = None
+        reason: str | None = None
+        if (
+            self.correction_mode in {"live", "delayed"}
+            and maximum_decode_s > maximum_hop_s
+        ):
+            selected = "after-stop"
+            reason = (
+                "runtime demotion: commit decode wall time "
+                f"{maximum_decode_s:.3f}s exceeded maximum scheduler hop "
+                f"{maximum_hop_s:.3f}s"
+            )
+        elif self.correction_mode == "live" and degraded:
+            selected = "delayed"
+            reason = (
+                "runtime demotion: commit decode exceeded the live scheduler "
+                "hop"
+            )
+        if selected is None or reason is None:
+            return None
+        with self._state_lock:
+            if self.correction_mode in {"after-stop", "unavailable"}:
+                return None
+            if self.correction_mode == "delayed" and selected == "delayed":
+                return None
+            self.correction_mode = selected
+            self.correction_reason = reason
+            self._write_session(
+                status="stopping" if self._capture_closed else "active"
+            )
+        return selected
 
     def add_lane(self, lane: CorrectedSessionLane) -> None:
         if self.closed:

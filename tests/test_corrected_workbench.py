@@ -84,6 +84,17 @@ class _BlockingCommitModel(_FakeCommitModel):
         )
 
 
+class _ExitedCommitModel(_FakeCommitModel):
+    def __init__(self) -> None:
+        self.closed = False
+
+    def status(self) -> dict[str, object]:
+        return {"alive": False}
+
+    def close(self) -> None:
+        self.closed = True
+
+
 def _fake_score_runner(
     input_midi: Path,
     input_notes: Path,
@@ -341,6 +352,29 @@ def test_corrected_workbench_marks_interrupted_settlement_recoverable(
     assert manifest["status"] == "failed"
     assert manifest["source_frame_count"] == 4
     assert "settlement" in manifest["processing"]["stage_errors"]
+
+
+def test_corrected_workbench_replaces_an_exited_model_before_next_session(
+    tmp_path: Path,
+) -> None:
+    server = create_corrected_workbench_server(
+        tmp_path,
+        port=0,
+        preview_model_factory=_FakePreviewModel,
+        commit_model_factory=_FakeCommitModel,
+        minimum_free_bytes=0,
+        isolate_models=False,
+    )
+    exited = _ExitedCommitModel()
+    server._commit_model = exited
+    try:
+        replacement = server.get_commit_model()
+    finally:
+        server.server_close()
+
+    assert exited.closed
+    assert isinstance(replacement, _FakeCommitModel)
+    assert replacement is not exited
 
 
 def test_corrected_workbench_can_serve_the_shared_app_shell(

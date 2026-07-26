@@ -287,6 +287,14 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
 
     def get_preview_model(self) -> LiveWindowModel:
         with self.model_lock:
+            if (
+                self._preview_model is not None
+                and self._model_has_exited(self._preview_model)
+            ):
+                close = getattr(self._preview_model, "close", None)
+                if close is not None:
+                    close()
+                self._preview_model = None
             if self._preview_model is None:
                 self._preview_model = (
                     PreviewModelWorker(self.preview_model_factory)
@@ -297,6 +305,14 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
 
     def get_commit_model(self) -> CommitModel:
         with self.model_lock:
+            if (
+                self._commit_model is not None
+                and self._model_has_exited(self._commit_model)
+            ):
+                close = getattr(self._commit_model, "close", None)
+                if close is not None:
+                    close()
+                self._commit_model = None
             if self._commit_model is None:
                 self._commit_model = (
                     CommitModelWorker(
@@ -307,6 +323,17 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                     else self.commit_model_factory()
                 )
             return self._commit_model
+
+    @staticmethod
+    def _model_has_exited(model: Any) -> bool:
+        status = getattr(model, "status", None)
+        if status is None:
+            return False
+        try:
+            document = status()
+        except RuntimeError:
+            return True
+        return isinstance(document, dict) and document.get("alive") is False
 
     def get_models(self) -> tuple[LiveWindowModel, CommitModel]:
         return self.get_preview_model(), self.get_commit_model()

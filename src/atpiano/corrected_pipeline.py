@@ -53,7 +53,7 @@ class CorrectedSessionPipeline:
                 "deferred pipeline lanes are unavailable: "
                 + ", ".join(sorted(unknown_deferred))
             )
-        self._defer_until_stop = defer_until_stop
+        self._defer_until_stop = set(defer_until_stop)
         self._condition = threading.Condition()
         self._states = {
             lane.name: _LaneState()
@@ -168,10 +168,16 @@ class CorrectedSessionPipeline:
                         received_ns=received_ns,
                         max_work_items=1,
                     )
+                    selected_mode = self.session.observe_lane_pressure(
+                        lane.name,
+                        lane.status(),
+                    )
                     elapsed_s = (
                         time.perf_counter_ns() - started_ns
                     ) / 1_000_000_000
                     with self._condition:
+                        if selected_mode == "after-stop":
+                            self._defer_until_stop.add(lane.name)
                         state.running = False
                         state.run_count += 1
                         state.total_wall_s += elapsed_s
