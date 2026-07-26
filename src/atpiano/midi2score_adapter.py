@@ -8,6 +8,7 @@ upstream model stack.
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import sys
@@ -256,12 +257,57 @@ def _alignment_rows(
     return rows, inserted_segments
 
 
+def _write_alignment(
+    *,
+    source: dict,
+    input_notes: Path,
+    output_musicxml: Path,
+    output_alignment: Path,
+    rows: list[dict],
+    inserted_score_segments: list[dict],
+) -> dict[str, int]:
+    mapped = sum(row["status"] == "mapped" for row in rows)
+    unmatched = len(rows) - mapped
+    note_elements = sum(len(row["segments"]) for row in rows)
+    note_elements += len(inserted_score_segments)
+    summary = {
+        "source_notes": len(rows),
+        "mapped_source_notes": mapped,
+        "unmatched_source_notes": unmatched,
+        "musicxml_note_elements": note_elements,
+        "inserted_score_note_elements": len(inserted_score_segments),
+    }
+    alignment = {
+        "schema_version": SCORE_ALIGNMENT_SCHEMA,
+        "session_id": source["session_id"],
+        "sample_rate_hz": source["sample_rate_hz"],
+        "source": {
+            "schema_version": SCORE_INPUT_NOTES_SCHEMA,
+            "sha256": _sha256(input_notes),
+        },
+        "musicxml": {
+            "sha256": _sha256(output_musicxml),
+        },
+        "summary": summary,
+        "rows": rows,
+        "inserted_score_segments": inserted_score_segments,
+    }
+    output_alignment.parent.mkdir(parents=True, exist_ok=True)
+    output_alignment.write_text(
+        json.dumps(alignment, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return summary
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", type=Path, required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--input-midi", type=Path, required=True)
     parser.add_argument("--input-notes", type=Path, required=True)
+    parser.add_argument("--output-baseline-musicxml", type=Path, required=True)
+    parser.add_argument("--output-baseline-alignment", type=Path, required=True)
     parser.add_argument("--output-musicxml", type=Path, required=True)
     parser.add_argument("--output-alignment", type=Path, required=True)
     args = parser.parse_args()
@@ -279,6 +325,7 @@ def main() -> int:
     from config import MyModelConfig
     from models.roformer import Roformer
     from music21 import defaults, metadata
+    from score_postprocess import process_score
     from score_utils import postprocess_score
     from tokenizer import MultistreamTokenizer
     from utils import infer
@@ -318,41 +365,40 @@ def main() -> int:
     score.metadata = metadata.Metadata()
     score.metadata.title = "Performance"
     defaults.author = ""
+
+    baseline_output_path = args.output_baseline_musicxml.resolve()
+    baseline_output_path.parent.mkdir(parents=True, exist_ok=True)
+    score.write("musicxml", fp=str(baseline_output_path))
+    if (
+        not baseline_output_path.is_file()
+        or baseline_output_path.stat().st_size == 0
+    ):
+        raise RuntimeError("MIDI2ScoreTransformer produced empty baseline MusicXML")
+    baseline_alignment_path = args.output_baseline_alignment.resolve()
+    _write_alignment(
+        source=source,
+        input_notes=args.input_notes.resolve(),
+        output_musicxml=baseline_output_path,
+        output_alignment=baseline_alignment_path,
+        rows=rows,
+        inserted_score_segments=inserted_score_segments,
+    )
+
+    automatic_score = copy.deepcopy(score)
+    postprocess = process_score(automatic_score, clef_policy="automatic")
     output_path = args.output_musicxml.resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    score.write("musicxml", fp=str(output_path))
+    automatic_score.write("musicxml", fp=str(output_path))
     if not output_path.is_file() or output_path.stat().st_size == 0:
         raise RuntimeError("MIDI2ScoreTransformer produced empty MusicXML")
-    mapped = sum(row["status"] == "mapped" for row in rows)
-    unmatched = len(rows) - mapped
-    note_elements = sum(len(row["segments"]) for row in rows)
-    note_elements += len(inserted_score_segments)
-    alignment = {
-        "schema_version": SCORE_ALIGNMENT_SCHEMA,
-        "session_id": source["session_id"],
-        "sample_rate_hz": source["sample_rate_hz"],
-        "source": {
-            "schema_version": SCORE_INPUT_NOTES_SCHEMA,
-            "sha256": _sha256(args.input_notes.resolve()),
-        },
-        "musicxml": {
-            "sha256": _sha256(output_path),
-        },
-        "summary": {
-            "source_notes": len(rows),
-            "mapped_source_notes": mapped,
-            "unmatched_source_notes": unmatched,
-            "musicxml_note_elements": note_elements,
-            "inserted_score_note_elements": len(inserted_score_segments),
-        },
-        "rows": rows,
-        "inserted_score_segments": inserted_score_segments,
-    }
     alignment_path = args.output_alignment.resolve()
-    alignment_path.parent.mkdir(parents=True, exist_ok=True)
-    alignment_path.write_text(
-        json.dumps(alignment, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    summary = _write_alignment(
+        source=source,
+        input_notes=args.input_notes.resolve(),
+        output_musicxml=output_path,
+        output_alignment=alignment_path,
+        rows=rows,
+        inserted_score_segments=inserted_score_segments,
     )
     print(
         json.dumps(
@@ -364,11 +410,20 @@ def main() -> int:
                 "musicxml_sha256": _sha256(output_path),
                 "alignment_bytes": alignment_path.stat().st_size,
                 "alignment_sha256": _sha256(alignment_path),
-                "mapped_source_notes": mapped,
-                "unmatched_source_notes": unmatched,
-                "inserted_score_note_elements": len(
-                    inserted_score_segments
+                "baseline_musicxml_bytes": baseline_output_path.stat().st_size,
+                "baseline_musicxml_sha256": _sha256(baseline_output_path),
+                "baseline_alignment_bytes": (
+                    baseline_alignment_path.stat().st_size
                 ),
+                "baseline_alignment_sha256": _sha256(
+                    baseline_alignment_path
+                ),
+                "mapped_source_notes": summary["mapped_source_notes"],
+                "unmatched_source_notes": summary["unmatched_source_notes"],
+                "inserted_score_note_elements": summary[
+                    "inserted_score_note_elements"
+                ],
+                "postprocess": postprocess,
             },
             sort_keys=True,
         )

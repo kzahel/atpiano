@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import time
 import urllib.request
@@ -21,9 +22,15 @@ from atpiano.score_alignment import (
     score_input_notes_document,
     validate_score_alignment,
 )
+from atpiano.score_postprocess import (
+    SCORE_POSTPROCESSOR_VERSION,
+    normalized_options,
+    score_variant_id,
+)
 from atpiano.util import read_json, sha256_file, utc_now, write_json
 
 SCORE_SNAPSHOT_SCHEMA = "atpiano.committed-score-snapshot.v1"
+SCORE_VARIANT_SCHEMA = "atpiano.score-variant.v1"
 SCORE_RUNTIME_SCHEMA = "atpiano.midi2score-runtime.v2"
 MIDI2SCORE_REPOSITORY = "https://github.com/TimFelixBeyer/MIDI2ScoreTransformer.git"
 MIDI2SCORE_COMMIT = "115432bda16ca16e0fec2e9465788f2ba369971f"
@@ -35,10 +42,15 @@ MIDI2SCORE_CHECKPOINT_SHA256 = "7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d
 MAX_SCORE_NOTES = 4096
 MAX_SCORE_SOURCE_S = 15 * 60
 SCORE_TIMEOUT_S = 180
+SCORE_VARIANT_TIMEOUT_S = 30
 MAX_SCORE_NOTE_EXPANSION_RATIO = 4
 MAX_SCORE_NOTE_EXPANSION_ALLOWANCE = 16
 
 ScoreRunner = Callable[[Path, Path, Path, Path, Path], dict[str, Any]]
+ScoreVariantRunner = Callable[
+    [Path, Path, Path, Path, str, int | None, Path],
+    dict[str, Any],
+]
 
 
 def score_snapshot_is_plausible(manifest: dict[str, Any]) -> bool:
@@ -229,6 +241,9 @@ def run_score_adapter(
     input_notes: Path,
     output_musicxml: Path,
     output_alignment: Path,
+    *,
+    output_baseline_musicxml: Path,
+    output_baseline_alignment: Path,
 ) -> dict[str, Any]:
     runtime = inspect_score_runtime(runtime_directory)
     if not runtime["available"]:
@@ -249,6 +264,10 @@ def run_score_adapter(
                 str(input_midi.resolve()),
                 "--input-notes",
                 str(input_notes.resolve()),
+                "--output-baseline-musicxml",
+                str(output_baseline_musicxml.resolve()),
+                "--output-baseline-alignment",
+                str(output_baseline_alignment.resolve()),
                 "--output-musicxml",
                 str(output_musicxml.resolve()),
                 "--output-alignment",
@@ -269,6 +288,134 @@ def run_score_adapter(
     adapter = json.loads(lines[-1])
     adapter["subprocess_elapsed_s"] = time.perf_counter() - started
     return adapter
+
+
+def run_score_variant_adapter(
+    runtime_directory: Path,
+    input_musicxml: Path,
+    input_alignment: Path,
+    output_musicxml: Path,
+    output_alignment: Path,
+    *,
+    clef_policy: str,
+    target_key_fifths: int | None,
+) -> dict[str, Any]:
+    """Run music21-only variant generation without loading the transformer."""
+
+    runtime = inspect_score_runtime(runtime_directory)
+    if not runtime["available"]:
+        raise RuntimeError(str(runtime["error"]))
+    paths = _runtime_paths(runtime_directory)
+    adapter_path = Path(__file__).with_name("score_variant_adapter.py").resolve()
+    command = [
+        str(paths["python"]),
+        str(adapter_path),
+        "--input-musicxml",
+        str(input_musicxml.resolve()),
+        "--input-alignment",
+        str(input_alignment.resolve()),
+        "--output-musicxml",
+        str(output_musicxml.resolve()),
+        "--output-alignment",
+        str(output_alignment.resolve()),
+        "--clef-policy",
+        clef_policy,
+    ]
+    if target_key_fifths is not None:
+        command.extend(["--target-key-fifths", str(target_key_fifths)])
+    started = time.perf_counter()
+    try:
+        result = subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=SCORE_VARIANT_TIMEOUT_S,
+            env={**os.environ, "CUDA_VISIBLE_DEVICES": ""},
+        )
+    except subprocess.CalledProcessError as error:
+        detail = (error.stderr or error.stdout or str(error)).strip()
+        raise RuntimeError(
+            f"score variant adapter failed: {detail[-4000:]}"
+        ) from error
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    if not lines:
+        raise RuntimeError("score variant adapter returned no result")
+    adapter = json.loads(lines[-1])
+    adapter["subprocess_elapsed_s"] = time.perf_counter() - started
+    return adapter
+
+
+def _artifact_record(
+    path: Path,
+    *,
+    session_directory: Path,
+    summary: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    value: dict[str, Any] = {
+        "path": str(path.relative_to(session_directory)),
+        "sha256": sha256_file(path),
+        "bytes": path.stat().st_size,
+    }
+    if summary is not None:
+        value["summary"] = summary
+    return value
+
+
+def _variant_label(
+    role: str,
+    postprocess: dict[str, Any] | None,
+) -> str:
+    key_state = (postprocess or {}).get("key_signature", {})
+    key_label = key_state.get("target_label") or key_state.get("source_label")
+    prefix = {
+        "baseline": "Model baseline",
+        "automatic": "Automatic clefs",
+        "enharmonic": "Enharmonic key",
+    }[role]
+    return f"{prefix} · {key_label}" if key_label else prefix
+
+
+def _variant_record(
+    *,
+    variant_id: str,
+    role: str,
+    options: dict[str, Any],
+    baseline_musicxml_sha256: str,
+    baseline_alignment_sha256: str,
+    musicxml: dict[str, Any],
+    alignment: dict[str, Any],
+    postprocess: dict[str, Any] | None,
+    created_at: str,
+) -> dict[str, Any]:
+    return {
+        "schema_version": SCORE_VARIANT_SCHEMA,
+        "variant_id": variant_id,
+        "role": role,
+        "label": _variant_label(role, postprocess),
+        "created_at": created_at,
+        "postprocessor_version": SCORE_POSTPROCESSOR_VERSION,
+        "options": options,
+        "baseline_musicxml_sha256": baseline_musicxml_sha256,
+        "baseline_alignment_sha256": baseline_alignment_sha256,
+        "musicxml": musicxml,
+        "alignment": alignment,
+        "postprocess": postprocess,
+        "needs_review": bool(
+            (postprocess or {}).get("needs_review", False)
+        ),
+    }
+
+
+def _select_variant(
+    pointer: dict[str, Any],
+    variant: dict[str, Any],
+) -> dict[str, Any]:
+    selected = dict(pointer)
+    selected["selected_variant_id"] = variant["variant_id"]
+    selected["musicxml"] = variant["musicxml"]
+    selected["alignment"] = variant["alignment"]
+    return selected
 
 
 def _selected_notes(
@@ -319,8 +466,12 @@ def generate_score_snapshot(
     snapshot_directory.mkdir(parents=True, exist_ok=True)
     midi_path = snapshot_directory / "committed.mid"
     source_notes_path = snapshot_directory / "source-notes.json"
-    musicxml_path = snapshot_directory / "score.musicxml"
-    alignment_path = snapshot_directory / "alignment.json"
+    baseline_directory = snapshot_directory / "baseline"
+    baseline_directory.mkdir(exist_ok=True)
+    baseline_musicxml_path = baseline_directory / "score.musicxml"
+    baseline_alignment_path = baseline_directory / "alignment.json"
+    staging_musicxml_path = snapshot_directory / ".automatic.musicxml"
+    staging_alignment_path = snapshot_directory / ".automatic-alignment.json"
     write_json(
         source_notes_path,
         score_input_notes_document(
@@ -336,37 +487,128 @@ def generate_score_snapshot(
     )
     if pedal_count:
         raise RuntimeError("score snapshot unexpectedly included pedal events")
-    execute = runner or (
-        lambda input_path, source_path, output_path, alignment_output, runtime_path: (
-            run_score_adapter(
-                runtime_path,
-                input_path,
-                source_path,
-                output_path,
-                alignment_output,
-            )
+    if runner is None:
+        adapter = run_score_adapter(
+            runtime_directory.resolve(),
+            midi_path,
+            source_notes_path,
+            staging_musicxml_path,
+            staging_alignment_path,
+            output_baseline_musicxml=baseline_musicxml_path,
+            output_baseline_alignment=baseline_alignment_path,
         )
+    else:
+        adapter = runner(
+            midi_path,
+            source_notes_path,
+            staging_musicxml_path,
+            staging_alignment_path,
+            runtime_directory.resolve(),
+        )
+        shutil.copy2(staging_musicxml_path, baseline_musicxml_path)
+        shutil.copy2(staging_alignment_path, baseline_alignment_path)
+
+    baseline_summary = summarize_musicxml(baseline_musicxml_path.read_bytes())
+    _validate_score_output(note_count, baseline_summary)
+    baseline_alignment_summary = validate_score_alignment(
+        read_json(baseline_alignment_path),
+        source_notes_path=source_notes_path,
+        musicxml_path=baseline_musicxml_path,
     )
-    adapter = execute(
-        midi_path,
-        source_notes_path,
-        musicxml_path,
-        alignment_path,
-        runtime_directory.resolve(),
-    )
-    summary = summarize_musicxml(musicxml_path.read_bytes())
+    if baseline_alignment_summary["source_notes"] != note_count:
+        raise RuntimeError("baseline score alignment source count differs")
+
+    summary = summarize_musicxml(staging_musicxml_path.read_bytes())
     _validate_score_output(note_count, summary)
     alignment_summary = validate_score_alignment(
-        read_json(alignment_path),
+        read_json(staging_alignment_path),
         source_notes_path=source_notes_path,
-        musicxml_path=musicxml_path,
+        musicxml_path=staging_musicxml_path,
     )
     if alignment_summary["source_notes"] != note_count:
         raise RuntimeError("score alignment source count differs from snapshot")
+    created_at = utc_now()
+    baseline_musicxml = _artifact_record(
+        baseline_musicxml_path,
+        session_directory=session_directory,
+        summary=baseline_summary,
+    )
+    baseline_alignment = _artifact_record(
+        baseline_alignment_path,
+        session_directory=session_directory,
+        summary=baseline_alignment_summary,
+    ) | {"schema_version": SCORE_ALIGNMENT_SCHEMA}
+    baseline_options = normalized_options(clef_policy="preserve")
+    baseline_variant_id = score_variant_id(
+        baseline_musicxml_sha256=baseline_musicxml["sha256"],
+        baseline_alignment_sha256=baseline_alignment["sha256"],
+        options=baseline_options,
+    )
+    postprocess = adapter.get("postprocess")
+    if not isinstance(postprocess, dict):
+        postprocess = None
+    baseline = _variant_record(
+        variant_id=baseline_variant_id,
+        role="baseline",
+        options=baseline_options,
+        baseline_musicxml_sha256=baseline_musicxml["sha256"],
+        baseline_alignment_sha256=baseline_alignment["sha256"],
+        musicxml=baseline_musicxml,
+        alignment=baseline_alignment,
+        postprocess=(
+            {
+                "schema_version": "atpiano.score-postprocessor.v1",
+                "version": SCORE_POSTPROCESSOR_VERSION,
+                "key_signature": postprocess.get("key_signature", {}),
+                "needs_review": False,
+            }
+            if postprocess is not None
+            else None
+        ),
+        created_at=created_at,
+    )
+    automatic_options = normalized_options(clef_policy="automatic")
+    automatic_variant_id = score_variant_id(
+        baseline_musicxml_sha256=baseline_musicxml["sha256"],
+        baseline_alignment_sha256=baseline_alignment["sha256"],
+        options=automatic_options,
+    )
+    variant_directory = (
+        snapshot_directory
+        / "variants"
+        / automatic_variant_id.replace(":", "-")
+    )
+    variant_directory.mkdir(parents=True, exist_ok=True)
+    musicxml_path = variant_directory / "score.musicxml"
+    alignment_path = variant_directory / "alignment.json"
+    staging_musicxml_path.replace(musicxml_path)
+    staging_alignment_path.replace(alignment_path)
+    musicxml = _artifact_record(
+        musicxml_path,
+        session_directory=session_directory,
+        summary=summary,
+    )
+    alignment = _artifact_record(
+        alignment_path,
+        session_directory=session_directory,
+        summary=alignment_summary,
+    ) | {"schema_version": SCORE_ALIGNMENT_SCHEMA}
+    automatic = _variant_record(
+        variant_id=automatic_variant_id,
+        role="automatic",
+        options=automatic_options,
+        baseline_musicxml_sha256=baseline_musicxml["sha256"],
+        baseline_alignment_sha256=baseline_alignment["sha256"],
+        musicxml=musicxml,
+        alignment=alignment,
+        postprocess=postprocess,
+        created_at=created_at,
+    )
+    write_json(variant_directory / "manifest.json", automatic)
     manifest = {
         "schema_version": SCORE_SNAPSHOT_SCHEMA,
         "session_id": session["session_id"],
-        "generated_at": utc_now(),
+        "generated_at": created_at,
         "commit_sample": commit_sample,
         "commit_s": commit_sample / sample_rate_hz,
         "sample_rate_hz": sample_rate_hz,
@@ -381,21 +623,164 @@ def generate_score_snapshot(
             "path": str(source_notes_path.relative_to(session_directory)),
             "sha256": sha256_file(source_notes_path),
         },
-        "musicxml": {
-            "path": str(musicxml_path.relative_to(session_directory)),
-            "sha256": sha256_file(musicxml_path),
-            "bytes": musicxml_path.stat().st_size,
-            "summary": summary,
-        },
-        "alignment": {
-            "schema_version": SCORE_ALIGNMENT_SCHEMA,
-            "path": str(alignment_path.relative_to(session_directory)),
-            "sha256": sha256_file(alignment_path),
-            "bytes": alignment_path.stat().st_size,
-            "summary": alignment_summary,
-        },
+        "baseline": baseline,
+        "variants": [automatic],
+        "default_variant_id": automatic_variant_id,
+        "selected_variant_id": automatic_variant_id,
+        "musicxml": musicxml,
+        "alignment": alignment,
         "adapter": adapter,
     }
     write_json(snapshot_directory / "manifest.json", manifest)
     write_json(score_root / "current.json", manifest)
     return manifest
+
+
+def generate_score_variant(
+    session_directory: Path,
+    runtime_directory: Path,
+    *,
+    baseline_musicxml_path: Path,
+    baseline_alignment_path: Path,
+    clef_policy: str = "automatic",
+    target_key_fifths: int | None = None,
+    runner: ScoreVariantRunner | None = None,
+) -> dict[str, Any]:
+    """Create or select one deterministic variant of the current baseline."""
+
+    session_directory = session_directory.resolve()
+    pointer_path = session_directory / "score" / "current.json"
+    pointer = read_json(pointer_path)
+    if (
+        pointer.get("schema_version") != SCORE_SNAPSHOT_SCHEMA
+        or pointer.get("session_id")
+        != read_json(session_directory / "session.json").get("session_id")
+    ):
+        raise ValueError("current score snapshot is invalid")
+    baseline = pointer.get("baseline")
+    if not isinstance(baseline, dict):
+        raise ValueError(
+            "score snapshot predates deterministic baseline variants; "
+            "refresh the committed score first"
+        )
+    baseline_musicxml_path = baseline_musicxml_path.resolve()
+    baseline_alignment_path = baseline_alignment_path.resolve()
+    expected_musicxml = (
+        session_directory / Path(str(baseline["musicxml"]["path"]))
+    ).resolve()
+    expected_alignment = (
+        session_directory / Path(str(baseline["alignment"]["path"]))
+    ).resolve()
+    if (
+        baseline_musicxml_path != expected_musicxml
+        or baseline_alignment_path != expected_alignment
+        or not expected_musicxml.is_file()
+        or not expected_alignment.is_file()
+        or sha256_file(expected_musicxml)
+        != str(baseline["musicxml"]["sha256"])
+        or sha256_file(expected_alignment)
+        != str(baseline["alignment"]["sha256"])
+    ):
+        raise ValueError("variant request does not name the current baseline")
+
+    options = normalized_options(
+        clef_policy=clef_policy,
+        target_key_fifths=target_key_fifths,
+    )
+    variant_id = score_variant_id(
+        baseline_musicxml_sha256=str(baseline["musicxml"]["sha256"]),
+        baseline_alignment_sha256=str(baseline["alignment"]["sha256"]),
+        options=options,
+    )
+    if variant_id == baseline["variant_id"]:
+        selected = _select_variant(pointer, baseline)
+        write_json(pointer_path, selected)
+        return baseline
+    variants = pointer.get("variants")
+    if not isinstance(variants, list):
+        raise ValueError("score variant catalog is invalid")
+    for existing in variants:
+        if isinstance(existing, dict) and existing.get("variant_id") == variant_id:
+            selected = _select_variant(pointer, existing)
+            write_json(pointer_path, selected)
+            return existing
+
+    snapshot_directory = (
+        session_directory
+        / "score"
+        / "snapshots"
+        / f"{int(pointer['commit_sample']):016d}"
+    ).resolve()
+    variant_directory = (
+        snapshot_directory / "variants" / variant_id.replace(":", "-")
+    )
+    if variant_directory.exists():
+        raise RuntimeError("unpublished score variant directory already exists")
+    variant_directory.mkdir(parents=True)
+    musicxml_path = variant_directory / "score.musicxml"
+    alignment_path = variant_directory / "alignment.json"
+    if runner is None:
+        adapter = run_score_variant_adapter(
+            runtime_directory.resolve(),
+            expected_musicxml,
+            expected_alignment,
+            musicxml_path,
+            alignment_path,
+            clef_policy=clef_policy,
+            target_key_fifths=target_key_fifths,
+        )
+    else:
+        adapter = runner(
+            expected_musicxml,
+            expected_alignment,
+            musicxml_path,
+            alignment_path,
+            clef_policy,
+            target_key_fifths,
+            runtime_directory.resolve(),
+        )
+    source_notes_path = (
+        session_directory / Path(str(pointer["source_notes"]["path"]))
+    ).resolve()
+    summary = summarize_musicxml(musicxml_path.read_bytes())
+    _validate_score_output(int(pointer["note_count"]), summary)
+    alignment_summary = validate_score_alignment(
+        read_json(alignment_path),
+        source_notes_path=source_notes_path,
+        musicxml_path=musicxml_path,
+    )
+    if alignment_summary["source_notes"] != int(pointer["note_count"]):
+        raise RuntimeError("variant alignment source count differs")
+    postprocess = adapter.get("postprocess")
+    if not isinstance(postprocess, dict):
+        raise RuntimeError("score variant adapter omitted its evidence")
+    role = "enharmonic" if target_key_fifths is not None else "automatic"
+    variant = _variant_record(
+        variant_id=variant_id,
+        role=role,
+        options=options,
+        baseline_musicxml_sha256=str(baseline["musicxml"]["sha256"]),
+        baseline_alignment_sha256=str(baseline["alignment"]["sha256"]),
+        musicxml=_artifact_record(
+            musicxml_path,
+            session_directory=session_directory,
+            summary=summary,
+        ),
+        alignment=_artifact_record(
+            alignment_path,
+            session_directory=session_directory,
+            summary=alignment_summary,
+        )
+        | {"schema_version": SCORE_ALIGNMENT_SCHEMA},
+        postprocess=postprocess,
+        created_at=utc_now(),
+    )
+    write_json(variant_directory / "manifest.json", variant)
+    variants.append(variant)
+    root_manifest_path = snapshot_directory / "manifest.json"
+    root_manifest = read_json(root_manifest_path)
+    root_manifest["variants"] = variants
+    write_json(root_manifest_path, root_manifest)
+    pointer["variants"] = variants
+    write_json(pointer_path, _select_variant(pointer, variant))
+    return variant
