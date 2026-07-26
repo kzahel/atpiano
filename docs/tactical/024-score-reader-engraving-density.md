@@ -2,7 +2,7 @@
 
 Topic: performance-to-notation
 
-Status: planned on 2026-07-26 from desktop review of retained session
+Status: implemented on 2026-07-26 from desktop review of retained session
 `20260726T154200-f86498b7ed5b`.
 
 ## Observation
@@ -49,4 +49,55 @@ instead change the engraving geometry that decides system and page breaks.
 
 ## Execution Record
 
-No implementation commits yet.
+The implementation landed as:
+
+- `a928af9` — plan the bounded density correction;
+- `dfcd3e8` — replace pixel-only zoom with engraving profiles; and
+- `59f81e8` — wait for the asynchronous renderer page map in the routing
+  regression.
+
+Each profile now changes both OSMD's pre-layout geometry and effective page
+capacity:
+
+| Profile | Page scale | Minimum system distance | Sky/bottom clearance |
+|---|---:|---:|---:|
+| Large | 1.16 | 16 | 12 |
+| Comfortable | 1.00 | 12 | 9 |
+| Compact | 0.86 | 6 | 4 |
+
+The reader also gives every page explicit top and bottom engraving margins.
+It no longer uses OSMD `Zoom`: fixed-width responsive SVG fitting had
+cancelled that pixel-only distinction after layout. Changing profiles
+re-renders the exact pinned MusicXML with a profile-specific custom page
+format, then restores the source-sample or measure anchor.
+
+### Browser evidence
+
+The retained score named above was opened in the real reader with OSMD 1.9.9.
+At a 1440-by-913 desktop viewport:
+
+- **Large** produced six pages and two grand-staff systems on the first page,
+  with about 146 pixels between the measured system extents.
+- **Comfortable** produced four pages and three systems on the first page,
+  with measured clearances of about 75–106 pixels.
+- **Compact** fit four systems on the first page and advanced its page
+  anchors farther through the score than **Comfortable**.
+
+At a 390-by-844 emulated phone viewport, **Compact** presented one 366-by-717
+paper page at a time with no document-level horizontal overflow. Switching
+from page two in **Compact** to **Comfortable** retained the active measure,
+even though the profile change altered pagination.
+
+### Automated evidence
+
+- The focused application test passed three consecutive runs.
+- TypeScript checking and the Vite production build passed.
+- The complete migration regression passed at
+  `results/migration-regression/20260726T171157Z/report.json`: 120 Python
+  tests, 6 legacy live-view tests, 5 TypeScript node tests, and 41 Vitest
+  tests passed along with contract, audit, lint, syntax, and whitespace
+  gates.
+
+Physical piano-distance viewing and representative Bluetooth pedal behavior
+remain subjective device checks owned by the continuing reader topic; they do
+not block this spacing correction.

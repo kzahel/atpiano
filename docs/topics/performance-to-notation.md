@@ -251,11 +251,14 @@ safe areas, and a representative Bluetooth keyboard pedal remain subjective
 profile-tuning checks.
 
 [`024-score-reader-engraving-density.md`](../tactical/024-score-reader-engraving-density.md)
-owns the first profile-tuning follow-up. Retained desktop review found that
-OSMD's compact default leaves adjacent grand-staff systems too close and that
-fixed-width SVG fitting cancels a pixel-only `Zoom` distinction. Density must
-change engraving geometry and pagination while keeping the exact pinned XML
-and semantic reader position.
+records the implemented first profile-tuning follow-up. Retained desktop
+review found that OSMD's compact default left adjacent grand-staff systems too
+close and that fixed-width SVG fitting cancelled a pixel-only `Zoom`
+distinction. Large, Comfortable, and Compact now change pre-layout system
+clearance and effective page capacity while keeping the exact pinned XML and
+semantic reader position. The retained score visibly reflows across all three
+profiles at desktop and phone viewports without document-level horizontal
+overflow.
 
 ### Two-phase paid oracle
 
