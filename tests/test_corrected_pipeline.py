@@ -6,6 +6,10 @@ import time
 from pathlib import Path
 
 from atpiano.corrected import CorrectedSession, LaneUpdate
+from atpiano.corrected_commit import (
+    CommitModelOutput,
+    CorrectedCommitLane,
+)
 from atpiano.corrected_pipeline import CorrectedSessionPipeline
 from atpiano.live import PcmBlock
 from atpiano.util import read_json
@@ -116,6 +120,28 @@ class _FailingLane(_ImmediateLane):
         raise RuntimeError("intentional lane failure")
 
 
+class _EmptyCommitModel:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def transcribe(
+        self,
+        pcm_s16le: bytes,
+        *,
+        source_sample_rate_hz: int,
+    ) -> CommitModelOutput:
+        self.calls += 1
+        return CommitModelOutput(
+            events=(),
+            inference_s=0.0,
+            source_frame_count=len(pcm_s16le) // 2,
+            model_frame_count=len(pcm_s16le) // 2,
+        )
+
+    def provenance(self) -> dict[str, object]:
+        return {"name": "empty-commit"}
+
+
 def test_blocked_lane_does_not_block_pcm_or_other_lane(tmp_path: Path) -> None:
     session = CorrectedSession(
         tmp_path / "session",
@@ -203,6 +229,53 @@ def test_pipeline_defers_named_lane_until_stop(tmp_path: Path) -> None:
     assert blocking.started.wait(1)
     blocking.release.set()
     assert pipeline.wait(1)
+
+
+def test_after_stop_lane_catches_up_beyond_pcm_ring_from_durable_audio(
+    tmp_path: Path,
+) -> None:
+    session = CorrectedSession(
+        tmp_path / "session",
+        session_id="session",
+        sample_rate_hz=8_000,
+        source="microphone",
+        pcm_ring_s=0.5,
+        segment_s=1.0,
+        minimum_free_bytes=0,
+        correction_mode="after-stop",
+        correction_reason="test policy",
+    )
+    model = _EmptyCommitModel()
+    lane = CorrectedCommitLane(
+        session,
+        model=model,
+        buffer_s=0.5,
+        hop_s=0.25,
+        maximum_hop_s=0.25,
+        guard_s=0.125,
+        minimum_context_s=0.25,
+    )
+    session.add_lane(lane)
+    pipeline = CorrectedSessionPipeline(
+        session,
+        defer_until_stop=frozenset({"commit"}),
+    )
+    block_frames = 4_000
+    for sequence in range(6):
+        pipeline.accept_block(
+            _block(sequence, sequence * block_frames, block_frames),
+            received_ns=sequence + 1,
+        )
+
+    assert session.horizons.audio_head_sample == 24_000
+    assert session.ring.start_sample == 20_000
+    assert model.calls == 0
+    pipeline.begin_stop()
+    assert pipeline.wait(2)
+
+    assert model.calls > 1
+    assert session.horizons.commit_sample == 24_000
+    assert read_json(session.directory / "session.json")["status"] == "complete"
 
 
 def test_lane_failure_preserves_capture_and_completes_with_stage_error(

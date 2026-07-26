@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
+
 import numpy as np
+import pytest
 
 from atpiano.corrected_commit import CommitModelOutput
 from atpiano.live import LiveModelOutput
@@ -45,6 +48,28 @@ class _CommitModel:
         return {"name": "spawn-commit"}
 
 
+class _CrashingCommitModel(_CommitModel):
+    def transcribe(
+        self,
+        pcm_s16le: bytes,
+        *,
+        source_sample_rate_hz: int,
+    ) -> CommitModelOutput:
+        del pcm_s16le, source_sample_rate_hz
+        os._exit(7)
+
+
+class _MalformedCommitModel(_CommitModel):
+    def transcribe(
+        self,
+        pcm_s16le: bytes,
+        *,
+        source_sample_rate_hz: int,
+    ) -> object:
+        del pcm_s16le, source_sample_rate_hz
+        return {"not": "a native commit result"}
+
+
 def test_preview_worker_spawns_and_returns_native_output() -> None:
     worker = PreviewModelWorker(_PreviewModel)
     try:
@@ -67,5 +92,23 @@ def test_commit_worker_spawns_with_thread_budget() -> None:
         assert output.source_frame_count == 6
         assert output.model_frame_count == 8_000
         assert worker.status()["thread_limit"] == 2
+    finally:
+        worker.close()
+
+
+def test_commit_worker_reports_process_exit() -> None:
+    worker = CommitModelWorker(_CrashingCommitModel, thread_limit=1)
+    try:
+        with pytest.raises(RuntimeError, match="disconnected"):
+            worker.transcribe(bytes(12), source_sample_rate_hz=8_000)
+    finally:
+        worker.close()
+
+
+def test_commit_worker_rejects_malformed_native_output() -> None:
+    worker = CommitModelWorker(_MalformedCommitModel, thread_limit=1)
+    try:
+        with pytest.raises(RuntimeError, match="output type is invalid"):
+            worker.transcribe(bytes(12), source_sample_rate_hz=8_000)
     finally:
         worker.close()
