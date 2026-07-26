@@ -2,9 +2,13 @@
 
 Topic: session-workspace-management
 
-Status: accepted proposed foundation on 2026-07-26; existing session artifacts
-are durable, but catalog, selection, explicit New, history, and deletion are
-not implemented.
+Status: accepted proposed foundation on 2026-07-26; Phase 2 contract and local
+compatibility work is in progress under
+[`015-product-contracts-and-structure.md`](../tactical/015-product-contracts-and-structure.md).
+Existing session artifacts remain authoritative while explicit catalog,
+session-addressed reads, capture identity, score targets, and recoverable
+deletion are introduced. The durable React New/history/selection UI remains a
+later phase.
 
 ## Scope And Relationship
 
