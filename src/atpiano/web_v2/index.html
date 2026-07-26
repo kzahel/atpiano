@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>ATPiano · Corrected notes</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">ATPiano / local instrument</p>
+          <h1>Corrected notes</h1>
+          <p class="lede">
+            Fast provisional recognition, then a stable piano-specific transcript.
+          </p>
+        </div>
+        <div class="status-lockup">
+          <span id="status-dot" class="status-dot"></span>
+          <div>
+            <span class="label">Session state</span>
+            <strong id="session-state">Connecting</strong>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <section class="control-deck" aria-label="Session controls">
+          <div class="actions">
+            <button id="start-microphone" class="primary">Start microphone</button>
+            <button id="stop-microphone" disabled>Stop &amp; settle</button>
+            <button id="start-replay" class="quiet" hidden>Replay fixture</button>
+          </div>
+          <p id="action-status" class="action-status">
+            Waiting for the local session engine.
+          </p>
+          <div class="exports">
+            <a id="download-midi" class="download disabled" href="/api/artifacts/exports/session.mid">
+              MIDI
+            </a>
+            <a id="download-jsonl" class="download disabled" href="/api/artifacts/exports/session.jsonl">
+              Event history
+            </a>
+          </div>
+        </section>
+
+        <section class="metrics" aria-label="Live session state">
+          <article>
+            <span>Source</span>
+            <strong id="source-value">—</strong>
+            <small id="duration-value">00:00.0</small>
+          </article>
+          <article>
+            <span>Fast lane</span>
+            <strong id="preview-value">—</strong>
+            <small id="preview-detail">Basic Pitch</small>
+          </article>
+          <article>
+            <span>Corrected lane</span>
+            <strong id="commit-value">—</strong>
+            <small id="commit-detail">Transkun</small>
+          </article>
+          <article>
+            <span>Local storage</span>
+            <strong id="storage-value">—</strong>
+            <small id="storage-detail">segmented &amp; bounded</small>
+          </article>
+        </section>
+
+        <section class="timeline-card">
+          <div class="timeline-heading">
+            <div>
+              <p class="eyebrow">Source-sample timeline</p>
+              <h2>Performance</h2>
+            </div>
+            <div class="legend" aria-label="Timeline legend">
+              <span><i class="swatch provisional"></i>provisional</span>
+              <span><i class="swatch committed"></i>corrected</span>
+              <span><i class="line-swatch"></i>commit horizon</span>
+            </div>
+          </div>
+
+          <div class="timeline-controls">
+            <label>
+              View
+              <select id="window-size">
+                <option value="15">15 seconds</option>
+                <option value="30" selected>30 seconds</option>
+                <option value="60">60 seconds</option>
+                <option value="120">2 minutes</option>
+              </select>
+            </label>
+            <label class="follow-control">
+              <input id="follow-head" type="checkbox" checked />
+              Follow live edge
+            </label>
+            <output id="range-label">00:00 — 00:30</output>
+          </div>
+
+          <div class="seek-row">
+            <input
+              id="timeline-seek"
+              type="range"
+              min="0"
+              max="0"
+              value="0"
+              step="0.25"
+              aria-label="Timeline position"
+            />
+          </div>
+
+          <div class="canvas-shell">
+            <canvas id="timeline" aria-label="Corrected-note piano roll"></canvas>
+            <div id="timeline-empty" class="timeline-empty">
+              Start the fixture replay or microphone to fill the timeline.
+            </div>
+          </div>
+          <div class="pedal-label">PEDAL · sustain 64 / soft 67</div>
+        </section>
+
+        <section class="session-foot">
+          <div>
+            <span class="label">Session</span>
+            <code id="session-id">none</code>
+          </div>
+          <div>
+            <span class="label">Delivery</span>
+            <span id="transport-value">indexed recovery ready</span>
+          </div>
+          <p id="error-message" role="alert"></p>
+        </section>
+      </main>
+    </div>
+
+    <script src="/timeline.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

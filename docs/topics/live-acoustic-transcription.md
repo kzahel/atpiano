@@ -77,8 +77,15 @@ Compared with one independent full-file Transkun control, the final 147-note
 rolling transcript scores 0.936 onset F1 at 25 and 50 ms and 0.827
 note-with-offset F1. Ten of 11 control pedal onsets match and nine of those
 offsets are within 200 ms. This passes the planned onset-parity band but is not
-exact equivalence. The separate browser app, review, export, and representative
-longevity runs remain in progress.
+exact equivalence.
+
+The separate `atpiano workbench-v2` browser app now accepts server-driven WAV
+replay or AudioWorklet microphone blocks through that same session engine. Its
+fixed canvas queries only 15–120 seconds from a maintained materialized-event
+index, shows both horizons and pedal bands, and writes committed MIDI plus
+full revision-history JSONL without reading PCM. The v1 command and frontend
+remain separate. Representative real-model longevity and final acceptance
+recording remain in progress.
 
 ## Desired Experience
 

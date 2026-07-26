@@ -31,6 +31,51 @@ _LATEST_JOIN = """
 """
 
 
+def ensure_materialized_index(database_path: Path) -> None:
+    """Add or rebuild the bounded range-query table in an older v2 index."""
+
+    database_path = database_path.resolve()
+    if not database_path.is_file():
+        raise FileNotFoundError(f"corrected event index does not exist: {database_path}")
+    with sqlite3.connect(database_path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS materialized_events (
+                event_id TEXT PRIMARY KEY,
+                revision INTEGER NOT NULL,
+                onset_sample INTEGER NOT NULL,
+                offset_sample INTEGER,
+                lane TEXT NOT NULL,
+                lifecycle TEXT NOT NULL,
+                payload TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS materialized_events_visible
+                ON materialized_events(onset_sample, offset_sample, event_id);
+            """
+        )
+        materialized_count = int(
+            connection.execute(
+                "SELECT COUNT(*) FROM materialized_events"
+            ).fetchone()[0]
+        )
+        event_count = int(
+            connection.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+        )
+        if materialized_count == 0 and event_count:
+            connection.execute(
+                f"""
+                INSERT INTO materialized_events (
+                    event_id, revision, onset_sample, offset_sample,
+                    lane, lifecycle, payload
+                )
+                SELECT latest.event_id, latest.revision, latest.onset_sample,
+                       latest.offset_sample, latest.lane, latest.lifecycle,
+                       latest.payload
+                {_LATEST_JOIN}
+                """
+            )
+
+
 def _connect_index(database_path: Path) -> sqlite3.Connection:
     database_path = database_path.resolve()
     if not database_path.is_file():

@@ -130,6 +130,40 @@ are retained so an actual page session can also report delivery latency.
 Notation remains a separate artifact consumer and does not change the
 acoustic model output.
 
+## Corrected-note Workbench v2
+
+The v1 MVP remains available as `atpiano workbench`. The separate v2
+application keeps immediate Basic Pitch notes provisional, replaces settled
+spans with the bounded trailing Transkun lane, shows sustain and soft pedal,
+and stores indefinite sessions as segmented audio plus indexed events.
+
+Install the optional corrected-note dependencies, generate the musical
+fixture, and open v2 with server-driven replay:
+
+```text
+uv sync --extra corrected
+uv run atpiano musical-fixture \
+  ../atpiano-artifacts/musical-loop-input
+uv run atpiano workbench-v2 \
+  --replay ../atpiano-artifacts/musical-loop-input/input.json
+```
+
+The page starts the WAV without microphone permission and exercises the same
+session, recognition, correction, review, and export paths used by capture.
+Use `--repeat N` to loop it on one continuous source sample clock, or
+`--no-wait` for accelerated bring-up. Generated session data defaults to
+`results/workbench-v2/`.
+
+Start the app without `--replay` to use its microphone Start/Stop controls:
+
+```text
+uv run atpiano workbench-v2
+```
+
+Only the visible 15–120 second timeline range is queried. After Stop, MIDI
+contains the latest committed notes and pedal intervals, while Event history
+contains every append-only revision in global sequence order.
+
 ## Benchmark Commands
 
 The lower-level commands remain available for reproducible experiments.

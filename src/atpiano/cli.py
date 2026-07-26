@@ -129,6 +129,49 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="do not open the workbench in the default browser",
     )
+    corrected_workbench_parser = subparsers.add_parser(
+        "workbench-v2",
+        help="run the bounded corrected-note capture and replay application",
+    )
+    corrected_workbench_parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=Path("results/workbench-v2"),
+        help="segmented session directory (default: results/workbench-v2)",
+    )
+    corrected_workbench_parser.add_argument("--port", type=int, default=8001)
+    corrected_workbench_parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="do not open the corrected workbench in the default browser",
+    )
+    corrected_workbench_parser.add_argument(
+        "--replay",
+        type=Path,
+        help="start by replaying this deterministic input manifest",
+    )
+    corrected_workbench_parser.add_argument(
+        "--repeat",
+        type=int,
+        default=1,
+        help="number of continuous-clock replay repetitions (default: 1)",
+    )
+    corrected_workbench_parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="run configured replay without wall-clock waits",
+    )
+    corrected_workbench_parser.add_argument(
+        "--minimum-free-gib",
+        type=float,
+        default=2.0,
+        help="stop before free space falls below this reserve (default: 2)",
+    )
+    corrected_workbench_parser.add_argument(
+        "--commit-device",
+        default="cpu",
+        help="Transkun execution device (default: cpu)",
+    )
     subparsers.add_parser(
         "devices",
         help="list audio devices available for microphone capture",
@@ -219,6 +262,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.workspace,
             port=args.port,
             open_browser=not args.no_open,
+        )
+        return 0
+    if args.command == "workbench-v2":
+        from atpiano.corrected_workbench import serve_corrected_workbench
+
+        serve_corrected_workbench(
+            args.workspace,
+            port=args.port,
+            open_browser=not args.no_open,
+            commit_device=args.commit_device,
+            minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
+            replay_manifest=args.replay,
+            replay_repeat=args.repeat,
+            replay_realtime=not args.no_wait,
         )
         return 0
     if args.command == "devices":

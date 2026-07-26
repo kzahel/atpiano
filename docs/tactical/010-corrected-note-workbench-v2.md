@@ -112,7 +112,7 @@ The in-memory working set is independent of session duration:
 | Lane B PCM input | one 28-second decode buffer |
 | Lane B native output | one decode |
 | browser event batch | one requested visible range |
-| live delivery retry buffer | fixed recent sequence count |
+| live delivery recovery | zero RAM backlog; bounded indexed cursor pages |
 
 Persistent layout:
 
@@ -472,3 +472,59 @@ One limitation is explicit: the full-file control's predicted soft-pedal
 interval lasts almost the entire take, longer than Lane B's 28-second outer
 context. The rolling lane closes it when left context expires. This is a
 bounded-context disagreement, not hidden parity.
+
+### Separate workbench, indexed review, and export
+
+Implemented the separate `atpiano workbench-v2` product surface on
+2026-07-26. It uses its own `src/atpiano/web_v2/` assets, port default,
+configuration schema, streaming schema, session workspace, HTTP handler, and
+CLI parser branch. The existing `atpiano workbench` command and v1 assets
+remain independent.
+
+Both server-driven WAV replay and browser AudioWorklet PCM enter
+`CorrectedSession`, attach the same Lane A and Lane B implementations, and
+finish through the same bounded tail flush and export writer. A configured
+`--replay INPUT_JSON --repeat N` begins without browser microphone permission;
+`--no-wait` accelerates the same source-sample schedule. The microphone
+adapter never retains a growing browser-side copy of captured PCM.
+
+The browser implements a fixed-size canvas piano roll with 15, 30, 60, or
+120-second indexed viewports. It distinguishes provisional and corrected
+notes, replaces revisions by stable identity without relighting them, removes
+retractions from the materialized view, draws sustain and soft-pedal bands,
+marks `H_commit`, follows the source head, and can seek an old range. It also
+shows both horizon lags, lane decode state, source duration, received blocks,
+PCM disk growth, free-space warnings, and export readiness.
+
+The event index now maintains one current materialized row per identity in
+addition to append-only evidence. This avoids grouping the full revision
+history for every browser poll and prevents an older revision from
+resurfacing when a corrected onset crosses a viewport edge. Range selection
+also includes a note or pedal that begins before the viewport and overlaps it.
+Sequence recovery pages are capped at 4,096 rows and visible ranges at 120
+seconds, so no session-age-sized delivery retry queue lives in RAM.
+
+Stop streams every event-index row in global sequence order to
+`exports/session.jsonl`, then streams latest committed identities into
+`exports/session.mid`. MIDI includes note durations plus controllers 64 and
+67. Neither export opens session audio. A restart can serve the latest stopped
+session, and it upgrades an older v2 event index with the materialized table
+once at load.
+
+Focused product validation currently covers:
+
+```text
+loopback Host and Origin enforcement
+distinct v1 and v2 CLI branches and static assets
+microphone WebSocket PCM continuity, Stop, and exports
+accelerated two-repeat server-driven WAV replay
+bounded range and sequence queries
+latest-revision viewport crossing and interval overlap
+JSONL history order and committed MIDI note/pedal selection
+frontend DOM contract and pure timeline materialization/geometry
+```
+
+The Sites building workflow was used only to enforce the local application
+boundary and validation discipline. This repository has no
+`.openai/hosting.json`, and v2 is intentionally loopback-only, so there is no
+hosted deployment.
