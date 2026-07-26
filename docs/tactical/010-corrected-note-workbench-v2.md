@@ -2,8 +2,10 @@
 
 Topic: live-acoustic-transcription
 
-Status: active. Implementation authorized on 2026-07-26. This tactical owns the
-first complete v2 milestone and becomes its execution record as slices land.
+Status: complete on 2026-07-26. This tactical owns the first complete v2
+milestone and remains its execution record. The physical microphone audition
+and multi-hour real-model soak are explicit follow-up validation, not hidden
+claims of this deterministic acceptance.
 
 ## Outcome
 
@@ -528,3 +530,134 @@ The Sites building workflow was used only to enforce the local application
 boundary and validation discipline. This repository has no
 `.openai/hosting.json`, and v2 is intentionally loopback-only, so there is no
 hosted deployment.
+
+### Final validation and closure
+
+The completed acceptance pass used the actual loopback server and page-facing
+replay route, not only lower-level lane calls. It regenerated both fixtures
+byte-identically:
+
+```text
+frozen smoke WAV:
+39217861396c1bb84ddd883a9f10c63f1be8b8c34462676d87b626916452b043
+frozen smoke MIDI:
+84326c3ce5131b4a475a9bd3205fc289a995182e82cbf51b716e5958d540cf12
+musical WAV:
+0eab5d787cb482735dc840daaed2abfb6d00ad6ff7a7058fdd217522905aaa89
+musical MIDI:
+d24635a3f75d83dd8ff40e9513475dc43064e1dbb29fd836345f2057da0ec7d9
+```
+
+A one-pass 42-second musical-fixture product run under
+`results/workbench-v2-product-validation/` produced 161 preview windows,
+retained 32 after 129 evictions, used eight commit decodes, closed all pending
+tails, and advanced `H_commit` to all 2,016,000 source frames. Commit inference
+used 22.037 seconds. The export contains 946 append-history rows, 152 latest
+committed notes, and 12 pedal intervals. Its 622,873-byte JSONL has unique,
+strictly increasing sequences 1 through 946; MIDI contains 152 note-on/off
+pairs and 24 controller messages.
+
+Against a fresh 148-note finite Transkun control, that page-facing result
+scored:
+
+```text
+onset F1 at 25 ms: 0.953
+onset F1 at 50 ms: 0.953
+note-with-offset F1: 0.840
+```
+
+Against the aligned generated MIDI it had 1.0 onset precision, 0.768 recall,
+and 0.869 F1 at 25 and 50 ms. The offset comparison to the synthetic MIDI is
+only 0.183 F1; Transkun's learned acoustic durations do not reproduce the
+renderer envelope, so the finite Transkun control remains the stitching
+parity oracle for offsets.
+
+This 152-note result differs from the earlier 147-note execution recorded
+above even though each remained close to the same 148-note finite control.
+Inputs and fixture files are byte deterministic; neural rolling output is
+accepted by declared pitch/onset distributions and control parity, not by a
+frozen output hash.
+
+A separate two-repeat product run under
+`results/workbench-v2-musical-loop-validation/` used one continuous
+4,032,000-sample clock and exact boundaries `[0, 2016000)` and
+`[2016000, 4032000)`. The repetitions contained 155 and 156 committed notes.
+Their aligned-reference onset F1 values were 0.878 and 0.870, a 0.009
+difference within the declared 0.02 distribution tolerance. Direct
+repeat-to-repeat onset F1 was 0.939 and note-with-offset F1 was 0.682. The
+loop boundary therefore remains a reported context effect, not an assertion
+of byte-identical model output.
+
+The user's checksummed 34.688-second target-piano take then ran twice through
+the same server under `results/workbench-v2-golden-validation/`. Its
+continuous boundaries were exactly `[0, 1665024)` and
+`[1665024, 3330048)`. Each repetition materialized 79 committed notes. After
+shifting the second source boundary back to zero, all 79 pitch/onset pairs
+matched at 50 ms for 1.0 F1; note-with-offset F1 was 0.861. With four seconds
+excluded at each artificial edge, all 69 interior onsets still matched and
+offset F1 was 0.870. This proves deterministic operational repeatability for
+the retained unaligned take, not note accuracy.
+
+The target-piano loop used 271 preview windows and 15 commit decodes totaling
+42.524 seconds of CPU model inference over 69.376 seconds of source. It kept
+exactly 32 native preview windows, reached seven pending tails, closed all of
+them at Stop, and flushed `H_commit` to 3,330,048. The export contains 158
+notes, 30 pedal intervals, and 853 history rows.
+
+Stopped-session recovery was exercised in a fresh server process. It reopened
+the same manifest and horizons, queried a late 12-second range without reading
+earlier PCM, continued a bounded sequence page from cursor 900, and served the
+same MIDI and JSONL artifacts.
+
+The two-lane longevity gate represents 30 accelerated source minutes with
+fake constant-cost model adapters so it can assert state shape independently
+of neural throughput:
+
+```text
+source blocks / preview windows / commit decodes: 360 / 1800 / 447
+PCM ring: 40.0 source seconds
+native windows retained / evicted: 4 / 1796
+active preview identities / high water: 12 / 15
+pending commit tails / high water: 0 / 1
+final provisional / commit lag: 1.0 s / 0.0 s
+indexed old-range rows at source seconds 60–75: 5
+history recovery page: 128 rows of a 4096-row maximum
+in-memory delivery retry rows: 0
+RSS before / high water: 105,250,816 / 108,724,224 bytes
+CPU / wall time: 0.855 / 0.869 s
+tracked session disk: 11,133,846 bytes
+```
+
+That low-rate run verifies bounds, not real model performance. At the product
+48 kHz source boundary PCM grows linearly by exactly 96,000 bytes per source
+second, or 172.8 MB per 30 minutes, before WAV headers. The real 42-second run
+confirmed 4,032,000 PCM bytes and a 1.1 MiB event index. The existing separate
+eight-hour preview-clock test still holds its ring at 40 seconds, native
+evidence at three windows, and active identity set at one.
+
+Lane B now measures full decode wall time in addition to native inference. If
+one decode exceeds the four-second source hop, it records degraded mode and
+increases the hop once, up to a bounded eight seconds. A focused slow-adapter
+test forces and verifies that transition. The browser reports the degraded
+hop and its current/high-water WebSocket backlog. Accelerated replay records
+source-to-emission latency as unavailable rather than publishing a false
+negative latency.
+
+Final regression evidence:
+
+```text
+uv run ruff check .                         pass
+uv run pytest -q                            47 passed
+all tests/js/*.js                           pass
+v1 workbench configuration/assets          pass
+v1 live WebSocket and stopped review        pass
+v2 loopback Host/Origin and PCM continuity  pass
+```
+
+No ambient microphone was activated during automated acceptance. The protocol
+test sends exact signed PCM16 blocks through the microphone WebSocket and
+verifies Stop and exports; the next useful human check is a consentful piano
+take in the actual browser. A multi-hour real Transkun soak, pause/reconnect
+support, and the previously recorded over-28-second soft-pedal disagreement
+remain follow-up evidence. They do not change the completed v2 milestone's
+bounded contracts or reintroduce v1 replacement.

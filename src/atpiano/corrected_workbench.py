@@ -91,12 +91,15 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
         replay_manifest: Path | None = None,
         replay_repeat: int = 1,
+        replay_silence_s: float = 0.0,
         replay_realtime: bool = True,
     ) -> None:
         if minimum_free_bytes < 0:
             raise ValueError("minimum free bytes cannot be negative")
         if replay_repeat <= 0:
             raise ValueError("replay repetition count must be positive")
+        if replay_silence_s < 0:
+            raise ValueError("replay silence cannot be negative")
         self.workspace_directory = workspace_directory.resolve()
         self.workspace_directory.mkdir(parents=True, exist_ok=True)
         self.preview_model_factory = preview_model_factory
@@ -104,6 +107,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self.minimum_free_bytes = minimum_free_bytes
         self.replay_manifest = replay_manifest.resolve() if replay_manifest else None
         self.replay_repeat = replay_repeat
+        self.replay_silence_s = replay_silence_s
         self.replay_realtime = replay_realtime
         self.state_lock = threading.Lock()
         self.model_lock = threading.Lock()
@@ -305,6 +309,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                 self.replay_manifest or Path(),
                 directory,
                 repeat=self.replay_repeat,
+                silence_s=self.replay_silence_s,
                 realtime=self.replay_realtime,
                 minimum_free_bytes=self.minimum_free_bytes,
                 preview_model=preview_model,
@@ -422,6 +427,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                             else None
                         ),
                         "repeat": self.server.replay_repeat,
+                        "silence_s": self.server.replay_silence_s,
                         "realtime": self.server.replay_realtime,
                     },
                 }
@@ -715,6 +721,7 @@ def create_corrected_workbench_server(
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
     replay_manifest: Path | None = None,
     replay_repeat: int = 1,
+    replay_silence_s: float = 0.0,
     replay_realtime: bool = True,
 ) -> CorrectedWorkbenchServer:
     factory = commit_model_factory or (
@@ -728,6 +735,7 @@ def create_corrected_workbench_server(
         minimum_free_bytes=minimum_free_bytes,
         replay_manifest=replay_manifest,
         replay_repeat=replay_repeat,
+        replay_silence_s=replay_silence_s,
         replay_realtime=replay_realtime,
     )
 
@@ -741,6 +749,7 @@ def serve_corrected_workbench(
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
     replay_manifest: Path | None = None,
     replay_repeat: int = 1,
+    replay_silence_s: float = 0.0,
     replay_realtime: bool = True,
 ) -> None:
     server = create_corrected_workbench_server(
@@ -750,6 +759,7 @@ def serve_corrected_workbench(
         minimum_free_bytes=minimum_free_bytes,
         replay_manifest=replay_manifest,
         replay_repeat=replay_repeat,
+        replay_silence_s=replay_silence_s,
         replay_realtime=replay_realtime,
     )
     actual_port = server.server_address[1]

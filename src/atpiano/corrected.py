@@ -689,10 +689,13 @@ class CorrectedSession:
         start_sample: int,
         end_sample: int,
         input_id: str,
-        audio_sha256: str,
+        audio_sha256: str | None,
+        kind: str = "input",
     ) -> None:
         if start_sample < 0 or end_sample < start_sample:
             raise ValueError("corrected source boundary is invalid")
+        if kind not in {"input", "inserted-silence"}:
+            raise ValueError("corrected source boundary kind is invalid")
         _append_jsonl(
             self.boundaries_path,
             [
@@ -701,6 +704,7 @@ class CorrectedSession:
                     "repetition": repetition,
                     "start_sample": start_sample,
                     "end_sample": end_sample,
+                    "kind": kind,
                     "input_id": input_id,
                     "audio_sha256": audio_sha256,
                 }
@@ -749,6 +753,7 @@ def run_corrected_replay(
     session_directory: Path,
     *,
     repeat: int = 1,
+    silence_s: float = 0.0,
     realtime: bool = True,
     block_samples: int = 4096,
     pcm_ring_s: float = DEFAULT_PCM_RING_S,
@@ -760,6 +765,8 @@ def run_corrected_replay(
 ) -> dict[str, Any]:
     if repeat <= 0:
         raise ValueError("corrected replay repetition count must be positive")
+    if silence_s < 0:
+        raise ValueError("corrected replay silence cannot be negative")
     if not 0 < block_samples <= MAX_PCM_BLOCK_FRAMES:
         raise ValueError("corrected replay block size is invalid")
     input_manifest_path = input_manifest_path.resolve()
@@ -798,6 +805,35 @@ def run_corrected_replay(
         session_callback(session)
     sequence = 0
     session_origin_ns = time.perf_counter_ns()
+
+    def accept_pcm(pcm: bytes) -> None:
+        nonlocal sequence
+        frame_count = len(pcm) // 2
+        first_sample = session.horizons.audio_head_sample
+        source_end = first_sample + frame_count
+        scheduled_ns = session_origin_ns + round(
+            source_end / sample_rate_hz * 1_000_000_000
+        )
+        if realtime:
+            remaining_s = (
+                scheduled_ns - time.perf_counter_ns()
+            ) / 1_000_000_000
+            if remaining_s > 0:
+                time.sleep(remaining_s)
+        session.accept_block(
+            PcmBlock(
+                sequence=sequence,
+                first_sample=first_sample,
+                frame_count=frame_count,
+                sample_rate_hz=sample_rate_hz,
+                page_sent_ms=source_end / sample_rate_hz * 1000,
+                worklet_time_s=source_end / sample_rate_hz,
+                pcm_s16le=pcm,
+            ),
+            received_ns=time.perf_counter_ns(),
+        )
+        sequence += 1
+
     try:
         for repetition in range(repeat):
             repetition_start = session.horizons.audio_head_sample
@@ -806,31 +842,7 @@ def run_corrected_replay(
                     pcm = source.readframes(block_samples)
                     if not pcm:
                         break
-                    frame_count = len(pcm) // 2
-                    first_sample = session.horizons.audio_head_sample
-                    source_end = first_sample + frame_count
-                    scheduled_ns = session_origin_ns + round(
-                        source_end / sample_rate_hz * 1_000_000_000
-                    )
-                    if realtime:
-                        remaining_s = (
-                            scheduled_ns - time.perf_counter_ns()
-                        ) / 1_000_000_000
-                        if remaining_s > 0:
-                            time.sleep(remaining_s)
-                    session.accept_block(
-                        PcmBlock(
-                            sequence=sequence,
-                            first_sample=first_sample,
-                            frame_count=frame_count,
-                            sample_rate_hz=sample_rate_hz,
-                            page_sent_ms=source_end / sample_rate_hz * 1000,
-                            worklet_time_s=source_end / sample_rate_hz,
-                            pcm_s16le=pcm,
-                        ),
-                        received_ns=time.perf_counter_ns(),
-                    )
-                    sequence += 1
+                    accept_pcm(pcm)
             session.record_boundary(
                 repetition=repetition,
                 start_sample=repetition_start,
@@ -838,6 +850,22 @@ def run_corrected_replay(
                 input_id=str(manifest.get("input_id", input_manifest_path.stem)),
                 audio_sha256=str(manifest["audio"]["sha256"]),
             )
+            silence_frames = round(silence_s * sample_rate_hz)
+            if repetition + 1 < repeat and silence_frames:
+                silence_start = session.horizons.audio_head_sample
+                remaining_frames = silence_frames
+                while remaining_frames:
+                    frames = min(remaining_frames, block_samples)
+                    accept_pcm(bytes(frames * 2))
+                    remaining_frames -= frames
+                session.record_boundary(
+                    repetition=repetition,
+                    start_sample=silence_start,
+                    end_sample=session.horizons.audio_head_sample,
+                    input_id="inserted-silence",
+                    audio_sha256=None,
+                    kind="inserted-silence",
+                )
         return session.finalize()
     except Exception as error:
         session.abort(error)

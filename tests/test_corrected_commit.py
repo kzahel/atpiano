@@ -46,6 +46,25 @@ class _CommitModel:
         return {"name": "fake-commit", "calls": self.calls}
 
 
+class _SlowCommitModel(_CommitModel):
+    def transcribe(
+        self,
+        pcm_s16le: bytes,
+        *,
+        source_sample_rate_hz: int,
+    ) -> CommitModelOutput:
+        output = super().transcribe(
+            pcm_s16le,
+            source_sample_rate_hz=source_sample_rate_hz,
+        )
+        return CommitModelOutput(
+            events=output.events,
+            inference_s=5.0,
+            source_frame_count=output.source_frame_count,
+            model_frame_count=output.model_frame_count,
+        )
+
+
 def _preview(
     event_id: str,
     pitch: int,
@@ -149,3 +168,37 @@ def test_commit_lane_replaces_preview_and_closes_boundary_events(
         "preview_retractions": 1,
     }
     assert model.calls == 3
+
+
+def test_commit_lane_reports_and_bounds_a_slow_scheduler_hop(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    session = CorrectedSession(
+        tmp_path / "slow-session",
+        session_id="slow-commit-test",
+        sample_rate_hz=100,
+        source="replay",
+        realtime=False,
+        minimum_free_bytes=0,
+    )
+    model = _SlowCommitModel()
+    lane = CorrectedCommitLane(session, model=model)
+    session.add_lane(lane)
+    monotonic_values = iter((0, 5_000_000_001, 5_000_000_002))
+    monkeypatch.setattr(
+        "atpiano.corrected_commit.time.perf_counter_ns",
+        lambda: next(monotonic_values),
+    )
+
+    session.accept_block(
+        _block(0, 0, 1_600),
+        received_ns=0,
+    )
+
+    scheduler = lane.status()["scheduler"]
+    assert scheduler["degraded_mode"] is True
+    assert scheduler["hop_frames"] == 800
+    assert scheduler["hop_high_water_frames"] == 800
+    assert scheduler["degraded_transition_count"] == 1
+    session.abort(RuntimeError("test complete"))

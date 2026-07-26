@@ -145,6 +145,8 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
             "8101",
             "--repeat",
             "3",
+            "--silence-seconds",
+            "1.5",
             "--no-wait",
         ]
     )
@@ -155,6 +157,7 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
     assert v2.command == "workbench-v2"
     assert v2.port == 8101
     assert v2.repeat == 3
+    assert v2.silence_seconds == 1.5
     assert v2.no_wait is True
 
 

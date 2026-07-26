@@ -2,9 +2,9 @@
 
 Topic: live-acoustic-transcription
 
-Status: the strict-onset v1 live decoder remains the runnable MVP. On
-2026-07-26 the user selected a stable corrected-note experience as the first
-complete v2 milestone, excluding engraving. Implementation is active in
+Status: the strict-onset v1 live decoder remains a runnable MVP. On
+2026-07-26 the separate stable corrected-note v2 milestone, excluding
+engraving, completed in
 [`010-corrected-note-workbench-v2.md`](../tactical/010-corrected-note-workbench-v2.md):
 a separate app with deterministic replay, bounded indefinite sessions,
 provisional Basic Pitch, trailing Transkun correction, pedal, review, and
@@ -84,8 +84,23 @@ replay or AudioWorklet microphone blocks through that same session engine. Its
 fixed canvas queries only 15–120 seconds from a maintained materialized-event
 index, shows both horizons and pedal bands, and writes committed MIDI plus
 full revision-history JSONL without reading PCM. The v1 command and frontend
-remain separate. Representative real-model longevity and final acceptance
-recording remain in progress.
+remain separate.
+
+Final page-facing acceptance used both aligned and target-piano WAV loops. Two
+musical-fixture repetitions differed by 0.009 aligned-reference onset F1 and
+scored 0.939 directly against each other. Two repetitions of the retained
+34.688-second target-piano take each produced 79 committed notes with 1.0
+repeat-to-repeat pitch/onset F1 at 50 ms. A fresh stopped server recovered an
+old range and the same exports.
+
+A 30-minute two-lane source-clock test and the existing eight-hour preview
+test hold their declared rings, native windows, identities, pending offsets,
+and indexed delivery pages within fixed bounds. Real 42–84 second Transkun
+runs remained below the four-second hop, while a forced slow-adapter test
+proves that v2 exposes degraded mode and raises the hop no farther than eight
+seconds. A physical browser microphone audition and multi-hour real-model soak
+remain recommended evidence; no ambient microphone was activated
+automatically.
 
 ## Desired Experience
 

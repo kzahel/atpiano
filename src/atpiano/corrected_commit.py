@@ -23,6 +23,7 @@ from atpiano.util import sha256_file, utc_now, write_json
 COMMIT_LANE_SCHEMA = "atpiano.corrected-commit-lane.v1"
 DEFAULT_COMMIT_BUFFER_S = 28.0
 DEFAULT_COMMIT_HOP_S = 4.0
+DEFAULT_COMMIT_MAX_HOP_S = 8.0
 DEFAULT_COMMIT_GUARD_S = 4.0
 DEFAULT_COMMIT_MIN_CONTEXT_S = 16.0
 DEFAULT_COMMIT_ONSET_MATCH_S = 0.12
@@ -212,13 +213,24 @@ class CorrectedCommitLane:
         model: CommitModel,
         buffer_s: float = DEFAULT_COMMIT_BUFFER_S,
         hop_s: float = DEFAULT_COMMIT_HOP_S,
+        maximum_hop_s: float | None = None,
         guard_s: float = DEFAULT_COMMIT_GUARD_S,
         minimum_context_s: float = DEFAULT_COMMIT_MIN_CONTEXT_S,
         onset_match_s: float = DEFAULT_COMMIT_ONSET_MATCH_S,
     ) -> None:
         if not 0 < guard_s < buffer_s:
             raise ValueError("commit guard must be positive and shorter than buffer")
-        if hop_s <= 0 or minimum_context_s <= guard_s:
+        resolved_maximum_hop_s = (
+            min(DEFAULT_COMMIT_MAX_HOP_S, buffer_s - guard_s)
+            if maximum_hop_s is None
+            else maximum_hop_s
+        )
+        if (
+            hop_s <= 0
+            or resolved_maximum_hop_s < hop_s
+            or resolved_maximum_hop_s > buffer_s - guard_s
+            or minimum_context_s <= guard_s
+        ):
             raise ValueError("commit scheduler timing is invalid")
         if onset_match_s <= 0:
             raise ValueError("commit onset match tolerance must be positive")
@@ -226,7 +238,14 @@ class CorrectedCommitLane:
         self.source_sample_rate_hz = session.sample_rate_hz
         self.model = model
         self.buffer_frames = round(buffer_s * session.sample_rate_hz)
-        self.hop_frames = round(hop_s * session.sample_rate_hz)
+        self.base_hop_frames = round(hop_s * session.sample_rate_hz)
+        self.maximum_hop_frames = round(
+            resolved_maximum_hop_s * session.sample_rate_hz
+        )
+        self.hop_frames = self.base_hop_frames
+        self._hop_high_water_frames = self.hop_frames
+        self._degraded_reason: str | None = None
+        self._degraded_transition_count = 0
         self.guard_frames = round(guard_s * session.sample_rate_hz)
         self.minimum_context_frames = round(
             minimum_context_s * session.sample_rate_hz
@@ -246,6 +265,7 @@ class CorrectedCommitLane:
         self._closed_tail_count = 0
         self._max_pending_count = 0
         self._inference_s: list[float] = []
+        self._decode_wall_s: list[float] = []
         self.diagnostics_directory = (
             session.directory / "diagnostics" / "lane-b"
         )
@@ -587,10 +607,32 @@ class CorrectedCommitLane:
         padding_frames = self.guard_frames if final else 0
         if padding_frames:
             pcm += bytes(padding_frames * 2)
+        decode_started_ns = time.perf_counter_ns()
         output = self.model.transcribe(
             pcm,
             source_sample_rate_hz=self.source_sample_rate_hz,
         )
+        decode_wall_s = (
+            time.perf_counter_ns() - decode_started_ns
+        ) / 1_000_000_000
+        if (
+            not final
+            and decode_wall_s * self.source_sample_rate_hz
+            > self.hop_frames
+            and self.hop_frames < self.maximum_hop_frames
+        ):
+            self.hop_frames = min(
+                self.maximum_hop_frames,
+                self.hop_frames + self.base_hop_frames,
+            )
+            self._hop_high_water_frames = max(
+                self._hop_high_water_frames,
+                self.hop_frames,
+            )
+            self._degraded_transition_count += 1
+            self._degraded_reason = (
+                "decode wall time exceeded the source scheduler hop"
+            )
         emitted_ns = time.perf_counter_ns()
         band_start = self._commit_sample
         band_end = (
@@ -622,6 +664,7 @@ class CorrectedCommitLane:
         self._emission_count += len(records)
         self._max_pending_count = max(self._max_pending_count, len(self._pending))
         self._inference_s.append(output.inference_s)
+        self._decode_wall_s.append(decode_wall_s)
         _append_jsonl(
             self.decode_path,
             [
@@ -638,6 +681,9 @@ class CorrectedCommitLane:
                     "emission_count": len(records),
                     "pending_offset_count": len(self._pending),
                     "inference_s": output.inference_s,
+                    "decode_wall_s": decode_wall_s,
+                    "scheduler_hop_frames": self.hop_frames,
+                    "degraded_mode": self.hop_frames > self.base_hop_frames,
                     "final": final,
                     "emitted_monotonic_ns": emitted_ns,
                 }
@@ -688,10 +734,16 @@ class CorrectedCommitLane:
             "scheduler": {
                 "buffer_frames": self.buffer_frames,
                 "hop_frames": self.hop_frames,
+                "base_hop_frames": self.base_hop_frames,
+                "maximum_hop_frames": self.maximum_hop_frames,
+                "hop_high_water_frames": self._hop_high_water_frames,
                 "guard_frames": self.guard_frames,
                 "minimum_context_frames": self.minimum_context_frames,
                 "onset_match_frames": self.onset_match_frames,
                 "decode_count": self._decode_index,
+                "degraded_mode": self.hop_frames > self.base_hop_frames,
+                "degraded_reason": self._degraded_reason,
+                "degraded_transition_count": self._degraded_transition_count,
             },
             "commit_sample": self._commit_sample,
             "events": {
@@ -710,6 +762,20 @@ class CorrectedCommitLane:
                 "total": sum(inference),
                 "mean": sum(inference) / len(inference) if inference else None,
                 "max": max(inference) if inference else None,
+            },
+            "decode_wall_s": {
+                "count": len(self._decode_wall_s),
+                "total": sum(self._decode_wall_s),
+                "mean": (
+                    sum(self._decode_wall_s) / len(self._decode_wall_s)
+                    if self._decode_wall_s
+                    else None
+                ),
+                "max": (
+                    max(self._decode_wall_s)
+                    if self._decode_wall_s
+                    else None
+                ),
             },
             "recorded_at": utc_now(),
         }

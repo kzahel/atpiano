@@ -122,15 +122,20 @@ function updateStatus() {
   el("commit-detail").textContent = commit
     ? `${commit.scheduler?.decode_count || 0} decodes · ${
         commit.events?.emissions || 0
-      } revisions`
+      } revisions${commit.scheduler?.degraded_mode ? " · degraded hop" : ""}`
     : "Transkun";
   el("storage-value").textContent = formatBytes(current.storage?.audio_pcm_bytes);
   el("storage-detail").textContent = current.storage?.warning
     ? `low space · ${formatBytes(current.storage.free_bytes)} free`
     : `${formatBytes(current.storage?.free_bytes)} free`;
+  const buffered = state.capture?.socket?.bufferedAmount || 0;
+  const maxBuffered = state.capture?.maxBufferedBytes || 0;
   el("transport-value").textContent =
     `${current.transport?.received_blocks || 0} blocks · ` +
-    `sequence ${current.transport?.last_event_sequence || state.nextSequence}`;
+    `sequence ${current.transport?.last_event_sequence || state.nextSequence}` +
+    (state.capture
+      ? ` · ${formatBytes(buffered)} queued / ${formatBytes(maxBuffered)} high`
+      : "");
   if (current.error) showError(new Error(current.error));
   if (state.capture) {
     el("action-status").textContent =
@@ -402,6 +407,7 @@ async function startMicrophone() {
       frameCount: 0,
       blockCount: 0,
       acknowledgedBlocks: 0,
+      maxBufferedBytes: 0,
       stoppedFrameCount: null,
       workletStopResolver: null,
       stopResolver: null,
@@ -426,6 +432,10 @@ async function startMicrophone() {
         }
         capture.socket.send(
           packPcmBlock(samples, capture, event.data.firstSample, event.data.workletTime)
+        );
+        capture.maxBufferedBytes = Math.max(
+          capture.maxBufferedBytes,
+          capture.socket.bufferedAmount
         );
         capture.frameCount += samples.length;
         capture.blockCount += 1;

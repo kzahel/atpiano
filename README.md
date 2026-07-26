@@ -150,7 +150,8 @@ uv run atpiano workbench-v2 \
 
 The page starts the WAV without microphone permission and exercises the same
 session, recognition, correction, review, and export paths used by capture.
-Use `--repeat N` to loop it on one continuous source sample clock, or
+Use `--repeat N` to loop it on one continuous source sample clock,
+`--silence-seconds S` to declare and index a gap between repetitions, or
 `--no-wait` for accelerated bring-up. Generated session data defaults to
 `results/workbench-v2/`.
 

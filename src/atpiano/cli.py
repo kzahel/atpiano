@@ -70,6 +70,12 @@ def build_parser() -> argparse.ArgumentParser:
     corrected_replay_parser.add_argument("session_directory", type=Path)
     corrected_replay_parser.add_argument("--repeat", type=int, default=1)
     corrected_replay_parser.add_argument(
+        "--silence-seconds",
+        type=float,
+        default=0.0,
+        help="declared silence inserted between repetitions (default: 0)",
+    )
+    corrected_replay_parser.add_argument(
         "--block-samples",
         type=int,
         default=4096,
@@ -155,6 +161,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=1,
         help="number of continuous-clock replay repetitions (default: 1)",
+    )
+    corrected_workbench_parser.add_argument(
+        "--silence-seconds",
+        type=float,
+        default=0.0,
+        help="declared silence inserted between replay repetitions (default: 0)",
     )
     corrected_workbench_parser.add_argument(
         "--no-wait",
@@ -275,6 +287,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
             replay_manifest=args.replay,
             replay_repeat=args.repeat,
+            replay_silence_s=args.silence_seconds,
             replay_realtime=not args.no_wait,
         )
         return 0
@@ -333,6 +346,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.input_manifest,
             args.session_directory,
             repeat=args.repeat,
+            silence_s=args.silence_seconds,
             realtime=not args.no_wait,
             block_samples=args.block_samples,
             minimum_free_bytes=round(args.minimum_free_gib * 1024**3),

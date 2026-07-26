@@ -216,7 +216,10 @@ class CorrectedPreviewLane:
             )
 
     @staticmethod
-    def _translate_event(event: dict[str, Any]) -> dict[str, Any]:
+    def _translate_event(
+        session: CorrectedSession,
+        event: dict[str, Any],
+    ) -> dict[str, Any]:
         lifecycle = (
             "retracted" if event["lifecycle"] == "retracted" else "provisional"
         )
@@ -236,9 +239,11 @@ class CorrectedPreviewLane:
             "confidence": event["confidence"],
             "emitted_at_monotonic_ns": event["emitted_at_monotonic_ns"],
             "emitted_elapsed_s": event["emitted_elapsed_s"],
-            "source_to_emission_latency_s": event[
-                "source_to_emission_latency_s"
-            ],
+            "source_to_emission_latency_s": (
+                event["source_to_emission_latency_s"]
+                if session.realtime
+                else None
+            ),
             "window_index": event["window_index"],
             "observation_count": event["observation_count"],
             "preview_internal_lifecycle": event["lifecycle"],
@@ -343,7 +348,9 @@ class CorrectedPreviewLane:
                 audio_head_sample=session.horizons.audio_head_sample,
                 total_source_samples=session.horizons.audio_head_sample,
             )
-            events.extend(self._translate_event(record) for record in records)
+            events.extend(
+                self._translate_event(session, record) for record in records
+            )
             self._persist_native(
                 output.raw,
                 source_start=source_start,

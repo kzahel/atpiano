@@ -362,6 +362,25 @@ persistence path. It does not establish acoustic accuracy, and a control
 soft-pedal interval longer than the outer buffer remains an explicit bounded
 context disagreement.
 
+The final page-facing validation reran the control after the product surface
+landed. One 42-second rolling result contained 152 notes versus 148 in the
+finite control and scored 0.953 onset F1 at 25 and 50 ms plus 0.840
+note-with-offset F1. A two-repeat aligned run scored 0.878 and 0.870 against
+the generated reference, a 0.009 F1 distribution difference, while direct
+repeat onset F1 was 0.939.
+
+The earlier and final single runs contain 147 and 152 notes respectively
+against the same 148-note finite control. Fixture bytes are deterministic, but
+the rolling neural result is therefore gated by declared event tolerances and
+distribution stability rather than an output-file hash.
+
+Lane B now records adapter inference and full decode wall time separately. If
+decode wall time exceeds the four-second source hop, it enters an explicit
+degraded mode and increases scheduling no farther than eight seconds. The real
+musical and target-piano validations did not enter degraded mode: their decode
+maxima stayed near 3.3 seconds. A fake slow-adapter test forces the transition
+without making a real-time claim from throughput alone.
+
 ## Accepted Pipeline Boundary
 
 ```text

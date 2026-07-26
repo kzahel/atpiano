@@ -198,6 +198,7 @@ def test_corrected_replay_repeats_one_continuous_sample_clock(tmp_path: Path) ->
         input_directory / "input.json",
         session_directory,
         repeat=3,
+        silence_s=0.001,
         realtime=False,
         block_samples=2,
         pcm_ring_s=0.001,
@@ -206,7 +207,7 @@ def test_corrected_replay_repeats_one_continuous_sample_clock(tmp_path: Path) ->
     )
 
     assert result["status"] == "complete"
-    assert result["source_frame_count"] == 15
+    assert result["source_frame_count"] == 31
     boundaries = [
         json.loads(line)
         for line in (session_directory / "boundaries.jsonl")
@@ -215,7 +216,16 @@ def test_corrected_replay_repeats_one_continuous_sample_clock(tmp_path: Path) ->
     ]
     assert [(row["start_sample"], row["end_sample"]) for row in boundaries] == [
         (0, 5),
-        (5, 10),
-        (10, 15),
+        (5, 13),
+        (13, 18),
+        (18, 26),
+        (26, 31),
     ]
-    assert read_json(session_directory / "horizons.json")["audio_head_sample"] == 15
+    assert [row["kind"] for row in boundaries] == [
+        "input",
+        "inserted-silence",
+        "input",
+        "inserted-silence",
+        "input",
+    ]
+    assert read_json(session_directory / "horizons.json")["audio_head_sample"] == 31

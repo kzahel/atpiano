@@ -69,6 +69,7 @@ def test_preview_lane_persists_events_and_bounds_native_state(tmp_path: Path) ->
         session_id="preview-test",
         sample_rate_hz=8_000,
         source="replay",
+        realtime=False,
         pcm_ring_s=2.0,
         segment_s=2.0,
         minimum_free_bytes=0,
@@ -99,6 +100,7 @@ def test_preview_lane_persists_events_and_bounds_native_state(tmp_path: Path) ->
     assert all(
         event["lifecycle"] in {"provisional", "retracted"} for event in events
     )
+    assert all(event["source_to_emission_latency_s"] is None for event in events)
     assert session.horizons.provisional_sample >= 18 * 8_000
     assert session.ring.frame_count == session.ring.capacity_frames
     assert len(list(lane.raw_directory.glob("*.npz"))) == 3
@@ -130,6 +132,7 @@ def test_preview_lane_bounds_state_over_eight_hour_source_clock(
         session_id="long-preview-test",
         sample_rate_hz=sample_rate_hz,
         source="replay",
+        realtime=False,
         pcm_ring_s=40.0,
         segment_s=4 * 60 * 60,
         minimum_free_bytes=0,
