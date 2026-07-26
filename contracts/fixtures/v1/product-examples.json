@@ -1,0 +1,265 @@
+{
+  "objects": [
+    {
+      "model": "User",
+      "value": {
+        "created_at": "2026-07-26T10:00:00Z",
+        "display_name": "Kyle",
+        "schema_version": "atpiano.product.v1",
+        "user_id": "user-kyle"
+      }
+    },
+    {
+      "model": "Workspace",
+      "value": {
+        "created_at": "2026-07-26T10:00:00Z",
+        "mode": "local",
+        "name": "On this Mac",
+        "owner_user_id": null,
+        "schema_version": "atpiano.product.v1",
+        "workspace_id": "local"
+      }
+    },
+    {
+      "model": "Membership",
+      "value": {
+        "created_at": "2026-07-26T10:00:00Z",
+        "role": "owner",
+        "schema_version": "atpiano.product.v1",
+        "user_id": "user-kyle",
+        "workspace_id": "local"
+      }
+    },
+    {
+      "model": "Session",
+      "value": {
+        "active_capture_id": null,
+        "available_artifact_kinds": [
+          "audio",
+          "event-history",
+          "midi",
+          "musicxml"
+        ],
+        "completed_at": "2026-07-26T10:00:42Z",
+        "current_transcription_run_id": "run-1",
+        "display_name": "26 Jul 2026, replay",
+        "sample_rate_hz": 48000,
+        "schema_version": "atpiano.product.v1",
+        "session_id": "20260726T100000-abcdef123456",
+        "source": "replay",
+        "source_frame_count": 2016000,
+        "started_at": "2026-07-26T10:00:00Z",
+        "status": "complete",
+        "workspace_id": "local"
+      }
+    },
+    {
+      "model": "Capture",
+      "value": {
+        "accepted_through_sample": 96000,
+        "capture_id": "capture-1",
+        "error_id": null,
+        "sample_rate_hz": 48000,
+        "schema_version": "atpiano.product.v1",
+        "session_id": "20260726T100000-abcdef123456",
+        "source": "microphone",
+        "started_at": "2026-07-26T10:00:00Z",
+        "status": "recording",
+        "stopped_at": null,
+        "workspace_id": "local"
+      }
+    },
+    {
+      "model": "TranscriptionRun",
+      "value": {
+        "commit_model": "transkun-2.0.1",
+        "completed_at": null,
+        "created_at": "2026-07-26T10:00:00Z",
+        "preview_model": "basic-pitch-0.4.0",
+        "schema_version": "atpiano.product.v1",
+        "session_id": "20260726T100000-abcdef123456",
+        "status": "running",
+        "transcription_run_id": "run-1",
+        "workspace_id": "local"
+      }
+    },
+    {
+      "model": "EventRevision",
+      "value": {
+        "confidence": 0.91,
+        "event_id": "note-c4",
+        "kind": "note",
+        "lane": "commit",
+        "lifecycle": "committed",
+        "offset_sample": 72000,
+        "offset_state": "closed",
+        "onset_sample": 48000,
+        "pitch": 60,
+        "revision": 2,
+        "schema_version": "atpiano.product.v1",
+        "session_id": "20260726T100000-abcdef123456",
+        "supersedes_revision": 1,
+        "transcription_run_id": "run-1",
+        "velocity": 84,
+        "workspace_id": "local"
+      }
+    },
+    {
+      "model": "Horizon",
+      "value": {
+        "audio_head_sample": 120000,
+        "commit_sample": 96000,
+        "provisional_sample": 115200,
+        "recorded_at": "2026-07-26T10:00:02.500000Z",
+        "sample_rate_hz": 48000,
+        "schema_version": "atpiano.product.v1",
+        "session_id": "20260726T100000-abcdef123456",
+        "transcription_run_id": "run-1",
+        "workspace_id": "local"
+      }
+    },
+    {
+      "model": "Provenance",
+      "value": {
+        "adapter": "transkun-commit-v1",
+        "application_version": "0.1.0",
+        "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "execution_backend": "cpu",
+        "model_id": "transkun-2.0.1",
+        "schema_version": "atpiano.product.v1",
+        "schema_versions": {
+          "events": "atpiano.product.v1",
+          "source": "atpiano.corrected-session.v1"
+        },
+        "settings_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "source_artifact_sha256": [
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ]
+      }
+    },
+    {
+      "model": "Artifact",
+      "value": {
+        "artifact_id": "artifact-midi-1",
+        "byte_count": 4096,
+        "created_at": "2026-07-26T10:00:43Z",
+        "filename": "session.mid",
+        "kind": "midi",
+        "media_type": "audio/midi",
+        "producing_job_id": "job-export-1",
+        "provenance": {
+          "adapter": "corrected-export-v1",
+          "application_version": "0.1.0",
+          "checkpoint_sha256": null,
+          "execution_backend": "cpu",
+          "model_id": null,
+          "schema_version": "atpiano.product.v1",
+          "schema_versions": {
+            "events": "atpiano.product.v1"
+          },
+          "settings_sha256": null,
+          "source_artifact_sha256": [
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          ]
+        },
+        "schema_version": "atpiano.product.v1",
+        "session_id": "20260726T100000-abcdef123456",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "source_horizon_sample": 2016000,
+        "transcription_run_id": "run-1",
+        "workspace_id": "local"
+      }
+    },
+    {
+      "model": "ScoreSnapshot",
+      "value": {
+        "artifact_ids": [
+          "artifact-musicxml-1",
+          "artifact-score-midi-1"
+        ],
+        "commit_sample": 2016000,
+        "created_at": "2026-07-26T10:00:47Z",
+        "note_count": 147,
+        "producing_job_id": "job-score-1",
+        "schema_version": "atpiano.product.v1",
+        "score_snapshot_id": "score-1",
+        "session_id": "20260726T100000-abcdef123456",
+        "transcription_run_id": "run-1",
+        "workspace_id": "local"
+      }
+    },
+    {
+      "model": "Job",
+      "value": {
+        "artifact_ids": [],
+        "completed_at": null,
+        "created_at": "2026-07-26T10:00:43Z",
+        "error": null,
+        "input_horizon_sample": 2016000,
+        "job_id": "job-score-1",
+        "kind": "score",
+        "schema_version": "atpiano.product.v1",
+        "session_id": "20260726T100000-abcdef123456",
+        "started_at": "2026-07-26T10:00:43Z",
+        "status": "running",
+        "workspace_id": "local"
+      }
+    },
+    {
+      "model": "ProductError",
+      "value": {
+        "capture_id": "capture-active",
+        "code": "capture-busy",
+        "details": {
+          "active_session_id": "session-active"
+        },
+        "error_id": "error-1",
+        "job_id": null,
+        "message": "Another local capture is active.",
+        "retryable": true,
+        "schema_version": "atpiano.product.v1",
+        "session_id": "session-active",
+        "workspace_id": "local"
+      }
+    },
+    {
+      "model": "RuntimeCapabilities",
+      "value": {
+        "capture_sources": [
+          "microphone",
+          "replay"
+        ],
+        "max_event_range_samples": 5760000,
+        "max_pcm_block_frames": 1048576,
+        "recoverable_delete": true,
+        "runtime_mode": "local",
+        "schema_version": "atpiano.product.v1",
+        "score_available": false,
+        "supported_pcm_protocol_versions": [
+          "atpiano.pcm.v1"
+        ],
+        "supported_schema_versions": [
+          "atpiano.product.v1"
+        ]
+      }
+    },
+    {
+      "model": "PcmEnvelope",
+      "value": {
+        "capture_id": "capture-1",
+        "channel_count": 1,
+        "first_sample": 4096,
+        "frame_count": 4096,
+        "payload_byte_count": 8192,
+        "protocol_version": "atpiano.pcm.v1",
+        "sample_format": "pcm-s16le",
+        "sample_rate_hz": 48000,
+        "sequence": 1,
+        "session_id": "20260726T100000-abcdef123456",
+        "stream_id": "stream-1",
+        "workspace_id": "local"
+      }
+    }
+  ],
+  "schema_version": "atpiano.product-examples.v1"
+}

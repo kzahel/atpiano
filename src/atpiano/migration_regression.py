@@ -53,6 +53,21 @@ def default_lanes(root: Path | None = None) -> tuple[RegressionLane, ...]:
             ),
         ),
         RegressionLane(
+            "product-contracts",
+            (
+                (
+                    sys.executable,
+                    "-m",
+                    "atpiano.cli",
+                    "generate-contracts",
+                    "--check",
+                ),
+                ("npm", "run", "typecheck", "--prefix", "product"),
+                ("npm", "test", "--prefix", "product"),
+                ("npm", "audit", "--audit-level", "high", "--prefix", "product"),
+            ),
+        ),
+        RegressionLane(
             "python-lint",
             ((sys.executable, "-m", "ruff", "check", "."),),
         ),
