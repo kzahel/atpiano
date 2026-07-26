@@ -59,12 +59,16 @@ function errorMessage(error: unknown): string {
   if (
     typeof error === "object" &&
     error !== null &&
-    "error" in error &&
-    typeof error.error === "object" &&
-    error.error !== null &&
-    "message" in error.error
+    "error" in error
   ) {
-    return String(error.error.message);
+    if (typeof error.error === "string") return error.error;
+    if (
+      typeof error.error === "object" &&
+      error.error !== null &&
+      "message" in error.error
+    ) {
+      return String(error.error.message);
+    }
   }
   if (
     typeof error === "object" &&

@@ -168,18 +168,51 @@ export function App() {
       }),
     enabled: workspace !== undefined && selectedSessionId !== null,
   });
+  const scoreJobQuery = useQuery({
+    queryKey: ["job", scoreJob?.job_id],
+    queryFn: ({ signal }) =>
+      runtime.getJob(scoreJob!.job_id, {
+        requestId: requestId("score-job"),
+        signal,
+      }),
+    enabled:
+      scoreJob !== null &&
+      scoreJob.job_id !== "pending" &&
+      (scoreJob.status === "pending" || scoreJob.status === "running"),
+    refetchInterval: 750,
+  });
+
+  useEffect(() => {
+    const result = scoreJobQuery.data;
+    if (!result || result.session_id !== selectedSessionId) return;
+    setScoreJob(result);
+    if (result.status === "complete") {
+      void queryClient.invalidateQueries({ queryKey: ["artifacts"] });
+    }
+    if (result.status === "failed") {
+      setNotice(result.error?.message ?? "Score generation failed.");
+    }
+  }, [
+    queryClient,
+    scoreJobQuery.data,
+    scoreJobQuery.dataUpdatedAt,
+    selectedSessionId,
+  ]);
 
   useEffect(() => {
     setEventPage(null);
     if (!workspace || !selectedSession.data) return;
     const target = selectedSession.data;
+    const endSample = Math.max(1, target.source_frame_count);
+    const maxRange =
+      capabilities.data?.max_event_range_samples ?? 5_760_000;
     const subscription = runtime.subscribeEvents(
       workspace.workspace_id,
       target.session_id,
       {
         requestId: requestId("events"),
-        startSample: 0,
-        endSample: Math.max(1, target.source_frame_count),
+        startSample: Math.max(0, endSample - maxRange),
+        endSample,
         limit: 4_096,
       },
       {
@@ -194,6 +227,7 @@ export function App() {
     return () => subscription.close();
   }, [
     runtime,
+    capabilities.data?.max_event_range_samples,
     selectedSession.data,
     selectedSession.data?.source_frame_count,
     workspace,

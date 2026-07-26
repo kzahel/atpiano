@@ -257,7 +257,7 @@ export class FixtureRuntime implements AtpianoRuntime {
       ...this.#data.sessions[0]!.session,
       source: "replay",
       status: "active",
-      source_frame_count: 0,
+      source_frame_count: this.#data.sessions[0]!.session.source_frame_count,
       completed_at: null,
       active_capture_id: this.#capture.capture_id,
     };
