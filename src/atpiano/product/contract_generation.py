@@ -175,28 +175,6 @@ def build_openapi_document() -> dict[str, Any]:
                 "responses": _response("ArtifactAccess"),
             }
         },
-        "/api/product/v1/captures": {
-            "post": {
-                "operationId": "startCapture",
-                "requestBody": _request("CaptureStart"),
-                "responses": _response("Capture", status="202"),
-            }
-        },
-        "/api/product/v1/captures/{capture_id}/stop": {
-            "post": {
-                "operationId": "stopCapture",
-                "parameters": [_path_parameter("capture_id")],
-                "requestBody": _request("CaptureStop"),
-                "responses": _response("Session", status="202"),
-            }
-        },
-        "/api/product/v1/replays": {
-            "post": {
-                "operationId": "startReplay",
-                "requestBody": _request("ReplayStart"),
-                "responses": _response("Capture", status="202"),
-            }
-        },
         "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/score-jobs": {
             "post": {
                 "operationId": "startScoreJob",

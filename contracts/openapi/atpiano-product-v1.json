@@ -2098,90 +2098,6 @@
         }
       }
     },
-    "/api/product/v1/captures": {
-      "post": {
-        "operationId": "startCapture",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CaptureStart"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Capture"
-                }
-              }
-            },
-            "description": "Capture"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Structured product error"
-          }
-        }
-      }
-    },
-    "/api/product/v1/captures/{capture_id}/stop": {
-      "post": {
-        "operationId": "stopCapture",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "capture_id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CaptureStop"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Session"
-                }
-              }
-            },
-            "description": "Session"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Structured product error"
-          }
-        }
-      }
-    },
     "/api/product/v1/jobs/{job_id}": {
       "get": {
         "operationId": "getJob",
@@ -2205,43 +2121,6 @@
               }
             },
             "description": "Job"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Structured product error"
-          }
-        }
-      }
-    },
-    "/api/product/v1/replays": {
-      "post": {
-        "operationId": "startReplay",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReplayStart"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Capture"
-                }
-              }
-            },
-            "description": "Capture"
           },
           "default": {
             "content": {
