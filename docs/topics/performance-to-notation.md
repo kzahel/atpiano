@@ -250,6 +250,13 @@ The first real-browser matrix passes; physical piano viewing, notched-device
 safe areas, and a representative Bluetooth keyboard pedal remain subjective
 profile-tuning checks.
 
+[`024-score-reader-engraving-density.md`](../tactical/024-score-reader-engraving-density.md)
+owns the first profile-tuning follow-up. Retained desktop review found that
+OSMD's compact default leaves adjacent grand-staff systems too close and that
+fixed-width SVG fitting cancels a pixel-only `Zoom` distinction. Density must
+change engraving geometry and pagination while keeping the exact pinned XML
+and semantic reader position.
+
 ### Two-phase paid oracle
 
 The first black-box comparison uses [Ivory](https://ivory-app.com/). The
