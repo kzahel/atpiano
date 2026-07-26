@@ -147,6 +147,16 @@ uv run atpiano musical-fixture \
   ../atpiano-artifacts/musical-loop-input
 ```
 
+Exercise the bounded v2 source and segmented-storage foundation without model
+inference or microphone input:
+
+```text
+uv run atpiano replay-v2 \
+  ../atpiano-artifacts/musical-loop-input/input.json \
+  ../atpiano-artifacts/workbench-v2-source-check \
+  --repeat 2 --no-wait
+```
+
 Run the untouched Basic Pitch file path:
 
 ```text

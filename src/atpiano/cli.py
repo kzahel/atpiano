@@ -62,6 +62,30 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="exercise replay without wall-clock waits; latency is not reported",
     )
+    corrected_replay_parser = subparsers.add_parser(
+        "replay-v2",
+        help="feed a WAV manifest through the bounded corrected-session engine",
+    )
+    corrected_replay_parser.add_argument("input_manifest", type=Path)
+    corrected_replay_parser.add_argument("session_directory", type=Path)
+    corrected_replay_parser.add_argument("--repeat", type=int, default=1)
+    corrected_replay_parser.add_argument(
+        "--block-samples",
+        type=int,
+        default=4096,
+        help="source delivery block size (default: 4096)",
+    )
+    corrected_replay_parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="exercise replay without wall-clock waits",
+    )
+    corrected_replay_parser.add_argument(
+        "--minimum-free-gib",
+        type=float,
+        default=2.0,
+        help="stop before free space falls below this reserve (default: 2)",
+    )
     review_parser = subparsers.add_parser(
         "review",
         help="serve a local browser reviewer for a completed run",
@@ -219,6 +243,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             "onset F1 @ 50 ms: "
             f"{format_score(read_score(args.run_directory, 'onset', '50_ms', 'f1'))}"
         )
+        return 0
+    if args.command == "replay-v2":
+        from atpiano.corrected import run_corrected_replay
+
+        manifest = run_corrected_replay(
+            args.input_manifest,
+            args.session_directory,
+            repeat=args.repeat,
+            realtime=not args.no_wait,
+            block_samples=args.block_samples,
+            minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
+        )
+        print(args.session_directory / "session.json")
+        print(f"source frames: {manifest['source_frame_count']}")
         return 0
     if args.command == "decoder-study":
         from atpiano.decoder_study import run_decoder_study

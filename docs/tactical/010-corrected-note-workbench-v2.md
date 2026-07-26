@@ -334,3 +334,29 @@ The generated files are under the ignored
 byte-deterministic regeneration plus the declared form, block-chord density,
 Alberti order, repeated attacks, register coverage, tempo, meter, sustain,
 soft pedal, and WAV format assertions.
+
+### Session and replay foundation
+
+Implemented the model-independent `CorrectedSession` spine on 2026-07-26:
+
+- `atpiano.corrected-session.v1` and monotonic horizon documents;
+- a 40-second absolute-sample PCM ring;
+- independently readable 60-second PCM16 WAV segments with hashes;
+- segmented append-only corrected-event JSONL;
+- a rebuildable SQLite range and event-sequence index;
+- explicit disk-reserve failure rather than silent audio loss;
+- source-boundary evidence; and
+- `atpiano replay-v2` with wall-clock or accelerated continuous-clock
+  repetition.
+
+An accelerated two-repeat run of the musical fixture produced one contiguous
+4,032,000-frame, 84-second source timeline. Its two boundaries were exactly
+`[0, 2016000)` and `[2016000, 4032000)`. The audio log closed as a 60-second
+segment plus a 24-second tail segment whose frame counts sum to the source
+total. Focused tests cover ring eviction and range reads, event revision
+materialization, retraction, audio segmentation, horizon monotonicity, replay
+continuity, and bounded retention.
+
+No acoustic model is connected in this foundation commit. `replay-v2` at this
+point validates source and persistence behavior only; the next execution step
+adds bounded Lane A.

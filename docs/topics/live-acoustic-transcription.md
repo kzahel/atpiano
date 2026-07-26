@@ -51,6 +51,15 @@ resources before a pianist is asked to perform into a microphone. Because the
 golden-reference recording has no aligned MIDI, it is an operational and
 offline-parity oracle, not absolute note truth.
 
+Implementation began under tactical 010. The aligned musical fixture and the
+model-independent v2 session foundation now exist. `atpiano replay-v2` feeds a
+WAV through one continuous source clock into a fixed 40-second PCM ring,
+60-second WAV and event segments, monotonic horizon evidence, and an indexed
+range-query store. A two-repeat 84-second source check preserved all 4,032,000
+frames across the expected two repetition boundaries. Lane A, Lane B, and the
+separate browser app remain in progress, so this command is not yet a
+corrected transcription path.
+
 ## Desired Experience
 
 The near-term target is not instrument-control latency or readable full
