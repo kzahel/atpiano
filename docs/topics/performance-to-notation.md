@@ -7,11 +7,12 @@ readability test while an Ivory preview succeeded. A local Transkun +
 MIDI2ScoreTransformer cascade produced the first sight-readable local score
 for the same reference take, cutting ties from 20 to 1 and voices from 10 to
 5. V2 now renders explicit on-demand snapshots of its closed committed prefix
-through that cascade. This is not yet progressive engraving or a permanent
-consumer-stack selection, and the leading score converter has no published
-license. The active source-to-score alignment slice currently blocks a real
-Linux snapshot before inference when near-simultaneous source attacks collapse
-to one MIDI tick and reorder by pitch; no invalid alignment is published. See
+through that cascade. Tactical 018 now preserves a checksummed
+source-event-to-MusicXML alignment beside each new snapshot and uses it to
+drive discrete OSMD playback attacks from the authoritative source-sample
+clock. Historical snapshots without alignment still render without a cursor.
+This is not yet progressive engraving or a permanent consumer-stack
+selection, and the leading score converter has no published license. See
 [`008-score-pipeline-bakeoff.md`](../tactical/008-score-pipeline-bakeoff.md)
 and
 [`012-committed-score-snapshots.md`](../tactical/012-committed-score-snapshots.md),

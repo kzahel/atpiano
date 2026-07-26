@@ -2,10 +2,7 @@
 
 Topic: performance-to-notation
 
-Status: **active. A real x86_64 Linux checkpoint run on 2026-07-26 exposed a
-pre-inference ordering mismatch when distinct source attacks quantize to the
-same MIDI tick. The alignment guard correctly blocked publication; the input
-ordering contract must be corrected before further real snapshot evidence.**
+Status: **complete.**
 
 ## Motivation
 
@@ -111,7 +108,7 @@ continuous tempo reconstruction between attacks.
 - Focused tests, TypeScript checks, application build, Python checks, and the
   migration regression pass.
 
-## Current Real-Runtime Evidence
+## Linux Tick-Collision Evidence
 
 The pinned Python 3.11 runtime, upstream commit, and 389,829,880-byte
 checkpoint installed successfully on x86_64 Linux. A complete 42-second
@@ -133,11 +130,9 @@ the first retained collision, but there is no evidence that operating-system
 iteration order or model nondeterminism caused it; the same input conversion
 has the same ordering conflict on macOS.
 
-Do not remove or relax `_verify_midi_order`. Correct the source-note ordering
-to account for the exact MIDI tick conversion while retaining the original
-sample coordinates and event IDs. Add focused coverage for attacks that
-collide only after tick rounding, then repeat the real checkpoint run before
-continuing to browser cursor evidence.
+The `_verify_midi_order` guard was retained. This result became the input to
+the post-completion correction and repeated real checkpoint evidence recorded
+below.
 
 ## Deliberate Exclusions
 
@@ -147,6 +142,71 @@ continuing to browser cursor evidence.
   first slice.
 - No public distribution or hosted operation of MIDI2ScoreTransformer.
 - No Phase 4 application-core extraction.
+
+## Execution Record
+
+Commits `6f94387` and `808d05c` landed the bounded implementation. Each
+successful score snapshot now freezes the ordered source-note document,
+propagates stable source tokens through transformer detokenization and
+music21 post-processing, assigns unique MusicXML note IDs, and publishes a
+checksummed `atpiano.score-alignment.v1` artifact. Rows retain exact source
+event IDs and samples, rational quarter-note positions, every rendered tie
+segment, and explicit unmatched or inserted accounting.
+
+The browser accepts alignment only when its session and full MusicXML hash
+match the selected score artifact. Recorded-audio playback samples the media
+clock on animation frames, updates the existing shared inspection sample, and
+drives the keyboard, the source-linear piano-roll line, and OSMD's built-in
+cursor. Score movement is deliberately discrete at mapped attacks. Opening
+silence, a position beyond the score horizon, missing alignment, and invalid
+alignment hide only the score cursor; engraving remains available.
+
+### Transformer evidence
+
+The pinned checkpoint was run against retained session
+`20260726T113845-517f8d425847` at commit sample `1,804,288`
+(`37.589333` seconds at 48 kHz). It selected 57 source notes and produced 66
+pitched MusicXML elements because ties split some notes. All 57 source rows
+mapped, all 66 rendered segments were identified, and the artifact reported
+zero unmatched source notes and zero inserted score segments. Adapter
+inference took `2.255318` seconds in the final isolated validation run.
+
+The known pathological one-note probe produced 510 rendered notes. Alignment
+did not disguise that expansion: it recorded one mapped source note and 509
+inserted score segments, after which the existing plausibility gate rejected
+the snapshot. This preserves useful diagnostic evidence without publishing a
+misleading score.
+
+### Browser evidence
+
+The final build was served from the isolated workspace
+`results/score-playback-alignment-validation` and exercised in headless
+Chromium at 1440 and 1024 CSS pixels:
+
+- leading silence at sample `96,000` showed the roll line and hid the score
+  cursor;
+- actual MP3 playback advanced the shared position from sample `156,000` to
+  `209,760`, moved the roll line from about 8.6% to 11.6%, and changed the
+  score cursor from hidden to visible as playback crossed the first mapped
+  attack;
+- forward seeks to samples `240,000`, `600,000`, `1,200,000`, and
+  `1,680,000` advanced the cursor across the first and second score systems;
+- a backward seek to `240,000` restored the earlier cursor position;
+- resizing to 1024 CSS pixels retained the visible cursor with no horizontal
+  page overflow; and
+- the original pre-alignment snapshot rendered one score SVG with no cursor,
+  warning, or browser console error.
+
+### Automated evidence
+
+`uv run atpiano migration-regression` passed at revision `808d05c`; its report
+is
+`results/migration-regression/20260726T132944Z/report.json`. The gate recorded
+85 passing Python tests, 27 passing Vitest tests, five passing TypeScript node
+tests, six legacy live-view tests, contract-generation parity, Ruff, npm audit
+with zero vulnerabilities, and all legacy JavaScript syntax checks. The
+production Vite build also passed; its only warning was the existing OSMD
+chunk-size advisory.
 
 ## Rollback
 
