@@ -228,7 +228,10 @@ versioned profile, the runtime starts Transkun only after Stop. The new
 profiling command records fixture, host, model/checkpoint, scheduler, thread
 limit, and raw decode timing samples. A real Apple Silicon run exercised the
 command and selected delayed correction, but a profile is host-specific and
-does not alter the Linux direction.
+does not alter the Linux direction. Runtime evidence can only demote within a
+session: live becomes delayed after missing the base hop, live or delayed
+becomes after-Stop after missing the maximum hop, and worker failure becomes
+unavailable while capture and preview continue.
 
 These changes remove the known synchronous call path by inspection and pass
 blocked-lane, durable-catch-up, worker-exit, prompt-Stop, transport-evidence,

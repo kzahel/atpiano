@@ -10,7 +10,7 @@ Topic: linux-development-portability
 
 Status: **profile artifact, automatic selection, explicit modes, and local
 real-model validation implemented on 2026-07-26. Linux measurement, browser
-acceptance, and runtime-pressure demotion remain open.**
+acceptance, and selected-mode confirmation remain open.**
 
 ## Outcome
 
@@ -140,9 +140,15 @@ sustainable, but the 0.961 maximum-to-base-hop ratio lacked live headroom, so
 the matching profile selected **delayed**. This establishes the command and
 selector on this host; it is not a Linux capability claim.
 
+`f0a8d5e` added one-way runtime demotion. A live session whose commit decode
+exceeds its base hop becomes delayed. A live or delayed session whose decode
+exceeds the configured maximum hop defers subsequent commit work until Stop.
+Commit worker failure becomes unavailable while PCM capture and preview
+continue. No automatic promotion occurs within the session, each reason is
+retained, and a dead warmed worker is replaced before the next session.
+
 The remaining Linux packet must generate its own profile under controlled
 load, retain thread and worker evidence, and run the real Chrome capture in
-the selected conservative mode. Runtime pressure currently changes the
-commit lane's bounded scheduler hop but does not demote an already selected
-session mode; that acceptance item remains open and should not be hidden by
-calling scheduler degradation a product-mode transition.
+the selected conservative mode. It must also demonstrate the one-way
+demotion under real contention and confirm that the UI and retained session
+show the resulting mode without interrupting PCM acceptance.

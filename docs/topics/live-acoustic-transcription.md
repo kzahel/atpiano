@@ -232,9 +232,12 @@ rather than an orphan that blocks future capture.
 Sessions record live, delayed, after-Stop, or unavailable correction behavior.
 Automatic selection requires an exact matching versioned backend profile and
 otherwise uses after-Stop. A real two-thread Apple Silicon profile selected
-delayed; no inference about Linux follows from that result. The next action is
-the fixed Linux Chrome and capability-profile packet, not broader feature or
-application-core refactoring.
+delayed; no inference about Linux follows from that result. Runtime evidence
+only demotes: missing the base or maximum scheduler budget moves correction
+toward delayed or after-Stop, while worker failure moves it to unavailable
+without stopping PCM or preview. The next action is the fixed Linux Chrome
+and capability-profile packet, not broader feature or application-core
+refactoring.
 
 ## Desired Experience
 

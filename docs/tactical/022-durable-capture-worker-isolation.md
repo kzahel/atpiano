@@ -225,6 +225,8 @@ The host-independent implementation landed as a bounded series:
    failures rather than permanent workspace blockers.
 6. `bbdd548` added durable catch-up, killed-worker, and malformed-result
    acceptance tests.
+7. `f0a8d5e` made worker failure an explicit unavailable correction stage and
+   replaced an exited warmed model before a later session.
 
 The React microphone path now sends every binary block through
 `CorrectedSessionPipeline.accept_block`. That call only validates and appends
