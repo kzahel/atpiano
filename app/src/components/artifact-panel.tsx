@@ -1,0 +1,45 @@
+import type { Artifact } from "../runtime/atpiano-runtime.js";
+
+function artifactLabel(artifact: Artifact): string {
+  if (artifact.kind === "midi") return "Performance MIDI";
+  if (artifact.kind === "musicxml") return "MusicXML score";
+  if (artifact.kind === "event-history") return "Event history";
+  return artifact.filename;
+}
+
+export function ArtifactPanel({
+  artifacts,
+  onDownload,
+}: {
+  readonly artifacts: readonly Artifact[];
+  readonly onDownload: (artifact: Artifact) => void;
+}) {
+  return (
+    <section className="artifact-panel" aria-labelledby="artifacts-title">
+      <div>
+        <p className="eyebrow">Session evidence</p>
+        <h3 id="artifacts-title">Exports</h3>
+      </div>
+      {artifacts.length ? (
+        <div className="artifact-list">
+          {artifacts.map((artifact) => (
+            <button
+              type="button"
+              key={artifact.artifact_id}
+              onClick={() => onDownload(artifact)}
+            >
+              <span aria-hidden="true">↓</span>
+              <strong>{artifactLabel(artifact)}</strong>
+              <small>{artifact.sha256.slice(0, 8)} · {artifact.filename}</small>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="empty-copy">
+          Exports appear after the session finishes and its corrected tail
+          settles.
+        </p>
+      )}
+    </section>
+  );
+}

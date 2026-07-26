@@ -12,6 +12,7 @@ import type {
   EventRangeRequest,
   EventSubscriber,
   EventSubscription,
+  Horizon,
   Job,
   PageRequest,
   PcmBlock,
@@ -29,13 +30,18 @@ export interface FixtureRuntimeData {
   readonly fixtureId: string;
   readonly capabilities: RuntimeCapabilities;
   readonly workspace: Workspace;
-  readonly session: Session;
   readonly capture: Capture;
+  readonly sessions: readonly FixtureSessionData[];
+  readonly scoreJob: Job;
+  readonly trashedAt: string;
+}
+
+export interface FixtureSessionData {
+  readonly session: Session;
+  readonly horizon: Horizon;
   readonly events: EventPage;
   readonly artifacts: ArtifactPage;
   readonly artifactAccess: Readonly<Record<string, ArtifactAccess>>;
-  readonly scoreJob: Job;
-  readonly trashedAt: string;
 }
 
 function assertRequest(request: RuntimeRequest): void {
@@ -69,15 +75,21 @@ function pageWindow<T>(
  */
 export class FixtureRuntime implements AtpianoRuntime {
   readonly #data: FixtureRuntimeData;
+  readonly #sessions: Map<string, FixtureSessionData>;
   #capture: Capture;
   #session: Session;
-  #deleted = false;
   #nextSample = 0;
 
   constructor(data: FixtureRuntimeData) {
+    if (data.sessions.length === 0) {
+      throw new Error("fixture runtime requires at least one session");
+    }
     this.#data = data;
+    this.#sessions = new Map(
+      data.sessions.map((record) => [record.session.session_id, record]),
+    );
     this.#capture = data.capture;
-    this.#session = data.session;
+    this.#session = data.sessions[0]!.session;
   }
 
   async getCapabilities(request: RuntimeRequest): Promise<RuntimeCapabilities> {
@@ -100,7 +112,14 @@ export class FixtureRuntime implements AtpianoRuntime {
   ): Promise<SessionPage> {
     assertRequest(request);
     this.#assertWorkspace(workspaceId);
-    const items = this.#deleted ? [] : pageWindow([this.#session], request);
+    const items = pageWindow(
+      [...this.#sessions.values()].map((record) =>
+        record.session.session_id === this.#session.session_id
+          ? this.#session
+          : record.session
+      ),
+      request,
+    );
     return {
       schema_version: "atpiano.contract.v1",
       workspace_id: workspaceId,
@@ -116,7 +135,34 @@ export class FixtureRuntime implements AtpianoRuntime {
   ): Promise<Session> {
     assertRequest(request);
     this.#assertTarget(workspaceId, sessionId);
-    return this.#session;
+    return sessionId === this.#session.session_id
+      ? this.#session
+      : this.#record(sessionId).session;
+  }
+
+  async getHorizon(
+    workspaceId: string,
+    sessionId: string,
+    request: RuntimeRequest,
+  ): Promise<Horizon> {
+    assertRequest(request);
+    this.#assertTarget(workspaceId, sessionId);
+    const horizon = this.#record(sessionId).horizon;
+    if (sessionId !== this.#session.session_id) {
+      return horizon;
+    }
+    return {
+      ...horizon,
+      audio_head_sample: this.#session.source_frame_count,
+      provisional_sample: Math.min(
+        horizon.provisional_sample,
+        this.#session.source_frame_count,
+      ),
+      commit_sample: Math.min(
+        horizon.commit_sample,
+        this.#session.source_frame_count,
+      ),
+    };
   }
 
   async startCapture(
@@ -125,7 +171,6 @@ export class FixtureRuntime implements AtpianoRuntime {
   ): Promise<Capture> {
     assertRequest(request);
     this.#assertWorkspace(input.workspace_id);
-    this.#deleted = false;
     this.#nextSample = 0;
     this.#capture = {
       ...this.#data.capture,
@@ -135,7 +180,7 @@ export class FixtureRuntime implements AtpianoRuntime {
       stopped_at: null,
     };
     this.#session = {
-      ...this.#data.session,
+      ...this.#data.sessions[0]!.session,
       source: "microphone",
       status: "active",
       source_frame_count: 0,
@@ -200,7 +245,6 @@ export class FixtureRuntime implements AtpianoRuntime {
     if (input.fixture_id !== this.#data.fixtureId) {
       throw new Error("fixture does not exist");
     }
-    this.#deleted = false;
     this.#nextSample = 0;
     this.#capture = {
       ...this.#data.capture,
@@ -210,7 +254,7 @@ export class FixtureRuntime implements AtpianoRuntime {
       stopped_at: null,
     };
     this.#session = {
-      ...this.#data.session,
+      ...this.#data.sessions[0]!.session,
       source: "replay",
       status: "active",
       source_frame_count: 0,
@@ -228,11 +272,12 @@ export class FixtureRuntime implements AtpianoRuntime {
   ): EventSubscription {
     assertRequest(range);
     this.#assertTarget(workspaceId, sessionId);
+    const events = this.#record(sessionId).events;
     let closed = false;
     queueMicrotask(() => {
       if (!closed) {
         subscriber.next({
-          ...this.#data.events,
+          ...events,
           start_sample: range.startSample,
           end_sample: range.endSample,
         });
@@ -252,9 +297,10 @@ export class FixtureRuntime implements AtpianoRuntime {
   ): Promise<ArtifactPage> {
     assertRequest(request);
     this.#assertTarget(workspaceId, sessionId);
+    const artifacts = this.#record(sessionId).artifacts;
     return {
-      ...this.#data.artifacts,
-      items: pageWindow(this.#data.artifacts.items, request),
+      ...artifacts,
+      items: pageWindow(artifacts.items, request),
       next_cursor: null,
     };
   }
@@ -267,7 +313,7 @@ export class FixtureRuntime implements AtpianoRuntime {
   ): Promise<ArtifactAccess> {
     assertRequest(request);
     this.#assertTarget(workspaceId, sessionId);
-    const access = this.#data.artifactAccess[artifactId];
+    const access = this.#record(sessionId).artifactAccess[artifactId];
     if (access === undefined) {
       throw new Error("artifact does not exist");
     }
@@ -307,7 +353,7 @@ export class FixtureRuntime implements AtpianoRuntime {
     if (this.#session.status === "active") {
       throw new Error("active session cannot be deleted");
     }
-    this.#deleted = true;
+    this.#sessions.delete(input.session_id);
     return {
       schema_version: "atpiano.contract.v1",
       workspace_id: input.workspace_id,
@@ -325,9 +371,17 @@ export class FixtureRuntime implements AtpianoRuntime {
 
   #assertTarget(workspaceId: string, sessionId: string): void {
     this.#assertWorkspace(workspaceId);
-    if (this.#deleted || sessionId !== this.#session.session_id) {
+    if (!this.#sessions.has(sessionId)) {
       throw new Error("session does not exist");
     }
+  }
+
+  #record(sessionId: string): FixtureSessionData {
+    const record = this.#sessions.get(sessionId);
+    if (record === undefined) {
+      throw new Error("session does not exist");
+    }
+    return record;
   }
 }
 

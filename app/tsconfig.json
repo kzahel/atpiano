@@ -2,6 +2,7 @@
   "compilerOptions": {
     "esModuleInterop": true,
     "exactOptionalPropertyTypes": true,
+    "jsx": "react-jsx",
     "lib": ["ES2023", "DOM"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
@@ -9,7 +10,7 @@
     "noUncheckedIndexedAccess": true,
     "strict": true,
     "target": "ES2023",
-    "types": ["node"]
+    "types": ["node", "vite/client", "vitest/globals"]
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"]
 }

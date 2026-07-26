@@ -7,6 +7,7 @@ import type {
   Artifact,
   Capture,
   EventRevision,
+  Horizon,
   Job,
   RuntimeCapabilities,
   Session,
@@ -43,42 +44,46 @@ function runtimeData(): FixtureRuntimeData {
   const session = fixture<Session>("Session");
   const capture = fixture<Capture>("Capture");
   const event = fixture<EventRevision>("EventRevision");
+  const horizon = fixture<Horizon>("Horizon");
   const artifact = fixture<Artifact>("Artifact");
   const scoreJob = fixture<Job>("Job");
   return {
     fixtureId: "deterministic-musical-loop-v1",
     capabilities: fixture<RuntimeCapabilities>("RuntimeCapabilities"),
     workspace,
-    session,
     capture,
-    events: {
-      schema_version: "atpiano.contract.v1",
-      workspace_id: workspace.workspace_id,
-      session_id: session.session_id,
-      start_sample: 0,
-      end_sample: session.source_frame_count,
-      items: [event],
-      next_cursor: null,
-    },
-    artifacts: {
-      schema_version: "atpiano.contract.v1",
-      workspace_id: workspace.workspace_id,
-      session_id: session.session_id,
-      items: [artifact],
-      next_cursor: null,
-    },
-    artifactAccess: {
-      [artifact.artifact_id]: {
+    sessions: [{
+      session,
+      horizon,
+      events: {
         schema_version: "atpiano.contract.v1",
         workspace_id: workspace.workspace_id,
         session_id: session.session_id,
-        artifact_id: artifact.artifact_id,
-        media_type: artifact.media_type,
-        download_name: artifact.filename,
-        url: `/fixture/${artifact.artifact_id}`,
-        expires_at: null,
+        start_sample: 0,
+        end_sample: session.source_frame_count,
+        items: [event],
+        next_cursor: null,
       },
-    },
+      artifacts: {
+        schema_version: "atpiano.contract.v1",
+        workspace_id: workspace.workspace_id,
+        session_id: session.session_id,
+        items: [artifact],
+        next_cursor: null,
+      },
+      artifactAccess: {
+        [artifact.artifact_id]: {
+          schema_version: "atpiano.contract.v1",
+          workspace_id: workspace.workspace_id,
+          session_id: session.session_id,
+          artifact_id: artifact.artifact_id,
+          media_type: artifact.media_type,
+          download_name: artifact.filename,
+          url: `/fixture/${artifact.artifact_id}`,
+          expires_at: null,
+        },
+      },
+    }],
     scoreJob,
     trashedAt: "2026-07-26T11:00:00Z",
   };
@@ -95,7 +100,10 @@ test("fixture runtime exercises replay, PCM, Stop, and explicit reads", async ()
     request,
   );
   assert.equal(workspaces.items[0]?.workspace_id, "local");
-  assert.equal(sessions.items[0]?.session_id, data.session.session_id);
+  assert.equal(
+    sessions.items[0]?.session_id,
+    data.sessions[0]!.session.session_id,
+  );
 
   const capture = await runtime.startReplay(
     {
@@ -114,7 +122,7 @@ test("fixture runtime exercises replay, PCM, Stop, and explicit reads", async ()
     envelope: {
       protocol_version: "atpiano.pcm.v1",
       workspace_id: data.workspace.workspace_id,
-      session_id: data.session.session_id,
+      session_id: data.sessions[0]!.session.session_id,
       capture_id: capture.capture_id,
       stream_id: "stream-1",
       sequence: 0,
@@ -131,7 +139,7 @@ test("fixture runtime exercises replay, PCM, Stop, and explicit reads", async ()
     {
       schema_version: "atpiano.contract.v1",
       workspace_id: data.workspace.workspace_id,
-      session_id: data.session.session_id,
+      session_id: data.sessions[0]!.session.session_id,
       capture_id: capture.capture_id,
       accepted_frame_count: 4,
       request_id: "request-stop",
@@ -144,10 +152,10 @@ test("fixture runtime exercises replay, PCM, Stop, and explicit reads", async ()
   assert.equal(
     (await runtime.listArtifacts(
       data.workspace.workspace_id,
-      data.session.session_id,
+      data.sessions[0]!.session.session_id,
       request,
     )).items[0]?.artifact_id,
-    data.artifacts.items[0]?.artifact_id,
+    data.sessions[0]!.artifacts.items[0]?.artifact_id,
   );
 });
 
@@ -157,7 +165,7 @@ test("fixture subscription disposal suppresses late delivery", async () => {
   let deliveries = 0;
   const subscription = runtime.subscribeEvents(
     data.workspace.workspace_id,
-    data.session.session_id,
+    data.sessions[0]!.session.session_id,
     {
       requestId: "request-events",
       startSample: 0,
@@ -185,14 +193,14 @@ test("fixture runtime rejects stale targets and cancelled requests", async () =>
   controller.abort(new Error("cancelled"));
 
   await assert.rejects(
-    runtime.getSession("local", data.session.session_id, {
+    runtime.getSession("local", data.sessions[0]!.session.session_id, {
       requestId: "cancelled",
       signal: controller.signal,
     }),
     /cancelled/,
   );
   await assert.rejects(
-    runtime.getSession("other", data.session.session_id, {
+    runtime.getSession("other", data.sessions[0]!.session.session_id, {
       requestId: "wrong-workspace",
     }),
     /workspace does not exist/,

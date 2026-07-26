@@ -13,6 +13,7 @@ export type CaptureStop = Schemas["CaptureStop"];
 export type ReplayStart = Schemas["ReplayStart"];
 export type EventRevision = Schemas["EventRevision"];
 export type EventPage = Schemas["EventPage"];
+export type Horizon = Schemas["Horizon"];
 export type PcmEnvelope = Schemas["PcmEnvelope"];
 export type Artifact = Schemas["Artifact"];
 export type ArtifactPage = Schemas["ArtifactPage"];
@@ -75,6 +76,11 @@ export interface AtpianoRuntime {
     sessionId: string,
     request: RuntimeRequest,
   ): Promise<Session>;
+  getHorizon(
+    workspaceId: string,
+    sessionId: string,
+    request: RuntimeRequest,
+  ): Promise<Horizon>;
   startCapture(input: CaptureStart, request: RuntimeRequest): Promise<Capture>;
   streamPcm(block: PcmBlock): void;
   stopCapture(input: CaptureStop, request: RuntimeRequest): Promise<Session>;
