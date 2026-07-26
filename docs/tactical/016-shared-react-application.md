@@ -8,8 +8,9 @@ Topic: session-workspace-management
 
 Status: implementation revised after R3 exposed live-event range, horizon
 presentation, and misleading score-placeholder defects. The fixes are
-validated and await explicit R3 re-review. Phase 4 must not start before that
-decision.
+validated. Pathological score expansion and missing session-addressed URLs
+were subsequently corrected and await explicit R3 re-review. Phase 4 must not
+start before that decision.
 
 ## Entry Evidence
 
@@ -179,7 +180,9 @@ The implementation series began at `a9805fd` and is:
 - `8a9a78e` fixed live recognition ranges after the first R3 microphone
   review; and
 - `7423159` clipped corrected display at the commit horizon and removed
-  synthetic placeholder engraving after follow-up review.
+  synthetic placeholder engraving after follow-up review;
+- `f8d096e` rejected and hid pathological score-model note expansion; and
+- `f39179a` put the selected session ID in copyable browser URLs.
 
 The real page-facing golden replay is recorded in
 [`r3-interaction-review.md`](../r3-interaction-review.md). Its 42-second
@@ -190,8 +193,8 @@ views, the score job, artifact refresh, and real SVG notation without browser
 alerts or page-level horizontal overflow.
 
 The final `uv run atpiano migration-regression` report at
-`results/migration-regression/20260726T114234Z/report.json` passed 78 Python
-tests, retained JavaScript tests, 20 application tests, contract drift,
+`results/migration-regression/20260726T115307Z/report.json` passed 81 Python
+tests, retained JavaScript tests, 23 application tests, contract drift,
 TypeScript, dependency audit, Ruff, syntax, and whitespace. Physical
 microphone permission and playing remain the explicit human lane at R3. The
 implementation range is `a9805fd^..HEAD` at this review handoff. Phase 4
@@ -212,3 +215,9 @@ clips corrected solids at the commit horizon, restores dashed open-note tails
 ending at that boundary, and removes all fake notation. The score panel is
 plain text until a real MusicXML artifact exists; real engraving is explicitly
 labeled as a frozen generated snapshot rather than a live view.
+
+The two-chord follow-up session had 13 correct score-input MIDI notes but 491
+pitched elements in the transformer output. `f8d096e` now fails that score
+job before publication and hides existing invalid pointers while retaining
+their diagnostic files. `f39179a` adds `?session=<session-id>` selection so a
+copied review URL resolves the exact performance.

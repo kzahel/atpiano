@@ -3,7 +3,9 @@
 Status: human review remains unaccepted on 2026-07-26. `8a9a78e` fixed notes
 not appearing until Stop; follow-up review found corrected bars crossing the
 commit horizon and a misleading synthetic score placeholder. `7423159`
-addresses both findings and awaits re-review. Phase 4 remains closed.
+addresses both findings. Further review exposed pathological score-model
+expansion and non-addressable browser state; `f8d096e` and `f39179a` address
+those findings and await re-review. Phase 4 remains closed.
 
 This packet reviews the shared React application while its visual hierarchy,
 controls, and session mental model are still inexpensive to change. The
@@ -33,6 +35,11 @@ uv run atpiano workbench-v3 \
 The command builds the pinned application, opens it in the default browser,
 runs the replay without wall-clock delay, and keeps the local review server
 available. Use a fresh workspace path for an empty first-run review.
+
+The selected session is encoded as `?session=<session-id>`. Copying the
+browser URL therefore carries the exact performance under review, and opening
+that URL restores the selection. New has no session parameter because it is
+not durable.
 
 For the physical microphone review:
 
@@ -132,8 +139,8 @@ its artifact access handle, and rendered it as SVG. Automated tests also
 cover score failure isolation.
 
 The final `uv run atpiano migration-regression` passed at
-`results/migration-regression/20260726T114234Z/report.json`: 78 Python tests,
-the retained JavaScript suites, 20 application tests, contract drift,
+`results/migration-regression/20260726T115307Z/report.json`: 81 Python tests,
+the retained JavaScript suites, 23 application tests, contract drift,
 TypeScript, dependency audit, Ruff, JavaScript syntax, and whitespace all
 passed. The dependency audit found zero vulnerabilities.
 
@@ -214,3 +221,34 @@ scored.
 Unit evidence covers a closed note whose reported offset crosses the commit
 horizon, an open corrected note whose dashed tail ends at the horizon, and an
 impossible corrected note entirely beyond the horizon.
+
+The next review supplied a seven-second, two-chord example at session
+`20260726T114525-d82bfe1f7822`. Its committed score input contains 13
+detected notes, but MIDI2ScoreTransformer emitted 491 pitched MusicXML
+elements across 31 measures. The input MIDI contains one copy of each
+detected note; repetition was introduced by the experimental score model,
+not capture, transcription storage, export, React, or OSMD.
+
+Commit `f8d096e` adds a publication sanity gate. Generated MusicXML may expand
+input notation within a bounded allowance for ties and notation structure,
+but gross note multiplication is a failed job. Invalid snapshots are not
+advertised in session capabilities, artifact lists, current-score state, or
+compatibility downloads. Existing bad pointers remain on disk as diagnostic
+evidence but are hidden; audio, event history, and committed MIDI are
+unchanged.
+
+The exact screenshot session now demonstrates the guard end to end:
+
+```text
+RuntimeError: score output failed sanity check:
+491 pitched notes from 13 input notes
+```
+
+No engraving or MusicXML download is shown for that rejected result.
+
+Commit `f39179a` makes selected sessions copyable and restorable. The exact
+review link is:
+
+```text
+http://127.0.0.1:8123/?session=20260726T114525-d82bfe1f7822
+```

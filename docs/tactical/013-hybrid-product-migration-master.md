@@ -5,10 +5,11 @@ Topic: multi-tenant-hybrid-service-architecture
 Status: accepted master plan on 2026-07-26; Phases 1 and 2 are complete, R2
 is accepted, and Phase 3 is being revised through mandatory R3 feedback.
 Live microphone feedback, commit-horizon presentation, and misleading
-placeholder engraving have been corrected; the result awaits R3 re-review.
-This document tracks the staged migration program and its human review gates.
-Each phase must create one or more smaller numbered tacticals before
-implementation.
+placeholder engraving have been corrected. Pathological score expansion is
+now rejected, and browser URLs carry selected session IDs. The result awaits
+R3 re-review. This document tracks the staged migration program and its human
+review gates. Each phase must create one or more smaller numbered tacticals
+before implementation.
 
 ## Outcome
 
@@ -364,6 +365,12 @@ and the synthetic pitch-dot staff shown before real score generation.
 `7423159` restores horizon clipping and dashed open-note tails, removes the
 placeholder staff entirely, and labels actual MusicXML as a generated frozen
 snapshot rather than live notation. R3 remains open.
+
+Further R3 evidence isolated a score transformer failure: 13 committed input
+notes became 491 pitched MusicXML elements. `f8d096e` rejects gross note
+expansion before publication and hides existing invalid score pointers.
+`f39179a` adds a selected-session query parameter so review links identify
+their exact session. Neither change opens Phase 4.
 
 ## Phase 4 — Extract The Framework-Independent Python Application Core
 
