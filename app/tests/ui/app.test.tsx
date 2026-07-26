@@ -24,6 +24,7 @@ function renderApp(runtime: AtpianoRuntime = createFixtureRuntime()) {
 
 describe("shared application", () => {
   beforeEach(() => {
+    window.history.replaceState(null, "", "/");
     useWorkspaceStore.setState({
       selectedSessionId: null,
       newIntent: false,
@@ -55,6 +56,23 @@ describe("shared application", () => {
     expect(screen.queryByRole("heading", { name: "Piano roll" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Detected keys" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Committed score" })).toBeTruthy();
+  });
+
+  it("keeps the selected session in the copyable URL", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("heading", { name: "Morning progression" });
+    expect(new URL(window.location.href).searchParams.get("session")).toBe(
+      "20260726T100000-abcdef123456",
+    );
+
+    await user.click(screen.getByRole("button", { name: /Nocturne sketch/ }));
+
+    await waitFor(() =>
+      expect(new URL(window.location.href).searchParams.get("session")).toBe(
+        "20260725T201500-bbbbbbbbbbbb",
+      ),
+    );
   });
 
   it("enters New without creating history and replay claims the active target", async () => {

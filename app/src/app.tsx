@@ -17,6 +17,7 @@ import { SessionRail } from "./components/session-rail.js";
 import { useMicrophone } from "./hooks/use-microphone.js";
 import { eventWindow, liveFrameCount } from "./lib/event-window.js";
 import { formatClock, formatSessionDate, requestId } from "./lib/format.js";
+import { sessionIdFromUrl, urlForSession } from "./lib/session-url.js";
 import type {
   Artifact,
   EventPage,
@@ -85,6 +86,7 @@ export function App() {
   const [eventPage, setEventPage] = useState<EventPage | null>(null);
   const [scoreJob, setScoreJob] = useState<Job | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [routeReady, setRouteReady] = useState(false);
 
   const capabilities = useQuery({
     queryKey: ["capabilities"],
@@ -127,7 +129,26 @@ export function App() {
     activeSession?.session_id === selectedSessionId;
 
   useEffect(() => {
+    const requestedSession = sessionIdFromUrl(window.location.href);
+    if (requestedSession) selectSession(requestedSession);
+    setRouteReady(true);
+  }, [selectSession]);
+
+  useEffect(() => {
+    if (!routeReady) return;
+    window.history.replaceState(
+      null,
+      "",
+      urlForSession(
+        window.location.href,
+        newIntent ? null : selectedSessionId,
+      ),
+    );
+  }, [newIntent, routeReady, selectedSessionId]);
+
+  useEffect(() => {
     if (
+      routeReady &&
       !newIntent &&
       selectedSessionId === null &&
       sessionItems[0] !== undefined
@@ -137,6 +158,7 @@ export function App() {
   }, [
     activeSession?.session_id,
     newIntent,
+    routeReady,
     selectSession,
     selectedSessionId,
     sessionItems,
