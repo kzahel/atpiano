@@ -1,8 +1,9 @@
 # R3 Interaction And Frontend Review
 
-Status: first human review rejected on 2026-07-26 because recognition was not
-visible until Stop. The defect is fixed and validated in `8a9a78e`; R3 now
-awaits human re-review. Phase 4 remains closed.
+Status: human review remains unaccepted on 2026-07-26. `8a9a78e` fixed notes
+not appearing until Stop; follow-up review found corrected bars crossing the
+commit horizon and a misleading synthetic score placeholder. `7423159`
+addresses both findings and awaits re-review. Phase 4 remains closed.
 
 This packet reviews the shared React application while its visual hierarchy,
 controls, and session mental model are still inexpensive to change. The
@@ -131,8 +132,8 @@ its artifact access handle, and rendered it as SVG. Automated tests also
 cover score failure isolation.
 
 The final `uv run atpiano migration-regression` passed at
-`results/migration-regression/20260726T112916Z/report.json`: 78 Python tests,
-the retained JavaScript suites, 17 application tests, contract drift,
+`results/migration-regression/20260726T114234Z/report.json`: 78 Python tests,
+the retained JavaScript suites, 20 application tests, contract drift,
 TypeScript, dependency audit, Ruff, JavaScript syntax, and whitespace all
 passed. The dependency audit found zero vulnerabilities.
 
@@ -187,3 +188,29 @@ Automated coverage now asserts that an active zero-frame session subscribes
 through an advancing 96,000-sample audio head and displays its two-second live
 duration. Human microphone re-review is still required; this evidence does
 not accept R3 on the user's behalf.
+
+Follow-up review supplied screenshots showing mint corrected bars continuing
+right of the commit line and a treble-clef staff populated with synthetic
+dots. That staff was an orientation placeholder derived from event pitches,
+not live notation or generated MusicXML, so it was misleading and has been
+removed.
+
+Commit `7423159` restores the earlier horizon presentation:
+
+- a closed corrected bar is defensively clipped at `H_commit`;
+- an open note uses a short solid onset followed by a dashed uncertainty tail;
+- a corrected open-note tail ends exactly at `H_commit`;
+- a corrected event beginning beyond `H_commit` is not drawn as corrected;
+- no staff or notehead is shown before a real MusicXML artifact exists; and
+- actual OSMD engraving is labeled as generated on request from a frozen
+  corrected prefix, explicitly not as a live-note view.
+
+Before score generation, the panel is now a plain text empty state. After a
+real score job, it displays the real MusicXML and states the source horizon
+through which that snapshot was generated. Score-job display state is also
+scoped to its session so selecting history cannot make another session look
+scored.
+
+Unit evidence covers a closed note whose reported offset crosses the commit
+horizon, an open corrected note whose dashed tail ends at the horizon, and an
+impossible corrected note entirely beyond the horizon.

@@ -3,10 +3,11 @@
 Topic: multi-tenant-hybrid-service-architecture
 
 Status: accepted master plan on 2026-07-26; Phases 1 and 2 are complete, R2
-is accepted, and Phase 3 was revised after the first R3 review rejected its
-live microphone feedback. The fix awaits mandatory R3 re-review. This
-document tracks the staged migration program and its human review gates. Each
-phase must create one or more smaller numbered tacticals before
+is accepted, and Phase 3 is being revised through mandatory R3 feedback.
+Live microphone feedback, commit-horizon presentation, and misleading
+placeholder engraving have been corrected; the result awaits R3 re-review.
+This document tracks the staged migration program and its human review gates.
+Each phase must create one or more smaller numbered tacticals before
 implementation.
 
 ## Outcome
@@ -357,6 +358,12 @@ Stop. The cause was a live event range pinned to the zero-frame Start
 snapshot. `8a9a78e` follows the advancing audio horizon instead and has
 automated plus real-engine browser evidence. This is a revision within Phase
 3, not permission to open Phase 4.
+
+Follow-up R3 feedback rejected corrected bars visually crossing `H_commit`
+and the synthetic pitch-dot staff shown before real score generation.
+`7423159` restores horizon clipping and dashed open-note tails, removes the
+placeholder staff entirely, and labels actual MusicXML as a generated frozen
+snapshot rather than live notation. R3 remains open.
 
 ## Phase 4 — Extract The Framework-Independent Python Application Core
 

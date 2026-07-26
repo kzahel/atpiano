@@ -6,9 +6,10 @@ Topic: multi-tenant-hybrid-service-architecture
 
 Topic: session-workspace-management
 
-Status: implementation revised after the first R3 review exposed a live-event
-range defect; the fix is validated and awaits explicit R3 re-review. Phase 4
-must not start before that decision.
+Status: implementation revised after R3 exposed live-event range, horizon
+presentation, and misleading score-placeholder defects. The fixes are
+validated and await explicit R3 re-review. Phase 4 must not start before that
+decision.
 
 ## Entry Evidence
 
@@ -175,7 +176,10 @@ The implementation series began at `a9805fd` and is:
 - `836ce69` covered score failure isolation; and
 - `d049fdf` restored actual committed-MusicXML rendering with pinned,
   lazy-loaded OSMD; and
-- `8a9a78e` fixed live recognition ranges after the first R3 microphone review.
+- `8a9a78e` fixed live recognition ranges after the first R3 microphone
+  review; and
+- `7423159` clipped corrected display at the commit horizon and removed
+  synthetic placeholder engraving after follow-up review.
 
 The real page-facing golden replay is recorded in
 [`r3-interaction-review.md`](../r3-interaction-review.md). Its 42-second
@@ -186,8 +190,8 @@ views, the score job, artifact refresh, and real SVG notation without browser
 alerts or page-level horizontal overflow.
 
 The final `uv run atpiano migration-regression` report at
-`results/migration-regression/20260726T112916Z/report.json` passed 78 Python
-tests, retained JavaScript tests, 17 application tests, contract drift,
+`results/migration-regression/20260726T114234Z/report.json` passed 78 Python
+tests, retained JavaScript tests, 20 application tests, contract drift,
 TypeScript, dependency audit, Ruff, syntax, and whitespace. Physical
 microphone permission and playing remain the explicit human lane at R3. The
 implementation range is `a9805fd^..HEAD` at this review handoff. Phase 4
@@ -201,3 +205,10 @@ browser/fake-device pass over the frozen musical WAV displayed 74 notes before
 Stop, 55 already corrected, and then settled to 113 final notes. The exact
 feedback, cause, validation path, and re-review request are recorded in
 [`r3-interaction-review.md`](../r3-interaction-review.md).
+
+Follow-up R3 screenshots showed corrected bars extending beyond `H_commit`
+and a synthetic pitch-dot staff that looked like live engraving. `7423159`
+clips corrected solids at the commit horizon, restores dashed open-note tails
+ending at that boundary, and removes all fake notation. The score panel is
+plain text until a real MusicXML artifact exists; real engraving is explicitly
+labeled as a frozen generated snapshot rather than a live view.
