@@ -92,7 +92,54 @@
               <input id="show-keyboard" type="checkbox" checked />
               Keyboard
             </label>
+            <label>
+              <input id="show-score" type="checkbox" checked />
+              Score
+            </label>
           </div>
+
+          <section
+            id="score-view"
+            class="score-view"
+            aria-labelledby="score-heading"
+          >
+            <div class="score-heading">
+              <div>
+                <p class="eyebrow">Stable notation snapshot</p>
+                <h3 id="score-heading">Committed score</h3>
+              </div>
+              <div class="score-actions">
+                <output id="score-status">No committed score yet</output>
+                <button id="generate-score" class="small" type="button" disabled>
+                  Render committed score
+                </button>
+              </div>
+            </div>
+            <p id="score-detail" class="score-detail">
+              Only closed notes behind the commit horizon enter this score.
+            </p>
+            <div id="score-paper" class="score-paper placeholder">
+              Play or replay some notes, then render the stable committed section.
+            </div>
+            <div class="score-downloads">
+              <a
+                id="download-score-musicxml"
+                class="download disabled"
+                href="/api/artifacts/score/current.musicxml"
+                download="atpiano-committed.musicxml"
+              >
+                MusicXML
+              </a>
+              <a
+                id="download-score-midi"
+                class="download disabled"
+                href="/api/artifacts/score/current.mid"
+                download="atpiano-committed.mid"
+              >
+                Snapshot MIDI
+              </a>
+            </div>
+          </section>
 
           <div id="roll-view">
             <div class="timeline-controls">
@@ -201,7 +248,13 @@
       </main>
     </div>
 
-    <script src="/timeline.js"></script>
-    <script src="/app.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.9/build/opensheetmusicdisplay.min.js"
+      integrity="sha384-fg3wZv9jtlPKdAf6XrWArUctknClaeTcDye6pqhsbofsbXIKtWucGZtDtPXkJi3Z"
+      crossorigin="anonymous"
+      defer
+    ></script>
+    <script src="/timeline.js" defer></script>
+    <script src="/app.js" defer></script>
   </body>
 </html>

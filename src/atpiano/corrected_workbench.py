@@ -44,6 +44,7 @@ from atpiano.websocket import encode_frame, encode_json, read_frame, websocket_a
 
 CORRECTED_WORKBENCH_SCHEMA = "atpiano.corrected-workbench.v1"
 CORRECTED_STREAM_SCHEMA = "atpiano.corrected-stream.v1"
+CORRECTED_SCORE_STATE_SCHEMA = "atpiano.corrected-score-state.v1"
 MAX_CLIENT_METADATA_BYTES = 16 * 1024
 MAX_VISIBLE_RANGE_S = 120.0
 DEFAULT_MINIMUM_FREE_BYTES = 2 * 1024**3
@@ -356,7 +357,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         runtime = self._runtime_state()
         running = job_status == "running" and job_session_id == current_session_id
         return {
-            "schema_version": SCORE_SNAPSHOT_SCHEMA,
+            "schema_version": CORRECTED_SCORE_STATE_SCHEMA,
             "status": job_status,
             "error": job_error,
             "runtime": runtime,

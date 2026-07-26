@@ -30,7 +30,11 @@ const state = {
   inspectionS: null,
   showRoll: true,
   showKeyboard: true,
+  showScore: true,
   keyboardKeys: new Map(),
+  score: null,
+  scoreRenderKey: "",
+  scoreRenderer: null,
 };
 
 function el(id) {
@@ -107,6 +111,122 @@ function buildKeyboard() {
 function updateViewVisibility() {
   el("roll-view").hidden = !state.showRoll;
   el("keyboard-view").hidden = !state.showKeyboard;
+  el("score-view").hidden = !state.showScore;
+}
+
+async function renderCommittedScore(snapshot) {
+  const target = el("score-paper");
+  const renderKey = `${snapshot.session_id}:${snapshot.musicxml.sha256}`;
+  if (renderKey === state.scoreRenderKey) return;
+  state.scoreRenderKey = renderKey;
+  target.classList.remove("placeholder");
+  target.textContent = "Rendering committed score…";
+  if (!window.opensheetmusicdisplay?.OpenSheetMusicDisplay) {
+    target.innerHTML =
+      '<p class="score-error">The pinned browser score renderer could not load. ' +
+      "The MusicXML download is still available.</p>";
+    return;
+  }
+  try {
+    const response = await fetch("/api/artifacts/score/current.musicxml", {
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`MusicXML: HTTP ${response.status}`);
+    const musicxml = await response.text();
+    if (renderKey !== state.scoreRenderKey) return;
+    target.replaceChildren();
+    const renderer = new window.opensheetmusicdisplay.OpenSheetMusicDisplay(
+      target,
+      {
+        autoResize: true,
+        backend: "svg",
+        drawTitle: true,
+        drawPartNames: true,
+        drawingParameters: "compacttight",
+      }
+    );
+    state.scoreRenderer = renderer;
+    await renderer.load(musicxml);
+    if (renderKey !== state.scoreRenderKey) return;
+    renderer.render();
+  } catch (error) {
+    if (renderKey !== state.scoreRenderKey) return;
+    const message = document.createElement("p");
+    message.className = "score-error";
+    message.textContent = error.message || String(error);
+    target.replaceChildren(message);
+  }
+}
+
+function updateScore() {
+  const score = state.score;
+  const snapshot = score?.snapshot;
+  const runtimeAvailable = Boolean(score?.runtime?.available);
+  const running = score?.status === "running";
+  const button = el("generate-score");
+  button.disabled = !score?.can_generate || running;
+  button.textContent = running
+    ? "Rendering…"
+    : snapshot
+      ? "Refresh committed score"
+      : "Render committed score";
+  for (const id of ["download-score-musicxml", "download-score-midi"]) {
+    el(id).classList.toggle("disabled", !snapshot);
+  }
+
+  if (!runtimeAvailable) {
+    el("score-status").textContent = "Score runtime not installed";
+    el("score-detail").textContent =
+      "Run `uv run atpiano setup-midi2score`, then restart this app.";
+  } else if (running) {
+    const sampleRate = Number(state.session?.session?.sample_rate_hz || 1);
+    el("score-status").textContent =
+      `Rendering through ${formatClock(score.job?.commit_sample / sampleRate, true)}…`;
+    el("score-detail").textContent =
+      "MIDI2ScoreTransformer is working in the background; capture is unaffected.";
+  } else if (score?.status === "failed") {
+    el("score-status").textContent = "Score render failed";
+    el("score-detail").textContent = score.error || "The score job failed.";
+  } else if (snapshot) {
+    el("score-status").textContent =
+      `${snapshot.note_count} notes · through ${formatClock(snapshot.commit_s, true)}`;
+    el("score-detail").textContent = score.stale
+      ? `This score ends at ${formatClock(
+          snapshot.commit_s,
+          true
+        )}; newer committed notes are ready. Refresh when useful.`
+      : "This score exactly represents the current closed committed prefix.";
+  } else {
+    el("score-status").textContent =
+      score?.commit_sample > 0
+        ? "Committed notes are ready"
+        : "No committed score yet";
+    el("score-detail").textContent =
+      "Only closed notes behind the commit horizon enter this score.";
+  }
+
+  if (snapshot && state.showScore) {
+    renderCommittedScore(snapshot);
+  } else if (!snapshot && !state.scoreRenderKey) {
+    const target = el("score-paper");
+    target.classList.add("placeholder");
+    target.textContent =
+      "Play or replay some notes, then render the stable committed section.";
+  }
+}
+
+async function generateScore() {
+  showError(null);
+  try {
+    state.score = await fetchJson("/api/score", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    updateScore();
+  } catch (error) {
+    showError(error);
+  }
 }
 
 function pinInspection(seconds) {
@@ -318,13 +438,21 @@ async function loadVisibleEvents(force = false) {
 async function poll() {
   try {
     const previousSessionId = state.session?.session_id;
-    state.session = await fetchJson("/api/session");
+    const [session, score] = await Promise.all([
+      fetchJson("/api/session"),
+      fetchJson("/api/score"),
+    ]);
+    state.session = session;
+    state.score = score;
     if (state.session.session_id !== previousSessionId) {
       state.nextSequence = 0;
       state.queryKey = "";
       state.inspectionS = null;
+      state.scoreRenderKey = "";
+      state.scoreRenderer = null;
     }
     updateStatus();
+    updateScore();
     await loadVisibleEvents();
   } catch (error) {
     showError(error);
@@ -761,8 +889,14 @@ async function stopMicrophone() {
 }
 
 async function pollOnce() {
-  state.session = await fetchJson("/api/session");
+  const [session, score] = await Promise.all([
+    fetchJson("/api/session"),
+    fetchJson("/api/score"),
+  ]);
+  state.session = session;
+  state.score = score;
   updateStatus();
+  updateScore();
   await loadVisibleEvents(true);
 }
 
@@ -787,6 +921,7 @@ function wireInteractions() {
   el("start-microphone").addEventListener("click", startMicrophone);
   el("stop-microphone").addEventListener("click", stopMicrophone);
   el("start-replay").addEventListener("click", startReplay);
+  el("generate-score").addEventListener("click", generateScore);
   el("show-roll").addEventListener("change", (event) => {
     state.showRoll = event.target.checked;
     updateViewVisibility();
@@ -796,6 +931,11 @@ function wireInteractions() {
     state.showKeyboard = event.target.checked;
     updateViewVisibility();
     if (state.showKeyboard) drawTimeline();
+  });
+  el("show-score").addEventListener("change", (event) => {
+    state.showScore = event.target.checked;
+    updateViewVisibility();
+    if (state.showScore) updateScore();
   });
   el("window-size").addEventListener("change", (event) => {
     state.windowS = Number(event.target.value);

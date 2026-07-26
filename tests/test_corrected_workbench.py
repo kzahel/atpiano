@@ -134,7 +134,7 @@ def test_corrected_workbench_is_separate_loopback_app(tmp_path: Path) -> None:
         with urllib.request.urlopen(f"{base_url}/", timeout=2) as response:
             page = response.read()
         assert b"Corrected notes" in page
-        assert b"notation" not in page.lower()
+        assert b"Committed score" in page
         html = page.decode("utf-8")
         app = (Path(__file__).parents[1] / "src/atpiano/web_v2/app.js").read_text(encoding="utf-8")
         styles = (Path(__file__).parents[1] / "src/atpiano/web_v2/styles.css").read_text(
@@ -144,7 +144,10 @@ def test_corrected_workbench_is_separate_loopback_app(tmp_path: Path) -> None:
         assert requested_ids
         assert all(f'id="{requested_id}"' in html for requested_id in requested_ids)
         assert ".timeline-empty[hidden]" in styles
+        assert "#score-view[hidden]" in styles
         assert "include_history=0" in app
+        assert 'fetchJson("/api/score"' in app
+        assert "opensheetmusicdisplay@1.9.9" in html
         foreign = urllib.request.Request(
             f"{base_url}/api/session",
             headers={"Host": "example.test"},
