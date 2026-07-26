@@ -137,10 +137,24 @@ describe("shared application", () => {
     fireEvent.keyDown(window, { key: "PageDown" });
     expect(screen.getByText("Page 3 of 4")).toBeTruthy();
 
+    const engraving = screen.getByLabelText(
+      "Rendered committed MusicXML score",
+    );
+    const comfortableFormatWidth = Number(
+      engraving.dataset.osmdFormatWidth,
+    );
+    expect(engraving.dataset.osmdMinimumSystemDistance).toBe("12");
+
     const density = screen.getByLabelText("Density");
     await user.selectOptions(density, "compact");
     await waitFor(() =>
       expect(screen.getByText("Page 3 of 4")).toBeTruthy()
+    );
+    await waitFor(() =>
+      expect(engraving.dataset.osmdMinimumSystemDistance).toBe("6")
+    );
+    expect(Number(engraving.dataset.osmdFormatWidth)).toBeGreaterThan(
+      comfortableFormatWidth,
     );
     expect(
       window.localStorage.getItem("atpiano.score-reader-density"),

@@ -7,7 +7,13 @@ export interface ScoreReaderLayout {
   readonly pageHeightPx: number;
   readonly formatWidth: number;
   readonly formatHeight: number;
-  readonly zoom: number;
+  readonly engraving: ScoreEngravingProfile;
+}
+
+export interface ScoreEngravingProfile {
+  readonly pageScale: number;
+  readonly minimumDistanceBetweenSystems: number;
+  readonly minSkyBottomDistanceBetweenSystems: number;
 }
 
 export interface ScorePageAnchor {
@@ -24,10 +30,22 @@ const paperMargin = 24;
 const screenMargin = 12;
 const minimumSpreadPageWidth = 500;
 
-const densityZoom: Record<ScoreDensity, number> = {
-  large: 1.16,
-  comfortable: 1,
-  compact: 0.88,
+const engravingProfiles: Record<ScoreDensity, ScoreEngravingProfile> = {
+  large: {
+    pageScale: 1.16,
+    minimumDistanceBetweenSystems: 16,
+    minSkyBottomDistanceBetweenSystems: 12,
+  },
+  comfortable: {
+    pageScale: 1,
+    minimumDistanceBetweenSystems: 12,
+    minSkyBottomDistanceBetweenSystems: 9,
+  },
+  compact: {
+    pageScale: 0.86,
+    minimumDistanceBetweenSystems: 6,
+    minSkyBottomDistanceBetweenSystems: 4,
+  },
 };
 
 function positiveSize(value: number, fallback: number): number {
@@ -45,7 +63,7 @@ export function scoreReaderLayout(
   const margin = screenLayout ? screenMargin : paperMargin;
   const availableWidth = Math.max(280, width - margin * 2);
   const availableHeight = Math.max(240, height - margin * 2);
-  const zoom = densityZoom[density];
+  const engraving = engravingProfiles[density];
 
   if (screenLayout) {
     const pageWidthPx = Math.floor(availableWidth);
@@ -55,9 +73,11 @@ export function scoreReaderLayout(
       pageSpan: 1,
       pageWidthPx,
       pageHeightPx,
-      formatWidth: a4Width,
-      formatHeight: a4Width * (pageHeightPx / pageWidthPx),
-      zoom,
+      formatWidth: a4Width / engraving.pageScale,
+      formatHeight:
+        (a4Width * (pageHeightPx / pageWidthPx)) /
+        engraving.pageScale,
+      engraving,
     };
   }
 
@@ -80,9 +100,9 @@ export function scoreReaderLayout(
     pageSpan,
     pageWidthPx,
     pageHeightPx: Math.floor(pageWidthPx / paperRatio),
-    formatWidth: a4Width,
-    formatHeight: a4Height,
-    zoom,
+    formatWidth: a4Width / engraving.pageScale,
+    formatHeight: a4Height / engraving.pageScale,
+    engraving,
   };
 }
 

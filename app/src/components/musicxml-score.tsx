@@ -45,6 +45,11 @@ interface ReaderEngravingRules {
   NewPageAtXMLNewPageAttribute: boolean;
   NewSystemAtXMLNewPageAttribute: boolean;
   NewSystemAtXMLNewSystemAttribute: boolean;
+  MinimumDistanceBetweenSystems: number;
+  MinSkyBottomDistBetweenSystems: number;
+  PageTopMargin: number;
+  PageTopMarginNarrow: number;
+  PageBottomMargin: number;
 }
 
 function pageElements(container: HTMLElement): HTMLElement[] {
@@ -149,16 +154,20 @@ export function MusicXmlScore({
           rules.NewPageAtXMLNewPageAttribute = true;
           rules.NewSystemAtXMLNewPageAttribute = true;
           rules.NewSystemAtXMLNewSystemAttribute = true;
+          rules.MinimumDistanceBetweenSystems =
+            readerLayout.engraving.minimumDistanceBetweenSystems;
+          rules.MinSkyBottomDistBetweenSystems =
+            readerLayout.engraving.minSkyBottomDistanceBetweenSystems;
+          rules.PageTopMargin = 5;
+          rules.PageTopMarginNarrow = 4;
+          rules.PageBottomMargin = 4;
         }
-        if (readerLayout?.kind === "paper") {
-          next.setPageFormat("A4_P");
-        } else if (readerLayout) {
+        if (readerLayout) {
           next.setCustomPageFormat(
             readerLayout.formatWidth,
             readerLayout.formatHeight,
           );
         }
-        if (readerLayout) next.Zoom = readerLayout.zoom;
         await next.load(xml);
         if (cancelled) return;
         next.render();
@@ -208,7 +217,8 @@ export function MusicXmlScore({
     readerLayout?.formatHeight,
     readerLayout?.formatWidth,
     readerLayout?.kind,
-    readerLayout?.zoom,
+    readerLayout?.engraving.minSkyBottomDistanceBetweenSystems,
+    readerLayout?.engraving.minimumDistanceBetweenSystems,
     xml,
   ]);
 

@@ -42,6 +42,11 @@ vi.mock("opensheetmusicdisplay", () => ({
       NewPageAtXMLNewPageAttribute: false,
       NewSystemAtXMLNewPageAttribute: false,
       NewSystemAtXMLNewSystemAttribute: false,
+      MinimumDistanceBetweenSystems: 7,
+      MinSkyBottomDistBetweenSystems: 5,
+      PageTopMargin: 5,
+      PageTopMarginNarrow: 0,
+      PageBottomMargin: 5,
     };
     readonly cursor = {
       SkipInvisibleNotes: true,
@@ -79,11 +84,20 @@ vi.mock("opensheetmusicdisplay", () => ({
 
     setPageFormat() {}
 
-    setCustomPageFormat() {}
+    setCustomPageFormat(width: number, height: number) {
+      this.#container.dataset.osmdFormatWidth = String(width);
+      this.#container.dataset.osmdFormatHeight = String(height);
+    }
 
     async load() {}
 
     render() {
+      this.#container.dataset.osmdMinimumSystemDistance = String(
+        this.EngravingRules.MinimumDistanceBetweenSystems,
+      );
+      this.#container.dataset.osmdSkyBottomSystemDistance = String(
+        this.EngravingRules.MinSkyBottomDistBetweenSystems,
+      );
       this.#container.replaceChildren(
         ...this.GraphicSheet.MusicPages.map((_, index) => {
           const page = document.createElement("div");

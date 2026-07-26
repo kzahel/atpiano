@@ -27,7 +27,34 @@ describe("score reader layout", () => {
     expect(tablet.pageSpan).toBe(1);
     expect(laptop.kind).toBe("paper");
     expect(laptop.pageSpan).toBe(2);
-    expect(laptop.zoom).toBeLessThan(tablet.zoom);
+    expect(laptop.formatWidth).toBeGreaterThan(tablet.formatWidth);
+    expect(
+      laptop.engraving.minimumDistanceBetweenSystems,
+    ).toBeLessThan(
+      tablet.engraving.minimumDistanceBetweenSystems,
+    );
+  });
+
+  it("makes every density a distinct engraving profile", () => {
+    const large = scoreReaderLayout(1200, 900, "large");
+    const comfortable = scoreReaderLayout(1200, 900, "comfortable");
+    const compact = scoreReaderLayout(1200, 900, "compact");
+
+    expect(large.formatWidth).toBeLessThan(comfortable.formatWidth);
+    expect(comfortable.formatWidth).toBeLessThan(compact.formatWidth);
+    expect(
+      large.engraving.minimumDistanceBetweenSystems,
+    ).toBeGreaterThan(
+      comfortable.engraving.minimumDistanceBetweenSystems,
+    );
+    expect(
+      comfortable.engraving.minSkyBottomDistanceBetweenSystems,
+    ).toBeGreaterThan(
+      compact.engraving.minSkyBottomDistanceBetweenSystems,
+    );
+    expect(large.formatWidth / large.formatHeight).toBeCloseTo(
+      comfortable.formatWidth / comfortable.formatHeight,
+    );
   });
 
   it("clamps turns to a complete spread", () => {
