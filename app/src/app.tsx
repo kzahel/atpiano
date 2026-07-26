@@ -15,6 +15,7 @@ import { CaptureDeck } from "./components/capture-deck.js";
 import { PerformanceViews } from "./components/performance-views.js";
 import { SessionRail } from "./components/session-rail.js";
 import { useMicrophone } from "./hooks/use-microphone.js";
+import { eventWindow, liveFrameCount } from "./lib/event-window.js";
 import { formatClock, formatSessionDate, requestId } from "./lib/format.js";
 import type {
   Artifact,
@@ -122,6 +123,8 @@ export function App() {
       session.status === "stopping" ||
       session.session_id === captureState.capture?.session_id,
   );
+  const selectedSessionIsActive =
+    activeSession?.session_id === selectedSessionId;
 
   useEffect(() => {
     if (
@@ -147,6 +150,10 @@ export function App() {
         signal,
       }),
     enabled: workspace !== undefined && selectedSessionId !== null,
+    refetchInterval:
+      captureState.phase === "recording" || selectedSessionIsActive
+        ? 750
+        : false,
   });
   const horizon = useQuery({
     queryKey: ["horizon", workspace?.workspace_id, selectedSessionId],
@@ -156,7 +163,10 @@ export function App() {
         signal,
       }),
     enabled: workspace !== undefined && selectedSessionId !== null,
-    refetchInterval: captureState.phase === "recording" ? 750 : false,
+    refetchInterval:
+      captureState.phase === "recording" || selectedSessionIsActive
+        ? 750
+        : false,
   });
   const artifacts = useQuery({
     queryKey: ["artifacts", workspace?.workspace_id, selectedSessionId],
@@ -223,20 +233,25 @@ export function App() {
     selectedSessionId,
   ]);
 
+  useEffect(() => setEventPage(null), [selectedSessionId]);
+
   useEffect(() => {
-    setEventPage(null);
     if (!workspace || !selectedSession.data) return;
     const target = selectedSession.data;
-    const endSample = Math.max(1, target.source_frame_count);
     const maxRange =
       capabilities.data?.max_event_range_samples ?? 5_760_000;
+    const range = eventWindow(
+      target.source_frame_count,
+      horizon.data?.audio_head_sample,
+      maxRange,
+    );
     const subscription = runtime.subscribeEvents(
       workspace.workspace_id,
       target.session_id,
       {
         requestId: requestId("events"),
-        startSample: Math.max(0, endSample - maxRange),
-        endSample,
+        startSample: range.startSample,
+        endSample: range.endSample,
         limit: 4_096,
       },
       {
@@ -252,6 +267,7 @@ export function App() {
   }, [
     runtime,
     capabilities.data?.max_event_range_samples,
+    horizon.data?.audio_head_sample,
     selectedSession.data,
     selectedSession.data?.source_frame_count,
     workspace,
@@ -390,6 +406,15 @@ export function App() {
   }, [runtime]);
 
   const selected = selectedSession.data;
+  const selectedFrames = selected
+    ? liveFrameCount(
+        selected.source_frame_count,
+        horizon.data?.audio_head_sample,
+      )
+    : 0;
+  const displayedSession = selected && selectedFrames !== selected.source_frame_count
+    ? { ...selected, source_frame_count: selectedFrames }
+    : selected;
   const events = eventPage?.items ?? [];
   const noteCount = events.filter(
     (event) => event.kind === "note" && event.lifecycle !== "retracted",
@@ -481,7 +506,7 @@ export function App() {
                   <span>·</span>
                   {selected.source === "microphone" ? "Microphone" : "Fixture replay"}
                   <span>·</span>
-                  {formatClock(selected.source_frame_count, selected.sample_rate_hz)}
+                  {formatClock(selectedFrames, selected.sample_rate_hz)}
                 </p>
               </div>
               <div className="session-actions">
@@ -577,7 +602,7 @@ export function App() {
             </section>
 
             <PerformanceViews
-              session={selected}
+              session={displayedSession}
               events={events}
               horizon={horizon.data}
               inspectionSample={inspectionSample}

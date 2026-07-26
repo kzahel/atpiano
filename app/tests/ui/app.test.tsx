@@ -118,4 +118,56 @@ describe("shared application", () => {
       .toBeTruthy();
     expect(screen.getByRole("heading", { name: "Piano roll" })).toBeTruthy();
   });
+
+  it("subscribes through the live audio head before the session snapshot advances", async () => {
+    const fixture = createFixtureRuntime();
+    let subscribedThrough = 0;
+    const runtime = new Proxy(fixture, {
+      get(target, property) {
+        if (property === "listSessions") {
+          return async (...args: Parameters<AtpianoRuntime["listSessions"]>) => {
+            const page = await target.listSessions(...args);
+            return {
+              ...page,
+              items: page.items.map((session, index) =>
+                index === 0
+                  ? { ...session, status: "active" as const, source_frame_count: 0 }
+                  : session,
+              ),
+            };
+          };
+        }
+        if (property === "getSession") {
+          return async (...args: Parameters<AtpianoRuntime["getSession"]>) => {
+            const session = await target.getSession(...args);
+            return { ...session, status: "active" as const, source_frame_count: 0 };
+          };
+        }
+        if (property === "getHorizon") {
+          return async (...args: Parameters<AtpianoRuntime["getHorizon"]>) => {
+            const horizon = await target.getHorizon(...args);
+            return {
+              ...horizon,
+              audio_head_sample: 96_000,
+              provisional_sample: 84_000,
+              commit_sample: 72_000,
+            };
+          };
+        }
+        if (property === "subscribeEvents") {
+          return (...args: Parameters<AtpianoRuntime["subscribeEvents"]>) => {
+            subscribedThrough = args[2].endSample;
+            return target.subscribeEvents(...args);
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) satisfies AtpianoRuntime;
+
+    renderApp(runtime);
+
+    await waitFor(() => expect(subscribedThrough).toBe(96_000));
+    expect(screen.getAllByText("00:02.0").length).toBeGreaterThan(0);
+  });
 });
