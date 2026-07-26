@@ -229,6 +229,15 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="+",
         help="labeled completed run with raw/basic_pitch.npz and input.wav",
     )
+    migration_parser = subparsers.add_parser(
+        "migration-regression",
+        help="run and report the frozen product-migration regression lanes",
+    )
+    migration_parser.add_argument(
+        "--output",
+        type=Path,
+        help="report path (default: timestamped path under results/)",
+    )
     return parser
 
 
@@ -394,6 +403,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(args.output_directory / "report.md")
         print(args.output_directory / "decoder-study.json")
         return 0
+    if args.command == "migration-regression":
+        from atpiano.migration_regression import run_migration_regression
+
+        output_path, report = run_migration_regression(args.output)
+        print(output_path)
+        print(f"migration regression: {report['status']}")
+        return 0 if report["status"] == "passed" else 1
     if not args.version:
         parser.print_help()
     return 0
