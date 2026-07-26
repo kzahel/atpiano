@@ -181,6 +181,29 @@ request. It must not be called an append-only engraving lane. Continuous
 notation still needs bounded musical chunks with overlap, reconciliation,
 barline ownership, and a monotonic `H_engrave`.
 
+### Responsive score reader direction
+
+[`020-responsive-score-reader.md`](../tactical/020-responsive-score-reader.md)
+owns the planned dedicated reading view. It keeps the inline score as a
+workspace preview and opens one exact MusicXML artifact in a phone-, tablet-,
+and desktop-responsive reader with manual page turning and optional native
+fullscreen.
+
+Pinning applies to the artifact ID, full MusicXML hash, and score semantics,
+not to rendered pixels. OSMD may reflow the same bytes into different system
+breaks, page counts, zoom, density, or one- and two-page layouts. Reader
+position is therefore anchored to an aligned source sample when available or
+to a MusicXML measure ordinal, never only to a page number. A newer committed
+snapshot must not silently replace the pinned score while the performer is
+reading it.
+
+The current generated score supplies basic MusicXML scaling but no forced
+system or page breaks, so it is suitable for a first responsive reflow
+implementation. Imported scores with explicit layout directives require
+separate evidence. Responsive presentation should first exercise OSMD's page
+and custom-page formats; a renderer comparison is justified only if OSMD
+cannot supply stable pagination and measure anchoring.
+
 ### Two-phase paid oracle
 
 The first black-box comparison uses [Ivory](https://ivory-app.com/). The
@@ -397,13 +420,17 @@ Notation is no longer paused. The immediate work is:
 3. score the cascade on ASAP so the notation layer has a real metric instead of
    one subjective take;
 4. feed ground-truth MIDI and predicted MIDI through the same converter to
-   separate detection error from notation error; and
+   separate detection error from notation error;
 5. treat tie count, voices, measure splits, meter/downbeat/pickup, and
-   sight-readability as the decision metrics.
+   sight-readability as the decision metrics; and
+6. present each exact score snapshot in the responsive, artifact-pinned
+   reader defined by Tactical 020.
 
-Verovio cannot repair bad score semantics, and renderer work remains
-deprioritized. A paid Ivory export would enable note-level comparison against
-the oracle, which the screenshot alone cannot support.
+Verovio cannot repair bad score semantics, and renderer replacement remains
+deprioritized. Tactical 020 is a presentation and performance-usage slice
+over the existing MusicXML rather than a new renderer bakeoff. A paid Ivory
+export would enable note-level comparison against the oracle, which the
+screenshot alone cannot support.
 
 ## Evidence To Require
 
