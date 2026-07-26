@@ -18,6 +18,7 @@ import { SessionRail } from "./components/session-rail.js";
 import { useMicrophone } from "./hooks/use-microphone.js";
 import { eventWindow, liveFrameCount } from "./lib/event-window.js";
 import { formatClock, formatSessionDate, requestId } from "./lib/format.js";
+import { parseScoreAlignment } from "./lib/score-alignment.js";
 import { sessionIdFromUrl, urlForSession } from "./lib/session-url.js";
 import type {
   Artifact,
@@ -208,6 +209,9 @@ export function App() {
   const scoreArtifact = artifacts.data?.items.find(
     (artifact) => artifact.kind === "musicxml",
   );
+  const scoreAlignmentArtifact = artifacts.data?.items.find(
+    (artifact) => artifact.kind === "score-alignment",
+  );
   const audioArtifacts = useMemo(
     () => {
       const available = (artifacts.data?.items ?? []).filter(
@@ -278,6 +282,38 @@ export function App() {
       return response.text();
     },
     enabled: scoreArtifact !== undefined,
+    staleTime: Infinity,
+  });
+  const scoreAlignment = useQuery({
+    queryKey: [
+      "score-alignment",
+      scoreArtifact?.artifact_id,
+      scoreAlignmentArtifact?.artifact_id,
+    ],
+    queryFn: async ({ signal }) => {
+      const access = await runtime.getArtifactAccess(
+        scoreAlignmentArtifact!.workspace_id,
+        scoreAlignmentArtifact!.session_id,
+        scoreAlignmentArtifact!.artifact_id,
+        { requestId: requestId("score-alignment"), signal },
+      );
+      const response = await fetch(
+        new URL(access.url, window.location.origin),
+        { signal },
+      );
+      if (!response.ok) {
+        throw new Error(
+          `Score alignment download failed: HTTP ${response.status}`,
+        );
+      }
+      return parseScoreAlignment(await response.json(), {
+        sessionId: scoreAlignmentArtifact!.session_id,
+        musicXmlSha256: scoreArtifact!.sha256,
+      });
+    },
+    enabled:
+      scoreArtifact !== undefined &&
+      scoreAlignmentArtifact !== undefined,
     staleTime: Infinity,
   });
   const scoreJobQuery = useQuery({
@@ -756,6 +792,8 @@ export function App() {
               scoreAvailable={capabilities.data?.score_available ?? false}
               scoreXml={scoreXml.data}
               scoreXmlError={scoreXml.error}
+              scoreAlignment={scoreAlignment.data}
+              scoreAlignmentError={scoreAlignment.error}
               scoreHorizonSample={scoreArtifact?.source_horizon_sample}
               audioSources={audioPlayback.data ?? []}
               audioUnavailableReason={

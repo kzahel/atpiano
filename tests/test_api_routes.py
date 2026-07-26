@@ -298,6 +298,8 @@ def test_api_score_job_and_artifacts_remain_targeted_to_history(
     assert job["status"] == "complete"
     assert job["session_id"] == older_id
     assert access["session_id"] == older_id
+    assert musicxml["source_horizon_sample"] == 80
+    assert alignment["source_horizon_sample"] == 80
     assert b"score-partwise" in body
     assert alignment_body["summary"]["mapped_source_notes"] == 1
     assert legacy_current["session_id"] == newer_id

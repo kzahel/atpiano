@@ -106,6 +106,44 @@ export function AudioPlayback({
     if (!restart && audio.current?.readyState) playElement();
   };
 
+  const updatePositionFromElement = () => {
+    if (
+      !audio.current ||
+      !source ||
+      audio.current.readyState < 1 ||
+      seeking.current
+    ) {
+      return;
+    }
+    const sample = Math.min(
+      totalSamples,
+      Math.round(
+        source.startSample + audio.current.currentTime * sampleRateHz,
+      ),
+    );
+    if (sample === desiredSample.current) return;
+    desiredSample.current = sample;
+    setPositionSample(sample);
+    onInspect(sample);
+  };
+
+  useEffect(() => {
+    if (!playing || !source) return;
+    let animationFrame = 0;
+    const update = () => {
+      updatePositionFromElement();
+      animationFrame = window.requestAnimationFrame(update);
+    };
+    animationFrame = window.requestAnimationFrame(update);
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [
+    onInspect,
+    playing,
+    sampleRateHz,
+    source?.artifactId,
+    totalSamples,
+  ]);
+
   return (
     <section className="playback-transport" aria-label="Recorded audio playback">
       <audio
@@ -125,23 +163,7 @@ export function AudioPlayback({
           seeking.current = false;
         }}
         onTimeUpdate={() => {
-          if (
-            !audio.current ||
-            !source ||
-            audio.current.readyState < 1 ||
-            seeking.current
-          ) {
-            return;
-          }
-          const sample = Math.min(
-            totalSamples,
-            Math.round(
-              source.startSample + audio.current.currentTime * sampleRateHz,
-            ),
-          );
-          desiredSample.current = sample;
-          setPositionSample(sample);
-          onInspect(sample);
+          updatePositionFromElement();
         }}
         onEnded={() => {
           const nextIndex = activeIndex + 1;

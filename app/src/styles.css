@@ -850,6 +850,20 @@ input:focus-visible {
   box-shadow: 0 0 8px rgba(235, 244, 239, 0.25);
 }
 
+.roll-playhead {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-1px);
+  background: #2fbe8c;
+  box-shadow:
+    0 0 0 1px rgba(8, 20, 16, 0.65),
+    0 0 10px rgba(47, 190, 140, 0.72);
+  pointer-events: none;
+}
+
 .pedal-panel {
   grid-column: 1 / span 2;
   grid-row: 2;

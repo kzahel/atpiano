@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type {
+  OpenSheetMusicDisplay as OsmdRenderer,
+} from "opensheetmusicdisplay";
 
 import {
   AudioPlayback,
@@ -8,6 +11,11 @@ import { formatClock, noteName } from "../lib/format.js";
 import { noteDisplaySegments } from "../lib/note-display.js";
 import { pedalDisplaySegment } from "../lib/pedal-display.js";
 import { pianoLayout } from "../lib/piano-layout.js";
+import {
+  moveScoreCursor,
+  scoreAttackAtSample,
+  type ScoreAlignment,
+} from "../lib/score-alignment.js";
 import type {
   EventRevision,
   Horizon,
@@ -91,11 +99,13 @@ function PianoRoll({
   events,
   session,
   horizon,
+  inspectionSample,
   onInspect,
 }: {
   readonly events: readonly EventRevision[];
   readonly session: Session;
   readonly horizon: Horizon | undefined;
+  readonly inspectionSample: number | null;
   readonly onInspect: (sample: number) => void;
 }) {
   const total = Math.max(1, session.source_frame_count);
@@ -171,6 +181,18 @@ function PianoRoll({
               style={{ left: `${(horizon.commit_sample / total) * 100}%` }}
             />
           )}
+          {inspectionSample !== null && (
+            <i
+              className="roll-playhead"
+              aria-hidden="true"
+              style={{
+                left: `${(
+                  (Math.max(0, Math.min(total, inspectionSample)) / total) *
+                  100
+                ).toFixed(4)}%`,
+              }}
+            />
+          )}
         </div>
         <div
           className="pedal-panel"
@@ -237,7 +259,10 @@ function ScorePreview({
   scoreAvailable,
   scoreXml,
   scoreXmlError,
+  scoreAlignment,
+  scoreAlignmentError,
   scoreHorizonSample,
+  inspectionSample,
   onGenerate,
 }: {
   readonly session: Session;
@@ -245,7 +270,10 @@ function ScorePreview({
   readonly scoreAvailable: boolean;
   readonly scoreXml: string | undefined;
   readonly scoreXmlError: Error | null;
+  readonly scoreAlignment: ScoreAlignment | undefined;
+  readonly scoreAlignmentError: Error | null;
   readonly scoreHorizonSample: number | undefined;
+  readonly inspectionSample: number | null;
   readonly onGenerate: () => void;
 }) {
   return (
@@ -280,7 +308,12 @@ function ScorePreview({
         live-note view.
       </p>
       {scoreXml ? (
-        <MusicXmlScore xml={scoreXml} />
+        <MusicXmlScore
+          xml={scoreXml}
+          alignment={scoreAlignment}
+          inspectionSample={inspectionSample}
+          scoreHorizonSample={scoreHorizonSample}
+        />
       ) : (
         <div className="score-empty">
           <strong>No generated score snapshot</strong>
@@ -296,6 +329,11 @@ function ScorePreview({
           available.
         </p>
       )}
+      {scoreAlignmentError && (
+        <p className="score-render-error" role="status">
+          The score remains readable, but its playback cursor could not load.
+        </p>
+      )}
       <small>
         Snapshot target · {session.display_name ?? session.session_id}
       </small>
@@ -303,15 +341,30 @@ function ScorePreview({
   );
 }
 
-function MusicXmlScore({ xml }: { readonly xml: string }) {
+function MusicXmlScore({
+  xml,
+  alignment,
+  inspectionSample,
+  scoreHorizonSample,
+}: {
+  readonly xml: string;
+  readonly alignment: ScoreAlignment | undefined;
+  readonly inspectionSample: number | null;
+  readonly scoreHorizonSample: number | undefined;
+}) {
   const target = useRef<HTMLDivElement>(null);
+  const renderer = useRef<OsmdRenderer | null>(null);
+  const priorTargetQuarter = useRef<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [renderVersion, setRenderVersion] = useState(0);
 
   useEffect(() => {
     const container = target.current;
     if (!container) return;
     let cancelled = false;
-    let renderer: { clear(): void } | null = null;
+    let currentRenderer: OsmdRenderer | null = null;
+    renderer.current = null;
+    priorTargetQuarter.current = null;
     setError(null);
     void import("opensheetmusicdisplay")
       .then(async ({ OpenSheetMusicDisplay }) => {
@@ -321,20 +374,56 @@ function MusicXmlScore({ xml }: { readonly xml: string }) {
           backend: "svg",
           drawTitle: false,
           drawingParameters: "compacttight",
+          followCursor: true,
+          cursorsOptions: [
+            {
+              type: 1,
+              color: "#2fbe8c",
+              alpha: 0.82,
+              follow: true,
+            },
+          ],
         });
-        renderer = next;
+        currentRenderer = next;
         await next.load(xml);
-        if (!cancelled) next.render();
+        if (!cancelled) {
+          next.render();
+          next.cursor.SkipInvisibleNotes = true;
+          next.cursor.hide();
+          renderer.current = next;
+          setRenderVersion((value) => value + 1);
+        }
       })
       .catch(() => {
         if (!cancelled) setError("Notation rendering failed.");
       });
     return () => {
       cancelled = true;
-      renderer?.clear();
+      if (renderer.current === currentRenderer) renderer.current = null;
+      currentRenderer?.clear();
       container.replaceChildren();
     };
   }, [xml]);
+
+  useEffect(() => {
+    const cursor = renderer.current?.cursor;
+    if (!cursor) return;
+    const targetQuarter = scoreAttackAtSample(
+      alignment,
+      inspectionSample,
+      scoreHorizonSample,
+    );
+    priorTargetQuarter.current = moveScoreCursor(
+      cursor,
+      targetQuarter,
+      priorTargetQuarter.current,
+    );
+  }, [
+    alignment,
+    inspectionSample,
+    renderVersion,
+    scoreHorizonSample,
+  ]);
 
   return (
     <div className="score-paper rendered">
@@ -356,6 +445,8 @@ export function PerformanceViews({
   scoreAvailable,
   scoreXml,
   scoreXmlError,
+  scoreAlignment,
+  scoreAlignmentError,
   scoreHorizonSample,
   audioSources,
   audioUnavailableReason,
@@ -373,6 +464,8 @@ export function PerformanceViews({
   readonly scoreAvailable: boolean;
   readonly scoreXml: string | undefined;
   readonly scoreXmlError: Error | null;
+  readonly scoreAlignment: ScoreAlignment | undefined;
+  readonly scoreAlignmentError: Error | null;
   readonly scoreHorizonSample: number | undefined;
   readonly audioSources: readonly AudioPlaybackSource[];
   readonly audioUnavailableReason: string;
@@ -396,7 +489,10 @@ export function PerformanceViews({
           scoreAvailable={scoreAvailable}
           scoreXml={scoreXml}
           scoreXmlError={scoreXmlError}
+          scoreAlignment={scoreAlignment}
+          scoreAlignmentError={scoreAlignmentError}
           scoreHorizonSample={scoreHorizonSample}
+          inspectionSample={inspectionSample}
           onGenerate={onGenerateScore}
         />
       )}
@@ -405,6 +501,7 @@ export function PerformanceViews({
           events={events}
           session={session}
           horizon={horizon}
+          inspectionSample={inspectionSample}
           onInspect={onInspect}
         />
       )}

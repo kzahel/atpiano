@@ -8,6 +8,7 @@ function artifactLabel(artifact: Artifact): string {
   }
   if (artifact.kind === "midi") return "Performance MIDI";
   if (artifact.kind === "musicxml") return "MusicXML score";
+  if (artifact.kind === "score-alignment") return "Score playback alignment";
   if (artifact.kind === "event-history") return "Event history";
   return artifact.filename;
 }

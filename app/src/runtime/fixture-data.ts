@@ -63,7 +63,13 @@ function session(
     display_name: displayName,
     available_artifact_kinds:
       status === "complete"
-        ? ["audio", "event-history", "midi", "musicxml"]
+        ? [
+            "audio",
+            "event-history",
+            "midi",
+            "musicxml",
+            "score-alignment",
+          ]
         : [],
   };
 }
@@ -154,10 +160,16 @@ function artifact(target: Session, kind: Artifact["kind"], filename: string): Ar
     filename,
     sha256: hash,
     byte_count: kind === "musicxml" ? 82_104 : 4_096,
-    source_horizon_sample: target.source_frame_count,
+    source_horizon_sample:
+      kind === "musicxml" || kind === "score-alignment"
+        ? Math.max(0, target.source_frame_count - sampleRate)
+        : target.source_frame_count,
     created_at: target.completed_at ?? target.started_at,
     transcription_run_id: target.current_transcription_run_id,
-    producing_job_id: kind === "musicxml" ? "job:fixture-score" : null,
+    producing_job_id:
+      kind === "musicxml" || kind === "score-alignment"
+        ? "job:fixture-score"
+        : null,
     provenance: {
       schema_version: schemaVersion,
       application_version: "0.1.0",
@@ -183,8 +195,44 @@ function record(
         artifact(value, "midi", "session.mid"),
         artifact(value, "event-history", "session.jsonl"),
         artifact(value, "musicxml", "score.musicxml"),
+        artifact(value, "score-alignment", "alignment.json"),
       ]
     : [];
+  const mappedNotes = values
+    .filter(
+      (event) =>
+        event.kind === "note" &&
+        event.lifecycle === "committed" &&
+        event.pitch !== null &&
+        event.offset_sample !== null,
+    )
+    .sort(
+      (left, right) =>
+        left.onset_sample - right.onset_sample ||
+        left.pitch! - right.pitch! ||
+        left.offset_sample! -
+          left.onset_sample -
+          (right.offset_sample! - right.onset_sample) ||
+        left.event_id.localeCompare(right.event_id),
+    );
+  const alignment = {
+    schema_version: "atpiano.score-alignment.v1",
+    session_id: value.session_id,
+    sample_rate_hz: value.sample_rate_hz,
+    musicxml: { sha256: hash },
+    rows: mappedNotes.map((event, index) => ({
+      source_index: index,
+      event_id: event.event_id,
+      pitch: event.pitch,
+      onset_sample: event.onset_sample,
+      offset_sample: event.offset_sample,
+      status: "mapped",
+      score_time_quarters: {
+        numerator: Math.floor(index / 3),
+        denominator: 1,
+      },
+    })),
+  };
   const access = Object.fromEntries(
     artifacts.map((item): [string, ArtifactAccess] => [
       item.artifact_id,
@@ -195,7 +243,10 @@ function record(
         artifact_id: item.artifact_id,
         media_type: item.media_type,
         download_name: item.filename,
-        url: `data:text/plain,Deterministic%20${encodeURIComponent(item.filename)}`,
+        url:
+          item.kind === "score-alignment"
+            ? `data:application/json,${encodeURIComponent(JSON.stringify(alignment))}`
+            : `data:text/plain,Deterministic%20${encodeURIComponent(item.filename)}`,
         expires_at: null,
       },
     ]),
@@ -293,7 +344,10 @@ const scoreJob: Job = {
   created_at: "2026-07-26T10:00:43Z",
   started_at: "2026-07-26T10:00:43Z",
   completed_at: "2026-07-26T10:00:45Z",
-  artifact_ids: [`artifact:${primary.session_id}:musicxml`],
+  artifact_ids: [
+    `artifact:${primary.session_id}:musicxml`,
+    `artifact:${primary.session_id}:score-alignment`,
+  ],
   error: null,
 };
 

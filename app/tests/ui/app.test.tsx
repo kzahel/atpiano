@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -67,6 +67,19 @@ describe("shared application", () => {
     expect(screen.queryByRole("heading", { name: "Piano roll" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Detected keys" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Committed score" })).toBeTruthy();
+  });
+
+  it("draws the shared inspection position on the piano roll", async () => {
+    renderApp();
+    await screen.findByRole("heading", { name: "Morning progression" });
+
+    fireEvent.change(screen.getByRole("slider"), {
+      target: { value: String(48_000 * 21) },
+    });
+
+    const playhead = document.querySelector<HTMLElement>(".roll-playhead");
+    expect(playhead).toBeTruthy();
+    expect(playhead?.style.left).toBe("50%");
   });
 
   it("keeps the selected session in the copyable URL", async () => {

@@ -365,6 +365,7 @@ class LocalSessionStore:
         directory = self.resolve(session_id)
         session = self.get_session(session_id)
         audio_horizons: dict[Path, int] = {}
+        score_horizons: dict[Path, int] = {}
         audio_index = directory / "audio" / "segments.jsonl"
         if audio_index.is_file():
             for line in audio_index.read_text(encoding="utf-8").splitlines():
@@ -385,11 +386,14 @@ class LocalSessionStore:
             paths.append(score_pointer)
             try:
                 pointer = read_json(score_pointer)
+                score_horizon = int(pointer["commit_sample"])
+                score_horizons[score_pointer.resolve()] = score_horizon
                 for section in ("midi", "musicxml", "alignment"):
                     relative = Path(str(pointer[section]["path"]))
                     candidate = (directory / relative).resolve()
                     if candidate.is_relative_to(directory) and candidate.is_file():
                         paths.append(candidate)
+                        score_horizons[candidate] = score_horizon
             except (KeyError, OSError, TypeError, ValueError):
                 pass
         unique_paths = sorted({path.resolve() for path in paths if path.is_file()})
@@ -439,7 +443,10 @@ class LocalSessionStore:
                 byte_count=path.stat().st_size,
                 source_horizon_sample=audio_horizons.get(
                     path,
-                    session.source_frame_count,
+                    score_horizons.get(
+                        path,
+                        session.source_frame_count,
+                    ),
                 ),
                 created_at=datetime.fromtimestamp(
                     path.stat().st_mtime,
