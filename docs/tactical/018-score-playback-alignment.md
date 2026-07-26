@@ -208,6 +208,32 @@ with zero vulnerabilities, and all legacy JavaScript syntax checks. The
 production Vite build also passed; its only warning was the existing OSMD
 chunk-size advisory.
 
+### Post-completion tick-collision correction
+
+Session `20260726T134843-17b0729ad6ca` exposed a real ordering edge after the
+initial closeout. Source notes at samples `1,421,403` and `1,421,409` collapse
+onto the same exported MIDI tick. The transformer orders that tick by pitch,
+while the first source-note sidecar ordered it by the six-sample raw-onset
+difference. The adapter rejected the mismatch before inference with
+`score input-note order differs from MIDI`.
+
+Commits `0650ce0`, `8ac8380`, and `9da53b2` corrected the contract and failure
+presentation. Source identities now use the exporter's exact MIDI tick
+conversion and the transformer's onset, pitch, and duration ordering. After
+validation, the browser sorts rows back onto the authoritative raw-sample
+timeline for lookup. A lost score-job poll also becomes an explicit failed
+state instead of leaving the control indefinitely disabled.
+
+The corrected exact session selected 86 notes, produced 87 pitched MusicXML
+elements, mapped all 86 source rows, and reported zero unmatched notes and
+zero inserted score segments. In Chromium at 1024 CSS pixels, seeking to
+sample `1,200,000` displayed the score, placed the roll line at 43.5237%, and
+showed the OSMD cursor with no render or console errors. The final
+`uv run atpiano migration-regression` passed at revision `9da53b2`; its report
+is `results/migration-regression/20260726T140248Z/report.json` and records 86
+Python tests, 29 Vitest tests, five TypeScript node tests, contract parity,
+Ruff, npm audit, and legacy JavaScript checks.
+
 ## Rollback
 
 Alignment is an additive snapshot artifact and cursor rendering is

@@ -10,7 +10,10 @@ for the same reference take, cutting ties from 20 to 1 and voices from 10 to
 through that cascade. Tactical 018 now preserves a checksummed
 source-event-to-MusicXML alignment beside each new snapshot and uses it to
 drive discrete OSMD playback attacks from the authoritative source-sample
-clock. Historical snapshots without alignment still render without a cursor.
+clock. Source identities follow the actual serialized MIDI tick, pitch, and
+duration order consumed by the transformer; the browser normalizes validated
+rows back onto raw source-sample order for playback lookup. Historical
+snapshots without alignment still render without a cursor.
 This is not yet progressive engraving or a permanent consumer-stack
 selection, and the leading score converter has no published license. See
 [`008-score-pipeline-bakeoff.md`](../tactical/008-score-pipeline-bakeoff.md)
