@@ -8,3 +8,5 @@
   feedback, measured delivery, and final backfill
 - `browser-only-wasm-deployment` — static browser execution, local
   persistence, offline packaging, and serverless deployment
+- `session-workspace-management` — v2 session catalog, explicit New and
+  selection, history, recoverable deletion, and continuation boundaries

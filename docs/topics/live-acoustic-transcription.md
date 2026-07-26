@@ -28,6 +28,11 @@ and the general latency/quality benchmark. This topic applies those contracts
 to a user-operated browser session. The downstream piano-roll or notation
 consumer remains separable and must also accept direct MIDI.
 
+[`session-workspace-management.md`](session-workspace-management.md) owns the
+accepted refactor that separates the active capture session from each
+browser's selected session, then adds explicit New, history, and recoverable
+deletion without changing the capture sample-clock contract.
+
 ## Product Version Boundary
 
 The current `uv run atpiano workbench` application is the v1 MVP. Its command,

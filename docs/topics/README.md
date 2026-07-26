@@ -29,6 +29,9 @@ normally reuse the document slug in its `Topic:` trailers.
 - [`performance-to-notation.md`](performance-to-notation.md):
   evaluated downstream conversion prototype whose artifacts are inspectable
   but whose first target-piano score failed the readability goal.
+- [`session-workspace-management.md`](session-workspace-management.md):
+  accepted v2 foundation for explicit New, session history, separate
+  active/selected identities, recoverable deletion, and future continuation.
 
 ## Update Policy
 
