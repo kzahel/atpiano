@@ -583,9 +583,18 @@ class CorrectedSession:
         segment_s: float = DEFAULT_SEGMENT_S,
         minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
         horizon_snapshot_s: float = DEFAULT_HORIZON_SNAPSHOT_S,
+        correction_mode: str = "delayed",
+        correction_reason: str = "explicit local default",
     ) -> None:
         if source not in {"replay", "microphone"}:
             raise ValueError("corrected session source is invalid")
+        if correction_mode not in {
+            "live",
+            "delayed",
+            "after-stop",
+            "unavailable",
+        }:
+            raise ValueError("corrected session correction mode is invalid")
         self.directory = directory.resolve()
         if self.directory.exists() and any(self.directory.iterdir()):
             raise FileExistsError(
@@ -595,6 +604,9 @@ class CorrectedSession:
         self.session_id = session_id
         self.sample_rate_hz = sample_rate_hz
         self.source = source
+        self.correction_mode = correction_mode
+        self.correction_reason = correction_reason
+        self._stage_errors: dict[str, str] = {}
         self.realtime = realtime
         self.origin_monotonic_ns = time.perf_counter_ns()
         self.started_at = utc_now()
@@ -642,6 +654,11 @@ class CorrectedSession:
             ),
             "error": error,
             "source_frame_count": self.horizons.audio_head_sample,
+            "processing": {
+                "correction_mode": self.correction_mode,
+                "correction_reason": self.correction_reason,
+                "stage_errors": dict(self._stage_errors),
+            },
             "retention": {
                 "pcm_ring_frames": self.ring.capacity_frames,
                 "audio_segment_frames": self.audio.segment_frames,
@@ -658,6 +675,13 @@ class CorrectedSession:
             },
         }
         write_json(self.directory / "session.json", document)
+
+    def record_stage_error(self, stage: str, error: Exception) -> None:
+        with self._state_lock:
+            self._stage_errors[stage] = f"{type(error).__name__}: {error}"
+            self._write_session(
+                status="stopping" if self._capture_closed else "active"
+            )
 
     def add_lane(self, lane: CorrectedSessionLane) -> None:
         if self.closed:

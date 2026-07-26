@@ -583,6 +583,16 @@
         "title": "CaptureStop",
         "type": "object"
       },
+      "CorrectionMode": {
+        "enum": [
+          "live",
+          "delayed",
+          "after-stop",
+          "unavailable"
+        ],
+        "title": "CorrectionMode",
+        "type": "string"
+      },
       "DeleteSessionRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1686,6 +1696,31 @@
             ],
             "default": null,
             "title": "Completed At"
+          },
+          "correction_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CorrectionMode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "correction_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Correction Reason"
           },
           "current_transcription_run_id": {
             "anyOf": [

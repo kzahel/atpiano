@@ -381,6 +381,11 @@ export interface components {
             /** Workspace Id */
             workspace_id: string;
         };
+        /**
+         * CorrectionMode
+         * @enum {string}
+         */
+        CorrectionMode: "live" | "delayed" | "after-stop" | "unavailable";
         /** DeleteSessionRequest */
         DeleteSessionRequest: {
             /**
@@ -829,6 +834,13 @@ export interface components {
              * @default null
              */
             completed_at: string | null;
+            /** @default null */
+            correction_mode: components["schemas"]["CorrectionMode"] | null;
+            /**
+             * Correction Reason
+             * @default null
+             */
+            correction_reason: string | null;
             /**
              * Current Transcription Run Id
              * @default null

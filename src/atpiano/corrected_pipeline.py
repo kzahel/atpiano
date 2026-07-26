@@ -39,11 +39,21 @@ class CorrectedSessionPipeline:
         finalizer: SettlementFinalizer | None = None,
         on_settled: SettlementCallback | None = None,
         on_failed: FailureCallback | None = None,
+        defer_until_stop: frozenset[str] = frozenset(),
     ) -> None:
         self.session = session
         self._finalizer = finalizer
         self._on_settled = on_settled
         self._on_failed = on_failed
+        unknown_deferred = defer_until_stop.difference(
+            lane.name for lane in session.lanes
+        )
+        if unknown_deferred:
+            raise ValueError(
+                "deferred pipeline lanes are unavailable: "
+                + ", ".join(sorted(unknown_deferred))
+            )
+        self._defer_until_stop = defer_until_stop
         self._condition = threading.Condition()
         self._states = {
             lane.name: _LaneState()
@@ -102,7 +112,10 @@ class CorrectedSessionPipeline:
         manifest = self.session.begin_settling()
         with self._condition:
             self._condition.notify_all()
-        if not self.session.lanes:
+            all_completed = all(
+                state.completed for state in self._states.values()
+            )
+        if not self.session.lanes or all_completed:
             self._finish_settlement()
         return manifest
 
@@ -128,13 +141,19 @@ class CorrectedSessionPipeline:
                         lambda: (
                             self._aborted
                             or self._stopping
-                            or lane.has_pending_work(self.session)
+                            or (
+                                lane.name not in self._defer_until_stop
+                                and lane.has_pending_work(self.session)
+                            )
                         )
                     )
                     if self._aborted:
                         return
-                    has_work = lane.has_pending_work(self.session)
                     stopping = self._stopping
+                    has_work = lane.has_pending_work(self.session) and (
+                        stopping
+                        or lane.name not in self._defer_until_stop
+                    )
                     if has_work:
                         state.running = True
                         state.last_started_at = utc_now()
@@ -173,8 +192,17 @@ class CorrectedSessionPipeline:
         except Exception as error:
             with self._condition:
                 state.running = False
+                state.completed = True
                 state.error = f"{type(error).__name__}: {error}"
-            self.abort(error)
+                stopping = self._stopping
+            self.session.record_stage_error(lane.name, error)
+            if stopping:
+                with self._condition:
+                    if all(
+                        candidate.completed
+                        for candidate in self._states.values()
+                    ):
+                        self._finish_settlement()
 
     def _finish_settlement(self) -> None:
         if self._settled.is_set() or self._aborted:
@@ -219,6 +247,9 @@ class CorrectedSessionPipeline:
                     "last_started_at": state.last_started_at,
                     "last_completed_at": state.last_completed_at,
                     "error": state.error,
+                    "deferred_until_stop": (
+                        name in self._defer_until_stop
+                    ),
                 }
                 for name, state in self._states.items()
             }

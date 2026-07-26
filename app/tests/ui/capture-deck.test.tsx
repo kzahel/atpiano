@@ -41,6 +41,6 @@ describe("capture deck", () => {
       (screen.getByRole("button", { name: "Settling…" }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
-    expect(screen.getByText("Settling the final notes…")).toBeTruthy();
+    expect(screen.getByText("Closing microphone capture…")).toBeTruthy();
   });
 });

@@ -286,7 +286,9 @@ describe("shared application", () => {
 
     await user.click(screen.getByRole("button", { name: /Replay musical fixture/ }));
 
-    expect(await screen.findByText("Listening and correcting")).toBeTruthy();
+    expect(
+      await screen.findByText("Listening with background correction"),
+    ).toBeTruthy();
     expect(
       await screen.findByRole("heading", { name: "Morning progression" }),
     ).toBeTruthy();

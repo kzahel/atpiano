@@ -85,6 +85,13 @@ class CaptureStatus(str, Enum):
     FAILED = "failed"
 
 
+class CorrectionMode(str, Enum):
+    LIVE = "live"
+    DELAYED = "delayed"
+    AFTER_STOP = "after-stop"
+    UNAVAILABLE = "unavailable"
+
+
 class SourceKind(str, Enum):
     MICROPHONE = "microphone"
     REPLAY = "replay"
@@ -183,6 +190,11 @@ class Session(VersionedContractModel):
     current_transcription_run_id: OpaqueId | None = None
     display_name: Annotated[str, StringConstraints(min_length=1, max_length=200)] | None = None
     available_artifact_kinds: tuple[ArtifactKind, ...] = ()
+    correction_mode: CorrectionMode | None = None
+    correction_reason: Annotated[
+        str,
+        StringConstraints(min_length=1, max_length=500),
+    ] | None = None
 
     @model_validator(mode="after")
     def validate_lifecycle(self) -> Session:

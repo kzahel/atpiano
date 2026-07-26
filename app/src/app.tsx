@@ -915,9 +915,13 @@ export function App() {
                 <i aria-hidden="true" />
                 <strong>
                   {captureState.phase === "recording"
-                    ? "Listening and correcting"
+                    ? selected.correction_mode === "after-stop"
+                      ? "Listening now; correction begins after Stop"
+                      : selected.correction_mode === "unavailable"
+                        ? "Listening with provisional recognition"
+                        : "Listening with background correction"
                     : captureState.phase === "stopping"
-                      ? "Settling the final notes"
+                      ? "Closing microphone capture"
                       : captureState.phase === "failed"
                         ? "Capture needs attention"
                         : "Preparing the local engine"}
@@ -943,6 +947,24 @@ export function App() {
               </div>
             )}
 
+            {selected.status === "stopping" && captureState.phase === "idle" && (
+              <div className="live-status-strip stopping" role="status">
+                <i aria-hidden="true" />
+                <strong>Capture complete; correction is settling</strong>
+                <span>
+                  Corrected {formatClock(settleCommit, selected.sample_rate_hz)}
+                  {" "}of {formatClock(settleAudioHead, selected.sample_rate_hz)}
+                </span>
+                <div className="settle-progress">
+                  <progress
+                    max={100}
+                    value={settlePercent}
+                    aria-label="Background correction progress"
+                  />
+                </div>
+              </div>
+            )}
+
             <section className="metrics-row" aria-label="Session summary">
               <article>
                 <span>Recognized notes</span>
@@ -956,7 +978,11 @@ export function App() {
                     ? formatClock(horizon.data.commit_sample, selected.sample_rate_hz)
                     : "—"}
                 </strong>
-                <small>source sample horizon</small>
+                <small>
+                  {selected.correction_mode
+                    ? `${selected.correction_mode} correction`
+                    : "source sample horizon"}
+                </small>
               </article>
               <article>
                 <span>Session state</span>

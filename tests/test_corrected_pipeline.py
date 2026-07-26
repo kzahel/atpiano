@@ -102,6 +102,20 @@ class _ImmediateLane:
         return {"name": self.name}
 
 
+class _FailingLane(_ImmediateLane):
+    name = "failing"
+
+    def process_available(
+        self,
+        session: CorrectedSession,
+        *,
+        received_ns: int,
+        max_work_items: int | None = None,
+    ) -> LaneUpdate:
+        del session, received_ns, max_work_items
+        raise RuntimeError("intentional lane failure")
+
+
 def test_blocked_lane_does_not_block_pcm_or_other_lane(tmp_path: Path) -> None:
     session = CorrectedSession(
         tmp_path / "session",
@@ -159,3 +173,65 @@ def test_pipeline_abort_preserves_accepted_audio(tmp_path: Path) -> None:
     assert manifest["status"] == "failed"
     assert manifest["source_frame_count"] == 4
     assert session.read_pcm(0, 4) == _block(0, 0, 4).pcm_s16le
+
+
+def test_pipeline_defers_named_lane_until_stop(tmp_path: Path) -> None:
+    session = CorrectedSession(
+        tmp_path / "session",
+        session_id="session",
+        sample_rate_hz=8_000,
+        source="microphone",
+        minimum_free_bytes=0,
+        correction_mode="after-stop",
+        correction_reason="test policy",
+    )
+    blocking = _BlockingLane()
+    session.add_lane(blocking)
+    pipeline = CorrectedSessionPipeline(
+        session,
+        defer_until_stop=frozenset({"blocking"}),
+    )
+
+    pipeline.accept_block(_block(0, 0, 4), received_ns=1)
+
+    assert not blocking.started.wait(0.05)
+    assert pipeline.status()["lanes"]["blocking"]["deferred_until_stop"]
+    pipeline.begin_stop()
+    assert blocking.started.wait(1)
+    blocking.release.set()
+    assert pipeline.wait(1)
+
+
+def test_lane_failure_preserves_capture_and_completes_with_stage_error(
+    tmp_path: Path,
+) -> None:
+    session = CorrectedSession(
+        tmp_path / "session",
+        session_id="session",
+        sample_rate_hz=8_000,
+        source="microphone",
+        minimum_free_bytes=0,
+    )
+    failing = _FailingLane()
+    immediate = _ImmediateLane()
+    session.add_lane(failing)
+    session.add_lane(immediate)
+    pipeline = CorrectedSessionPipeline(session)
+
+    pipeline.accept_block(_block(0, 0, 4), received_ns=1)
+    deadline = time.monotonic() + 1
+    while (
+        pipeline.status()["lanes"]["failing"]["error"] is None
+        and time.monotonic() < deadline
+    ):
+        time.sleep(0.005)
+    pipeline.accept_block(_block(1, 4, 4), received_ns=2)
+    pipeline.begin_stop()
+
+    assert pipeline.wait(1)
+    manifest = read_json(session.directory / "session.json")
+    assert manifest["status"] == "complete"
+    assert manifest["source_frame_count"] == 8
+    assert "intentional lane failure" in (
+        manifest["processing"]["stage_errors"]["failing"]
+    )

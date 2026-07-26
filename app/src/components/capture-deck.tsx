@@ -8,8 +8,8 @@ const phaseCopy: Record<CaptureState["phase"], string> = {
   idle: "Ready for a new performance",
   requesting: "Requesting access…",
   warming: "Warming recognition models…",
-  recording: "Listening and correcting",
-  stopping: "Settling the final notes…",
+  recording: "Listening for notes",
+  stopping: "Closing microphone capture…",
   failed: "Capture needs attention",
 };
 
@@ -80,7 +80,12 @@ export function CaptureDeck({
         <span>
           <strong>{phaseCopy[captureState.phase]}</strong>
           {activeSession && (
-            <small>Active session · {activeSession.display_name ?? activeSession.session_id}</small>
+            <small>
+              Active session · {activeSession.display_name ?? activeSession.session_id}
+              {activeSession.correction_mode
+                ? ` · ${activeSession.correction_mode} correction`
+                : ""}
+            </small>
           )}
           {captureState.error && <small>{captureState.error}</small>}
         </span>

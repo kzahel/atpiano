@@ -275,11 +275,13 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
     assert v2.silence_seconds == 1.5
     assert v2.no_wait is True
     assert v2.commit_threads == 2
+    assert v2.correction_mode == "delayed"
     assert v3.command == "workbench-v3"
     assert v3.port == 8102
     assert v3.repeat == 2
     assert v3.workspace == Path("results/workbench-v3")
     assert v3.commit_threads == 2
+    assert v3.correction_mode == "delayed"
 
 
 def test_corrected_workbench_can_serve_the_shared_app_shell(
@@ -467,6 +469,7 @@ def test_microphone_websocket_uses_corrected_session_and_exports(
         _, payload = _server_frame(stream)
         ready = json.loads(payload)
         assert ready["type"] == "ready"
+        assert ready["correction"]["mode"] == "delayed"
         assert [lane["name"] for lane in ready["lanes"]] == ["preview", "commit"]
 
         pcm = struct.pack("<6h", -32768, -2, -1, 0, 1, 32767)

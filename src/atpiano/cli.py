@@ -191,6 +191,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="maximum Transkun CPU threads (default: 2)",
     )
     corrected_workbench_parser.add_argument(
+        "--correction-mode",
+        choices=("live", "delayed", "after-stop", "unavailable"),
+        default="delayed",
+        help="when the corrected lane may run (default: delayed)",
+    )
+    corrected_workbench_parser.add_argument(
         "--score-runtime",
         type=Path,
         default=Path("results/midi2score-runtime"),
@@ -250,6 +256,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=2,
         help="maximum Transkun CPU threads (default: 2)",
+    )
+    shared_app_parser.add_argument(
+        "--correction-mode",
+        choices=("live", "delayed", "after-stop", "unavailable"),
+        default="delayed",
+        help="when the corrected lane may run (default: delayed)",
     )
     shared_app_parser.add_argument(
         "--score-runtime",
@@ -386,6 +398,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             open_browser=not args.no_open,
             commit_device=args.commit_device,
             commit_threads=args.commit_threads,
+            correction_mode=args.correction_mode,
             minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
             replay_manifest=args.replay,
             replay_repeat=args.repeat,
@@ -403,6 +416,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             open_browser=not args.no_open,
             commit_device=args.commit_device,
             commit_threads=args.commit_threads,
+            correction_mode=args.correction_mode,
             minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
             replay_manifest=args.replay,
             replay_repeat=args.repeat,

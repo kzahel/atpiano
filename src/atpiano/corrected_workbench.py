@@ -139,6 +139,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         application_mode: str = "corrected-workbench-v2",
         isolate_models: bool = True,
         commit_threads: int | None = 2,
+        correction_mode: str = "delayed",
     ) -> None:
         if minimum_free_bytes < 0:
             raise ValueError("minimum free bytes cannot be negative")
@@ -148,6 +149,13 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             raise ValueError("replay silence cannot be negative")
         if commit_threads is not None and commit_threads <= 0:
             raise ValueError("commit worker thread limit must be positive")
+        if correction_mode not in {
+            "live",
+            "delayed",
+            "after-stop",
+            "unavailable",
+        }:
+            raise ValueError("local correction mode is invalid")
         self.workspace_directory = workspace_directory.resolve()
         self.workspace_directory.mkdir(parents=True, exist_ok=True)
         self.session_store = LocalSessionStore(self.workspace_directory)
@@ -164,6 +172,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self.application_mode = application_mode
         self.isolate_models = isolate_models
         self.commit_threads = commit_threads
+        self.correction_mode = correction_mode
         self.state_lock = threading.Lock()
         self.model_lock = threading.Lock()
         self.score_lock = threading.Lock()
@@ -224,7 +233,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             self._status = persisted_status
             self._error = latest.get("error")
 
-    def get_models(self) -> tuple[LiveWindowModel, CommitModel]:
+    def get_preview_model(self) -> LiveWindowModel:
         with self.model_lock:
             if self._preview_model is None:
                 self._preview_model = (
@@ -232,6 +241,10 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                     if self.isolate_models
                     else self.preview_model_factory()
                 )
+            return self._preview_model
+
+    def get_commit_model(self) -> CommitModel:
+        with self.model_lock:
             if self._commit_model is None:
                 self._commit_model = (
                     CommitModelWorker(
@@ -241,7 +254,10 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                     if self.isolate_models
                     else self.commit_model_factory()
                 )
-            return self._preview_model, self._commit_model
+            return self._commit_model
+
+    def get_models(self) -> tuple[LiveWindowModel, CommitModel]:
+        return self.get_preview_model(), self.get_commit_model()
 
     def model_worker_status(self) -> list[dict[str, Any]]:
         with self.model_lock:
@@ -1481,21 +1497,45 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     if len(encoded_metadata) > MAX_CLIENT_METADATA_BYTES:
                         raise ValueError("microphone client metadata is too large")
                     session_id, directory = self.server.claim_session(source="microphone")
-                    preview_model, commit_model = self.server.get_models()
+                    preview_model = self.server.get_preview_model()
+                    correction_mode = self.server.correction_mode
+                    correction_reason = (
+                        "selected by explicit local configuration"
+                    )
+                    commit_model: CommitModel | None = None
+                    if correction_mode != "unavailable":
+                        try:
+                            commit_model = self.server.get_commit_model()
+                        except RuntimeError as error:
+                            correction_mode = "unavailable"
+                            correction_reason = (
+                                "commit worker could not start: "
+                                f"{type(error).__name__}: {error}"
+                            )
                     session = CorrectedSession(
                         directory,
                         session_id=session_id,
                         sample_rate_hz=sample_rate_hz,
                         source="microphone",
                         minimum_free_bytes=self.server.minimum_free_bytes,
+                        correction_mode=correction_mode,
+                        correction_reason=correction_reason,
                     )
                     session.add_lane(CorrectedPreviewLane(session, model=preview_model))
-                    session.add_lane(CorrectedCommitLane(session, model=commit_model))
+                    if commit_model is not None:
+                        session.add_lane(
+                            CorrectedCommitLane(session, model=commit_model)
+                        )
                     pipeline = CorrectedSessionPipeline(
                         session,
                         finalizer=self.server._finalize_microphone_session,
                         on_settled=self.server._microphone_session_settled,
                         on_failed=self.server._microphone_session_failed,
+                        defer_until_stop=(
+                            frozenset({"commit"})
+                            if correction_mode == "after-stop"
+                            else frozenset()
+                        ),
                     )
                     write_json(
                         directory / "client.json",
@@ -1513,6 +1553,10 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                             "session_id": session_id,
                             "sample_rate_hz": sample_rate_hz,
                             "lanes": [lane.status() for lane in session.lanes],
+                            "correction": {
+                                "mode": correction_mode,
+                                "reason": correction_reason,
+                            },
                         }
                     )
                 elif message_type == "stop":
@@ -1587,6 +1631,7 @@ def create_corrected_workbench_server(
     commit_device: str = "cpu",
     commit_threads: int | None = 2,
     isolate_models: bool = True,
+    correction_mode: str = "delayed",
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
     replay_manifest: Path | None = None,
     replay_repeat: int = 1,
@@ -1609,6 +1654,7 @@ def create_corrected_workbench_server(
         commit_model_factory=factory,
         commit_threads=commit_threads,
         isolate_models=isolate_models,
+        correction_mode=correction_mode,
         minimum_free_bytes=minimum_free_bytes,
         replay_manifest=replay_manifest,
         replay_repeat=replay_repeat,
@@ -1628,6 +1674,7 @@ def serve_corrected_workbench(
     open_browser: bool = True,
     commit_device: str = "cpu",
     commit_threads: int | None = 2,
+    correction_mode: str = "delayed",
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
     replay_manifest: Path | None = None,
     replay_repeat: int = 1,
@@ -1643,6 +1690,7 @@ def serve_corrected_workbench(
         port=port,
         commit_device=commit_device,
         commit_threads=commit_threads,
+        correction_mode=correction_mode,
         minimum_free_bytes=minimum_free_bytes,
         replay_manifest=replay_manifest,
         replay_repeat=replay_repeat,
@@ -1675,6 +1723,7 @@ def serve_shared_application(
     open_browser: bool = True,
     commit_device: str = "cpu",
     commit_threads: int | None = 2,
+    correction_mode: str = "delayed",
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
     replay_manifest: Path | None = None,
     replay_repeat: int = 1,
@@ -1695,6 +1744,7 @@ def serve_shared_application(
         open_browser=open_browser,
         commit_device=commit_device,
         commit_threads=commit_threads,
+        correction_mode=correction_mode,
         minimum_free_bytes=minimum_free_bytes,
         replay_manifest=replay_manifest,
         replay_repeat=replay_repeat,
