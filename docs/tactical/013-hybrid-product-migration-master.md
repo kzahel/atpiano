@@ -59,7 +59,7 @@ result, and commit range.
 
 | Phase | Status | Bounded tactical | Human gate |
 | --- | --- | --- | --- |
-| 1. Freeze and characterize | In progress | [`014`](014-freeze-migration-baseline.md) | Evidence review if a discrepancy appears |
+| 1. Freeze and characterize | Complete (`3aabcda^..0bca270`) | [`014`](014-freeze-migration-baseline.md) | R1 accepted; no ambiguity |
 | 2. Contracts and structure | Not started | Not created | **Required structure review** |
 | 3. Shared React application | Not started | Not created | **Required interaction review** |
 | 4. Python application core | Not started | Not created | **Required parity review; hold before Phase 5** |

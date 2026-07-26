@@ -4,7 +4,8 @@ Master phase: 1. Freeze and characterize
 
 Topic: multi-tenant-hybrid-service-architecture
 
-Status: in progress on 2026-07-26.
+Status: complete on 2026-07-26. R1 found no product ambiguity requiring an
+early hold; Phase 2 may proceed.
 
 ## Entry Evidence
 
@@ -120,5 +121,54 @@ either application or existing artifacts.
 
 ## Execution Record
 
-In progress. Append commit IDs, validation results, baseline hashes,
-discrepancies, and the R1 disposition as the slice lands.
+The bounded implementation landed as:
+
+- `3aabcda` opened this tactical and linked it from the master tracker;
+- `663fe63` added the single migration-regression command and report schema;
+- `b969170` froze the aligned fixture plus normalized v1 and v2 route
+  products; and
+- `0bca270` documented commands, environment constraints, behavior inventory,
+  manual lanes, and deliberate non-parity.
+
+The implementation range is `3aabcda^..0bca270`.
+
+The frozen aligned musical fixture is:
+
+```text
+audio SHA-256:
+0eab5d787cb482735dc840daaed2abfb6d00ad6ff7a7058fdd217522905aaa89
+MIDI SHA-256:
+d24635a3f75d83dd8ff40e9513475dc43064e1dbb29fd836345f2057da0ec7d9
+```
+
+The first complete report is ignored runtime evidence at
+`results/migration-regression/20260726T094151Z/report.json`. It passed:
+
+```text
+Python tests:       57 passed, one upstream deprecation warning
+JavaScript tests:   pass
+Ruff:               pass
+JavaScript syntax:  pass
+Git whitespace:     pass
+```
+
+It records Python 3.10.19, macOS arm64, Basic Pitch 0.4.0, Transkun 2.0.1,
+Partitura 1.9.0, and the exact package/runtime provenance. Physical
+microphone, real corrected-model, internal score-runtime, and long-soak lanes
+remain explicitly not run by the unattended command.
+
+### R1 disposition
+
+No current useful behavior had an ambiguous disposition. The principal
+discrepancies are known proof-of-concept boundaries:
+
+- unqualified v2 routes and score jobs resolve through one global current
+  session;
+- restart silently chooses the newest valid session;
+- v1 retains its two-minute resource limit and experimental frontend; and
+- the internal score converter cannot become a distributed capability while
+  its license is unresolved.
+
+Phase 2 should preserve these only through compatibility aliases while
+introducing explicit session-addressed products and the runtime-provider
+vocabulary. No baseline behavior is proposed for silent removal.
