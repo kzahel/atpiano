@@ -2,12 +2,13 @@
 
 Topic: session-workspace-management
 
-Status: accepted proposed foundation on 2026-07-26; Phase 2 contract and local
-compatibility implementation is complete and awaiting R2 review under
-[`015-product-contracts-and-structure.md`](../tactical/015-product-contracts-and-structure.md).
+Status: accepted proposed foundation on 2026-07-26; the revised Phase 2
+contract and local compatibility implementation is complete and awaiting R2
+review under
+[`015-contracts-and-structure.md`](../tactical/015-contracts-and-structure.md).
 Existing session artifacts remain authoritative while explicit catalog,
 session-addressed reads, capture identity, score targets, and recoverable
-deletion are exposed through additive product routes. The durable React
+deletion are exposed through additive `/api/v1` routes. The durable React
 New/history/selection UI remains Phase 3 and has not started.
 
 ## Scope And Relationship
@@ -195,15 +196,15 @@ retarget or hide the job.
 Phase 2 established the versioned ordinary HTTP shape:
 
 ```text
-GET    /api/product/v1/workspaces
-GET    /api/product/v1/workspaces/{workspace-id}/sessions
-GET    /api/product/v1/workspaces/{workspace-id}/sessions/{session-id}
-GET    /api/product/v1/workspaces/{workspace-id}/sessions/{session-id}/horizon
-GET    /api/product/v1/workspaces/{workspace-id}/sessions/{session-id}/events
-GET    /api/product/v1/workspaces/{workspace-id}/sessions/{session-id}/artifacts
-POST   /api/product/v1/workspaces/{workspace-id}/sessions/{session-id}/score-jobs
-DELETE /api/product/v1/workspaces/{workspace-id}/sessions/{session-id}
-GET    /api/product/v1/jobs/{job-id}
+GET    /api/v1/workspaces
+GET    /api/v1/workspaces/{workspace-id}/sessions
+GET    /api/v1/workspaces/{workspace-id}/sessions/{session-id}
+GET    /api/v1/workspaces/{workspace-id}/sessions/{session-id}/horizon
+GET    /api/v1/workspaces/{workspace-id}/sessions/{session-id}/events
+GET    /api/v1/workspaces/{workspace-id}/sessions/{session-id}/artifacts
+POST   /api/v1/workspaces/{workspace-id}/sessions/{session-id}/score-jobs
+DELETE /api/v1/workspaces/{workspace-id}/sessions/{session-id}
+GET    /api/v1/jobs/{job-id}
 ```
 
 List responses are bounded and cursor-paginated. Resource responses include

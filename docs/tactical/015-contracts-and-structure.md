@@ -1,4 +1,4 @@
-# 015 — Product Contracts And Structure
+# 015 — Contracts And Structure
 
 Master phase: 2. Contracts and structure
 
@@ -6,8 +6,8 @@ Topic: multi-tenant-hybrid-service-architecture
 
 Topic: session-workspace-management
 
-Status: implementation complete on 2026-07-26; awaiting mandatory R2 review.
-Phase 3 has not started.
+Status: implementation revised after initial R2 feedback on 2026-07-26;
+awaiting mandatory R2 review. Phase 3 has not started.
 
 ## Entry Evidence
 
@@ -22,7 +22,7 @@ Phase 3 has not started.
 ## User-Visible Outcome
 
 The current v1 and v2 applications remain independently runnable. In
-addition, the repository exposes a small, versioned product vocabulary and
+addition, the repository exposes a small, versioned atpiano vocabulary and
 explicit session-addressed local compatibility API that the Phase 3 shared
 frontend can consume without depending on global current-session selection.
 
@@ -39,18 +39,22 @@ broad React migration begins.
   job.
 - Existing v1 and v2 artifacts remain readable without migration.
 - Existing unqualified v2 routes remain temporary compatibility aliases.
-- Pydantic is the source for public product schemas; generated TypeScript is
+- Pydantic is the source for public contract schemas; generated TypeScript is
   checked and not hand-maintained.
-- Domain and application modules do not import HTTP, browser, Tauri, or
-  persistence adapters.
+- Contract schemas do not import HTTP, browser, Tauri, persistence adapters,
+  or existing corrected-session implementations.
+- Concrete adapters depend on contracts; no framework-independent
+  application layer is introduced before Phase 4 has real services to place
+  in it.
 - Types cover the next executable slices rather than speculative billing,
   deployment, or general-sync behavior.
 
 ## Exact Implementation Scope
 
-### 1. Versioned product schemas
+### 1. Versioned contract schemas
 
-Add a dedicated inward-facing Python product package with checked schemas for:
+Add a dedicated inward-facing Python contract package with checked schemas
+for:
 
 - user, workspace, membership, session, capture, and transcription run;
 - event revision and sample-clock horizons;
@@ -68,12 +72,12 @@ than renaming old evidence in place.
 
 Add one reproducible command that:
 
-- exports the product OpenAPI document from Pydantic;
+- exports the atpiano OpenAPI document from Pydantic;
 - generates checked TypeScript schema types;
 - verifies generated files have no drift; and
 - runs cross-language fixtures through runtime validation.
 
-Establish a minimal TypeScript product workspace containing:
+Establish the initial TypeScript application workspace containing:
 
 - generated wire types and a typed HTTP client;
 - a hand-owned `AtpianoRuntime` behavioral interface;
@@ -94,7 +98,7 @@ Introduce focused adapter modules for:
 - score jobs frozen to their target session and commit horizon; and
 - recoverable trash movement with active and score-job guards.
 
-Expose bounded `/api/product/v1/...` routes for these behaviors. Retain
+Expose bounded `/api/v1/...` routes for these behaviors. Retain
 `/api/session`, `/api/events`, `/api/score`, `/api/replay`, `/api/live`, and
 their current artifact aliases for the framework-free v2 client.
 
@@ -102,10 +106,10 @@ their current artifact aliases for the framework-free v2 client.
 
 Add:
 
-- shared JSON fixtures for representative successful and failed products;
+- shared JSON fixtures for representative successful and failed values;
 - Python and TypeScript serialization/validation tests over the same bytes;
-- dependency tests that prevent product domain/application imports from
-  reaching HTTP, filesystem-adapter, Tauri, React, or generated-client code;
+- dependency tests that prevent contract-schema imports from reaching HTTP,
+  filesystem-adapter, Tauri, React, or generated-client code;
 - path, traversal, pagination, selected-versus-active, late-target, score-job,
   and recoverable-delete tests; and
 - an actual directory/responsibility map matching the implemented tree.
@@ -125,14 +129,13 @@ Add:
 
 ## Migration And Compatibility
 
-The product contract has its own explicit `v1` version and adapters from
+The atpiano contract has its own explicit `v1` version and adapters from
 existing v2 manifests and events. It does not rewrite existing session files.
 Catalog scanning treats manifests as authoritative and `.trash` as excluded.
 
-The current v2 page continues to use global aliases until Phase 3. New product
-routes always name their target. A compatibility route may call a product
-adapter, but product domain and application types cannot import the HTTP
-server.
+The current v2 page continues to use global aliases until Phase 3. New API
+routes always name their target. A compatibility route may call a local
+adapter, but contract types cannot import the HTTP server.
 
 Generated output changes only through the documented generation command.
 Breaking changes require a new schema/protocol version; additive compatible
@@ -157,7 +160,7 @@ optional compatibility smoke:
 
 1. run `uv run atpiano workbench-v2` over an existing workspace;
 2. verify the existing page still opens its latest session;
-3. query the product catalog and one explicit historical session;
+3. query the API catalog and one explicit historical session;
 4. confirm browsing that history does not alter the active capture identity;
    and
 5. confirm an artifact and score target still name the requested session.
@@ -183,7 +186,7 @@ accepts or revises the packet.
 
 ## Rollback Or Disable Path
 
-Product schemas, generated clients, adapter modules, routes, and fixtures are
+Contract schemas, generated clients, adapter modules, routes, and fixtures are
 additive. Reverting this series restores the Phase 1 baseline. Recoverable
 delete moves data only after explicit confirmation and retains it under the
 workspace `.trash`; no permanent purge exists.
@@ -202,18 +205,22 @@ The bounded implementation landed as:
 - `3ccb70f` exposed explicit local product routes and target-frozen score jobs;
 - `3441dcd` added an executable deterministic runtime provider; and
 - `7fdc3d1` kept capture transport provider-owned and limited generated HTTP
-  paths to actually implemented ordinary operations.
+  paths to actually implemented ordinary operations; and
+- `3b53285` applied R2 terminology feedback: moved Python responsibilities to
+  `contracts` and `adapters`, renamed the TypeScript workspace to `app`,
+  published `/api/v1` and `atpiano.contract.v1`, and removed unused
+  application ports.
 
-The implementation range is `e2c2b9d^..7fdc3d1`.
+The reviewed implementation range is `e2c2b9d^..3b53285`.
 
-Pydantic 2.13.4 is the direct Python schema dependency. The product workspace
-pins TypeScript 5.9.3, openapi-typescript 7.13.0, openapi-fetch 0.17.0, tsx
-4.23.1, AJV 8.20.0, and transitive security overrides captured in
-`product/package-lock.json`. `npm audit --audit-level high` reports zero
+Pydantic 2.13.4 is the direct Python schema dependency. The application
+workspace pins TypeScript 5.9.3, openapi-typescript 7.13.0, openapi-fetch
+0.17.0, tsx 4.23.1, AJV 8.20.0, and transitive security overrides captured
+in `app/package-lock.json`. `npm audit --audit-level high` reports zero
 vulnerabilities.
 
 The final unattended report is
-`results/migration-regression/20260726T100824Z/report.json`. It passed 77
+`results/migration-regression/20260726T103639Z/report.json`. It passed 77
 Python tests, both retained JavaScript suites, generated-contract drift,
 TypeScript typecheck, five TypeScript runtime tests, npm audit, Ruff,
 JavaScript syntax, and Git whitespace checks.

@@ -2,20 +2,25 @@
 
 Status: awaiting required human review on 2026-07-26.
 
-This packet is the mandatory hold after Phase 2. It reviews vocabulary,
-dependency direction, generated contracts, and the provider boundary before
-the broad React migration. It does not ask for approval of a visual design or
-claim that hosted, Tauri, or framework-independent application services
-already exist.
+This packet is the revised mandatory hold after Phase 2. Initial review found
+the provider direction useful for a future Android client but the `product`
+namespace too generic and the Python application ports premature. The
+implementation now names concrete responsibilities and introduces no
+framework-independent application layer before real Phase 4 services exist.
+
+This review covers vocabulary, dependency direction, generated contracts,
+and the provider boundary before the broad React migration. It does not ask
+for approval of a visual design or claim that hosted, Android, Tauri, or
+framework-independent application services already exist.
 
 ## Actual Repository Shape
 
 ```text
 contracts/
-  fixtures/v1/product-examples.json    shared successful wire examples
-  openapi/atpiano-product-v1.json      generated public HTTP contract
+  fixtures/v1/contract-examples.json   shared successful wire examples
+  openapi/atpiano-api-v1.json          generated public HTTP contract
 
-product/
+app/
   package.json                         pinned TypeScript tooling and checks
   src/generated/schema.ts              generated wire and HTTP path types
   src/http-client.ts                   typed openapi-fetch composition
@@ -23,20 +28,21 @@ product/
   src/runtime/fixture-runtime.ts       deterministic executable provider
   tests/                               cross-language and provider tests
 
-src/atpiano/product/
-  domain/schemas.py                    Pydantic source of product vocabulary
-  application/ports.py                 inward use-case port protocols
-  adapters/local_sessions.py           existing-v2 compatibility adapter
-  contract_generation.py               OpenAPI and TypeScript generation
+src/atpiano/contracts/
+  schemas.py                           Pydantic source of shared vocabulary
+  generation.py                        OpenAPI and TypeScript generation
+
+src/atpiano/adapters/
+  local_sessions.py                    existing-v2 compatibility adapter
 
 src/atpiano/corrected_workbench.py     retained v2 composition and additive
-                                      /api/product/v1 adapter routes
+                                      /api/v1 adapter routes
 tests/
-  test_product_schemas.py              semantic Python contract checks
-  test_product_fixtures.py             shared-byte Python validation
+  test_contract_schemas.py             semantic Python contract checks
+  test_contract_fixtures.py            shared-byte Python validation
   test_contract_generation.py          deterministic generation and drift
-  test_local_product_sessions.py       catalog/path/trash/dependency checks
-  test_product_routes.py               explicit target and compatibility HTTP
+  test_local_session_adapter.py        catalog/path/trash/dependency checks
+  test_api_routes.py                    explicit target and compatibility HTTP
 ```
 
 The current `src/atpiano/web` and `src/atpiano/web_v2` applications are
@@ -45,10 +51,7 @@ unchanged. React does not exist yet.
 ## Dependency Direction
 
 ```text
-Pydantic product domain
-          ^
-          |
-application port protocols
+Pydantic contract schemas
           ^
           |
 local manifest / event / artifact adapter
@@ -65,22 +68,30 @@ AtpianoRuntime interface
 fixture provider     Phase 3 local provider
 ```
 
-Python AST checks prevent domain and application modules from importing:
+Python AST checks prevent contract schemas from importing:
 
 - current corrected-session implementation modules;
 - local adapter modules;
 - HTTP server modules; or
 - filesystem APIs.
 
-The adapter may depend inward on product contracts and outward on existing v2
+The adapter may depend inward on contracts and outward on existing v2
 artifacts. `corrected_workbench.py` remains an outer compatibility
-composition. Framework-independent capture, transcription, score, and
-persistence services remain Phase 4 work.
+composition. There is deliberately no `application` package yet.
+Framework-independent capture, transcription, score, and persistence
+services remain Phase 4 work and will establish that package from concrete
+use cases.
+
+This is a cross-client boundary, not a generic multi-product wrapper. Web and
+a future Android application can depend on `AtpianoRuntime` and the same
+contract vocabulary. A hosted HTTP/WebSocket provider or a local desktop
+provider can fulfill that boundary without exposing transport choices
+through UI components.
 
 ## Runtime Provider
 
 The hand-owned interface is
-[`atpiano-runtime.ts`](../product/src/runtime/atpiano-runtime.ts). It covers:
+[`atpiano-runtime.ts`](../app/src/runtime/atpiano-runtime.ts). It covers:
 
 - capabilities and workspace/session pages;
 - explicit session reads;
@@ -108,7 +119,7 @@ The later hosted provider may use authenticated WebSockets; the local provider
 may use a loopback sidecar or Tauri bridge. UI components see neither.
 
 The deterministic
-[`fixture-runtime.ts`](../product/src/runtime/fixture-runtime.ts) already
+[`fixture-runtime.ts`](../app/src/runtime/fixture-runtime.ts) already
 executes the boundary through replay, contiguous PCM, Stop, event delivery,
 artifacts, score targeting, cancellation, and deletion guards. It gives Phase
 3 an executable provider without a test-only transcription domain.
@@ -140,10 +151,10 @@ implemented here. IDs are opaque validated strings. This intentionally does
 not freeze a UUID representation before offline/cloud identity requirements
 need one.
 
-## Representative Products
+## Representative Contract Values
 
 The exact shared bytes are
-[`product-examples.json`](../contracts/fixtures/v1/product-examples.json).
+[`contract-examples.json`](../contracts/fixtures/v1/contract-examples.json).
 They include:
 
 - a local workspace, user, and membership;
@@ -156,8 +167,8 @@ They include:
 - a mono PCM16 envelope beginning at absolute source sample 4,096.
 
 Both Pydantic and TypeScript JSON Schema validation accept every example and
-reject `atpiano.product.v2` where `atpiano.product.v1` is required. Pydantic
-also enforces semantic relationships that JSON Schema cannot compare
+reject `atpiano.contract.v2` where `atpiano.contract.v1` is required.
+Pydantic also enforces semantic relationships that JSON Schema cannot compare
 directly, including offset-after-onset, horizon-before-audio-head,
 immediately-prior revision ownership, lifecycle completion, and PCM byte
 counts.
@@ -167,20 +178,20 @@ counts.
 Install the pinned TypeScript tools, generate, and check drift with:
 
 ```text
-npm ci --prefix product
+npm ci --prefix app
 uv run atpiano generate-contracts
 uv run atpiano generate-contracts --check
-npm run typecheck --prefix product
-npm test --prefix product
+npm run typecheck --prefix app
+npm test --prefix app
 ```
 
 Pydantic is the source. The OpenAPI document and
-`product/src/generated/schema.ts` are machine-owned. The runtime interface and
+`app/src/generated/schema.ts` are machine-owned. The runtime interface and
 typed HTTP composition are hand-owned because they define behavior rather
 than serialization.
 
-`atpiano.product.v1` and `atpiano.pcm.v1` fail closed on incompatible
-versions. Strict product objects reject unknown fields. Additive changes may
+`atpiano.contract.v1` and `atpiano.pcm.v1` fail closed on incompatible
+versions. Strict contract objects reject unknown fields. Additive changes may
 extend v1 only when old readers remain valid; a breaking rename, semantic
 change, or required field uses a new contract version and compatibility
 window.
@@ -200,7 +211,7 @@ IDs. Existing:
 
 remain for the framework-free v2 client. New catalog, session, horizon, event,
 artifact, score-job, and recoverable-delete paths live under
-`/api/product/v1` and always name the target. Tests score and download an
+`/api/v1` and always name the target. Tests score and download an
 older session while proving the legacy current session remains the newer one.
 
 ## Retained, Wrapped, Generated, And Replaced Later
@@ -215,8 +226,8 @@ Retained:
 Wrapped:
 
 - v2 manifests as a bounded newest-first local catalog;
-- event indexes as explicit product event pages;
-- current exports and score files as checksummed artifact products;
+- event indexes as explicit contract event pages;
+- current exports and score files as checksummed artifacts;
 - the existing score runner as a job frozen to session and commit horizon.
 
 Generated:
@@ -227,8 +238,8 @@ Generated:
 Expected to be replaced or thinned:
 
 - server-global current-session composition;
-- direct `ThreadingHTTPServer` use for the new product;
-- framework-free product UI composition;
+- direct `ThreadingHTTPServer` use for the new application;
+- framework-free UI composition;
 - compatibility aliases after retained clients no longer need them.
 
 The transcription and score algorithms are retained behind later
@@ -236,10 +247,12 @@ application/worker boundaries, not re-created from these contracts.
 
 ## Validation Evidence
 
-The implementation range is `e2c2b9d^..7fdc3d1`.
+The initial implementation range was `e2c2b9d^..7fdc3d1`. The terminology and
+layering revision is `3b53285`; the reviewed range is
+`e2c2b9d^..3b53285`.
 
 The final unattended report is ignored evidence at
-`results/migration-regression/20260726T100824Z/report.json` and records:
+`results/migration-regression/20260726T103639Z/report.json` and records:
 
 ```text
 Python tests:               77 passed, one upstream deprecation warning
@@ -265,8 +278,9 @@ Please review:
    durable nouns?
 2. Is provider-owned capture transport behind `AtpianoRuntime` preferable to
    pretending every platform uses one HTTP mechanism?
-3. Is the product/domain/application/adapter direction proportionate, or is a
-   boundary premature or missing?
+3. Is the concrete `contracts` → `adapters` direction, with the application
+   layer deferred until Phase 4, proportionate for web, future Android, and
+   desktop clients?
 4. Are opaque IDs and strict `v1` failures appropriate before choosing the
    offline/cloud ID format?
 5. Is the retained/wrapped/replaced split sound enough to begin the shared

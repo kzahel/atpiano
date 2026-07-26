@@ -3,12 +3,15 @@
 Topic: multi-tenant-hybrid-service-architecture
 
 Status: **accepted target architecture as of 2026-07-26; Phase 1 is complete
-and Phase 2 implementation awaits mandatory R2 review.** Versioned Pydantic
-domain products, generated OpenAPI/TypeScript, the `AtpianoRuntime` boundary,
-an executable fixture provider, and explicit local compatibility paths now
-exist. The shared React application has not started. The target remains a
-zero-install hosted service and auto-updating offline-capable Tauri desktop
-application over the same contracts.
+and revised Phase 2 implementation awaits mandatory R2 review.** Versioned
+Pydantic contracts, generated OpenAPI/TypeScript, the `AtpianoRuntime`
+boundary, an executable fixture provider, and explicit local compatibility
+paths now exist. R2 feedback removed the generic `product` namespace and
+premature application ports while retaining the cross-client provider seam
+needed by web, future Android, and desktop clients. The shared React
+application has not started. The target remains a zero-install hosted service
+and auto-updating offline-capable Tauri desktop application over the same
+contracts.
 
 ## Scope And Relationship
 
@@ -768,7 +771,7 @@ useful behavior requiring a product decision, so the next bounded slice may
 establish contracts and structure.
 
 Phase 2 implementation completed in
-[`015-product-contracts-and-structure.md`](../tactical/015-product-contracts-and-structure.md).
+[`015-contracts-and-structure.md`](../tactical/015-contracts-and-structure.md).
 Its actual tree, public vocabulary, dependency map, runtime interface,
 examples, generation workflow, compatibility policy, and evidence are in
 [`r2-structure-contracts-review.md`](../r2-structure-contracts-review.md).

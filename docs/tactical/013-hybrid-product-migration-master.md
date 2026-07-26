@@ -60,7 +60,7 @@ result, and commit range.
 | Phase | Status | Bounded tactical | Human gate |
 | --- | --- | --- | --- |
 | 1. Freeze and characterize | Complete (`3aabcda^..0bca270`) | [`014`](014-freeze-migration-baseline.md) | R1 accepted; no ambiguity |
-| 2. Contracts and structure | Awaiting R2 (`e2c2b9d^..7fdc3d1`) | [`015`](015-product-contracts-and-structure.md) | **Required structure review** |
+| 2. Contracts and structure | Revised; awaiting R2 (`e2c2b9d^..3b53285`) | [`015`](015-contracts-and-structure.md) | **Required structure review** |
 | 3. Shared React application | Not started | Not created | **Required interaction review** |
 | 4. Python application core | Not started | Not created | **Required parity review; hold before Phase 5** |
 | 5. Early Tauri skeleton | Blocked by Phase 4 approval | Not created | Required desktop-boundary review |
