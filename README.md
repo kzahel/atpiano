@@ -138,15 +138,23 @@ spans with the bounded trailing Transkun lane, shows sustain and soft pedal,
 and stores indefinite sessions as segmented audio plus indexed events.
 
 Install the optional corrected-note dependencies, generate the musical
-fixture, and open v2 with server-driven replay:
+fixture, install the isolated internal score runtime once, and open v2 with
+server-driven replay:
 
 ```text
 uv sync --extra corrected
 uv run atpiano musical-fixture \
   ../atpiano-artifacts/musical-loop-input
+uv run atpiano setup-midi2score
 uv run atpiano workbench-v2 \
   --replay ../atpiano-artifacts/musical-loop-input/input.json
 ```
+
+`setup-midi2score` downloads the pinned upstream source, Python 3.11
+dependencies, and 389,829,880-byte checkpoint into the ignored
+`results/midi2score-runtime/` directory. This integration is for private
+internal experimentation: the upstream repository has no confirmed license.
+Skip that setup if only the roll and keyboard are needed.
 
 The page starts the WAV without microphone permission and exercises the same
 session, recognition, correction, review, and export paths used by capture.
@@ -155,11 +163,20 @@ Use `--repeat N` to loop it on one continuous source sample clock,
 `--no-wait` for accelerated bring-up. Generated session data defaults to
 `results/workbench-v2/`.
 
-The Performance card can show the piano roll, an 88-key detected-note
-keyboard, or both. The roll includes an aligned pitch-key gutter with octave
-labels. The keyboard follows the latest detected attack by default; click the
-roll or move its source-time slider to inspect the exact pitches sounding at
-an earlier moment. Amber keys are provisional and mint keys are corrected.
+The Performance card independently toggles a committed score, piano roll, and
+88-key detected-note keyboard. The roll includes an aligned pitch-key gutter
+with octave labels. The keyboard follows the latest detected attack by
+default; click the roll or move its source-time slider to inspect the exact
+pitches sounding at an earlier moment. Amber keys are provisional and mint
+keys are corrected.
+
+Press **Render committed score** after corrected notes appear. The server
+freezes the current commit horizon, excludes provisional and still-open
+notes, and runs MIDI2ScoreTransformer as a bounded background job. The score
+states the exact source time it covers and becomes stale, rather than silently
+changing, as new notes commit. Refresh only when useful. The MusicXML and
+snapshot MIDI remain downloadable if the pinned OSMD browser bundle cannot
+load from its CDN.
 
 Start the app without `--replay` to use its microphone Start/Stop controls:
 

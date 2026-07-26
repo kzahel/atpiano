@@ -2,13 +2,13 @@
 
 Topic: live-acoustic-transcription
 
-Status: the strict-onset v1 live decoder remains a runnable MVP. On
-2026-07-26 the separate stable corrected-note v2 milestone, excluding
-engraving, completed in
+Status: the strict-onset v1 live decoder remains a runnable MVP. On 2026-07-26
+the separate stable corrected-note v2 milestone completed in
 [`010-corrected-note-workbench-v2.md`](../tactical/010-corrected-note-workbench-v2.md):
 a separate app with deterministic replay, bounded indefinite sessions,
 provisional Basic Pitch, trailing Transkun correction, pedal, review, and
-export.
+export. Tactical 012 subsequently added optional bounded committed-score
+snapshots without claiming continuous progressive engraving.
 
 ## Scope And Relationship
 
@@ -104,6 +104,22 @@ the roll or moving a source-time slider pins the keyboard to notes sounding at
 that exact sample-clock time. This exact-pitch view does not infer score
 rhythm, meter, key, spelling, hands, or chord names; those remain Lane C
 concerns.
+
+V2 now also has an independently toggleable committed Score view. It is an
+explicit, on-demand downstream snapshot rather than part of either acoustic
+lane: the server freezes one `H_commit`, selects only closed committed notes,
+and runs a pinned MIDI2ScoreTransformer process in the background. The page
+states the snapshot boundary, generation duration, freshness, and failures
+while capture continues. The real two-repeat musical fixture produced a valid
+311-note, 19-measure MusicXML snapshot through the loopback API in 4.257
+seconds. See
+[`012-committed-score-snapshots.md`](../tactical/012-committed-score-snapshots.md)
+for the runtime and evidence.
+
+Open offsets on the roll now use a short solid onset stub plus a faint dashed
+tail to the applicable commit or source horizon. A note with no known ending
+therefore no longer appears to assert a solid duration all the way to the
+viewport edge.
 
 Final page-facing acceptance used both aligned and target-piano WAV loops. Two
 musical-fixture repetitions differed by 0.009 aligned-reference onset F1 and
@@ -584,16 +600,17 @@ A focused test covers the behavior.
 
 ## Recommended Direction
 
-The accepted next direction is the three-phase, unbounded-session architecture
+The current architecture is the three-phase, unbounded-session design
 sketched in
 [`009-three-phase-unbounded-sessions.md`](../tactical/009-three-phase-unbounded-sessions.md):
 a separate v2 live web application with a provisional Basic Pitch lane, a
-trailing Transkun commit lane, and an engraving lane. Monotonic horizons plus
-bounded in-memory working sets and segmented disk logs let a session run
-indefinitely without retaining the whole session in RAM. Its first slice adds
-the v2 boundary and deterministic looping WAV input, then implements horizons
-and bounded retention with no new model. It removes the two-minute cap only in
-v2; the v1 MVP remains runnable and unchanged.
+trailing Transkun commit lane, and a separable engraving consumer. The first
+two lanes and bounded storage/review surface are complete. The current score
+consumer is an on-demand bounded-prefix snapshot, not the plan's final
+monotonic `H_engrave`. Monotonic horizons plus bounded in-memory working sets
+and segmented disk logs let capture run indefinitely without retaining the
+whole session in RAM. V2 removes the two-minute cap; the v1 MVP remains
+runnable and unchanged.
 
 Bring up and stress the pipeline with both aligned fixtures and the checksummed
 golden-reference WAV before microphone review. Preserve the existing
@@ -609,11 +626,12 @@ commit lane demonstrates that it corrects the error a few seconds later using
 a piano-specific model. That is a measured v2 acceptance criterion, not an
 assumption that every octave error disappears.
 
-The selected implementation milestone is
+The stable corrected-note milestone is recorded in
 [`010-corrected-note-workbench-v2.md`](../tactical/010-corrected-note-workbench-v2.md).
-It delivers the stable corrected-note experience end to end and deliberately
-stops before Lane C. This prevents unresolved score-inference quality and
-licensing from blocking a useful v2 transcript.
+The bounded internal score snapshot is recorded in
+[`012-committed-score-snapshots.md`](../tactical/012-committed-score-snapshots.md).
+The next Lane C architecture work, if requested, is progressive musical
+chunking and reconciliation rather than another whole-prefix converter.
 
 Do not tune the absolute-volume gate or add a generic harmonic filter for this
 failure. The former cannot distinguish a new strike from loud resonance; the

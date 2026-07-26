@@ -2,12 +2,17 @@
 
 Topic: performance-to-notation
 
-Status: resumed. Partitura's baseline failed the user's readability test while
-an Ivory preview succeeded. A local Transkun + MIDI2ScoreTransformer cascade has
-now produced the first sight-readable local score for the same reference take,
-cutting ties from 20 to 1 and voices from 10 to 5. No permanent consumer stack
-is selected, and the leading score converter has no published license. See
-[`008-score-pipeline-bakeoff.md`](../tactical/008-score-pipeline-bakeoff.md).
+Status: active internal prototype. Partitura's baseline failed the user's
+readability test while an Ivory preview succeeded. A local Transkun +
+MIDI2ScoreTransformer cascade produced the first sight-readable local score
+for the same reference take, cutting ties from 20 to 1 and voices from 10 to
+5. V2 now renders explicit on-demand snapshots of its closed committed prefix
+through that cascade. This is not yet progressive engraving or a permanent
+consumer-stack selection, and the leading score converter has no published
+license. See
+[`008-score-pipeline-bakeoff.md`](../tactical/008-score-pipeline-bakeoff.md)
+and
+[`012-committed-score-snapshots.md`](../tactical/012-committed-score-snapshots.md).
 
 The product goal is fixed and narrow: legible engraved sheet music the
 performer can sight read back. Lead sheets and chord-symbol summaries do not
@@ -121,6 +126,43 @@ Partitura 1.9.0 is the first transparent Python converter.
 OpenSheetMusicDisplay 1.9.9 is the first browser renderer, loaded from a
 pinned CDN URL with subresource integrity. The converter and renderer are
 replaceable artifact consumers, not permanent product commitments.
+
+### Committed v2 score snapshots
+
+Tactical 012 integrates MIDI2ScoreTransformer as an isolated internal
+experiment without changing the v1 MVP or making the score model part of the
+capture process. The user explicitly accepted unresolved licensing for this
+private, non-distributed use.
+
+The v2 page can independently show Score, Keyboard, Piano roll, or any
+combination. Pressing **Render committed score** freezes the current
+`H_commit`, selects only the latest committed note identities with closed
+offsets at or before that source sample, writes snapshot MIDI, and runs the
+pinned transformer in a separate Python 3.11 CPU process. The browser renders
+the resulting MusicXML with OSMD and states its exact committed-through time,
+note count, generation duration, and stale/current state. Capture and both
+transcription lanes continue if setup, inference, or rendering fails.
+
+The pinned runtime uses upstream commit
+`115432bda16ca16e0fec2e9465788f2ba369971f` and the v0.0.1 checkpoint with
+SHA-256
+`7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d43cb2011245db638`.
+It remains under ignored `results/` and is installed explicitly with
+`uv run atpiano setup-midi2score`.
+
+The real two-repeat generated musical fixture supplied 311 closed committed
+notes over 84 seconds. The external process produced 144,536 bytes of valid
+MusicXML in 4.058 seconds on CPU, containing 19 measures, two parts, four
+voices, and 312 pitched note elements. This proves the internal end-to-end
+path on chords, progression, melody, and Alberti bass; it does not prove that
+every inferred meter, voice, or duration is musically correct. Although the
+source fixture exercises pedal transcription, this first score snapshot
+deliberately sends notes only and does not yet engrave pedal.
+
+This first integration deliberately recomputes the complete bounded prefix on
+request. It must not be called an append-only engraving lane. Continuous
+notation still needs bounded musical chunks with overlap, reconciliation,
+barline ownership, and a monotonic `H_engrave`.
 
 ### Two-phase paid oracle
 
