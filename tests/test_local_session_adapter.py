@@ -5,15 +5,15 @@ from pathlib import Path
 
 import pytest
 
+from atpiano.adapters.local_sessions import (
+    LOCAL_WORKSPACE_ID,
+    LocalSessionConflictError,
+    LocalSessionNotFoundError,
+    LocalSessionStore,
+)
 from atpiano.corrected import CORRECTED_EVENT_SCHEMA, CorrectedSession
 from atpiano.corrected_export import write_corrected_exports
 from atpiano.live import PcmBlock
-from atpiano.product.adapters.local_sessions import (
-    LOCAL_WORKSPACE_ID,
-    LocalProductConflictError,
-    LocalProductNotFoundError,
-    LocalSessionStore,
-)
 
 
 def _session(
@@ -72,7 +72,7 @@ def test_local_catalog_paginates_and_reads_explicit_sessions(
     assert store.workspace().mode.value == "local"
 
 
-def test_local_reader_converts_events_and_horizons_to_product_contract(
+def test_local_reader_converts_events_and_horizons_to_contract(
     tmp_path: Path,
 ) -> None:
     session_id = "20260726T100000-aaaaaaaaaaaa"
@@ -130,9 +130,9 @@ def test_local_artifacts_are_explicit_and_path_safe(tmp_path: Path) -> None:
     assert resolved.session_id == session_id
     assert path == session.directory / "exports" / "session.mid"
     assert path.is_relative_to(session.directory)
-    with pytest.raises(LocalProductNotFoundError):
+    with pytest.raises(LocalSessionNotFoundError):
         store.get_artifact_with_path(session_id, "artifact:missing")
-    with pytest.raises(LocalProductNotFoundError):
+    with pytest.raises(LocalSessionNotFoundError):
         store.resolve("../outside")
 
 
@@ -147,13 +147,13 @@ def test_recoverable_delete_guards_targets_and_moves_only_session(
     second.finalize()
     store = LocalSessionStore(tmp_path)
 
-    with pytest.raises(LocalProductConflictError, match="active"):
+    with pytest.raises(LocalSessionConflictError, match="active"):
         store.trash_session(
             first_id,
             active_session_id=first_id,
             running_score_session_id=None,
         )
-    with pytest.raises(LocalProductConflictError, match="score"):
+    with pytest.raises(LocalSessionConflictError, match="score"):
         store.trash_session(
             first_id,
             active_session_id=None,
@@ -187,30 +187,29 @@ def test_stale_active_manifest_is_read_as_failed(tmp_path: Path) -> None:
     assert active.active_capture_id is not None
 
 
-def test_domain_and_application_packages_have_inward_dependencies() -> None:
-    root = Path(__file__).parents[1] / "src" / "atpiano" / "product"
+def test_contract_schemas_do_not_depend_on_adapters() -> None:
+    root = Path(__file__).parents[1] / "src" / "atpiano" / "contracts"
     forbidden = {
+        "atpiano.adapters",
         "atpiano.corrected",
         "atpiano.corrected_workbench",
-        "atpiano.product.adapters",
         "http",
         "pathlib",
     }
-    for package in ("domain", "application"):
-        for path in (root / package).glob("*.py"):
-            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-            imports = {
-                node.module
-                for node in ast.walk(tree)
-                if isinstance(node, ast.ImportFrom) and node.module
-            } | {
-                alias.name
-                for node in ast.walk(tree)
-                if isinstance(node, ast.Import)
-                for alias in node.names
-            }
-            assert not any(
-                imported == blocked or imported.startswith(f"{blocked}.")
-                for imported in imports
-                for blocked in forbidden
-            ), (path, imports)
+    path = root / "schemas.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    imports = {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module
+    } | {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    }
+    assert not any(
+        imported == blocked or imported.startswith(f"{blocked}.")
+        for imported in imports
+        for blocked in forbidden
+    ), (path, imports)

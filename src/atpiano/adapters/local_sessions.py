@@ -1,4 +1,4 @@
-"""Explicit product views over existing corrected-session directories."""
+"""Explicit contract views over existing corrected-session directories."""
 
 from __future__ import annotations
 
@@ -9,18 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from atpiano import __version__
-from atpiano.corrected import (
-    CORRECTED_EVENT_SCHEMA,
-    CORRECTED_HORIZONS_SCHEMA,
-    CORRECTED_SESSION_SCHEMA,
-)
-from atpiano.corrected_export import (
-    MAX_QUERY_LIMIT,
-    query_history_index,
-    query_materialized_index,
-)
-from atpiano.product.domain.schemas import (
-    PRODUCT_SCHEMA_VERSION,
+from atpiano.contracts.schemas import (
+    CONTRACT_SCHEMA_VERSION,
     Artifact,
     ArtifactKind,
     ArtifactPage,
@@ -39,6 +29,16 @@ from atpiano.product.domain.schemas import (
     Workspace,
     WorkspaceMode,
 )
+from atpiano.corrected import (
+    CORRECTED_EVENT_SCHEMA,
+    CORRECTED_HORIZONS_SCHEMA,
+    CORRECTED_SESSION_SCHEMA,
+)
+from atpiano.corrected_export import (
+    MAX_QUERY_LIMIT,
+    query_history_index,
+    query_materialized_index,
+)
 from atpiano.util import read_json, sha256_file
 
 LOCAL_WORKSPACE_ID = "local"
@@ -47,11 +47,11 @@ DEFAULT_PAGE_LIMIT = 100
 MAX_SESSION_PAGE_LIMIT = 500
 
 
-class LocalProductNotFoundError(LookupError):
+class LocalSessionNotFoundError(LookupError):
     pass
 
 
-class LocalProductConflictError(RuntimeError):
+class LocalSessionConflictError(RuntimeError):
     pass
 
 
@@ -77,17 +77,17 @@ class LocalSessionStore:
 
     def _validate_session_id(self, session_id: str) -> str:
         if not SESSION_ID_PATTERN.fullmatch(session_id):
-            raise LocalProductNotFoundError("session does not exist")
+            raise LocalSessionNotFoundError("session does not exist")
         return session_id
 
     def resolve(self, session_id: str) -> Path:
         session_id = self._validate_session_id(session_id)
         candidate = (self.workspace_directory / session_id).resolve()
         if candidate.parent != self.workspace_directory:
-            raise LocalProductNotFoundError("session does not exist")
+            raise LocalSessionNotFoundError("session does not exist")
         manifest = candidate / "session.json"
         if not manifest.is_file():
-            raise LocalProductNotFoundError("session does not exist")
+            raise LocalSessionNotFoundError("session does not exist")
         return candidate
 
     def _manifests(self) -> list[tuple[datetime, str, Path, dict[str, Any]]]:
@@ -226,7 +226,7 @@ class LocalSessionStore:
             manifest.get("schema_version") != CORRECTED_SESSION_SCHEMA
             or manifest.get("session_id") != session_id
         ):
-            raise LocalProductNotFoundError("session does not exist")
+            raise LocalSessionNotFoundError("session does not exist")
         return self._session(
             directory,
             manifest,
@@ -385,7 +385,7 @@ class LocalSessionStore:
             provenance = Provenance(
                 application_version=__version__,
                 schema_versions={
-                    "product": PRODUCT_SCHEMA_VERSION,
+                    "contract": CONTRACT_SCHEMA_VERSION,
                     "source": CORRECTED_SESSION_SCHEMA,
                 },
                 adapter="legacy-corrected-session-v1",
@@ -457,7 +457,7 @@ class LocalSessionStore:
         for artifact, path in self._artifact_candidates(session_id):
             if artifact.artifact_id == artifact_id:
                 return artifact, path
-        raise LocalProductNotFoundError("artifact does not exist")
+        raise LocalSessionNotFoundError("artifact does not exist")
 
     def trash_session(
         self,
@@ -468,9 +468,9 @@ class LocalSessionStore:
     ) -> DeleteSessionResult:
         directory = self.resolve(session_id)
         if session_id == active_session_id:
-            raise LocalProductConflictError("active session cannot be deleted")
+            raise LocalSessionConflictError("active session cannot be deleted")
         if session_id == running_score_session_id:
-            raise LocalProductConflictError(
+            raise LocalSessionConflictError(
                 "session with a running score job cannot be deleted"
             )
         trash = self.workspace_directory / ".trash"
@@ -479,7 +479,7 @@ class LocalSessionStore:
         stamp = deleted_at.strftime("%Y%m%dT%H%M%S%fZ")
         target = trash / f"{session_id}-{stamp}"
         if target.exists():
-            raise LocalProductConflictError("trash target already exists")
+            raise LocalSessionConflictError("trash target already exists")
         directory.replace(target)
         return DeleteSessionResult(
             workspace_id=LOCAL_WORKSPACE_ID,

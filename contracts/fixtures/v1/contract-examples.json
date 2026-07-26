@@ -5,7 +5,7 @@
       "value": {
         "created_at": "2026-07-26T10:00:00Z",
         "display_name": "Kyle",
-        "schema_version": "atpiano.product.v1",
+        "schema_version": "atpiano.contract.v1",
         "user_id": "user-kyle"
       }
     },
@@ -16,7 +16,7 @@
         "mode": "local",
         "name": "On this Mac",
         "owner_user_id": null,
-        "schema_version": "atpiano.product.v1",
+        "schema_version": "atpiano.contract.v1",
         "workspace_id": "local"
       }
     },
@@ -25,7 +25,7 @@
       "value": {
         "created_at": "2026-07-26T10:00:00Z",
         "role": "owner",
-        "schema_version": "atpiano.product.v1",
+        "schema_version": "atpiano.contract.v1",
         "user_id": "user-kyle",
         "workspace_id": "local"
       }
@@ -44,7 +44,7 @@
         "current_transcription_run_id": "run-1",
         "display_name": "26 Jul 2026, replay",
         "sample_rate_hz": 48000,
-        "schema_version": "atpiano.product.v1",
+        "schema_version": "atpiano.contract.v1",
         "session_id": "20260726T100000-abcdef123456",
         "source": "replay",
         "source_frame_count": 2016000,
@@ -60,7 +60,7 @@
         "capture_id": "capture-1",
         "error_id": null,
         "sample_rate_hz": 48000,
-        "schema_version": "atpiano.product.v1",
+        "schema_version": "atpiano.contract.v1",
         "session_id": "20260726T100000-abcdef123456",
         "source": "microphone",
         "started_at": "2026-07-26T10:00:00Z",
@@ -76,7 +76,7 @@
         "completed_at": null,
         "created_at": "2026-07-26T10:00:00Z",
         "preview_model": "basic-pitch-0.4.0",
-        "schema_version": "atpiano.product.v1",
+        "schema_version": "atpiano.contract.v1",
         "session_id": "20260726T100000-abcdef123456",
         "status": "running",
         "transcription_run_id": "run-1",
@@ -96,7 +96,7 @@
         "onset_sample": 48000,
         "pitch": 60,
         "revision": 2,
-        "schema_version": "atpiano.product.v1",
+        "schema_version": "atpiano.contract.v1",
         "session_id": "20260726T100000-abcdef123456",
         "supersedes_revision": 1,
         "transcription_run_id": "run-1",
@@ -112,7 +112,7 @@
         "provisional_sample": 115200,
         "recorded_at": "2026-07-26T10:00:02.500000Z",
         "sample_rate_hz": 48000,
-        "schema_version": "atpiano.product.v1",
+        "schema_version": "atpiano.contract.v1",
         "session_id": "20260726T100000-abcdef123456",
         "transcription_run_id": "run-1",
         "workspace_id": "local"
@@ -126,9 +126,9 @@
         "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "execution_backend": "cpu",
         "model_id": "transkun-2.0.1",
-        "schema_version": "atpiano.product.v1",
+        "schema_version": "atpiano.contract.v1",
         "schema_versions": {
-          "events": "atpiano.product.v1",
+          "events": "atpiano.contract.v1",
           "source": "atpiano.corrected-session.v1"
         },
         "settings_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -153,16 +153,16 @@
           "checkpoint_sha256": null,
           "execution_backend": "cpu",
           "model_id": null,
-          "schema_version": "atpiano.product.v1",
+          "schema_version": "atpiano.contract.v1",
           "schema_versions": {
-            "events": "atpiano.product.v1"
+            "events": "atpiano.contract.v1"
           },
           "settings_sha256": null,
           "source_artifact_sha256": [
             "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
           ]
         },
-        "schema_version": "atpiano.product.v1",
+        "schema_version": "atpiano.contract.v1",
         "session_id": "20260726T100000-abcdef123456",
         "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
         "source_horizon_sample": 2016000,
@@ -181,7 +181,7 @@
         "created_at": "2026-07-26T10:00:47Z",
         "note_count": 147,
         "producing_job_id": "job-score-1",
-        "schema_version": "atpiano.product.v1",
+        "schema_version": "atpiano.contract.v1",
         "score_snapshot_id": "score-1",
         "session_id": "20260726T100000-abcdef123456",
         "transcription_run_id": "run-1",
@@ -198,7 +198,7 @@
         "input_horizon_sample": 2016000,
         "job_id": "job-score-1",
         "kind": "score",
-        "schema_version": "atpiano.product.v1",
+        "schema_version": "atpiano.contract.v1",
         "session_id": "20260726T100000-abcdef123456",
         "started_at": "2026-07-26T10:00:43Z",
         "status": "running",
@@ -206,7 +206,7 @@
       }
     },
     {
-      "model": "ProductError",
+      "model": "AtpianoError",
       "value": {
         "capture_id": "capture-active",
         "code": "capture-busy",
@@ -217,7 +217,7 @@
         "job_id": null,
         "message": "Another local capture is active.",
         "retryable": true,
-        "schema_version": "atpiano.product.v1",
+        "schema_version": "atpiano.contract.v1",
         "session_id": "session-active",
         "workspace_id": "local"
       }
@@ -233,13 +233,13 @@
         "max_pcm_block_frames": 1048576,
         "recoverable_delete": true,
         "runtime_mode": "local",
-        "schema_version": "atpiano.product.v1",
+        "schema_version": "atpiano.contract.v1",
         "score_available": false,
         "supported_pcm_protocol_versions": [
           "atpiano.pcm.v1"
         ],
         "supported_schema_versions": [
-          "atpiano.product.v1"
+          "atpiano.contract.v1"
         ]
       }
     },
@@ -261,5 +261,5 @@
       }
     }
   ],
-  "schema_version": "atpiano.product-examples.v1"
+  "schema_version": "atpiano.contract-examples.v1"
 }

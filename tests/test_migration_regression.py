@@ -27,7 +27,7 @@ def test_default_regression_lanes_cover_repository_checks() -> None:
     assert [lane.name for lane in lanes] == [
         "python-tests",
         "javascript-tests",
-        "product-contracts",
+        "api-contracts",
         "python-lint",
         "javascript-syntax",
         "git-whitespace",

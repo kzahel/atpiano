@@ -56,7 +56,7 @@ export interface PcmBlock {
 }
 
 /**
- * Platform-neutral application boundary used by the shared frontend.
+ * Platform-neutral atpiano boundary used by the shared frontend.
  *
  * Every result repeats its target IDs. A consumer must discard a result whose
  * request ID or resource IDs no longer match its active intent. AbortSignal

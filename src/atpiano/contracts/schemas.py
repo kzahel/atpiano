@@ -1,4 +1,4 @@
-"""Pydantic source schemas for the atpiano product contract."""
+"""Pydantic source schemas for the versioned atpiano contract."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from pydantic import (
     model_validator,
 )
 
-PRODUCT_SCHEMA_VERSION = "atpiano.product.v1"
+CONTRACT_SCHEMA_VERSION = "atpiano.contract.v1"
 PCM_PROTOCOL_VERSION = "atpiano.pcm.v1"
 
 OpaqueId = Annotated[
@@ -41,13 +41,13 @@ SampleIndex = Annotated[int, Field(ge=0)]
 
 
 class ContractModel(BaseModel):
-    """Strict immutable base for wire-visible product values."""
+    """Strict immutable base for wire-visible contract values."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class ProductModel(ContractModel):
-    schema_version: Literal["atpiano.product.v1"] = PRODUCT_SCHEMA_VERSION
+class VersionedContractModel(ContractModel):
+    schema_version: Literal["atpiano.contract.v1"] = CONTRACT_SCHEMA_VERSION
 
 
 class WorkspaceMode(str, Enum):
@@ -148,13 +148,13 @@ class ErrorCode(str, Enum):
     INTERNAL = "internal"
 
 
-class User(ProductModel):
+class User(VersionedContractModel):
     user_id: OpaqueId
     display_name: Annotated[str, StringConstraints(min_length=1, max_length=200)]
     created_at: AwareDatetime
 
 
-class Workspace(ProductModel):
+class Workspace(VersionedContractModel):
     workspace_id: OpaqueId
     name: Annotated[str, StringConstraints(min_length=1, max_length=200)]
     mode: WorkspaceMode
@@ -162,14 +162,14 @@ class Workspace(ProductModel):
     owner_user_id: OpaqueId | None = None
 
 
-class Membership(ProductModel):
+class Membership(VersionedContractModel):
     workspace_id: OpaqueId
     user_id: OpaqueId
     role: MembershipRole
     created_at: AwareDatetime
 
 
-class Session(ProductModel):
+class Session(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     status: SessionStatus
@@ -193,7 +193,7 @@ class Session(ProductModel):
         return self
 
 
-class Capture(ProductModel):
+class Capture(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     capture_id: OpaqueId
@@ -206,7 +206,7 @@ class Capture(ProductModel):
     error_id: OpaqueId | None = None
 
 
-class TranscriptionRun(ProductModel):
+class TranscriptionRun(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     transcription_run_id: OpaqueId
@@ -217,7 +217,7 @@ class TranscriptionRun(ProductModel):
     completed_at: AwareDatetime | None = None
 
 
-class EventRevision(ProductModel):
+class EventRevision(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     transcription_run_id: OpaqueId
@@ -253,7 +253,7 @@ class EventRevision(ProductModel):
         return self
 
 
-class Horizon(ProductModel):
+class Horizon(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     transcription_run_id: OpaqueId
@@ -272,7 +272,7 @@ class Horizon(ProductModel):
         return self
 
 
-class Provenance(ProductModel):
+class Provenance(VersionedContractModel):
     application_version: Annotated[str, StringConstraints(min_length=1, max_length=128)]
     schema_versions: dict[str, Annotated[str, StringConstraints(min_length=1, max_length=128)]]
     adapter: Annotated[str, StringConstraints(min_length=1, max_length=200)]
@@ -283,7 +283,7 @@ class Provenance(ProductModel):
     source_artifact_sha256: tuple[Sha256, ...] = ()
 
 
-class Artifact(ProductModel):
+class Artifact(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     artifact_id: OpaqueId
@@ -299,7 +299,7 @@ class Artifact(ProductModel):
     provenance: Provenance
 
 
-class ScoreSnapshot(ProductModel):
+class ScoreSnapshot(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     score_snapshot_id: OpaqueId
@@ -314,7 +314,7 @@ class ScoreSnapshot(ProductModel):
 ErrorDetail = str | int | float | bool | None
 
 
-class ProductError(ProductModel):
+class AtpianoError(VersionedContractModel):
     error_id: OpaqueId
     code: ErrorCode
     message: Annotated[str, StringConstraints(min_length=1, max_length=500)]
@@ -326,7 +326,7 @@ class ProductError(ProductModel):
     details: dict[str, ErrorDetail] = Field(default_factory=dict)
 
 
-class Job(ProductModel):
+class Job(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     job_id: OpaqueId
@@ -337,7 +337,7 @@ class Job(ProductModel):
     started_at: AwareDatetime | None = None
     completed_at: AwareDatetime | None = None
     artifact_ids: tuple[OpaqueId, ...] = ()
-    error: ProductError | None = None
+    error: AtpianoError | None = None
 
     @model_validator(mode="after")
     def validate_job(self) -> Job:
@@ -348,7 +348,7 @@ class Job(ProductModel):
         return self
 
 
-class RuntimeCapabilities(ProductModel):
+class RuntimeCapabilities(VersionedContractModel):
     runtime_mode: RuntimeMode
     supported_schema_versions: tuple[str, ...]
     supported_pcm_protocol_versions: tuple[str, ...]
@@ -381,14 +381,14 @@ class PcmEnvelope(ContractModel):
         return self
 
 
-class CaptureStart(ProductModel):
+class CaptureStart(VersionedContractModel):
     workspace_id: OpaqueId
     source: Literal[SourceKind.MICROPHONE]
     sample_rate_hz: Annotated[int, Field(ge=8_000, le=384_000)]
     request_id: OpaqueId
 
 
-class CaptureStop(ProductModel):
+class CaptureStop(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     capture_id: OpaqueId
@@ -396,7 +396,7 @@ class CaptureStop(ProductModel):
     request_id: OpaqueId
 
 
-class ReplayStart(ProductModel):
+class ReplayStart(VersionedContractModel):
     workspace_id: OpaqueId
     fixture_id: OpaqueId
     repeat: Annotated[int, Field(ge=1, le=10_000)] = 1
@@ -405,7 +405,7 @@ class ReplayStart(ProductModel):
     request_id: OpaqueId
 
 
-class ScoreJobStart(ProductModel):
+class ScoreJobStart(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     transcription_run_id: OpaqueId
@@ -413,21 +413,21 @@ class ScoreJobStart(ProductModel):
     request_id: OpaqueId
 
 
-class DeleteSessionRequest(ProductModel):
+class DeleteSessionRequest(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     request_id: OpaqueId
     confirmation: Literal["recoverable-delete"]
 
 
-class DeleteSessionResult(ProductModel):
+class DeleteSessionResult(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     trashed_at: AwareDatetime
     recoverable: Literal[True] = True
 
 
-class ArtifactAccess(ProductModel):
+class ArtifactAccess(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     artifact_id: OpaqueId
@@ -437,18 +437,18 @@ class ArtifactAccess(ProductModel):
     expires_at: AwareDatetime | None = None
 
 
-class WorkspacePage(ProductModel):
+class WorkspacePage(VersionedContractModel):
     items: tuple[Workspace, ...]
     next_cursor: Cursor | None = None
 
 
-class SessionPage(ProductModel):
+class SessionPage(VersionedContractModel):
     workspace_id: OpaqueId
     items: tuple[Session, ...]
     next_cursor: Cursor | None = None
 
 
-class EventPage(ProductModel):
+class EventPage(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     start_sample: SampleIndex
@@ -457,18 +457,18 @@ class EventPage(ProductModel):
     next_cursor: Cursor | None = None
 
 
-class ArtifactPage(ProductModel):
+class ArtifactPage(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     items: tuple[Artifact, ...]
     next_cursor: Cursor | None = None
 
 
-class ErrorResponse(ProductModel):
-    error: ProductError
+class ErrorResponse(VersionedContractModel):
+    error: AtpianoError
 
 
-def product_models() -> tuple[type[BaseModel], ...]:
+def contract_models() -> tuple[type[BaseModel], ...]:
     """Return named public models in deterministic generation order."""
 
     return (
@@ -483,7 +483,7 @@ def product_models() -> tuple[type[BaseModel], ...]:
         Provenance,
         Artifact,
         ScoreSnapshot,
-        ProductError,
+        AtpianoError,
         Job,
         RuntimeCapabilities,
         PcmEnvelope,

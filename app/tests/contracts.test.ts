@@ -18,13 +18,13 @@ interface FixtureDocument {
 const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
 const openapi = JSON.parse(
   readFileSync(
-    `${repositoryRoot}/contracts/openapi/atpiano-product-v1.json`,
+    `${repositoryRoot}/contracts/openapi/atpiano-api-v1.json`,
     "utf8",
   ),
 ) as Record<string, unknown>;
 const fixtures = JSON.parse(
   readFileSync(
-    `${repositoryRoot}/contracts/fixtures/v1/product-examples.json`,
+    `${repositoryRoot}/contracts/fixtures/v1/contract-examples.json`,
     "utf8",
   ),
 ) as FixtureDocument;
@@ -41,8 +41,8 @@ function validatorFor(model: string) {
   });
 }
 
-test("shared product examples validate in TypeScript", () => {
-  assert.equal(fixtures.schema_version, "atpiano.product-examples.v1");
+test("shared contract examples validate in TypeScript", () => {
+  assert.equal(fixtures.schema_version, "atpiano.contract-examples.v1");
   assert.ok(fixtures.objects.length >= 15);
   for (const fixture of fixtures.objects) {
     const validate = validatorFor(fixture.model);
@@ -61,7 +61,7 @@ test("incompatible schema versions fail in TypeScript", () => {
   assert.ok(workspace);
   const validate = validatorFor("Workspace");
   assert.equal(
-    validate({ ...workspace.value, schema_version: "atpiano.product.v2" }),
+    validate({ ...workspace.value, schema_version: "atpiano.contract.v2" }),
     false,
   );
 });

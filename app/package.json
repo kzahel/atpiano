@@ -1,5 +1,5 @@
 {
-  "name": "@atpiano/product",
+  "name": "@atpiano/app",
   "private": true,
   "type": "module",
   "scripts": {

@@ -21,6 +21,29 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 from pydantic import ValidationError
 
+from atpiano.adapters.local_sessions import (
+    LOCAL_WORKSPACE_ID,
+    LocalSessionConflictError,
+    LocalSessionNotFoundError,
+    LocalSessionStore,
+)
+from atpiano.contracts.schemas import (
+    CONTRACT_SCHEMA_VERSION,
+    PCM_PROTOCOL_VERSION,
+    ArtifactAccess,
+    AtpianoError,
+    DeleteSessionRequest,
+    ErrorCode,
+    ErrorResponse,
+    Job,
+    JobKind,
+    RunStatus,
+    RuntimeCapabilities,
+    RuntimeMode,
+    ScoreJobStart,
+    SourceKind,
+    WorkspacePage,
+)
 from atpiano.corrected import (
     CorrectedSession,
     run_corrected_replay,
@@ -35,29 +58,6 @@ from atpiano.corrected_export import (
 )
 from atpiano.corrected_preview import CorrectedPreviewLane
 from atpiano.live import LiveWindowModel, parse_pcm_block
-from atpiano.product.adapters.local_sessions import (
-    LOCAL_WORKSPACE_ID,
-    LocalProductConflictError,
-    LocalProductNotFoundError,
-    LocalSessionStore,
-)
-from atpiano.product.domain.schemas import (
-    PCM_PROTOCOL_VERSION,
-    PRODUCT_SCHEMA_VERSION,
-    ArtifactAccess,
-    DeleteSessionRequest,
-    ErrorCode,
-    ErrorResponse,
-    Job,
-    JobKind,
-    ProductError,
-    RunStatus,
-    RuntimeCapabilities,
-    RuntimeMode,
-    ScoreJobStart,
-    SourceKind,
-    WorkspacePage,
-)
 from atpiano.score_snapshot import (
     SCORE_SNAPSHOT_SCHEMA,
     ScoreRunner,
@@ -140,7 +140,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             raise ValueError("replay silence cannot be negative")
         self.workspace_directory = workspace_directory.resolve()
         self.workspace_directory.mkdir(parents=True, exist_ok=True)
-        self.product_store = LocalSessionStore(self.workspace_directory)
+        self.session_store = LocalSessionStore(self.workspace_directory)
         self.preview_model_factory = preview_model_factory
         self.commit_model_factory = commit_model_factory
         self.minimum_free_bytes = minimum_free_bytes
@@ -373,7 +373,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                 else 0
             )
             return target_session_id, directory, commit_sample
-        directory = self.product_store.resolve(target_session_id)
+        directory = self.session_store.resolve(target_session_id)
         horizons = read_json(directory / "horizons.json")
         return target_session_id, directory, int(horizons.get("commit_sample", 0))
 
@@ -472,7 +472,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             daemon=True,
         )
         thread.start()
-        return self.product_score_job(job_id)
+        return self.score_job(job_id)
 
     def _run_score(
         self,
@@ -511,10 +511,10 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                     self._score_error = None
                     self._score_completed_at = datetime.now(timezone.utc)
 
-    def product_score_job(self, job_id: str) -> Job:
+    def score_job(self, job_id: str) -> Job:
         with self.score_lock:
             if job_id != self._score_job_id:
-                raise LocalProductNotFoundError("job does not exist")
+                raise LocalSessionNotFoundError("job does not exist")
             status = self._score_status
             error_text = self._score_error
             session_id = self._score_session_id
@@ -527,9 +527,9 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             or commit_sample is None
             or created_at is None
         ):
-            raise LocalProductNotFoundError("job does not exist")
+            raise LocalSessionNotFoundError("job does not exist")
         error = (
-            ProductError(
+            AtpianoError(
                 error_id=f"error:{job_id}",
                 code=ErrorCode.INTERNAL,
                 message=error_text or "Score generation failed.",
@@ -554,7 +554,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             error=error,
         )
 
-    def delete_product_session(self, session_id: str) -> dict[str, Any]:
+    def delete_api_session(self, session_id: str) -> dict[str, Any]:
         with self.state_lock:
             active_session_id = (
                 self._active_session.session_id
@@ -569,7 +569,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                     if self._score_status == "running"
                     else None
                 )
-            result = self.product_store.trash_session(
+            result = self.session_store.trash_session(
                 session_id,
                 active_session_id=active_session_id,
                 running_score_session_id=running_score_session_id,
@@ -709,7 +709,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             return None
         return candidate
 
-    def _send_product_error(
+    def _send_api_error(
         self,
         message: str,
         *,
@@ -720,7 +720,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         job_id: str | None = None,
     ) -> None:
         error = ErrorResponse(
-            error=ProductError(
+            error=AtpianoError(
                 error_id=f"error:{uuid.uuid4().hex[:16]}",
                 code=code,
                 message=message,
@@ -739,22 +739,22 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         )
         self._send_json(error.model_dump(mode="json"), status)
 
-    def _read_product_json(self) -> dict[str, Any]:
+    def _read_api_json(self) -> dict[str, Any]:
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
         except ValueError as error:
             raise ValueError("Content-Length is invalid") from error
         if not 0 < content_length <= 64 * 1024:
-            raise ValueError("product request body size is invalid")
+            raise ValueError("API request body size is invalid")
         try:
             value = json.loads(self.rfile.read(content_length))
         except (json.JSONDecodeError, UnicodeDecodeError) as error:
-            raise ValueError("product request body is invalid JSON") from error
+            raise ValueError("API request body is invalid JSON") from error
         if not isinstance(value, dict):
-            raise ValueError("product request body must be an object")
+            raise ValueError("API request body must be an object")
         return value
 
-    def _product_query_limit(
+    def _api_query_limit(
         self,
         query: dict[str, list[str]],
         *,
@@ -762,21 +762,21 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
     ) -> int:
         return int(query.get("limit", [str(default)])[0])
 
-    def _get_product(
+    def _get_api(
         self,
         request_path: str,
         query: dict[str, list[str]],
         *,
         include_body: bool,
     ) -> bool:
-        prefix = "/api/product/v1"
+        prefix = "/api/v1"
         if not request_path.startswith(prefix):
             return False
         try:
             if request_path == f"{prefix}/capabilities":
                 capabilities = RuntimeCapabilities(
                     runtime_mode=RuntimeMode.LOCAL,
-                    supported_schema_versions=(PRODUCT_SCHEMA_VERSION,),
+                    supported_schema_versions=(CONTRACT_SCHEMA_VERSION,),
                     supported_pcm_protocol_versions=(PCM_PROTOCOL_VERSION,),
                     capture_sources=(SourceKind.MICROPHONE, SourceKind.REPLAY),
                     score_available=bool(
@@ -792,14 +792,14 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                 return True
             if request_path == f"{prefix}/workspaces":
                 page = WorkspacePage(
-                    items=(self.server.product_store.workspace(),),
+                    items=(self.server.session_store.workspace(),),
                     next_cursor=None,
                 )
                 self._send_json(page.model_dump(mode="json"))
                 return True
             job_match = re.fullmatch(f"{prefix}/jobs/([^/]+)", request_path)
             if job_match:
-                job = self.server.product_score_job(job_match.group(1))
+                job = self.server.score_job(job_match.group(1))
                 self._send_json(job.model_dump(mode="json"))
                 return True
             sessions_match = re.fullmatch(
@@ -809,10 +809,10 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             if sessions_match:
                 workspace_id = sessions_match.group(1)
                 if workspace_id != LOCAL_WORKSPACE_ID:
-                    raise LocalProductNotFoundError("workspace does not exist")
-                page = self.server.product_store.list_sessions(
+                    raise LocalSessionNotFoundError("workspace does not exist")
+                page = self.server.session_store.list_sessions(
                     cursor=query.get("cursor", [None])[0],
-                    limit=self._product_query_limit(query),
+                    limit=self._api_query_limit(query),
                     active_session_id=self.server.active_session_id(),
                 )
                 self._send_json(page.model_dump(mode="json"))
@@ -824,13 +824,13 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             if event_match:
                 workspace_id, session_id = event_match.groups()
                 if workspace_id != LOCAL_WORKSPACE_ID:
-                    raise LocalProductNotFoundError("workspace does not exist")
-                page = self.server.product_store.events(
+                    raise LocalSessionNotFoundError("workspace does not exist")
+                page = self.server.session_store.events(
                     session_id,
                     start_sample=int(query.get("start_sample", ["0"])[0]),
                     end_sample=int(query.get("end_sample", ["0"])[0]),
                     cursor=query.get("cursor", [None])[0],
-                    limit=self._product_query_limit(query, default=1024),
+                    limit=self._api_query_limit(query, default=1024),
                 )
                 self._send_json(page.model_dump(mode="json"))
                 return True
@@ -841,8 +841,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             if horizon_match:
                 workspace_id, session_id = horizon_match.groups()
                 if workspace_id != LOCAL_WORKSPACE_ID:
-                    raise LocalProductNotFoundError("workspace does not exist")
-                horizon = self.server.product_store.horizon(session_id)
+                    raise LocalSessionNotFoundError("workspace does not exist")
+                horizon = self.server.session_store.horizon(session_id)
                 self._send_json(horizon.model_dump(mode="json"))
                 return True
             artifacts_match = re.fullmatch(
@@ -852,11 +852,11 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             if artifacts_match:
                 workspace_id, session_id = artifacts_match.groups()
                 if workspace_id != LOCAL_WORKSPACE_ID:
-                    raise LocalProductNotFoundError("workspace does not exist")
-                page = self.server.product_store.list_artifacts(
+                    raise LocalSessionNotFoundError("workspace does not exist")
+                page = self.server.session_store.list_artifacts(
                     session_id,
                     cursor=query.get("cursor", [None])[0],
-                    limit=self._product_query_limit(query),
+                    limit=self._api_query_limit(query),
                 )
                 self._send_json(page.model_dump(mode="json"))
                 return True
@@ -872,8 +872,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     artifact_match.groups()
                 )
                 if workspace_id != LOCAL_WORKSPACE_ID:
-                    raise LocalProductNotFoundError("workspace does not exist")
-                artifact, path = self.server.product_store.get_artifact_with_path(
+                    raise LocalSessionNotFoundError("workspace does not exist")
+                artifact, path = self.server.session_store.get_artifact_with_path(
                     session_id,
                     artifact_id,
                 )
@@ -902,29 +902,29 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             if session_match:
                 workspace_id, session_id = session_match.groups()
                 if workspace_id != LOCAL_WORKSPACE_ID:
-                    raise LocalProductNotFoundError("workspace does not exist")
-                session = self.server.product_store.get_session(
+                    raise LocalSessionNotFoundError("workspace does not exist")
+                session = self.server.session_store.get_session(
                     session_id,
                     active_session_id=self.server.active_session_id(),
                 )
                 self._send_json(session.model_dump(mode="json"))
                 return True
-        except LocalProductNotFoundError as error:
-            self._send_product_error(
+        except LocalSessionNotFoundError as error:
+            self._send_api_error(
                 str(error),
                 code=ErrorCode.NOT_FOUND,
                 status=HTTPStatus.NOT_FOUND,
             )
             return True
         except (OSError, sqlite3.Error, TypeError, ValueError) as error:
-            self._send_product_error(
+            self._send_api_error(
                 str(error),
                 code=ErrorCode.INVALID_REQUEST,
                 status=HTTPStatus.BAD_REQUEST,
             )
             return True
-        self._send_product_error(
-            "product resource does not exist",
+        self._send_api_error(
+            "API resource does not exist",
             code=ErrorCode.NOT_FOUND,
             status=HTTPStatus.NOT_FOUND,
         )
@@ -935,7 +935,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             return
         parsed = urlsplit(self.path)
         request_path = unquote(parsed.path)
-        if self._get_product(
+        if self._get_api(
             request_path,
             parse_qs(parsed.query),
             include_body=True,
@@ -993,7 +993,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             return
         parsed = urlsplit(self.path)
         request_path = unquote(parsed.path)
-        if self._get_product(
+        if self._get_api(
             request_path,
             parse_qs(parsed.query),
             include_body=False,
@@ -1017,9 +1017,9 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             return
         request_path = unquote(urlsplit(self.path).path)
         if not self._origin_is_local():
-            if request_path.startswith("/api/product/v1/"):
-                self._send_product_error(
-                    "product actions require the local origin",
+            if request_path.startswith("/api/v1/"):
+                self._send_api_error(
+                    "API actions require the local origin",
                     code=ErrorCode.INVALID_REQUEST,
                     status=HTTPStatus.FORBIDDEN,
                 )
@@ -1031,7 +1031,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             return
         score_match = re.fullmatch(
             (
-                r"/api/product/v1/workspaces/([^/]+)/sessions/([^/]+)"
+                r"/api/v1/workspaces/([^/]+)/sessions/([^/]+)"
                 r"/score-jobs"
             ),
             request_path,
@@ -1040,7 +1040,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             workspace_id, session_id = score_match.groups()
             try:
                 request = ScoreJobStart.model_validate(
-                    self._read_product_json()
+                    self._read_api_json()
                 )
                 if (
                     workspace_id != LOCAL_WORKSPACE_ID
@@ -1048,7 +1048,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     or request.session_id != session_id
                 ):
                     raise ValueError("score request target does not match its path")
-                target = self.server.product_store.get_session(session_id)
+                target = self.server.session_store.get_session(session_id)
                 if (
                     request.transcription_run_id
                     != target.current_transcription_run_id
@@ -1061,7 +1061,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     expected_commit_sample=request.commit_sample,
                 )
             except ValidationError as error:
-                self._send_product_error(
+                self._send_api_error(
                     str(error),
                     code=ErrorCode.INVALID_REQUEST,
                     status=HTTPStatus.BAD_REQUEST,
@@ -1069,8 +1069,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     session_id=session_id,
                 )
                 return
-            except LocalProductNotFoundError as error:
-                self._send_product_error(
+            except LocalSessionNotFoundError as error:
+                self._send_api_error(
                     str(error),
                     code=ErrorCode.NOT_FOUND,
                     status=HTTPStatus.NOT_FOUND,
@@ -1079,7 +1079,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                 )
                 return
             except (OSError, RuntimeError, ValueError) as error:
-                self._send_product_error(
+                self._send_api_error(
                     str(error),
                     code=ErrorCode.SCORE_BUSY
                     if "already running" in str(error)
@@ -1119,7 +1119,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             return
         request_path = unquote(urlsplit(self.path).path)
         match = re.fullmatch(
-            r"/api/product/v1/workspaces/([^/]+)/sessions/([^/]+)",
+            r"/api/v1/workspaces/([^/]+)/sessions/([^/]+)",
             request_path,
         )
         if not match:
@@ -1127,8 +1127,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             return
         workspace_id, session_id = match.groups()
         if not self._origin_is_local():
-            self._send_product_error(
-                "product actions require the local origin",
+            self._send_api_error(
+                "API actions require the local origin",
                 code=ErrorCode.INVALID_REQUEST,
                 status=HTTPStatus.FORBIDDEN,
                 workspace_id=workspace_id,
@@ -1137,7 +1137,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             return
         try:
             request = DeleteSessionRequest.model_validate(
-                self._read_product_json()
+                self._read_api_json()
             )
             if (
                 workspace_id != LOCAL_WORKSPACE_ID
@@ -1145,9 +1145,9 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                 or request.session_id != session_id
             ):
                 raise ValueError("delete request target does not match its path")
-            result = self.server.delete_product_session(session_id)
+            result = self.server.delete_api_session(session_id)
         except ValidationError as error:
-            self._send_product_error(
+            self._send_api_error(
                 str(error),
                 code=ErrorCode.INVALID_REQUEST,
                 status=HTTPStatus.BAD_REQUEST,
@@ -1155,8 +1155,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                 session_id=session_id,
             )
             return
-        except LocalProductNotFoundError as error:
-            self._send_product_error(
+        except LocalSessionNotFoundError as error:
+            self._send_api_error(
                 str(error),
                 code=ErrorCode.NOT_FOUND,
                 status=HTTPStatus.NOT_FOUND,
@@ -1164,8 +1164,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                 session_id=session_id,
             )
             return
-        except LocalProductConflictError as error:
-            self._send_product_error(
+        except LocalSessionConflictError as error:
+            self._send_api_error(
                 str(error),
                 code=ErrorCode.SESSION_ACTIVE
                 if "active session" in str(error)
@@ -1176,7 +1176,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             )
             return
         except (OSError, ValueError) as error:
-            self._send_product_error(
+            self._send_api_error(
                 str(error),
                 code=ErrorCode.INVALID_REQUEST,
                 status=HTTPStatus.BAD_REQUEST,

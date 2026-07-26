@@ -6,14 +6,14 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from atpiano.product.domain.schemas import product_models
+from atpiano.contracts.schemas import contract_models
 
 FIXTURE_PATH = (
     Path(__file__).parents[1]
     / "contracts"
     / "fixtures"
     / "v1"
-    / "product-examples.json"
+    / "contract-examples.json"
 )
 
 
@@ -23,13 +23,13 @@ def _fixture_document() -> dict[str, object]:
     return value
 
 
-def test_shared_product_examples_validate_in_python() -> None:
+def test_shared_contract_examples_validate_in_python() -> None:
     models: dict[str, type[BaseModel]] = {
-        model.__name__: model for model in product_models()
+        model.__name__: model for model in contract_models()
     }
     document = _fixture_document()
 
-    assert document["schema_version"] == "atpiano.product-examples.v1"
+    assert document["schema_version"] == "atpiano.contract-examples.v1"
     objects = document["objects"]
     assert isinstance(objects, list)
     assert len(objects) >= 15
@@ -40,7 +40,7 @@ def test_shared_product_examples_validate_in_python() -> None:
         assert validated.model_dump(mode="json") == fixture["value"]
 
 
-def test_shared_product_examples_reject_incompatible_version() -> None:
+def test_shared_contract_examples_reject_incompatible_version() -> None:
     document = _fixture_document()
     objects = document["objects"]
     assert isinstance(objects, list)
@@ -52,7 +52,7 @@ def test_shared_product_examples_reject_incompatible_version() -> None:
     value = workspace["value"]
     assert isinstance(value, dict)
 
-    from atpiano.product.domain.schemas import Workspace
+    from atpiano.contracts.schemas import Workspace
 
-    with pytest.raises(ValidationError, match="atpiano.product.v1"):
-        Workspace.model_validate(value | {"schema_version": "atpiano.product.v2"})
+    with pytest.raises(ValidationError, match="atpiano.contract.v1"):
+        Workspace.model_validate(value | {"schema_version": "atpiano.contract.v2"})

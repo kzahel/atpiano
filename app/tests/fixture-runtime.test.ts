@@ -25,7 +25,7 @@ interface FixtureObject {
 const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
 const fixtureDocument = JSON.parse(
   readFileSync(
-    `${repositoryRoot}/contracts/fixtures/v1/product-examples.json`,
+    `${repositoryRoot}/contracts/fixtures/v1/contract-examples.json`,
     "utf8",
   ),
 ) as { readonly objects: readonly FixtureObject[] };
@@ -52,7 +52,7 @@ function runtimeData(): FixtureRuntimeData {
     session,
     capture,
     events: {
-      schema_version: "atpiano.product.v1",
+      schema_version: "atpiano.contract.v1",
       workspace_id: workspace.workspace_id,
       session_id: session.session_id,
       start_sample: 0,
@@ -61,7 +61,7 @@ function runtimeData(): FixtureRuntimeData {
       next_cursor: null,
     },
     artifacts: {
-      schema_version: "atpiano.product.v1",
+      schema_version: "atpiano.contract.v1",
       workspace_id: workspace.workspace_id,
       session_id: session.session_id,
       items: [artifact],
@@ -69,7 +69,7 @@ function runtimeData(): FixtureRuntimeData {
     },
     artifactAccess: {
       [artifact.artifact_id]: {
-        schema_version: "atpiano.product.v1",
+        schema_version: "atpiano.contract.v1",
         workspace_id: workspace.workspace_id,
         session_id: session.session_id,
         artifact_id: artifact.artifact_id,
@@ -99,7 +99,7 @@ test("fixture runtime exercises replay, PCM, Stop, and explicit reads", async ()
 
   const capture = await runtime.startReplay(
     {
-      schema_version: "atpiano.product.v1",
+      schema_version: "atpiano.contract.v1",
       workspace_id: data.workspace.workspace_id,
       fixture_id: data.fixtureId,
       repeat: 1,
@@ -129,7 +129,7 @@ test("fixture runtime exercises replay, PCM, Stop, and explicit reads", async ()
   });
   const stopped = await runtime.stopCapture(
     {
-      schema_version: "atpiano.product.v1",
+      schema_version: "atpiano.contract.v1",
       workspace_id: data.workspace.workspace_id,
       session_id: data.session.session_id,
       capture_id: capture.capture_id,

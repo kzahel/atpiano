@@ -53,7 +53,7 @@ def default_lanes(root: Path | None = None) -> tuple[RegressionLane, ...]:
             ),
         ),
         RegressionLane(
-            "product-contracts",
+            "api-contracts",
             (
                 (
                     sys.executable,
@@ -62,9 +62,9 @@ def default_lanes(root: Path | None = None) -> tuple[RegressionLane, ...]:
                     "generate-contracts",
                     "--check",
                 ),
-                ("npm", "run", "typecheck", "--prefix", "product"),
-                ("npm", "test", "--prefix", "product"),
-                ("npm", "audit", "--audit-level", "high", "--prefix", "product"),
+                ("npm", "run", "typecheck", "--prefix", "app"),
+                ("npm", "test", "--prefix", "app"),
+                ("npm", "audit", "--audit-level", "high", "--prefix", "app"),
             ),
         ),
         RegressionLane(

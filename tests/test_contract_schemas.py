@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from atpiano.product.domain.schemas import (
-    PRODUCT_SCHEMA_VERSION,
+from atpiano.contracts.schemas import (
+    CONTRACT_SCHEMA_VERSION,
     Artifact,
     ArtifactKind,
     EventKind,
@@ -30,14 +30,14 @@ SHA256 = "a" * 64
 def _provenance() -> Provenance:
     return Provenance(
         application_version="0.1.0",
-        schema_versions={"product": PRODUCT_SCHEMA_VERSION},
+        schema_versions={"contract": CONTRACT_SCHEMA_VERSION},
         adapter="test-adapter",
         execution_backend="cpu",
         source_artifact_sha256=(SHA256,),
     )
 
 
-def test_representative_product_objects_round_trip_strictly() -> None:
+def test_representative_contract_objects_round_trip_strictly() -> None:
     workspace = Workspace(
         workspace_id="local",
         name="On this Mac",
@@ -79,15 +79,15 @@ def test_representative_product_objects_round_trip_strictly() -> None:
 
 def test_schema_version_and_unknown_fields_fail_explicitly() -> None:
     valid = {
-        "schema_version": PRODUCT_SCHEMA_VERSION,
+        "schema_version": CONTRACT_SCHEMA_VERSION,
         "workspace_id": "local",
         "name": "On this Mac",
         "mode": "local",
         "created_at": NOW.isoformat(),
     }
 
-    with pytest.raises(ValidationError, match="atpiano.product.v1"):
-        Workspace.model_validate(valid | {"schema_version": "atpiano.product.v2"})
+    with pytest.raises(ValidationError, match="atpiano.contract.v1"):
+        Workspace.model_validate(valid | {"schema_version": "atpiano.contract.v2"})
     with pytest.raises(ValidationError, match="Extra inputs"):
         Workspace.model_validate(valid | {"platform": "tauri"})
 

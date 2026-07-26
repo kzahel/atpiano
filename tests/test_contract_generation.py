@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from atpiano.cli import build_parser
-from atpiano.product.contract_generation import (
+from atpiano.contracts.generation import (
     OPENAPI_RELATIVE_PATH,
     TYPESCRIPT_RELATIVE_PATH,
     build_openapi_document,
@@ -28,13 +28,13 @@ def test_openapi_uses_explicit_targets_and_pydantic_components() -> None:
     assert "Session" in document["components"]["schemas"]
     paths = document["paths"]
     session_path = (
-        "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}"
+        "/api/v1/workspaces/{workspace_id}/sessions/{session_id}"
     )
     assert paths[session_path]["get"]["operationId"] == "getSession"
     assert paths[session_path]["delete"]["operationId"] == "deleteSession"
     assert paths[
         (
-            "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}"
+            "/api/v1/workspaces/{workspace_id}/sessions/{session_id}"
             "/score-jobs"
         )
     ]["post"]["operationId"] == (
@@ -43,8 +43,8 @@ def test_openapi_uses_explicit_targets_and_pydantic_components() -> None:
 
 
 def test_generation_check_detects_drift(tmp_path: Path) -> None:
-    product = tmp_path / "product"
-    executable = product / "node_modules" / ".bin" / "openapi-typescript"
+    app = tmp_path / "app"
+    executable = app / "node_modules" / ".bin" / "openapi-typescript"
     executable.parent.mkdir(parents=True)
     executable.write_text(
         "#!/bin/sh\n"
@@ -62,5 +62,5 @@ def test_generation_check_detects_drift(tmp_path: Path) -> None:
     assert typescript.read_text(encoding="utf-8") == "generated\n"
     generate_contracts(root=tmp_path, check=True)
     typescript.write_text("drifted\n", encoding="utf-8")
-    with pytest.raises(RuntimeError, match="generated product contracts"):
+    with pytest.raises(RuntimeError, match="generated API contracts"):
         generate_contracts(root=tmp_path, check=True)

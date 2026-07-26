@@ -420,7 +420,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"migration regression: {report['status']}")
         return 0 if report["status"] == "passed" else 1
     if args.command == "generate-contracts":
-        from atpiano.product.contract_generation import generate_contracts
+        from atpiano.contracts.generation import generate_contracts
 
         outputs = generate_contracts(check=args.check)
         for output in outputs:

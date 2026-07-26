@@ -56,8 +56,8 @@
             "$ref": "#/components/schemas/Provenance"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -154,8 +154,8 @@
             "type": "string"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -229,8 +229,8 @@
             "title": "Next Cursor"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -255,6 +255,128 @@
           "items"
         ],
         "title": "ArtifactPage",
+        "type": "object"
+      },
+      "AtpianoError": {
+        "additionalProperties": false,
+        "properties": {
+          "capture_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Capture Id"
+          },
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "details": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Details",
+            "type": "object"
+          },
+          "error_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Error Id",
+            "type": "string"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Job Id"
+          },
+          "message": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Session Id"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Workspace Id"
+          }
+        },
+        "required": [
+          "error_id",
+          "code",
+          "message",
+          "retryable"
+        ],
+        "title": "AtpianoError",
         "type": "object"
       },
       "Capture": {
@@ -294,8 +416,8 @@
             "type": "integer"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -368,8 +490,8 @@
             "type": "integer"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -430,8 +552,8 @@
             "type": "string"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -476,8 +598,8 @@
             "type": "string"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -515,8 +637,8 @@
             "type": "boolean"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -570,11 +692,11 @@
         "additionalProperties": false,
         "properties": {
           "error": {
-            "$ref": "#/components/schemas/ProductError"
+            "$ref": "#/components/schemas/AtpianoError"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           }
@@ -633,8 +755,8 @@
             "title": "Next Cursor"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -744,8 +866,8 @@
             "type": "integer"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -844,8 +966,8 @@
             "type": "integer"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -919,7 +1041,7 @@
           "error": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ProductError"
+                "$ref": "#/components/schemas/AtpianoError"
               },
               {
                 "type": "null"
@@ -943,8 +1065,8 @@
             "$ref": "#/components/schemas/JobKind"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -1013,8 +1135,8 @@
             "$ref": "#/components/schemas/MembershipRole"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -1151,128 +1273,6 @@
         "title": "PcmEnvelope",
         "type": "object"
       },
-      "ProductError": {
-        "additionalProperties": false,
-        "properties": {
-          "capture_id": {
-            "anyOf": [
-              {
-                "maxLength": 128,
-                "minLength": 1,
-                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Capture Id"
-          },
-          "code": {
-            "$ref": "#/components/schemas/ErrorCode"
-          },
-          "details": {
-            "additionalProperties": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "title": "Details",
-            "type": "object"
-          },
-          "error_id": {
-            "maxLength": 128,
-            "minLength": 1,
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
-            "title": "Error Id",
-            "type": "string"
-          },
-          "job_id": {
-            "anyOf": [
-              {
-                "maxLength": 128,
-                "minLength": 1,
-                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Job Id"
-          },
-          "message": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Message",
-            "type": "string"
-          },
-          "retryable": {
-            "title": "Retryable",
-            "type": "boolean"
-          },
-          "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
-            "title": "Schema Version",
-            "type": "string"
-          },
-          "session_id": {
-            "anyOf": [
-              {
-                "maxLength": 128,
-                "minLength": 1,
-                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Session Id"
-          },
-          "workspace_id": {
-            "anyOf": [
-              {
-                "maxLength": 128,
-                "minLength": 1,
-                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Workspace Id"
-          }
-        },
-        "required": [
-          "error_id",
-          "code",
-          "message",
-          "retryable"
-        ],
-        "title": "ProductError",
-        "type": "object"
-      },
       "Provenance": {
         "additionalProperties": false,
         "properties": {
@@ -1322,8 +1322,8 @@
             "title": "Model Id"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -1398,8 +1398,8 @@
             "type": "string"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -1464,8 +1464,8 @@
             "$ref": "#/components/schemas/RuntimeMode"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -1526,8 +1526,8 @@
             "type": "string"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -1599,8 +1599,8 @@
             "type": "string"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -1722,8 +1722,8 @@
             "type": "integer"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -1795,8 +1795,8 @@
             "title": "Next Cursor"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -1885,8 +1885,8 @@
             "title": "Preview Model"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -1940,8 +1940,8 @@
             "type": "string"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -1994,8 +1994,8 @@
             "title": "Owner User Id"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           },
@@ -2050,8 +2050,8 @@
             "title": "Next Cursor"
           },
           "schema_version": {
-            "const": "atpiano.product.v1",
-            "default": "atpiano.product.v1",
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
             "title": "Schema Version",
             "type": "string"
           }
@@ -2065,13 +2065,13 @@
     }
   },
   "info": {
-    "description": "Platform-neutral product operations. Musical time is always expressed in source-audio samples.",
-    "title": "atpiano product contract",
+    "description": "Platform-neutral atpiano operations. Musical time is always expressed in source-audio samples.",
+    "title": "atpiano API contract",
     "version": "1.0.0"
   },
   "openapi": "3.1.0",
   "paths": {
-    "/api/product/v1/capabilities": {
+    "/api/v1/capabilities": {
       "get": {
         "operationId": "getCapabilities",
         "responses": {
@@ -2093,12 +2093,12 @@
                 }
               }
             },
-            "description": "Structured product error"
+            "description": "Structured API error"
           }
         }
       }
     },
-    "/api/product/v1/jobs/{job_id}": {
+    "/api/v1/jobs/{job_id}": {
       "get": {
         "operationId": "getJob",
         "parameters": [
@@ -2130,12 +2130,12 @@
                 }
               }
             },
-            "description": "Structured product error"
+            "description": "Structured API error"
           }
         }
       }
     },
-    "/api/product/v1/workspaces": {
+    "/api/v1/workspaces": {
       "get": {
         "operationId": "listWorkspaces",
         "parameters": [
@@ -2178,12 +2178,12 @@
                 }
               }
             },
-            "description": "Structured product error"
+            "description": "Structured API error"
           }
         }
       }
     },
-    "/api/product/v1/workspaces/{workspace_id}/sessions": {
+    "/api/v1/workspaces/{workspace_id}/sessions": {
       "get": {
         "operationId": "listSessions",
         "parameters": [
@@ -2234,12 +2234,12 @@
                 }
               }
             },
-            "description": "Structured product error"
+            "description": "Structured API error"
           }
         }
       }
     },
-    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}": {
+    "/api/v1/workspaces/{workspace_id}/sessions/{session_id}": {
       "delete": {
         "operationId": "deleteSession",
         "parameters": [
@@ -2289,7 +2289,7 @@
                 }
               }
             },
-            "description": "Structured product error"
+            "description": "Structured API error"
           }
         }
       },
@@ -2332,12 +2332,12 @@
                 }
               }
             },
-            "description": "Structured product error"
+            "description": "Structured API error"
           }
         }
       }
     },
-    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/artifacts": {
+    "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/artifacts": {
       "get": {
         "operationId": "listArtifacts",
         "parameters": [
@@ -2396,12 +2396,12 @@
                 }
               }
             },
-            "description": "Structured product error"
+            "description": "Structured API error"
           }
         }
       }
     },
-    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/artifacts/{artifact_id}/access": {
+    "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/artifacts/{artifact_id}/access": {
       "get": {
         "operationId": "getArtifactAccess",
         "parameters": [
@@ -2449,12 +2449,12 @@
                 }
               }
             },
-            "description": "Structured product error"
+            "description": "Structured API error"
           }
         }
       }
     },
-    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/events": {
+    "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/events": {
       "get": {
         "operationId": "listEvents",
         "parameters": [
@@ -2531,12 +2531,12 @@
                 }
               }
             },
-            "description": "Structured product error"
+            "description": "Structured API error"
           }
         }
       }
     },
-    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/horizon": {
+    "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/horizon": {
       "get": {
         "operationId": "getHorizon",
         "parameters": [
@@ -2576,12 +2576,12 @@
                 }
               }
             },
-            "description": "Structured product error"
+            "description": "Structured API error"
           }
         }
       }
     },
-    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/score-jobs": {
+    "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/score-jobs": {
       "post": {
         "operationId": "startScoreJob",
         "parameters": [
@@ -2631,7 +2631,7 @@
                 }
               }
             },
-            "description": "Structured product error"
+            "description": "Structured API error"
           }
         }
       }

@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/api/product/v1/capabilities": {
+    "/api/v1/capabilities": {
         parameters: {
             query?: never;
             header?: never;
@@ -20,7 +20,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/product/v1/jobs/{job_id}": {
+    "/api/v1/jobs/{job_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -36,7 +36,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/product/v1/workspaces": {
+    "/api/v1/workspaces": {
         parameters: {
             query?: never;
             header?: never;
@@ -52,7 +52,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/product/v1/workspaces/{workspace_id}/sessions": {
+    "/api/v1/workspaces/{workspace_id}/sessions": {
         parameters: {
             query?: never;
             header?: never;
@@ -68,7 +68,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}": {
+    "/api/v1/workspaces/{workspace_id}/sessions/{session_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -84,7 +84,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/artifacts": {
+    "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/artifacts": {
         parameters: {
             query?: never;
             header?: never;
@@ -100,7 +100,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/artifacts/{artifact_id}/access": {
+    "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/artifacts/{artifact_id}/access": {
         parameters: {
             query?: never;
             header?: never;
@@ -116,7 +116,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/events": {
+    "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/events": {
         parameters: {
             query?: never;
             header?: never;
@@ -132,7 +132,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/horizon": {
+    "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/horizon": {
         parameters: {
             query?: never;
             header?: never;
@@ -148,7 +148,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/product/v1/workspaces/{workspace_id}/sessions/{session_id}/score-jobs": {
+    "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/score-jobs": {
         parameters: {
             query?: never;
             header?: never;
@@ -192,10 +192,10 @@ export interface components {
             provenance: components["schemas"]["Provenance"];
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Session Id */
             session_id: string;
             /** Sha256 */
@@ -225,10 +225,10 @@ export interface components {
             media_type: string;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Session Id */
             session_id: string;
             /** Url */
@@ -252,14 +252,54 @@ export interface components {
             next_cursor: string | null;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Session Id */
             session_id: string;
             /** Workspace Id */
             workspace_id: string;
+        };
+        /** AtpianoError */
+        AtpianoError: {
+            /**
+             * Capture Id
+             * @default null
+             */
+            capture_id: string | null;
+            code: components["schemas"]["ErrorCode"];
+            /** Details */
+            details?: {
+                [key: string]: string | number | boolean | null;
+            };
+            /** Error Id */
+            error_id: string;
+            /**
+             * Job Id
+             * @default null
+             */
+            job_id: string | null;
+            /** Message */
+            message: string;
+            /** Retryable */
+            retryable: boolean;
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+            /**
+             * Session Id
+             * @default null
+             */
+            session_id: string | null;
+            /**
+             * Workspace Id
+             * @default null
+             */
+            workspace_id: string | null;
         };
         /** Capture */
         Capture: {
@@ -276,10 +316,10 @@ export interface components {
             sample_rate_hz: number;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Session Id */
             session_id: string;
             source: components["schemas"]["SourceKind"];
@@ -305,10 +345,10 @@ export interface components {
             sample_rate_hz: number;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /**
              * Source
              * @constant
@@ -332,10 +372,10 @@ export interface components {
             request_id: string;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Session Id */
             session_id: string;
             /** Workspace Id */
@@ -352,10 +392,10 @@ export interface components {
             request_id: string;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Session Id */
             session_id: string;
             /** Workspace Id */
@@ -371,10 +411,10 @@ export interface components {
             recoverable: true;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Session Id */
             session_id: string;
             /**
@@ -392,13 +432,13 @@ export interface components {
         ErrorCode: "invalid-request" | "incompatible-version" | "not-found" | "conflict" | "capture-busy" | "score-busy" | "session-active" | "job-active" | "storage-unavailable" | "model-unavailable" | "cancelled" | "internal";
         /** ErrorResponse */
         ErrorResponse: {
-            error: components["schemas"]["ProductError"];
+            error: components["schemas"]["AtpianoError"];
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
         };
         /**
          * EventKind
@@ -423,10 +463,10 @@ export interface components {
             next_cursor: string | null;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Session Id */
             session_id: string;
             /** Start Sample */
@@ -461,10 +501,10 @@ export interface components {
             revision: number;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Session Id */
             session_id: string;
             /**
@@ -499,10 +539,10 @@ export interface components {
             sample_rate_hz: number;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Session Id */
             session_id: string;
             /** Transcription Run Id */
@@ -528,7 +568,7 @@ export interface components {
              */
             created_at: string;
             /** @default null */
-            error: components["schemas"]["ProductError"] | null;
+            error: components["schemas"]["AtpianoError"] | null;
             /** Input Horizon Sample */
             input_horizon_sample: number;
             /** Job Id */
@@ -536,10 +576,10 @@ export interface components {
             kind: components["schemas"]["JobKind"];
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Session Id */
             session_id: string;
             /**
@@ -566,10 +606,10 @@ export interface components {
             role: components["schemas"]["MembershipRole"];
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** User Id */
             user_id: string;
             /** Workspace Id */
@@ -620,46 +660,6 @@ export interface components {
             /** Workspace Id */
             workspace_id: string;
         };
-        /** ProductError */
-        ProductError: {
-            /**
-             * Capture Id
-             * @default null
-             */
-            capture_id: string | null;
-            code: components["schemas"]["ErrorCode"];
-            /** Details */
-            details?: {
-                [key: string]: string | number | boolean | null;
-            };
-            /** Error Id */
-            error_id: string;
-            /**
-             * Job Id
-             * @default null
-             */
-            job_id: string | null;
-            /** Message */
-            message: string;
-            /** Retryable */
-            retryable: boolean;
-            /**
-             * Schema Version
-             * @default atpiano.product.v1
-             * @constant
-             */
-            schema_version: "atpiano.product.v1";
-            /**
-             * Session Id
-             * @default null
-             */
-            session_id: string | null;
-            /**
-             * Workspace Id
-             * @default null
-             */
-            workspace_id: string | null;
-        };
         /** Provenance */
         Provenance: {
             /** Adapter */
@@ -680,10 +680,10 @@ export interface components {
             model_id: string | null;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Schema Versions */
             schema_versions: {
                 [key: string]: string;
@@ -717,10 +717,10 @@ export interface components {
             request_id: string;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /**
              * Silence Samples
              * @default 0
@@ -747,10 +747,10 @@ export interface components {
             runtime_mode: components["schemas"]["RuntimeMode"];
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Score Available */
             score_available: boolean;
             /** Supported Pcm Protocol Versions */
@@ -771,10 +771,10 @@ export interface components {
             request_id: string;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Session Id */
             session_id: string;
             /** Transcription Run Id */
@@ -799,10 +799,10 @@ export interface components {
             producing_job_id: string;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Score Snapshot Id */
             score_snapshot_id: string;
             /** Session Id */
@@ -843,10 +843,10 @@ export interface components {
             sample_rate_hz: number;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Session Id */
             session_id: string;
             source: components["schemas"]["SourceKind"];
@@ -872,10 +872,10 @@ export interface components {
             next_cursor: string | null;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Workspace Id */
             workspace_id: string;
         };
@@ -913,10 +913,10 @@ export interface components {
             preview_model: string | null;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Session Id */
             session_id: string;
             status: components["schemas"]["RunStatus"];
@@ -936,10 +936,10 @@ export interface components {
             display_name: string;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** User Id */
             user_id: string;
         };
@@ -960,10 +960,10 @@ export interface components {
             owner_user_id: string | null;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
             /** Workspace Id */
             workspace_id: string;
         };
@@ -983,10 +983,10 @@ export interface components {
             next_cursor: string | null;
             /**
              * Schema Version
-             * @default atpiano.product.v1
+             * @default atpiano.contract.v1
              * @constant
              */
-            schema_version: "atpiano.product.v1";
+            schema_version: "atpiano.contract.v1";
         };
     };
     responses: never;
@@ -1015,7 +1015,7 @@ export interface operations {
                     "application/json": components["schemas"]["RuntimeCapabilities"];
                 };
             };
-            /** @description Structured product error */
+            /** @description Structured API error */
             default: {
                 headers: {
                     [name: string]: unknown;
@@ -1046,7 +1046,7 @@ export interface operations {
                     "application/json": components["schemas"]["Job"];
                 };
             };
-            /** @description Structured product error */
+            /** @description Structured API error */
             default: {
                 headers: {
                     [name: string]: unknown;
@@ -1078,7 +1078,7 @@ export interface operations {
                     "application/json": components["schemas"]["WorkspacePage"];
                 };
             };
-            /** @description Structured product error */
+            /** @description Structured API error */
             default: {
                 headers: {
                     [name: string]: unknown;
@@ -1112,7 +1112,7 @@ export interface operations {
                     "application/json": components["schemas"]["SessionPage"];
                 };
             };
-            /** @description Structured product error */
+            /** @description Structured API error */
             default: {
                 headers: {
                     [name: string]: unknown;
@@ -1144,7 +1144,7 @@ export interface operations {
                     "application/json": components["schemas"]["Session"];
                 };
             };
-            /** @description Structured product error */
+            /** @description Structured API error */
             default: {
                 headers: {
                     [name: string]: unknown;
@@ -1180,7 +1180,7 @@ export interface operations {
                     "application/json": components["schemas"]["DeleteSessionResult"];
                 };
             };
-            /** @description Structured product error */
+            /** @description Structured API error */
             default: {
                 headers: {
                     [name: string]: unknown;
@@ -1215,7 +1215,7 @@ export interface operations {
                     "application/json": components["schemas"]["ArtifactPage"];
                 };
             };
-            /** @description Structured product error */
+            /** @description Structured API error */
             default: {
                 headers: {
                     [name: string]: unknown;
@@ -1248,7 +1248,7 @@ export interface operations {
                     "application/json": components["schemas"]["ArtifactAccess"];
                 };
             };
-            /** @description Structured product error */
+            /** @description Structured API error */
             default: {
                 headers: {
                     [name: string]: unknown;
@@ -1285,7 +1285,7 @@ export interface operations {
                     "application/json": components["schemas"]["EventPage"];
                 };
             };
-            /** @description Structured product error */
+            /** @description Structured API error */
             default: {
                 headers: {
                     [name: string]: unknown;
@@ -1317,7 +1317,7 @@ export interface operations {
                     "application/json": components["schemas"]["Horizon"];
                 };
             };
-            /** @description Structured product error */
+            /** @description Structured API error */
             default: {
                 headers: {
                     [name: string]: unknown;
@@ -1353,7 +1353,7 @@ export interface operations {
                     "application/json": components["schemas"]["Job"];
                 };
             };
-            /** @description Structured product error */
+            /** @description Structured API error */
             default: {
                 headers: {
                     [name: string]: unknown;

@@ -64,7 +64,7 @@ function pageWindow<T>(
 /**
  * Deterministic in-memory consumer of the same runtime contract used by local
  * and hosted adapters. It is a Phase 3 bring-up aid, not a test-only domain
- * shortcut: products still carry explicit workspace/session/capture IDs and
+ * shortcut: values still carry explicit workspace/session/capture IDs and
  * source-sample coordinates.
  */
 export class FixtureRuntime implements AtpianoRuntime {
@@ -88,7 +88,7 @@ export class FixtureRuntime implements AtpianoRuntime {
   async listWorkspaces(request: PageRequest): Promise<WorkspacePage> {
     assertRequest(request);
     return {
-      schema_version: "atpiano.product.v1",
+      schema_version: "atpiano.contract.v1",
       items: pageWindow([this.#data.workspace], request),
       next_cursor: null,
     };
@@ -102,7 +102,7 @@ export class FixtureRuntime implements AtpianoRuntime {
     this.#assertWorkspace(workspaceId);
     const items = this.#deleted ? [] : pageWindow([this.#session], request);
     return {
-      schema_version: "atpiano.product.v1",
+      schema_version: "atpiano.contract.v1",
       workspace_id: workspaceId,
       items,
       next_cursor: null,
@@ -309,7 +309,7 @@ export class FixtureRuntime implements AtpianoRuntime {
     }
     this.#deleted = true;
     return {
-      schema_version: "atpiano.product.v1",
+      schema_version: "atpiano.contract.v1",
       workspace_id: input.workspace_id,
       session_id: input.session_id,
       trashed_at: this.#data.trashedAt,
