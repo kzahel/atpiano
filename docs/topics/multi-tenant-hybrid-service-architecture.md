@@ -2,16 +2,17 @@
 
 Topic: multi-tenant-hybrid-service-architecture
 
-Status: **accepted target architecture as of 2026-07-26; Phase 1 is complete
-and revised Phase 2 implementation awaits mandatory R2 review.** Versioned
-Pydantic contracts, generated OpenAPI/TypeScript, the `AtpianoRuntime`
-boundary, an executable fixture provider, and explicit local compatibility
-paths now exist. R2 feedback removed the generic `product` namespace and
-premature application ports while retaining the cross-client provider seam
-needed by web, future Android, and desktop clients. The shared React
-application has not started. The target remains a zero-install hosted service
-and auto-updating offline-capable Tauri desktop application over the same
-contracts.
+Status: **accepted target architecture as of 2026-07-26; Phases 1 and 2 are
+complete, R2 is accepted, and Phase 3 is in progress under
+[`016-shared-react-application.md`](../tactical/016-shared-react-application.md).**
+Versioned Pydantic contracts, generated OpenAPI/TypeScript, the
+`AtpianoRuntime` boundary, an executable fixture provider, and explicit local
+compatibility paths exist. R2 feedback removed the generic `product`
+namespace and premature application ports while retaining the cross-client
+provider seam needed by web, future Android, and desktop clients. The shared
+React application is now the active slice. The target remains a zero-install
+hosted service and auto-updating offline-capable Tauri desktop application
+over the same contracts.
 
 ## Scope And Relationship
 

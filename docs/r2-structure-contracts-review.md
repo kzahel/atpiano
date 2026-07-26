@@ -1,6 +1,7 @@
 # R2 Structure And Contracts Review
 
-Status: awaiting required human review on 2026-07-26.
+Status: accepted by the user on 2026-07-26 after the terminology and layering
+revision. Phase 3 may proceed.
 
 This packet is the revised mandatory hold after Phase 2. Initial review found
 the provider direction useful for a future Android client but the `product`
@@ -286,5 +287,5 @@ Please review:
 5. Is the retained/wrapped/replaced split sound enough to begin the shared
    React application?
 
-Phase 3 remains blocked until this packet receives explicit acceptance or a
-documented revision.
+Decision: accepted. The user confirmed the revised direction and authorized
+Phase 3.

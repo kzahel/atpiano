@@ -2,10 +2,10 @@
 
 Topic: multi-tenant-hybrid-service-architecture
 
-Status: accepted master plan on 2026-07-26; no implementation phase has
-started. This document tracks the staged migration program and its human
-review gates. Each phase must create one or more smaller numbered tacticals
-before implementation.
+Status: accepted master plan on 2026-07-26; Phases 1 and 2 are complete, R2
+is accepted, and Phase 3 is in progress. This document tracks the staged
+migration program and its human review gates. Each phase must create one or
+more smaller numbered tacticals before implementation.
 
 ## Outcome
 
@@ -60,8 +60,8 @@ result, and commit range.
 | Phase | Status | Bounded tactical | Human gate |
 | --- | --- | --- | --- |
 | 1. Freeze and characterize | Complete (`3aabcda^..0bca270`) | [`014`](014-freeze-migration-baseline.md) | R1 accepted; no ambiguity |
-| 2. Contracts and structure | Revised; awaiting R2 (`e2c2b9d^..3b53285`) | [`015`](015-contracts-and-structure.md) | **Required structure review** |
-| 3. Shared React application | Not started | Not created | **Required interaction review** |
+| 2. Contracts and structure | Complete (`e2c2b9d^..9f8dd16`) | [`015`](015-contracts-and-structure.md) | R2 accepted 2026-07-26 |
+| 3. Shared React application | In progress | [`016`](016-shared-react-application.md) | **Required interaction review** |
 | 4. Python application core | Not started | Not created | **Required parity review; hold before Phase 5** |
 | 5. Early Tauri skeleton | Blocked by Phase 4 approval | Not created | Required desktop-boundary review |
 | 6. Complete local desktop | Blocked by Phase 5 | Not created | Required daily-use review |

@@ -2,14 +2,13 @@
 
 Topic: session-workspace-management
 
-Status: accepted proposed foundation on 2026-07-26; the revised Phase 2
-contract and local compatibility implementation is complete and awaiting R2
-review under
-[`015-contracts-and-structure.md`](../tactical/015-contracts-and-structure.md).
+Status: accepted proposed foundation on 2026-07-26; Phase 2 is complete, R2
+is accepted, and the durable React New/history/selection UI is in progress
+under
+[`016-shared-react-application.md`](../tactical/016-shared-react-application.md).
 Existing session artifacts remain authoritative while explicit catalog,
 session-addressed reads, capture identity, score targets, and recoverable
-deletion are exposed through additive `/api/v1` routes. The durable React
-New/history/selection UI remains Phase 3 and has not started.
+deletion are exposed through additive `/api/v1` routes.
 
 ## Scope And Relationship
 
