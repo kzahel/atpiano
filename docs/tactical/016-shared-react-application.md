@@ -9,8 +9,9 @@ Topic: session-workspace-management
 Status: implementation revised after R3 exposed live-event range, horizon
 presentation, and misleading score-placeholder defects. The fixes are
 validated. Pathological score expansion and missing session-addressed URLs
-were subsequently corrected and await explicit R3 re-review. Phase 4 must not
-start before that decision.
+were subsequently corrected. Stop progress and automatic post-settle score
+generation are now implemented and await explicit R3 re-review. Phase 4 must
+not start before that decision.
 
 ## Entry Evidence
 
@@ -182,7 +183,8 @@ The implementation series began at `a9805fd` and is:
 - `7423159` clipped corrected display at the commit horizon and removed
   synthetic placeholder engraving after follow-up review;
 - `f8d096e` rejected and hid pathological score-model note expansion; and
-- `f39179a` put the selected session ID in copyable browser URLs.
+- `f39179a` put the selected session ID in copyable browser URLs; and
+- `938a15b` added settling progress and automatic post-capture scoring.
 
 The real page-facing golden replay is recorded in
 [`r3-interaction-review.md`](../r3-interaction-review.md). Its 42-second
@@ -193,8 +195,8 @@ views, the score job, artifact refresh, and real SVG notation without browser
 alerts or page-level horizontal overflow.
 
 The final `uv run atpiano migration-regression` report at
-`results/migration-regression/20260726T115529Z/report.json` passed 81 Python
-tests, retained JavaScript tests, 23 application tests, contract drift,
+`results/migration-regression/20260726T120101Z/report.json` passed 81 Python
+tests, retained JavaScript tests, 24 application tests, contract drift,
 TypeScript, dependency audit, Ruff, syntax, and whitespace. Physical
 microphone permission and playing remain the explicit human lane at R3. The
 implementation range is `a9805fd^..HEAD` at this review handoff. Phase 4
@@ -221,3 +223,10 @@ pitched elements in the transformer output. `f8d096e` now fails that score
 job before publication and hides existing invalid pointers while retaining
 their diagnostic files. `f39179a` adds `?session=<session-id>` selection so a
 copied review URL resolves the exact performance.
+
+Further review found no clear progress after Stop and an unnecessary manual
+score action. `938a15b` disables Stop immediately, displays exact
+commit-to-audio-head progress, and automatically starts scoring once the
+settled session and final horizon are available. A real 20.5-second browser
+capture moved from 60% settling to a ready rendered score without another
+click.

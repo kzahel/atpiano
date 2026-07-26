@@ -5,7 +5,9 @@ not appearing until Stop; follow-up review found corrected bars crossing the
 commit horizon and a misleading synthetic score placeholder. `7423159`
 addresses both findings. Further review exposed pathological score-model
 expansion and non-addressable browser state; `f8d096e` and `f39179a` address
-those findings and await re-review. Phase 4 remains closed.
+those findings. Follow-up requested visible Stop progress and automatic score
+generation; `938a15b` implements and validates that workflow. R3 awaits
+re-review, and Phase 4 remains closed.
 
 This packet reviews the shared React application while its visual hierarchy,
 controls, and session mental model are still inexpensive to change. The
@@ -139,8 +141,8 @@ its artifact access handle, and rendered it as SVG. Automated tests also
 cover score failure isolation.
 
 The final `uv run atpiano migration-regression` passed at
-`results/migration-regression/20260726T115529Z/report.json`: 81 Python tests,
-the retained JavaScript suites, 23 application tests, contract drift,
+`results/migration-regression/20260726T120101Z/report.json`: 81 Python tests,
+the retained JavaScript suites, 24 application tests, contract drift,
 TypeScript, dependency audit, Ruff, JavaScript syntax, and whitespace all
 passed. The dependency audit found zero vulnerabilities.
 
@@ -252,3 +254,20 @@ review link is:
 ```text
 http://127.0.0.1:8123/?session=20260726T114525-d82bfe1f7822
 ```
+
+The next review found that **Stop & settle** looked inert during final
+correction and that score generation required an unnecessary second action.
+Commit `938a15b` makes settling a visible workflow:
+
+- Stop disables immediately and changes to `Settling… <percent>`;
+- a progress bar compares `H_commit` with the final audio head;
+- exact corrected and total source times remain visible;
+- completion automatically starts a score job for that settled session;
+- a top-level notice reports score generation, readiness, unavailability, or
+  rejection; and
+- the score panel still offers manual Refresh for a later explicit snapshot.
+
+The real browser, AudioWorklet, WebSocket, and local engine path showed
+`Settling… 60%` with `Corrected 00:12.0 of 00:20.0`, then transitioned without
+another click to score generation and a rendered valid snapshot through
+00:20.5. The selected session remained in the URL throughout.

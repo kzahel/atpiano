@@ -6,10 +6,11 @@ Status: accepted master plan on 2026-07-26; Phases 1 and 2 are complete, R2
 is accepted, and Phase 3 is being revised through mandatory R3 feedback.
 Live microphone feedback, commit-horizon presentation, and misleading
 placeholder engraving have been corrected. Pathological score expansion is
-now rejected, and browser URLs carry selected session IDs. The result awaits
-R3 re-review. This document tracks the staged migration program and its human
-review gates. Each phase must create one or more smaller numbered tacticals
-before implementation.
+now rejected, browser URLs carry selected session IDs, and Stop exposes
+settling progress before automatically generating the score. The result
+awaits R3 re-review. This document tracks the staged migration program and its
+human review gates. Each phase must create one or more smaller numbered
+tacticals before implementation.
 
 ## Outcome
 
@@ -371,6 +372,10 @@ notes became 491 pitched MusicXML elements. `f8d096e` rejects gross note
 expansion before publication and hides existing invalid score pointers.
 `f39179a` adds a selected-session query parameter so review links identify
 their exact session. Neither change opens Phase 4.
+
+`938a15b` responds to further R3 feedback by disabling Stop during final
+correction, showing source-horizon settling progress, and automatically
+starting the settled session's score job. Phase 4 remains closed.
 
 ## Phase 4 — Extract The Framework-Independent Python Application Core
 
