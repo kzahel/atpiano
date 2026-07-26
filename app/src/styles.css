@@ -708,6 +708,21 @@ input:focus-visible {
   background: transparent;
 }
 
+.roll-note-tail {
+  position: absolute;
+  height: 1px;
+  border-top: 1px dashed;
+  transform: translateY(-50%);
+}
+
+.roll-note-tail.committed {
+  border-color: rgba(98, 214, 165, 0.45);
+}
+
+.roll-note-tail.provisional {
+  border-color: rgba(255, 183, 77, 0.5);
+}
+
 .commit-line {
   position: absolute;
   top: 0;
@@ -834,6 +849,33 @@ input:focus-visible {
   color: #d58e84;
 }
 
+.score-not-live {
+  margin: -8px 0 14px;
+  color: #61756d;
+  font-size: 9px;
+}
+
+.score-empty {
+  display: grid;
+  min-height: 90px;
+  place-content: center;
+  gap: 6px;
+  border: 1px dashed #31473e;
+  border-radius: 4px;
+  color: #91a39b;
+  text-align: center;
+}
+
+.score-empty strong {
+  color: #c5d2cd;
+  font-size: 11px;
+}
+
+.score-empty span {
+  max-width: 420px;
+  font-size: 10px;
+}
+
 .score-paper {
   position: relative;
   height: 170px;
@@ -859,46 +901,6 @@ input:focus-visible {
   margin: 9px 0 0;
   color: #d58e84;
   font-size: 10px;
-}
-
-.staff-lines {
-  position: absolute;
-  inset: 46px 4% 42px;
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent 15px,
-    #7b7a72 16px,
-    transparent 17px
-  );
-}
-
-.treble-clef {
-  position: absolute;
-  z-index: 2;
-  bottom: 35px;
-  left: 5%;
-  font-family: serif;
-  font-size: 64px;
-  font-weight: 400;
-}
-
-.score-note {
-  position: absolute;
-  z-index: 2;
-  font-family: serif;
-  font-size: 15px;
-  font-style: normal;
-  transform: rotate(-14deg);
-}
-
-.score-paper > span {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: #72746e;
-  font-size: 11px;
 }
 
 .score-card > small {

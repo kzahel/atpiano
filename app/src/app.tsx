@@ -423,7 +423,9 @@ export function App() {
     (event) => event.kind === "note" && event.lifecycle === "committed",
   ).length;
   const selectedIsActive = selected?.session_id === activeSession?.session_id;
-  const scoreStatus = scoreJob?.status ?? (
+  const selectedScoreJob =
+    scoreJob?.session_id === selected?.session_id ? scoreJob : null;
+  const scoreStatus = selectedScoreJob?.status ?? (
     selected?.available_artifact_kinds.includes("musicxml") ? "complete" : null
   );
 
@@ -613,6 +615,7 @@ export function App() {
               scoreAvailable={capabilities.data?.score_available ?? false}
               scoreXml={scoreXml.data}
               scoreXmlError={scoreXml.error}
+              scoreHorizonSample={scoreArtifact?.source_horizon_sample}
               onInspect={setInspectionSample}
               onGenerateScore={() => void generateScore()}
             />

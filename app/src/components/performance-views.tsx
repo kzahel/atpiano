@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { formatClock, noteName } from "../lib/format.js";
+import { noteDisplaySegments } from "../lib/note-display.js";
 import { pianoLayout } from "../lib/piano-layout.js";
 import type {
   EventRevision,
@@ -145,18 +146,34 @@ function PianoRoll({
         </div>
         <div className="roll-grid">
           {notes.map((note) => {
-            const end = note.offset_sample ?? total;
+            const display = noteDisplaySegments(
+              note,
+              horizon,
+              session.sample_rate_hz,
+            );
+            if (!display) return null;
             return (
-              <i
-                key={`${note.event_id}:${note.revision}`}
-                className={`roll-note ${note.lifecycle}`}
-                title={`${noteName(note.pitch!)} at ${formatClock(note.onset_sample, session.sample_rate_hz)}`}
-                style={{
-                  left: `${(note.onset_sample / total) * 100}%`,
-                  width: `${Math.max(0.35, ((end - note.onset_sample) / total) * 100)}%`,
-                  top: `${((108 - note.pitch!) / 87) * 100}%`,
-                }}
-              />
+              <span key={`${note.event_id}:${note.revision}`}>
+                <i
+                  className={`roll-note ${note.lifecycle}`}
+                  title={`${noteName(note.pitch!)} at ${formatClock(note.onset_sample, session.sample_rate_hz)}`}
+                  style={{
+                    left: `${(display.solidStart / total) * 100}%`,
+                    width: `${Math.max(0.35, ((display.solidEnd - display.solidStart) / total) * 100)}%`,
+                    top: `${((108 - note.pitch!) / 87) * 100}%`,
+                  }}
+                />
+                {display.tailStart !== null && display.tailEnd !== null && (
+                  <i
+                    className={`roll-note-tail ${note.lifecycle}`}
+                    style={{
+                      left: `${(display.tailStart / total) * 100}%`,
+                      width: `${((display.tailEnd - display.tailStart) / total) * 100}%`,
+                      top: `${((108 - note.pitch!) / 87) * 100}%`,
+                    }}
+                  />
+                )}
+              </span>
             );
           })}
           {horizon && (
@@ -189,30 +206,22 @@ function PianoRoll({
 }
 
 function ScorePreview({
-  events,
   session,
   scoreStatus,
   scoreAvailable,
   scoreXml,
   scoreXmlError,
+  scoreHorizonSample,
   onGenerate,
 }: {
-  readonly events: readonly EventRevision[];
   readonly session: Session;
   readonly scoreStatus: string | null;
   readonly scoreAvailable: boolean;
   readonly scoreXml: string | undefined;
   readonly scoreXmlError: Error | null;
+  readonly scoreHorizonSample: number | undefined;
   readonly onGenerate: () => void;
 }) {
-  const notes = events
-    .filter(
-      (event) =>
-        event.kind === "note" &&
-        event.pitch !== null &&
-        event.lifecycle === "committed",
-    )
-    .slice(0, 14);
   return (
     <section className="view-card score-card">
       <div className="view-heading">
@@ -226,7 +235,7 @@ function ScorePreview({
           disabled={!scoreAvailable || scoreStatus === "running"}
           onClick={onGenerate}
         >
-          {scoreStatus === "complete" ? "Refresh score" : "Render committed score"}
+          {scoreXml ? "Refresh score" : "Render committed score"}
         </button>
       </div>
       <p className={`score-state ${scoreStatus ?? "idle"}`}>
@@ -236,29 +245,23 @@ function ScorePreview({
             ? "Rendering the frozen committed prefix…"
             : scoreStatus === "failed"
               ? "Score rendering failed. Your performance is still safe."
-              : scoreStatus === "complete"
-                ? "Score snapshot is current for the committed horizon."
+              : scoreXml && scoreHorizonSample !== undefined
+                ? `Generated score through ${formatClock(scoreHorizonSample, session.sample_rate_hz)}.`
                 : "Only closed corrected notes enter this snapshot."}
+      </p>
+      <p className="score-not-live">
+        Generated on request from a frozen corrected prefix. This is not a
+        live-note view.
       </p>
       {scoreXml ? (
         <MusicXmlScore xml={scoreXml} />
       ) : (
-        <div className="score-paper" aria-label="Orientation preview of committed notes">
-          <div className="staff-lines" aria-hidden="true" />
-          <strong className="treble-clef" aria-hidden="true">𝄞</strong>
-          {notes.map((note, index) => (
-            <i
-              key={note.event_id}
-              className="score-note"
-              style={{
-                left: `${13 + index * (78 / Math.max(1, notes.length))}%`,
-                bottom: `${34 + ((note.pitch! - 48) % 18) * 2.2}%`,
-              }}
-            >
-              ●
-            </i>
-          ))}
-          {!notes.length && <span>Corrected notes will appear here.</span>}
+        <div className="score-empty">
+          <strong>No generated score snapshot</strong>
+          <span>
+            Choose Render committed score to create notation from the current
+            corrected horizon.
+          </span>
         </div>
       )}
       {scoreXmlError && (
@@ -327,6 +330,7 @@ export function PerformanceViews({
   scoreAvailable,
   scoreXml,
   scoreXmlError,
+  scoreHorizonSample,
   onInspect,
   onGenerateScore,
 }: {
@@ -341,6 +345,7 @@ export function PerformanceViews({
   readonly scoreAvailable: boolean;
   readonly scoreXml: string | undefined;
   readonly scoreXmlError: Error | null;
+  readonly scoreHorizonSample: number | undefined;
   readonly onInspect: (sample: number | null) => void;
   readonly onGenerateScore: () => void;
 }) {
@@ -348,12 +353,12 @@ export function PerformanceViews({
     <div className="performance-views">
       {showScore && (
         <ScorePreview
-          events={events}
           session={session}
           scoreStatus={scoreStatus}
           scoreAvailable={scoreAvailable}
           scoreXml={scoreXml}
           scoreXmlError={scoreXmlError}
+          scoreHorizonSample={scoreHorizonSample}
           onGenerate={onGenerateScore}
         />
       )}
