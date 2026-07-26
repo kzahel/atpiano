@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { formatClock, noteName } from "../lib/format.js";
 import { noteDisplaySegments } from "../lib/note-display.js";
+import { pedalDisplaySegment } from "../lib/pedal-display.js";
 import { pianoLayout } from "../lib/piano-layout.js";
 import type {
   EventRevision,
@@ -116,7 +117,10 @@ function PianoRoll({
   const notes = events.filter(
     (event) => event.kind === "note" && event.pitch !== null,
   );
-  const pedals = events.filter((event) => event.kind !== "note");
+  const pedalLanes = [
+    { kind: "sustain", label: "Sustain" },
+    { kind: "soft-pedal", label: "Soft" },
+  ] as const;
   return (
     <section className="view-card roll-card">
       <div className="view-heading">
@@ -183,16 +187,53 @@ function PianoRoll({
             />
           )}
         </div>
-        <div className="pedal-track">
-          <span>SUSTAIN</span>
-          {pedals.map((pedal) => (
-            <i
-              key={`${pedal.event_id}:${pedal.revision}`}
-              style={{
-                left: `${(pedal.onset_sample / total) * 100}%`,
-                width: `${(((pedal.offset_sample ?? total) - pedal.onset_sample) / total) * 100}%`,
-              }}
-            />
+        <div
+          className="pedal-panel"
+          aria-label="Model-estimated pedal gestures"
+        >
+          {pedalLanes.map((lane) => (
+            <div className={`pedal-lane ${lane.kind}`} key={lane.kind}>
+              <span className="pedal-label">
+                {lane.label}
+                <small>inferred</small>
+              </span>
+              <div className="pedal-gestures">
+                {events
+                  .filter((event) => event.kind === lane.kind)
+                  .map((pedal) => {
+                    const display = pedalDisplaySegment(
+                      pedal,
+                      horizon,
+                      total,
+                      session.sample_rate_hz,
+                    );
+                    if (!display) return null;
+                    const suspect = display.suspectLongEstimate;
+                    const description = `${lane.label} pedal estimate from ${formatClock(
+                      display.start,
+                      session.sample_rate_hz,
+                    )} to ${formatClock(
+                      display.end,
+                      session.sample_rate_hz,
+                    )}${suspect ? "; unusually long, verify against the performance" : ""}`;
+                    return (
+                      <i
+                        aria-label={description}
+                        className={suspect ? "suspect" : undefined}
+                        key={`${pedal.event_id}:${pedal.revision}`}
+                        title={description}
+                        style={{
+                          left: `${(display.start / total) * 100}%`,
+                          width: `${Math.max(
+                            0.25,
+                            ((display.end - display.start) / total) * 100,
+                          )}%`,
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+            </div>
           ))}
         </div>
       </div>

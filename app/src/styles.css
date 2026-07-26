@@ -698,7 +698,7 @@ input:focus-visible {
 .roll-stage {
   display: grid;
   grid-template-columns: 42px 1fr;
-  grid-template-rows: 260px 30px;
+  grid-template-rows: 260px auto;
   overflow: hidden;
   border: 1px solid #243730;
   border-radius: 5px;
@@ -773,30 +773,74 @@ input:focus-visible {
   box-shadow: 0 0 8px rgba(235, 244, 239, 0.25);
 }
 
-.pedal-track {
-  position: relative;
+.pedal-panel {
   grid-column: 1 / span 2;
   grid-row: 2;
+  padding: 6px 8px 7px;
   border-top: 1px solid #243730;
   background: #0e1b17;
 }
 
-.pedal-track span {
-  position: absolute;
-  z-index: 2;
-  top: 9px;
-  left: 6px;
-  color: #587067;
-  font-family: "DM Mono", monospace;
-  font-size: 7px;
+.pedal-lane {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  min-height: 20px;
 }
 
-.pedal-track i {
+.pedal-label {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: #587067;
+  font-family: "DM Mono", monospace;
+  font-size: 8px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.pedal-label small {
+  margin-top: 3px;
+  color: #3f554d;
+  font-size: 6px;
+  letter-spacing: 0.06em;
+}
+
+.pedal-gestures {
+  position: relative;
+  min-width: 0;
+}
+
+.pedal-gestures i {
   position: absolute;
-  top: 11px;
-  height: 7px;
-  border-radius: 2px;
-  background: #6f8e82;
+  top: 8px;
+  height: 5px;
+  border-right: 2px solid;
+  border-left: 2px solid;
+  border-radius: 1px;
+}
+
+.pedal-lane.sustain .pedal-gestures i {
+  border-color: #65a7b4;
+  background: rgba(101, 167, 180, 0.72);
+}
+
+.pedal-lane.soft-pedal .pedal-gestures i {
+  border-color: #9879b8;
+  background: rgba(152, 121, 184, 0.66);
+}
+
+.pedal-gestures i.suspect {
+  top: 6px;
+  height: 8px;
+  border: 1px dashed #c49376;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(196, 147, 118, 0.48) 0,
+      rgba(196, 147, 118, 0.48) 3px,
+      transparent 3px,
+      transparent 7px
+    );
 }
 
 .timeline-axis {

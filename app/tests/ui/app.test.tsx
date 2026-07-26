@@ -48,6 +48,11 @@ describe("shared application", () => {
     expect(await screen.findByRole("heading", { name: "Morning progression" }))
       .toBeTruthy();
     expect(screen.getByRole("heading", { name: "Piano roll" })).toBeTruthy();
+    expect(screen.getByText("Sustain")).toBeTruthy();
+    expect(screen.getByText("Soft")).toBeTruthy();
+    expect(
+      screen.getByLabelText("Model-estimated pedal gestures"),
+    ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Detected keys" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Committed score" })).toBeTruthy();
 
