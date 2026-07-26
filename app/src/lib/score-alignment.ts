@@ -85,7 +85,8 @@ export function parseScoreAlignment(
   if (!Array.isArray(document.rows)) {
     throw new Error("Score alignment rows are invalid");
   }
-  let priorOnset = -1;
+  const sampleRateHz = integer(document.sample_rate_hz, "sample_rate_hz");
+  let priorMidiOrder: readonly [number, number, number] | null = null;
   let priorScoreTime = -1;
   const rows = document.rows.map((value, index): ScoreAlignmentRow => {
     const item = record(value, `score alignment row ${index}`);
@@ -96,14 +97,37 @@ export function parseScoreAlignment(
     if (
       sourceIndex !== index ||
       typeof item.event_id !== "string" ||
-      onsetSample < priorOnset ||
       offsetSample < onsetSample ||
       pitch < 21 ||
       pitch > 108
     ) {
       throw new Error("Score alignment source order is invalid");
     }
-    priorOnset = onsetSample;
+    const onsetTick = Math.round((onsetSample / sampleRateHz) * 960);
+    const offsetTick = Math.round((offsetSample / sampleRateHz) * 960);
+    const midiOrder = [
+      onsetTick,
+      pitch,
+      offsetTick - onsetTick,
+    ] as const;
+    if (
+      priorMidiOrder !== null &&
+      (
+        midiOrder[0] < priorMidiOrder[0] ||
+        (
+          midiOrder[0] === priorMidiOrder[0] &&
+          midiOrder[1] < priorMidiOrder[1]
+        ) ||
+        (
+          midiOrder[0] === priorMidiOrder[0] &&
+          midiOrder[1] === priorMidiOrder[1] &&
+          midiOrder[2] < priorMidiOrder[2]
+        )
+      )
+    ) {
+      throw new Error("Score alignment MIDI order is invalid");
+    }
+    priorMidiOrder = midiOrder;
     if (item.status === "unmatched") {
       if (item.score_time_quarters !== null) {
         throw new Error("Unmatched score alignment row has score time");
@@ -143,9 +167,13 @@ export function parseScoreAlignment(
   return {
     schema_version: "atpiano.score-alignment.v1",
     session_id: expected.sessionId,
-    sample_rate_hz: integer(document.sample_rate_hz, "sample_rate_hz"),
+    sample_rate_hz: sampleRateHz,
     musicxml: { sha256: expected.musicXmlSha256 },
-    rows,
+    rows: rows.toSorted(
+      (left, right) =>
+        left.onset_sample - right.onset_sample ||
+        left.source_index - right.source_index,
+    ),
   };
 }
 

@@ -79,6 +79,42 @@ describe("score playback alignment", () => {
     ).toThrow(/another score snapshot/);
   });
 
+  it("normalizes same-tick transformer order onto the sample timeline", () => {
+    const document = alignmentDocument();
+    document.rows = [
+      {
+        source_index: 0,
+        event_id: "later-low",
+        pitch: 48,
+        onset_sample: 48_009,
+        offset_sample: 72_009,
+        status: "mapped",
+        score_time_quarters: { numerator: 2, denominator: 1 },
+      },
+      {
+        source_index: 1,
+        event_id: "earlier-high",
+        pitch: 60,
+        onset_sample: 48_003,
+        offset_sample: 72_003,
+        status: "mapped",
+        score_time_quarters: { numerator: 2, denominator: 1 },
+      },
+    ];
+
+    const alignment = parseScoreAlignment(document, {
+      sessionId: "session-1",
+      musicXmlSha256: scoreHash,
+    });
+
+    expect(alignment.rows.map((row) => row.event_id)).toEqual([
+      "earlier-high",
+      "later-low",
+    ]);
+    expect(scoreAttackAtSample(alignment, 48_002, 144_000)).toBeNull();
+    expect(scoreAttackAtSample(alignment, 48_003, 144_000)).toBe(2);
+  });
+
   it("moves the OSMD cursor forward, backward, and out of coverage", () => {
     let index = 0;
     const positions = [0, 0.5, 0.875];
