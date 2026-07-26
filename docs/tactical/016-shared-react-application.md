@@ -6,8 +6,9 @@ Topic: multi-tenant-hybrid-service-architecture
 
 Topic: session-workspace-management
 
-Status: implementation complete on 2026-07-26; awaiting explicit R3
-interaction-review acceptance. Phase 4 must not start before that decision.
+Status: implementation revised after the first R3 review exposed a live-event
+range defect; the fix is validated and awaits explicit R3 re-review. Phase 4
+must not start before that decision.
 
 ## Entry Evidence
 
@@ -15,7 +16,7 @@ interaction-review acceptance. Phase 4 must not start before that decision.
   revision in `3b53285` and review update in `9f8dd16`.
 - Phase 2 contracts, fixture runtime, explicit local routes, generated
   TypeScript, and regression evidence are complete.
-- `uv run atpiano migration-regression` passes 77 Python tests, retained
+- `uv run atpiano migration-regression` passes 78 Python tests, retained
   JavaScript suites, contract drift, TypeScript checks, dependency audit,
   Ruff, syntax, and whitespace lanes.
 - The v1 and framework-free v2 applications remain independent regression
@@ -173,7 +174,8 @@ The implementation series began at `a9805fd` and is:
 - `6509c79` completed score polling, bounded event reads, and runtime feedback;
 - `836ce69` covered score failure isolation; and
 - `d049fdf` restored actual committed-MusicXML rendering with pinned,
-  lazy-loaded OSMD.
+  lazy-loaded OSMD; and
+- `8a9a78e` fixed live recognition ranges after the first R3 microphone review.
 
 The real page-facing golden replay is recorded in
 [`r3-interaction-review.md`](../r3-interaction-review.md). Its 42-second
@@ -184,9 +186,18 @@ views, the score job, artifact refresh, and real SVG notation without browser
 alerts or page-level horizontal overflow.
 
 The final `uv run atpiano migration-regression` report at
-`results/migration-regression/20260726T111635Z/report.json` passed 78 Python
-tests, retained JavaScript tests, 14 application tests, contract drift,
+`results/migration-regression/20260726T112916Z/report.json` passed 78 Python
+tests, retained JavaScript tests, 17 application tests, contract drift,
 TypeScript, dependency audit, Ruff, syntax, and whitespace. Physical
 microphone permission and playing remain the explicit human lane at R3. The
 implementation range is `a9805fd^..HEAD` at this review handoff. Phase 4
 remains closed pending the user's interaction decision.
+
+The first R3 review was not accepted: microphone results appeared only after
+Stop. The captured sessions contained final notes, isolating the failure to
+the live reader. `8a9a78e` moved the event window and musical-view duration
+from the zero-frame Start snapshot to the advancing audio horizon. A real
+browser/fake-device pass over the frozen musical WAV displayed 74 notes before
+Stop, 55 already corrected, and then settled to 113 final notes. The exact
+feedback, cause, validation path, and re-review request are recorded in
+[`r3-interaction-review.md`](../r3-interaction-review.md).

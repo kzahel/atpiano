@@ -1,8 +1,8 @@
 # R3 Interaction And Frontend Review
 
-Status: mandatory human review ready on 2026-07-26. Phase 3 implementation is
-complete; Phase 4 must not begin until this review is explicitly accepted or
-revised.
+Status: first human review rejected on 2026-07-26 because recognition was not
+visible until Stop. The defect is fixed and validated in `8a9a78e`; R3 now
+awaits human re-review. Phase 4 remains closed.
 
 This packet reviews the shared React application while its visual hierarchy,
 controls, and session mental model are still inexpensive to change. The
@@ -131,8 +131,8 @@ its artifact access handle, and rendered it as SVG. Automated tests also
 cover score failure isolation.
 
 The final `uv run atpiano migration-regression` passed at
-`results/migration-regression/20260726T111635Z/report.json`: 78 Python tests,
-the retained JavaScript suites, 14 application tests, contract drift,
+`results/migration-regression/20260726T112916Z/report.json`: 78 Python tests,
+the retained JavaScript suites, 17 application tests, contract drift,
 TypeScript, dependency audit, Ruff, JavaScript syntax, and whitespace all
 passed. The dependency audit found zero vulnerabilities.
 
@@ -153,3 +153,37 @@ Please respond with either:
 - **R3 accepted** — Phase 4 may open; or
 - requested changes — Phase 3 remains open and the feedback is resolved
   before any Python application-service extraction.
+
+## R3 Feedback Cycle
+
+The first review found that microphone audio was captured and final notes
+appeared after Stop, but no notes appeared during recording. The two review
+captures remained intact and completed with 29 and 7 final notes, confirming
+that capture and inference worked while the live read path did not.
+
+The React event subscription had used the session's start-time
+`source_frame_count`, which is zero, as its fixed range end. The independently
+polled source horizon advanced during capture, but the event query and piano
+roll ignored it. Stop refreshed the completed session snapshot and made the
+results appear all at once.
+
+Commit `8a9a78e` makes the live UI:
+
+- derive its event window, duration, roll scale, and inspection range from the
+  maximum of the stored frame count and advancing audio head;
+- poll a selected active session even after a page or client-state change;
+- preserve the last event page while the subscription window advances; and
+- retain the runtime's advertised maximum event-range bound.
+
+The regression was then exercised through Chrome's fake microphone device
+using the frozen musical WAV. Before Stop, at 20.5 seconds of captured source
+audio, the page visibly contained 74 note events, including 55 already
+corrected, with a 16.0-second commit horizon and no browser alert. Stop then
+settled normally to 113 final notes. This path used browser `getUserMedia`,
+AudioWorklet PCM conversion, the real WebSocket capture protocol, the real
+local engine, live HTTP horizon/event reads, and the React roll.
+
+Automated coverage now asserts that an active zero-frame session subscribes
+through an advancing 96,000-sample audio head and displays its two-second live
+duration. Human microphone re-review is still required; this evidence does
+not accept R3 on the user's behalf.

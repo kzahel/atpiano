@@ -3,10 +3,11 @@
 Topic: multi-tenant-hybrid-service-architecture
 
 Status: accepted master plan on 2026-07-26; Phases 1 and 2 are complete, R2
-is accepted, and Phase 3 implementation is complete pending mandatory R3
-interaction review. This document tracks the staged migration program and
-its human review gates. Each phase must create one or more smaller numbered
-tacticals before implementation.
+is accepted, and Phase 3 was revised after the first R3 review rejected its
+live microphone feedback. The fix awaits mandatory R3 re-review. This
+document tracks the staged migration program and its human review gates. Each
+phase must create one or more smaller numbered tacticals before
+implementation.
 
 ## Outcome
 
@@ -350,6 +351,12 @@ intentional differences, golden evidence, screenshots, and decision request
 are in
 [`r3-interaction-review.md`](../r3-interaction-review.md). Do not open Phase 4
 until the user explicitly accepts R3.
+
+The first R3 pass was rejected because notes appeared only after microphone
+Stop. The cause was a live event range pinned to the zero-frame Start
+snapshot. `8a9a78e` follows the advancing audio horizon instead and has
+automated plus real-engine browser evidence. This is a revision within Phase
+3, not permission to open Phase 4.
 
 ## Phase 4 — Extract The Framework-Independent Python Application Core
 

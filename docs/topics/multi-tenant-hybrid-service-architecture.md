@@ -5,8 +5,8 @@ Topic: multi-tenant-hybrid-service-architecture
 Status: **accepted target architecture as of 2026-07-26; Phases 1 and 2 are
 complete, R2 is accepted, and Phase 3 implementation is complete under
 [`016-shared-react-application.md`](../tactical/016-shared-react-application.md)
-pending mandatory
-[`R3 interaction review`](../r3-interaction-review.md).**
+with its first live-feedback defect fixed, pending mandatory
+[`R3 re-review`](../r3-interaction-review.md).**
 Versioned Pydantic contracts, generated OpenAPI/TypeScript, the
 `AtpianoRuntime` boundary, an executable fixture provider, and explicit local
 compatibility paths exist. R2 feedback removed the generic `product`
