@@ -2,10 +2,13 @@
 
 Topic: browser-only-wasm-deployment
 
-Status: **deprioritized option, not a requirement.** The user clarified on
-2026-07-25 that browser-only deployment was an appealing idea rather than a
-constraint, and that any execution backend including NVIDIA/CUDA is acceptable
-if it gives a clearly better result.
+Status: **deprioritized optional executor, not the product architecture.** The
+user clarified on 2026-07-25 that browser-only deployment was an appealing
+idea rather than a constraint, and that any execution backend including
+NVIDIA/CUDA is acceptable if it gives a clearly better result. On 2026-07-26,
+the project accepted a shared hosted-web plus offline Tauri architecture in
+[`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md).
+That architecture may later use a WASM lane, but it does not depend on one.
 
 A local ONNX Runtime Web WASM execution smoke test succeeded. Browser replay,
 model-output parity, live microphone latency, storage behavior, and offline
@@ -34,6 +37,10 @@ client-side web application:
 
 This is a deployment and execution-boundary concern. It does not select a new
 acoustic model or change the transcription-quality standard.
+[`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md)
+owns the selected hosted and desktop product topology, tenancy, persistence,
+sync, and distribution path. This topic describes only an optional
+browser-local runtime that could plug into the shared application.
 [`live-acoustic-transcription.md`](live-acoustic-transcription.md) continues to
 own the live event lifecycle, sample-clock timeline, windowing, gate,
 reconciliation, and latency evidence.
@@ -550,16 +557,20 @@ Hold. Do not open the browser WASM replay tactical yet.
 
 The measured bottlenecks are context, score-inference quality, and beat
 inference on rubato — none of which a browser runtime affects, and all of which
-it constrains. The accepted direction is instead
+it constrains. The accepted transcription direction remains
 [`009-three-phase-unbounded-sessions.md`](../tactical/009-three-phase-unbounded-sessions.md),
-which is host-executed and free to select the best available model.
+which is host-executed and free to select the best available model. The
+accepted product architecture is the hosted service plus local/offline Tauri
+runtime recorded in
+[`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md).
 
 This topic becomes relevant again under one of two conditions:
 
 1. a model lane small enough for WASM is shown to be good enough for the
    provisional zone, making a browser-only build of Lane A worthwhile; or
-2. distribution to other users becomes a goal, at which point a static build
-   competes with a desktop wrapper on install friction, not on quality.
+2. a separately measured client-side executor would materially improve hosted
+   cost, privacy, latency, or low-friction offline access beyond the accepted
+   desktop path.
 
 If it resumes, the earlier sequence still applies: one bounded tactical for
 browser WASM replay and parity — a static page that runs retained PCM through

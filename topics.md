@@ -10,3 +10,6 @@
   persistence, offline packaging, and serverless deployment
 - `session-workspace-management` — v2 session catalog, explicit New and
   selection, history, recoverable deletion, and continuation boundaries
+- `multi-tenant-hybrid-service-architecture` — shared React application,
+  hosted Python service and workers, multi-user tenancy, offline Tauri
+  runtime, observability, and explicit session-oriented sync

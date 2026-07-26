@@ -24,6 +24,14 @@ and latency. [`performance-to-notation.md`](performance-to-notation.md)
 continues to own score inference and rendering quality. This topic owns how
 the workspace selects and addresses those session-bound products.
 
+[`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md)
+owns the accepted hosted-plus-Tauri product architecture, including accounts,
+shared cloud workspaces, multiple concurrent capture sessions, local-only
+desktop workspaces, and later explicit sync. Here, **workspace** means the
+single local v2 process and its configured artifact root. Its one-capture
+limit is a local coordinator constraint, not a future cloud-workspace
+invariant.
+
 The v1 MVP and its workbench are outside this refactor. V2 may share utilities
 with v1 only when v1 behavior and artifacts remain unchanged.
 
@@ -70,7 +78,7 @@ Use these terms consistently:
 
 The first implementation must preserve these invariants:
 
-1. A workspace has at most one active capture session.
+1. One local v2 workbench process has at most one active capture session.
 2. Selection is per browser client and is never server-global.
 3. Every read, score action, artifact request, and delete action names an
    explicit session ID.
@@ -94,9 +102,11 @@ are not known yet, and abandoned clicks should not create empty history.
 
 From that state, **Start microphone** or fixture replay creates the concrete
 session, returns its ID, selects it in the initiating tab, and begins capture.
-When another tab already owns the one active capture, New may still show a
-blank intent, but starting another capture is disabled with the active
-session identified.
+When another tab connected to the same local process already owns the one
+active capture, New may still show a blank intent, but starting another
+capture is disabled with the active session identified. The future hosted
+service instead permits multiple active sessions in one shared workspace,
+while preserving one writer lease per session.
 
 The first UI does not switch away from an active recording in its owning tab.
 The backend nevertheless keeps reading historical sessions independent from
@@ -312,4 +322,8 @@ explicit resource addressing, New/history UI, recoverable Delete, and the
 responsibility split required to land those behaviors safely. Treat
 same-session resumption, labeling, trash restoration, permanent purge, and a
 larger visual redesign as later tacticals unless implementation uncovers a
-blocking contract issue.
+blocking contract issue. Preserve the explicit IDs, immutable artifacts, and
+selected-versus-active split needed by the accepted
+[`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md),
+but do not pull accounts, React migration, cloud storage, or sync into this
+first local slice.

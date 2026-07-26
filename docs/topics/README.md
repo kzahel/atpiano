@@ -26,6 +26,10 @@ normally reuse the document slug in its `Topic:` trailers.
   browser prototype whose strict-onset decoder, room gate, physical keyboard,
   grand-staff stream, confidence controls, and source-timing guides are
   validated for initial subjective use; target-piano octave overtones remain.
+- [`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md):
+  accepted target architecture for one shared React application, hosted
+  FastAPI service and Python workers, multi-user cloud workspaces, an offline
+  Tauri desktop runtime, and later explicit session-oriented sync.
 - [`performance-to-notation.md`](performance-to-notation.md):
   evaluated downstream conversion prototype whose artifacts are inspectable
   but whose first target-piano score failed the readability goal.

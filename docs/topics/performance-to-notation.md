@@ -37,6 +37,15 @@ the project boundary, not to the atpiano acoustic-transcription service. The
 consumer must accept both normalized atpiano events and direct MIDI. Direct
 MIDI must not pass through an acoustic model.
 
+The accepted
+[`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md)
+treats notation conversion as a session-addressed, versioned job that can run
+in a hosted worker or local desktop sidecar. MIDI2ScoreTransformer remains
+permitted only for isolated internal use under the current acceptance. Its
+unconfirmed license blocks public hosted operation, desktop bundling, and
+model-pack distribution until rights are resolved or a licensed converter
+satisfies the same job and artifact contracts.
+
 The source performance remains authoritative. A score is one editable,
 versioned interpretation of it, not a replacement for the source note times.
 
