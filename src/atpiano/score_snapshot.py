@@ -29,8 +29,43 @@ MIDI2SCORE_CHECKPOINT_SHA256 = "7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d
 MAX_SCORE_NOTES = 4096
 MAX_SCORE_SOURCE_S = 15 * 60
 SCORE_TIMEOUT_S = 180
+MAX_SCORE_NOTE_EXPANSION_RATIO = 4
+MAX_SCORE_NOTE_EXPANSION_ALLOWANCE = 16
 
 ScoreRunner = Callable[[Path, Path, Path], dict[str, Any]]
+
+
+def score_snapshot_is_plausible(manifest: dict[str, Any]) -> bool:
+    """Reject transformer output whose note expansion is clearly pathological."""
+
+    try:
+        input_notes = int(manifest["note_count"])
+        output_notes = int(
+            manifest["musicxml"]["summary"]["pitched_note_elements"]
+        )
+    except (KeyError, TypeError, ValueError):
+        return False
+    if input_notes <= 0 or output_notes <= 0:
+        return False
+    output_limit = max(
+        input_notes * MAX_SCORE_NOTE_EXPANSION_RATIO,
+        input_notes + MAX_SCORE_NOTE_EXPANSION_ALLOWANCE,
+    )
+    return output_notes <= output_limit
+
+
+def _validate_score_output(note_count: int, summary: dict[str, Any]) -> None:
+    candidate = {
+        "note_count": note_count,
+        "musicxml": {"summary": summary},
+    }
+    if score_snapshot_is_plausible(candidate):
+        return
+    output_notes = summary.get("pitched_note_elements")
+    raise RuntimeError(
+        "score output failed sanity check: "
+        f"{output_notes} pitched notes from {note_count} input notes"
+    )
 
 
 def _runtime_paths(runtime_directory: Path) -> dict[str, Path]:
@@ -287,6 +322,7 @@ def generate_score_snapshot(
     )
     adapter = execute(midi_path, musicxml_path, runtime_directory.resolve())
     summary = summarize_musicxml(musicxml_path.read_bytes())
+    _validate_score_output(note_count, summary)
     manifest = {
         "schema_version": SCORE_SNAPSHOT_SCHEMA,
         "session_id": session["session_id"],

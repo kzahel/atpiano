@@ -14,6 +14,7 @@ from atpiano.adapters.local_sessions import (
 from atpiano.corrected import CORRECTED_EVENT_SCHEMA, CorrectedSession
 from atpiano.corrected_export import write_corrected_exports
 from atpiano.live import PcmBlock
+from atpiano.util import write_json
 
 
 def _session(
@@ -132,6 +133,34 @@ def test_local_artifacts_are_explicit_and_path_safe(tmp_path: Path) -> None:
     assert path.is_relative_to(session.directory)
     with pytest.raises(LocalSessionNotFoundError):
         store.get_artifact_with_path(session_id, "artifact:missing")
+
+
+def test_local_catalog_hides_pathological_score_snapshot(tmp_path: Path) -> None:
+    session_id = "20260726T100000-aaaaaaaaaaaa"
+    session = _session(tmp_path, session_id)
+    session.finalize()
+    score_root = tmp_path / session_id / "score"
+    score_root.mkdir()
+    write_json(
+        score_root / "current.json",
+        {
+            "note_count": 13,
+            "musicxml": {
+                "summary": {
+                    "pitched_note_elements": 491,
+                }
+            },
+        },
+    )
+    store = LocalSessionStore(tmp_path)
+
+    assert "musicxml" not in {
+        kind.value for kind in store.get_session(session_id).available_artifact_kinds
+    }
+    assert all(
+        artifact.kind.value != "musicxml"
+        for artifact in store.list_artifacts(session_id).items
+    )
     with pytest.raises(LocalSessionNotFoundError):
         store.resolve("../outside")
 

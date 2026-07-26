@@ -64,6 +64,7 @@ from atpiano.score_snapshot import (
     ScoreRunner,
     generate_score_snapshot,
     inspect_score_runtime,
+    score_snapshot_is_plausible,
 )
 from atpiano.util import read_json, utc_now, write_json
 from atpiano.websocket import encode_frame, encode_json, read_frame, websocket_accept
@@ -397,6 +398,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                     if (
                         candidate.get("schema_version") == SCORE_SNAPSHOT_SCHEMA
                         and candidate.get("session_id") == target_session_id
+                        and score_snapshot_is_plausible(candidate)
                     ):
                         snapshot = candidate
                 except (OSError, ValueError):
@@ -704,6 +706,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             return None
         try:
             manifest = read_json(directory / "score" / "current.json")
+            if not score_snapshot_is_plausible(manifest):
+                return None
             section, field = selector
             relative_path = Path(str(manifest[section][field]))
             candidate = (directory / relative_path).resolve()

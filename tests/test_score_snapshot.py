@@ -7,7 +7,10 @@ import mido
 import pytest
 
 from atpiano.corrected import CORRECTED_EVENT_SCHEMA, CorrectedSession
-from atpiano.score_snapshot import generate_score_snapshot
+from atpiano.score_snapshot import (
+    generate_score_snapshot,
+    score_snapshot_is_plausible,
+)
 
 
 def _event(
@@ -165,3 +168,29 @@ def test_score_snapshot_rejects_empty_committed_prefix(tmp_path: Path) -> None:
             commit_sample=1_000,
             runner=_fake_runner,
         )
+
+
+def test_score_snapshot_rejects_pathological_note_expansion() -> None:
+    manifest = {
+        "note_count": 13,
+        "musicxml": {
+            "summary": {
+                "pitched_note_elements": 491,
+            }
+        },
+    }
+
+    assert score_snapshot_is_plausible(manifest) is False
+
+
+def test_score_snapshot_accepts_bounded_notation_expansion() -> None:
+    manifest = {
+        "note_count": 13,
+        "musicxml": {
+            "summary": {
+                "pitched_note_elements": 29,
+            }
+        },
+    }
+
+    assert score_snapshot_is_plausible(manifest) is True

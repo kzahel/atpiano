@@ -39,6 +39,7 @@ from atpiano.corrected_export import (
     query_history_index,
     query_materialized_index,
 )
+from atpiano.score_snapshot import score_snapshot_is_plausible
 from atpiano.util import read_json, sha256_file
 
 LOCAL_WORKSPACE_ID = "local"
@@ -137,9 +138,17 @@ class LocalSessionStore:
             kinds.append(ArtifactKind.EVENT_HISTORY)
         if (directory / "exports" / "session.mid").is_file():
             kinds.append(ArtifactKind.MIDI)
-        if (directory / "score" / "current.json").is_file():
+        score_pointer = directory / "score" / "current.json"
+        if score_pointer.is_file() and self._valid_score_pointer(score_pointer):
             kinds.append(ArtifactKind.MUSICXML)
         return tuple(kinds)
+
+    @staticmethod
+    def _valid_score_pointer(score_pointer: Path) -> bool:
+        try:
+            return score_snapshot_is_plausible(read_json(score_pointer))
+        except (OSError, ValueError):
+            return False
 
     def _session(
         self,
@@ -347,7 +356,7 @@ class LocalSessionStore:
             *sorted((directory / "exports").glob("*")),
         ]
         score_pointer = directory / "score" / "current.json"
-        if score_pointer.is_file():
+        if score_pointer.is_file() and self._valid_score_pointer(score_pointer):
             paths.append(score_pointer)
             try:
                 pointer = read_json(score_pointer)
