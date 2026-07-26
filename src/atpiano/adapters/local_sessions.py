@@ -488,35 +488,42 @@ class LocalSessionStore:
         directory = self.resolve(session_id)
         snapshots = directory / "score" / "snapshots"
         artifacts: list[tuple[Artifact, Path]] = []
-        for path in sorted(snapshots.glob("*/score.musicxml")):
-            resolved = path.resolve()
-            if not resolved.is_relative_to(directory):
-                continue
+        for snapshot in sorted(path for path in snapshots.glob("*") if path.is_dir()):
             try:
-                manifest = read_json(resolved.parent / "manifest.json")
+                manifest = read_json(snapshot / "manifest.json")
                 if (
                     manifest.get("schema_version") != SCORE_SNAPSHOT_SCHEMA
                     or manifest.get("session_id") != session_id
                     or not score_snapshot_is_plausible(manifest)
-                    or Path(str(manifest["musicxml"]["path"])).name
-                    != resolved.name
-                    or str(manifest["musicxml"]["sha256"])
-                    != sha256_file(resolved)
                 ):
                     continue
                 commit_sample = int(manifest["commit_sample"])
             except (KeyError, OSError, TypeError, ValueError):
                 continue
-            artifacts.append(
-                (
-                    self._artifact(
-                        session_id,
+            for section in ("musicxml", "alignment"):
+                try:
+                    resolved = (
+                        directory / Path(str(manifest[section]["path"]))
+                    ).resolve()
+                    if (
+                        resolved.parent != snapshot.resolve()
+                        or not resolved.is_file()
+                        or str(manifest[section]["sha256"])
+                        != sha256_file(resolved)
+                    ):
+                        continue
+                except (KeyError, OSError, TypeError, ValueError):
+                    continue
+                artifacts.append(
+                    (
+                        self._artifact(
+                            session_id,
+                            resolved,
+                            source_horizon_sample=commit_sample,
+                        ),
                         resolved,
-                        source_horizon_sample=commit_sample,
-                    ),
-                    resolved,
+                    )
                 )
-            )
         return artifacts
 
     def list_artifacts(

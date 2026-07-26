@@ -194,12 +194,20 @@ def test_exact_retained_score_artifact_survives_current_refresh(
     )
     first_id = f"artifact:{sha256_file(first_path)[:24]}"
     retained, retained_path = store.get_artifact_with_path(session_id, first_id)
+    first_alignment = first_path.with_name("alignment.json")
+    first_alignment_id = f"artifact:{sha256_file(first_alignment)[:24]}"
+    retained_alignment, retained_alignment_path = (
+        store.get_artifact_with_path(session_id, first_alignment_id)
+    )
 
     assert current.sha256 == sha256_file(second_path)
     assert current.artifact_id != first_id
     assert retained.sha256 == sha256_file(first_path)
     assert retained.source_horizon_sample == 40
     assert retained_path == first_path
+    assert retained_alignment.kind.value == "score-alignment"
+    assert retained_alignment.source_horizon_sample == 40
+    assert retained_alignment_path == first_alignment
     assert all(
         artifact.artifact_id != first_id
         for artifact in store.list_artifacts(session_id).items
