@@ -8,7 +8,7 @@ import sqlite3
 import threading
 import time
 import wave
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -243,8 +243,46 @@ class SegmentedEventStore:
                 ON events(onset_sample, event_id, revision);
             CREATE INDEX IF NOT EXISTS events_identity
                 ON events(event_id, revision);
+            CREATE TABLE IF NOT EXISTS materialized_events (
+                event_id TEXT PRIMARY KEY,
+                revision INTEGER NOT NULL,
+                onset_sample INTEGER NOT NULL,
+                offset_sample INTEGER,
+                lane TEXT NOT NULL,
+                lifecycle TEXT NOT NULL,
+                payload TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS materialized_events_visible
+                ON materialized_events(onset_sample, offset_sample, event_id);
             """
         )
+        materialized_count = self._database.execute(
+            "SELECT COUNT(*) FROM materialized_events"
+        ).fetchone()
+        event_count = self._database.execute(
+            "SELECT COUNT(*) FROM events"
+        ).fetchone()
+        if int(materialized_count[0]) == 0 and int(event_count[0]) > 0:
+            self._database.execute(
+                """
+                INSERT INTO materialized_events (
+                    event_id, revision, onset_sample, offset_sample,
+                    lane, lifecycle, payload
+                )
+                SELECT latest.event_id, latest.revision, latest.onset_sample,
+                       latest.offset_sample, latest.lane, latest.lifecycle,
+                       latest.payload
+                FROM events AS latest
+                JOIN (
+                    SELECT event_id, MAX(revision) AS revision
+                    FROM events
+                    GROUP BY event_id
+                ) AS selected
+                  ON latest.event_id = selected.event_id
+                 AND latest.revision = selected.revision
+                """
+            )
+            self._database.commit()
         row = self._database.execute(
             "SELECT COALESCE(MAX(sequence), 0) FROM events"
         ).fetchone()
@@ -340,6 +378,34 @@ class SegmentedEventStore:
                         for row in assigned
                     ],
                 )
+                self._database.executemany(
+                    """
+                    INSERT INTO materialized_events (
+                        event_id, revision, onset_sample, offset_sample,
+                        lane, lifecycle, payload
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(event_id) DO UPDATE SET
+                        revision = excluded.revision,
+                        onset_sample = excluded.onset_sample,
+                        offset_sample = excluded.offset_sample,
+                        lane = excluded.lane,
+                        lifecycle = excluded.lifecycle,
+                        payload = excluded.payload
+                    WHERE excluded.revision > materialized_events.revision
+                    """,
+                    [
+                        (
+                            row["event_id"],
+                            row["revision"],
+                            row["onset_sample"],
+                            row.get("offset_sample"),
+                            row["lane"],
+                            row["lifecycle"],
+                            json.dumps(row, sort_keys=True, allow_nan=False),
+                        )
+                        for row in assigned
+                    ],
+                )
                 self._database.commit()
             except Exception:
                 self._database.rollback()
@@ -357,20 +423,17 @@ class SegmentedEventStore:
         with self._lock:
             rows = self._database.execute(
                 """
-                SELECT latest.payload
-                FROM events AS latest
-                JOIN (
-                    SELECT event_id, MAX(revision) AS revision
-                    FROM events
-                    WHERE onset_sample >= ? AND onset_sample < ?
-                    GROUP BY event_id
-                ) AS selected
-                  ON latest.event_id = selected.event_id
-                 AND latest.revision = selected.revision
-                WHERE latest.lifecycle != 'retracted'
-                ORDER BY latest.onset_sample, latest.event_id
+                SELECT payload
+                FROM materialized_events
+                WHERE lifecycle != 'retracted'
+                  AND onset_sample < ?
+                  AND (
+                    offset_sample IS NULL
+                    OR offset_sample >= ?
+                  )
+                ORDER BY onset_sample, event_id
                 """,
-                (start_sample, end_sample),
+                (end_sample, start_sample),
             ).fetchall()
         return [json.loads(row[0]) for row in rows]
 
@@ -559,7 +622,12 @@ class CorrectedSession:
         write_json(self.directory / "horizons.json", row)
         self._last_snapshot = state
 
-    def accept_block(self, block: PcmBlock, *, received_ns: int) -> None:
+    def accept_block(
+        self,
+        block: PcmBlock,
+        *,
+        received_ns: int,
+    ) -> list[dict[str, Any]]:
         if self.closed:
             raise RuntimeError("corrected session is closed")
         if block.sample_rate_hz != self.sample_rate_hz:
@@ -582,14 +650,16 @@ class CorrectedSession:
         self.ring.append(block.first_sample, block.pcm_s16le)
         self.next_sequence += 1
         self.horizons.audio_head_sample += block.frame_count
+        assigned: list[dict[str, Any]] = []
         for lane in self.lanes:
             update = lane.accept_block(self, block, received_ns=received_ns)
-            self._apply_lane_update(update)
+            assigned.extend(self._apply_lane_update(update))
         if self.horizons.audio_head_sample >= self._next_head_snapshot:
             self._record_horizons()
             self._next_head_snapshot = (
                 self.horizons.audio_head_sample + self._snapshot_interval_frames
             )
+        return assigned
 
     def append_events(self, events: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
         if self.closed:
@@ -686,6 +756,7 @@ def run_corrected_replay(
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
     preview_model: Any | None = None,
     commit_model: Any | None = None,
+    session_callback: Callable[[CorrectedSession], None] | None = None,
 ) -> dict[str, Any]:
     if repeat <= 0:
         raise ValueError("corrected replay repetition count must be positive")
@@ -723,6 +794,8 @@ def run_corrected_replay(
         from atpiano.corrected_commit import CorrectedCommitLane
 
         session.add_lane(CorrectedCommitLane(session, model=commit_model))
+    if session_callback is not None:
+        session_callback(session)
     sequence = 0
     session_origin_ns = time.perf_counter_ns()
     try:
