@@ -1,0 +1,330 @@
+from __future__ import annotations
+
+import json
+import threading
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+from atpiano.corrected import CORRECTED_EVENT_SCHEMA, CorrectedSession
+from atpiano.corrected_export import write_corrected_exports
+from atpiano.corrected_workbench import create_corrected_workbench_server
+from atpiano.live import PcmBlock
+from atpiano.product.domain.schemas import (
+    DeleteSessionRequest,
+    ScoreJobStart,
+)
+
+
+def _session(
+    workspace: Path,
+    session_id: str,
+    *,
+    with_note: bool = False,
+) -> CorrectedSession:
+    session = CorrectedSession(
+        workspace / session_id,
+        session_id=session_id,
+        sample_rate_hz=8_000,
+        source="replay",
+        realtime=False,
+        minimum_free_bytes=0,
+    )
+    session.accept_block(
+        PcmBlock(
+            sequence=0,
+            first_sample=0,
+            frame_count=100,
+            sample_rate_hz=8_000,
+            page_sent_ms=0.0,
+            worklet_time_s=0.0125,
+            pcm_s16le=b"\0\0" * 100,
+        ),
+        received_ns=1,
+    )
+    if with_note:
+        session.append_events(
+            [
+                {
+                    "schema_version": CORRECTED_EVENT_SCHEMA,
+                    "session_id": session_id,
+                    "event_id": "note-c4",
+                    "revision": 1,
+                    "lane": "commit",
+                    "lifecycle": "committed",
+                    "pitch": 60,
+                    "controller": None,
+                    "onset_sample": 10,
+                    "offset_sample": 60,
+                    "offset_state": "closed",
+                    "velocity": 80,
+                    "confidence": 0.9,
+                }
+            ]
+        )
+        session.advance_provisional(90)
+        session.advance_commit(80)
+    session.finalize()
+    write_corrected_exports(session.directory)
+    return session
+
+
+def _score_runner(
+    input_midi: Path,
+    output_musicxml: Path,
+    runtime_directory: Path,
+) -> dict[str, Any]:
+    assert input_midi.is_file()
+    output_musicxml.write_text(
+        """<score-partwise version="4.0">
+<part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+<part id="P1"><measure number="1"><note><pitch><step>C</step>
+<octave>4</octave></pitch><duration>1</duration></note></measure></part>
+</score-partwise>
+""",
+        encoding="utf-8",
+    )
+    return {
+        "schema_version": "test-score-runner.v1",
+        "runtime_directory": str(runtime_directory),
+    }
+
+
+def _serve(server: Any) -> tuple[threading.Thread, str]:
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return thread, f"http://127.0.0.1:{server.server_address[1]}"
+
+
+def _get(url: str) -> dict[str, Any]:
+    with urllib.request.urlopen(url, timeout=2) as response:
+        value = json.load(response)
+    assert isinstance(value, dict)
+    return value
+
+
+def _request_json(
+    url: str,
+    *,
+    value: dict[str, Any],
+    origin: str,
+    method: str,
+) -> tuple[int, dict[str, Any]]:
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(value).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Origin": origin,
+        },
+        method=method,
+    )
+    with urllib.request.urlopen(request, timeout=2) as response:
+        result = json.load(response)
+        assert isinstance(result, dict)
+        return response.status, result
+
+
+def test_product_routes_read_explicit_history_without_retargeting_current(
+    tmp_path: Path,
+) -> None:
+    older_id = "20260726T100000-aaaaaaaaaaaa"
+    newer_id = "20260726T100001-bbbbbbbbbbbb"
+    _session(tmp_path, older_id, with_note=True)
+    _session(tmp_path, newer_id)
+    server = create_corrected_workbench_server(
+        tmp_path,
+        port=0,
+        minimum_free_bytes=0,
+        commit_model_factory=lambda: None,
+        score_runtime=tmp_path / "runtime",
+        score_runner=_score_runner,
+    )
+    thread, base_url = _serve(server)
+    product = f"{base_url}/api/product/v1"
+    try:
+        capabilities = _get(f"{product}/capabilities")
+        catalog = _get(f"{product}/workspaces/local/sessions?limit=1")
+        older = _get(
+            f"{product}/workspaces/local/sessions/{older_id}"
+        )
+        events = _get(
+            f"{product}/workspaces/local/sessions/{older_id}/events"
+            "?start_sample=0&end_sample=100"
+        )
+        legacy_current = _get(f"{base_url}/api/session")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert capabilities["supported_schema_versions"] == [
+        "atpiano.product.v1"
+    ]
+    assert catalog["items"][0]["session_id"] == newer_id
+    assert catalog["next_cursor"] == newer_id
+    assert older["session_id"] == older_id
+    assert events["session_id"] == older_id
+    assert events["items"][0]["event_id"] == "note-c4"
+    assert legacy_current["session_id"] == newer_id
+
+
+def test_product_score_job_and_artifacts_remain_targeted_to_history(
+    tmp_path: Path,
+) -> None:
+    older_id = "20260726T100000-aaaaaaaaaaaa"
+    newer_id = "20260726T100001-bbbbbbbbbbbb"
+    _session(tmp_path, older_id, with_note=True)
+    _session(tmp_path, newer_id)
+    server = create_corrected_workbench_server(
+        tmp_path,
+        port=0,
+        minimum_free_bytes=0,
+        commit_model_factory=lambda: None,
+        score_runtime=tmp_path / "runtime",
+        score_runner=_score_runner,
+    )
+    thread, base_url = _serve(server)
+    product = f"{base_url}/api/product/v1"
+    try:
+        request = ScoreJobStart(
+            workspace_id="local",
+            session_id=older_id,
+            transcription_run_id=f"legacy-v2:{older_id}",
+            commit_sample=80,
+            request_id="request-score-1",
+        )
+        status, job = _request_json(
+            f"{product}/workspaces/local/sessions/{older_id}/score-jobs",
+            value=request.model_dump(mode="json"),
+            origin=base_url,
+            method="POST",
+        )
+        assert status == 202
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            job = _get(f"{product}/jobs/{job['job_id']}")
+            if job["status"] != "running":
+                break
+            time.sleep(0.01)
+        artifacts = _get(
+            f"{product}/workspaces/local/sessions/{older_id}/artifacts"
+        )
+        musicxml = next(
+            item
+            for item in artifacts["items"]
+            if item["filename"] == "score.musicxml"
+        )
+        access = _get(
+            f"{product}/workspaces/local/sessions/{older_id}"
+            f"/artifacts/{musicxml['artifact_id']}/access"
+        )
+        with urllib.request.urlopen(
+            f"{base_url}{access['url']}",
+            timeout=2,
+        ) as response:
+            body = response.read()
+        legacy_current = _get(f"{base_url}/api/session")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert job["status"] == "complete"
+    assert job["session_id"] == older_id
+    assert access["session_id"] == older_id
+    assert b"score-partwise" in body
+    assert legacy_current["session_id"] == newer_id
+
+
+def test_product_delete_is_recoverable_and_structured(
+    tmp_path: Path,
+) -> None:
+    older_id = "20260726T100000-aaaaaaaaaaaa"
+    newer_id = "20260726T100001-bbbbbbbbbbbb"
+    _session(tmp_path, older_id)
+    _session(tmp_path, newer_id)
+    server = create_corrected_workbench_server(
+        tmp_path,
+        port=0,
+        minimum_free_bytes=0,
+        commit_model_factory=lambda: None,
+    )
+    thread, base_url = _serve(server)
+    product = f"{base_url}/api/product/v1"
+    try:
+        request = DeleteSessionRequest(
+            workspace_id="local",
+            session_id=older_id,
+            request_id="request-delete-1",
+            confirmation="recoverable-delete",
+        )
+        status, result = _request_json(
+            f"{product}/workspaces/local/sessions/{older_id}",
+            value=request.model_dump(mode="json"),
+            origin=base_url,
+            method="DELETE",
+        )
+        assert status == 200
+        try:
+            _get(f"{product}/workspaces/local/sessions/{older_id}")
+        except urllib.error.HTTPError as error:
+            assert error.code == 404
+            failure = json.load(error)
+        else:
+            raise AssertionError("deleted session remained readable")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert result["recoverable"] is True
+    assert failure["error"]["code"] == "not-found"
+    assert (tmp_path / newer_id / "session.json").is_file()
+    assert len(list((tmp_path / ".trash").iterdir())) == 1
+
+
+def test_product_delete_rejects_active_session(
+    tmp_path: Path,
+) -> None:
+    session_id = "20260726T100000-aaaaaaaaaaaa"
+    session = _session(tmp_path, session_id)
+    server = create_corrected_workbench_server(
+        tmp_path,
+        port=0,
+        minimum_free_bytes=0,
+        commit_model_factory=lambda: None,
+    )
+    server._session_id = session_id
+    server._session_directory = session.directory
+    server._status = "active"
+    thread, base_url = _serve(server)
+    try:
+        request = DeleteSessionRequest(
+            workspace_id="local",
+            session_id=session_id,
+            request_id="request-delete-active",
+            confirmation="recoverable-delete",
+        )
+        try:
+            _request_json(
+                f"{base_url}/api/product/v1/workspaces/local"
+                f"/sessions/{session_id}",
+                value=request.model_dump(mode="json"),
+                origin=base_url,
+                method="DELETE",
+            )
+        except urllib.error.HTTPError as error:
+            assert error.code == 409
+            failure = json.load(error)
+        else:
+            raise AssertionError("active session deletion succeeded")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert failure["error"]["code"] == "session-active"
+    assert (tmp_path / session_id / "session.json").is_file()
