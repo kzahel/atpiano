@@ -31,5 +31,5 @@ execution record; continuing status and direction belong in the relevant
 | [`018-score-playback-alignment.md`](018-score-playback-alignment.md) | Complete | Source-event-to-score alignment artifacts, synchronized OSMD playback cursor, and piano-roll playhead |
 | [`019-linux-development-validation.md`](019-linux-development-validation.md) | Complete | Fresh-clone x86_64 Linux gates, real model paths, platform-neutral fixes, dependency footprint, and same-process scheduling evidence |
 | [`020-responsive-score-reader.md`](020-responsive-score-reader.md) | Implemented | Exact-snapshot responsive score reader with phone, tablet, desktop, page-turn, and fullscreen layouts |
-| [`022-durable-capture-worker-isolation.md`](022-durable-capture-worker-isolation.md) | Planned | Durable PCM ingest, bounded isolated preview/commit workers, prompt Stop, and reattachable settlement |
-| [`023-backend-capability-degradation.md`](023-backend-capability-degradation.md) | Planned | Measured live, delayed, after-Stop, and unavailable correction modes |
+| [`022-durable-capture-worker-isolation.md`](022-durable-capture-worker-isolation.md) | Awaiting Linux | Durable PCM ingest, bounded isolated preview/commit workers, prompt Stop, and reattachable settlement |
+| [`023-backend-capability-degradation.md`](023-backend-capability-degradation.md) | Awaiting Linux | Measured live, delayed, after-Stop, and unavailable correction modes |
