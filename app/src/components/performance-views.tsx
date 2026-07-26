@@ -15,6 +15,7 @@ import { MusicXmlScore } from "./musicxml-score.js";
 import type {
   EventRevision,
   Horizon,
+  ScoreVariant,
   Session,
 } from "../runtime/atpiano-runtime.js";
 
@@ -258,9 +259,16 @@ function ScorePreview({
   scoreAlignment,
   scoreAlignmentError,
   scoreHorizonSample,
+  scoreVariants,
+  selectedScoreVariant,
+  scoreVariantBusy,
   inspectionSample,
   onGenerate,
   onOpenReader,
+  onSelectScoreVariant,
+  onCreateAutomaticVariant,
+  onCreateEnharmonicVariant,
+  onDownloadBaseline,
 }: {
   readonly session: Session;
   readonly scoreStatus: string | null;
@@ -270,9 +278,16 @@ function ScorePreview({
   readonly scoreAlignment: ScoreAlignment | undefined;
   readonly scoreAlignmentError: Error | null;
   readonly scoreHorizonSample: number | undefined;
+  readonly scoreVariants: readonly ScoreVariant[];
+  readonly selectedScoreVariant: ScoreVariant | undefined;
+  readonly scoreVariantBusy: boolean;
   readonly inspectionSample: number | null;
   readonly onGenerate: () => void;
   readonly onOpenReader: () => void;
+  readonly onSelectScoreVariant: (variant: ScoreVariant) => void;
+  readonly onCreateAutomaticVariant: () => void;
+  readonly onCreateEnharmonicVariant: () => void;
+  readonly onDownloadBaseline: (() => void) | undefined;
 }) {
   return (
     <section className="view-card score-card">
@@ -316,6 +331,73 @@ function ScorePreview({
         Generated on request from a frozen corrected prefix. This is not a
         live-note view.
       </p>
+      {scoreXml && scoreVariants.length > 0 && (
+        <div className="score-engraving-controls">
+          <label>
+            <span>Engraving</span>
+            <select
+              value={selectedScoreVariant?.score_variant_id ?? ""}
+              disabled={scoreVariantBusy}
+              onChange={(event) => {
+                const variant = scoreVariants.find(
+                  (candidate) =>
+                    candidate.score_variant_id === event.currentTarget.value,
+                );
+                if (variant) onSelectScoreVariant(variant);
+              }}
+            >
+              {scoreVariants.map((variant) => (
+                <option
+                  key={variant.score_variant_id}
+                  value={variant.score_variant_id}
+                >
+                  {variant.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {selectedScoreVariant?.available_enharmonic_fifths !== null &&
+            selectedScoreVariant?.available_enharmonic_fifths !== undefined && (
+              <button
+                className="button small secondary"
+                type="button"
+                disabled={scoreVariantBusy}
+                onClick={onCreateEnharmonicVariant}
+              >
+                Enharmonic key · {
+                  selectedScoreVariant.available_enharmonic_label
+                    ?.split(" — ")[0] ?? "Alternative spelling"
+                }
+              </button>
+            )}
+          {selectedScoreVariant?.role === "baseline" &&
+            !scoreVariants.some((variant) => variant.role === "automatic") && (
+              <button
+                className="button small secondary"
+                type="button"
+                disabled={scoreVariantBusy}
+                onClick={onCreateAutomaticVariant}
+              >
+                Apply automatic clefs
+              </button>
+            )}
+          {onDownloadBaseline && (
+            <button
+              className="button small"
+              type="button"
+              onClick={onDownloadBaseline}
+            >
+              Download model baseline
+            </button>
+          )}
+        </div>
+      )}
+      {selectedScoreVariant?.needs_review && (
+        <p className="score-render-warning" role="status">
+          Automatic clefs reduced ledger lines, but one or more passages still
+          merit engraving review.
+        </p>
+      )}
       {scoreXml ? (
         <MusicXmlScore
           xml={scoreXml}
@@ -365,11 +447,18 @@ export function PerformanceViews({
   scoreAlignment,
   scoreAlignmentError,
   scoreHorizonSample,
+  scoreVariants,
+  selectedScoreVariant,
+  scoreVariantBusy,
   audioSources,
   audioUnavailableReason,
   onInspect,
   onGenerateScore,
   onOpenScoreReader,
+  onSelectScoreVariant,
+  onCreateAutomaticVariant,
+  onCreateEnharmonicVariant,
+  onDownloadBaseline,
 }: {
   readonly session: Session;
   readonly events: readonly EventRevision[];
@@ -385,11 +474,18 @@ export function PerformanceViews({
   readonly scoreAlignment: ScoreAlignment | undefined;
   readonly scoreAlignmentError: Error | null;
   readonly scoreHorizonSample: number | undefined;
+  readonly scoreVariants: readonly ScoreVariant[];
+  readonly selectedScoreVariant: ScoreVariant | undefined;
+  readonly scoreVariantBusy: boolean;
   readonly audioSources: readonly AudioPlaybackSource[];
   readonly audioUnavailableReason: string;
   readonly onInspect: (sample: number | null) => void;
   readonly onGenerateScore: () => void;
   readonly onOpenScoreReader: () => void;
+  readonly onSelectScoreVariant: (variant: ScoreVariant) => void;
+  readonly onCreateAutomaticVariant: () => void;
+  readonly onCreateEnharmonicVariant: () => void;
+  readonly onDownloadBaseline: (() => void) | undefined;
 }) {
   return (
     <div className="performance-views">
@@ -411,9 +507,16 @@ export function PerformanceViews({
           scoreAlignment={scoreAlignment}
           scoreAlignmentError={scoreAlignmentError}
           scoreHorizonSample={scoreHorizonSample}
+          scoreVariants={scoreVariants}
+          selectedScoreVariant={selectedScoreVariant}
+          scoreVariantBusy={scoreVariantBusy}
           inspectionSample={inspectionSample}
           onGenerate={onGenerateScore}
           onOpenReader={onOpenScoreReader}
+          onSelectScoreVariant={onSelectScoreVariant}
+          onCreateAutomaticVariant={onCreateAutomaticVariant}
+          onCreateEnharmonicVariant={onCreateEnharmonicVariant}
+          onDownloadBaseline={onDownloadBaseline}
         />
       )}
       {showRoll && (

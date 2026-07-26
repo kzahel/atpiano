@@ -48,6 +48,8 @@ from atpiano.contracts.schemas import (
     RuntimeCapabilities,
     RuntimeMode,
     ScoreJobStart,
+    ScoreVariant,
+    ScoreVariantRequest,
     SourceKind,
     WorkspacePage,
 )
@@ -78,7 +80,9 @@ from atpiano.model_worker import CommitModelWorker, PreviewModelWorker
 from atpiano.score_snapshot import (
     SCORE_SNAPSHOT_SCHEMA,
     ScoreRunner,
+    ScoreVariantRunner,
     generate_score_snapshot,
+    generate_score_variant,
     inspect_score_runtime,
     score_snapshot_is_plausible,
 )
@@ -148,6 +152,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         replay_realtime: bool = True,
         score_runtime: Path = Path("results/midi2score-runtime"),
         score_runner: ScoreRunner | None = None,
+        score_variant_runner: ScoreVariantRunner | None = None,
         web_root: Path = WEB_ROOT,
         application_mode: str = "corrected-workbench-v2",
         isolate_models: bool = True,
@@ -183,6 +188,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self.replay_realtime = replay_realtime
         self.score_runtime = score_runtime.resolve()
         self.score_runner = score_runner
+        self.score_variant_runner = score_variant_runner
         self.web_root = web_root.resolve()
         self.application_mode = application_mode
         self.isolate_models = isolate_models
@@ -791,6 +797,50 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             error=error,
         )
 
+    def create_score_variant(
+        self,
+        request: ScoreVariantRequest,
+    ) -> ScoreVariant:
+        with self.score_lock:
+            if self._score_status == "running":
+                raise RuntimeError(
+                    "a committed score snapshot is already running"
+                )
+        directory = self.session_store.resolve(request.session_id)
+        musicxml, musicxml_path = (
+            self.session_store.get_artifact_with_path(
+                request.session_id,
+                request.baseline_musicxml_artifact_id,
+            )
+        )
+        alignment, alignment_path = (
+            self.session_store.get_artifact_with_path(
+                request.session_id,
+                request.baseline_alignment_artifact_id,
+            )
+        )
+        if (
+            musicxml.kind.value != "musicxml"
+            or alignment.kind.value != "score-alignment"
+        ):
+            raise ValueError("score variant request requires baseline artifacts")
+        record = generate_score_variant(
+            directory,
+            self.score_runtime,
+            baseline_musicxml_path=musicxml_path,
+            baseline_alignment_path=alignment_path,
+            clef_policy=request.clef_policy.value,
+            target_key_fifths=request.target_key_fifths,
+            runner=self.score_variant_runner,
+        )
+        return next(
+            variant
+            for variant in self.session_store.score_variants(
+                request.session_id
+            ).items
+            if variant.score_variant_id == record["variant_id"]
+        )
+
     def delete_api_session(self, session_id: str) -> dict[str, Any]:
         with self.state_lock:
             active_session_id = (
@@ -1131,6 +1181,22 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                 )
                 self._send_json(page.model_dump(mode="json"))
                 return True
+            variants_match = re.fullmatch(
+                (
+                    f"{prefix}/workspaces/([^/]+)/sessions/([^/]+)"
+                    r"/score-variants"
+                ),
+                request_path,
+            )
+            if variants_match:
+                workspace_id, session_id = variants_match.groups()
+                if workspace_id != LOCAL_WORKSPACE_ID:
+                    raise LocalSessionNotFoundError(
+                        "workspace does not exist"
+                    )
+                page = self.server.session_store.score_variants(session_id)
+                self._send_json(page.model_dump(mode="json"))
+                return True
             artifact_match = re.fullmatch(
                 (
                     f"{prefix}/workspaces/([^/]+)/sessions/([^/]+)"
@@ -1363,6 +1429,64 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                 )
                 return
             self._send_json(job.model_dump(mode="json"), HTTPStatus.ACCEPTED)
+            return
+        variant_match = re.fullmatch(
+            (
+                r"/api/v1/workspaces/([^/]+)/sessions/([^/]+)"
+                r"/score-variants"
+            ),
+            request_path,
+        )
+        if variant_match:
+            workspace_id, session_id = variant_match.groups()
+            try:
+                request = ScoreVariantRequest.model_validate(
+                    self._read_api_json()
+                )
+                if (
+                    workspace_id != LOCAL_WORKSPACE_ID
+                    or request.workspace_id != workspace_id
+                    or request.session_id != session_id
+                ):
+                    raise ValueError(
+                        "score variant request target does not match its path"
+                    )
+                variant = self.server.create_score_variant(request)
+            except ValidationError as error:
+                self._send_api_error(
+                    str(error),
+                    code=ErrorCode.INVALID_REQUEST,
+                    status=HTTPStatus.BAD_REQUEST,
+                    workspace_id=workspace_id,
+                    session_id=session_id,
+                )
+                return
+            except LocalSessionNotFoundError as error:
+                self._send_api_error(
+                    str(error),
+                    code=ErrorCode.NOT_FOUND,
+                    status=HTTPStatus.NOT_FOUND,
+                    workspace_id=workspace_id,
+                    session_id=session_id,
+                )
+                return
+            except (OSError, RuntimeError, ValueError) as error:
+                self._send_api_error(
+                    str(error),
+                    code=(
+                        ErrorCode.SCORE_BUSY
+                        if "already running" in str(error)
+                        else ErrorCode.CONFLICT
+                    ),
+                    status=HTTPStatus.CONFLICT,
+                    workspace_id=workspace_id,
+                    session_id=session_id,
+                )
+                return
+            self._send_json(
+                variant.model_dump(mode="json"),
+                HTTPStatus.CREATED,
+            )
             return
         if request_path == "/api/replay":
             try:
@@ -1812,6 +1936,7 @@ def create_corrected_workbench_server(
     replay_realtime: bool = True,
     score_runtime: Path = Path("results/midi2score-runtime"),
     score_runner: ScoreRunner | None = None,
+    score_variant_runner: ScoreVariantRunner | None = None,
     web_root: Path = WEB_ROOT,
     application_mode: str = "corrected-workbench-v2",
 ) -> CorrectedWorkbenchServer:
@@ -1836,6 +1961,7 @@ def create_corrected_workbench_server(
         replay_realtime=replay_realtime,
         score_runtime=score_runtime,
         score_runner=score_runner,
+        score_variant_runner=score_variant_runner,
         web_root=web_root,
         application_mode=application_mode,
     )

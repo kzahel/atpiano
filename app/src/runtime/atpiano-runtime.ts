@@ -19,6 +19,9 @@ export type Artifact = Schemas["Artifact"];
 export type ArtifactPage = Schemas["ArtifactPage"];
 export type ArtifactAccess = Schemas["ArtifactAccess"];
 export type ScoreJobStart = Schemas["ScoreJobStart"];
+export type ScoreVariant = Schemas["ScoreVariant"];
+export type ScoreVariantPage = Schemas["ScoreVariantPage"];
+export type ScoreVariantRequest = Schemas["ScoreVariantRequest"];
 export type Job = Schemas["Job"];
 export type DeleteSessionRequest = Schemas["DeleteSessionRequest"];
 export type DeleteSessionResult = Schemas["DeleteSessionResult"];
@@ -106,6 +109,15 @@ export interface AtpianoRuntime {
     input: ScoreJobStart,
     request: RuntimeRequest,
   ): Promise<Job>;
+  listScoreVariants(
+    workspaceId: string,
+    sessionId: string,
+    request: RuntimeRequest,
+  ): Promise<ScoreVariantPage>;
+  createScoreVariant(
+    input: ScoreVariantRequest,
+    request: RuntimeRequest,
+  ): Promise<ScoreVariant>;
   getJob(jobId: string, request: RuntimeRequest): Promise<Job>;
   deleteSession(
     input: DeleteSessionRequest,

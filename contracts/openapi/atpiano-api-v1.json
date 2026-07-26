@@ -1521,6 +1521,14 @@
         "title": "RuntimeMode",
         "type": "string"
       },
+      "ScoreClefPolicy": {
+        "enum": [
+          "preserve",
+          "automatic"
+        ],
+        "title": "ScoreClefPolicy",
+        "type": "string"
+      },
       "ScoreJobStart": {
         "additionalProperties": false,
         "properties": {
@@ -1657,6 +1665,291 @@
         ],
         "title": "ScoreSnapshot",
         "type": "object"
+      },
+      "ScoreVariant": {
+        "additionalProperties": false,
+        "properties": {
+          "alignment_artifact_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Alignment Artifact Id",
+            "type": "string"
+          },
+          "available_enharmonic_fifths": {
+            "anyOf": [
+              {
+                "maximum": 7,
+                "minimum": -7,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Available Enharmonic Fifths"
+          },
+          "available_enharmonic_label": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Available Enharmonic Label"
+          },
+          "baseline_alignment_artifact_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Baseline Alignment Artifact Id",
+            "type": "string"
+          },
+          "baseline_musicxml_artifact_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Baseline Musicxml Artifact Id",
+            "type": "string"
+          },
+          "clef_policy": {
+            "$ref": "#/components/schemas/ScoreClefPolicy"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "key_fifths": {
+            "anyOf": [
+              {
+                "maximum": 7,
+                "minimum": -7,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Key Fifths"
+          },
+          "label": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "musicxml_artifact_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Musicxml Artifact Id",
+            "type": "string"
+          },
+          "needs_review": {
+            "title": "Needs Review",
+            "type": "boolean"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ScoreVariantRole"
+          },
+          "schema_version": {
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "score_variant_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Score Variant Id",
+            "type": "string"
+          },
+          "selected": {
+            "title": "Selected",
+            "type": "boolean"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "source_horizon_sample": {
+            "minimum": 0,
+            "title": "Source Horizon Sample",
+            "type": "integer"
+          },
+          "target_key_fifths": {
+            "anyOf": [
+              {
+                "maximum": 7,
+                "minimum": -7,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target Key Fifths"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "score_variant_id",
+          "role",
+          "label",
+          "baseline_musicxml_artifact_id",
+          "baseline_alignment_artifact_id",
+          "musicxml_artifact_id",
+          "alignment_artifact_id",
+          "source_horizon_sample",
+          "clef_policy",
+          "selected",
+          "needs_review",
+          "created_at"
+        ],
+        "title": "ScoreVariant",
+        "type": "object"
+      },
+      "ScoreVariantPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScoreVariant"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "items"
+        ],
+        "title": "ScoreVariantPage",
+        "type": "object"
+      },
+      "ScoreVariantRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline_alignment_artifact_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Baseline Alignment Artifact Id",
+            "type": "string"
+          },
+          "baseline_musicxml_artifact_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Baseline Musicxml Artifact Id",
+            "type": "string"
+          },
+          "clef_policy": {
+            "$ref": "#/components/schemas/ScoreClefPolicy",
+            "default": "automatic"
+          },
+          "request_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "target_key_fifths": {
+            "anyOf": [
+              {
+                "maximum": 7,
+                "minimum": -7,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target Key Fifths"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "baseline_musicxml_artifact_id",
+          "baseline_alignment_artifact_id",
+          "request_id"
+        ],
+        "title": "ScoreVariantRequest",
+        "type": "object"
+      },
+      "ScoreVariantRole": {
+        "enum": [
+          "baseline",
+          "automatic",
+          "enharmonic"
+        ],
+        "title": "ScoreVariantRole",
+        "type": "string"
       },
       "Session": {
         "additionalProperties": false,
@@ -2671,6 +2964,104 @@
               }
             },
             "description": "Job"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured API error"
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/score-variants": {
+      "get": {
+        "operationId": "listScoreVariants",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreVariantPage"
+                }
+              }
+            },
+            "description": "ScoreVariantPage"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured API error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createScoreVariant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScoreVariantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreVariant"
+                }
+              }
+            },
+            "description": "ScoreVariant"
           },
           "default": {
             "content": {

@@ -20,6 +20,9 @@ import type {
   RuntimeCapabilities,
   RuntimeRequest,
   ScoreJobStart,
+  ScoreVariant,
+  ScoreVariantPage,
+  ScoreVariantRequest,
   Session,
   SessionPage,
   Workspace,
@@ -33,6 +36,7 @@ export interface FixtureRuntimeData {
   readonly capture: Capture;
   readonly sessions: readonly FixtureSessionData[];
   readonly scoreJob: Job;
+  readonly scoreVariants?: ScoreVariantPage;
   readonly trashedAt: string;
 }
 
@@ -334,6 +338,40 @@ export class FixtureRuntime implements AtpianoRuntime {
       throw new Error("score job target or horizon is stale");
     }
     return this.#data.scoreJob;
+  }
+
+  async listScoreVariants(
+    workspaceId: string,
+    sessionId: string,
+    request: RuntimeRequest,
+  ): Promise<ScoreVariantPage> {
+    assertRequest(request);
+    this.#assertTarget(workspaceId, sessionId);
+    return this.#data.scoreVariants ?? {
+      schema_version: "atpiano.contract.v1",
+      workspace_id: workspaceId,
+      session_id: sessionId,
+      items: [],
+    };
+  }
+
+  async createScoreVariant(
+    input: ScoreVariantRequest,
+    request: RuntimeRequest,
+  ): Promise<ScoreVariant> {
+    assertRequest(request);
+    this.#assertTarget(input.workspace_id, input.session_id);
+    const variant = this.#data.scoreVariants?.items.find(
+      (candidate) =>
+        candidate.baseline_musicxml_artifact_id ===
+          input.baseline_musicxml_artifact_id &&
+        candidate.baseline_alignment_artifact_id ===
+          input.baseline_alignment_artifact_id &&
+        candidate.clef_policy === input.clef_policy &&
+        candidate.target_key_fifths === input.target_key_fifths,
+    );
+    if (!variant) throw new Error("fixture score variant does not exist");
+    return variant;
   }
 
   async getJob(jobId: string, request: RuntimeRequest): Promise<Job> {

@@ -5,6 +5,7 @@ import type {
   Horizon,
   Job,
   RuntimeCapabilities,
+  ScoreVariantPage,
   Session,
   Workspace,
 } from "./atpiano-runtime.js";
@@ -501,6 +502,39 @@ const scoreJob: Job = {
   error: null,
 };
 
+const scoreVariants: ScoreVariantPage = {
+  schema_version: schemaVersion,
+  workspace_id: workspaceId,
+  session_id: primary.session_id,
+  items: [
+    {
+      schema_version: schemaVersion,
+      workspace_id: workspaceId,
+      session_id: primary.session_id,
+      score_variant_id: "score-variant:fixture-automatic",
+      role: "automatic",
+      label: "Automatic clefs · Six flats",
+      baseline_musicxml_artifact_id:
+        `artifact:${primary.session_id}:musicxml`,
+      baseline_alignment_artifact_id:
+        `artifact:${primary.session_id}:score-alignment`,
+      musicxml_artifact_id: `artifact:${primary.session_id}:musicxml`,
+      alignment_artifact_id:
+        `artifact:${primary.session_id}:score-alignment`,
+      source_horizon_sample: primary.source_frame_count - sampleRate,
+      clef_policy: "automatic",
+      target_key_fifths: null,
+      key_fifths: -6,
+      available_enharmonic_fifths: 6,
+      available_enharmonic_label:
+        "Six sharps — F-sharp major / D-sharp minor",
+      selected: true,
+      needs_review: false,
+      created_at: "2026-07-26T10:00:45Z",
+    },
+  ],
+};
+
 export function createFixtureRuntime(): FixtureRuntime {
   return new FixtureRuntime({
     fixtureId: "deterministic-musical-loop-v1",
@@ -525,6 +559,7 @@ export function createFixtureRuntime(): FixtureRuntime {
       record(warmup, warmupNotes),
     ],
     scoreJob,
+    scoreVariants,
     trashedAt: "2026-07-26T11:00:00Z",
   });
 }

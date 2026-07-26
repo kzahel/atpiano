@@ -164,6 +164,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/score-variants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listScoreVariants"];
+        put?: never;
+        post: operations["createScoreVariant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -768,6 +784,11 @@ export interface components {
          * @enum {string}
          */
         RuntimeMode: "local" | "hosted" | "fixture";
+        /**
+         * ScoreClefPolicy
+         * @enum {string}
+         */
+        ScoreClefPolicy: "preserve" | "automatic";
         /** ScoreJobStart */
         ScoreJobStart: {
             /** Commit Sample */
@@ -817,6 +838,110 @@ export interface components {
             /** Workspace Id */
             workspace_id: string;
         };
+        /** ScoreVariant */
+        ScoreVariant: {
+            /** Alignment Artifact Id */
+            alignment_artifact_id: string;
+            /**
+             * Available Enharmonic Fifths
+             * @default null
+             */
+            available_enharmonic_fifths: number | null;
+            /**
+             * Available Enharmonic Label
+             * @default null
+             */
+            available_enharmonic_label: string | null;
+            /** Baseline Alignment Artifact Id */
+            baseline_alignment_artifact_id: string;
+            /** Baseline Musicxml Artifact Id */
+            baseline_musicxml_artifact_id: string;
+            clef_policy: components["schemas"]["ScoreClefPolicy"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Key Fifths
+             * @default null
+             */
+            key_fifths: number | null;
+            /** Label */
+            label: string;
+            /** Musicxml Artifact Id */
+            musicxml_artifact_id: string;
+            /** Needs Review */
+            needs_review: boolean;
+            role: components["schemas"]["ScoreVariantRole"];
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+            /** Score Variant Id */
+            score_variant_id: string;
+            /** Selected */
+            selected: boolean;
+            /** Session Id */
+            session_id: string;
+            /** Source Horizon Sample */
+            source_horizon_sample: number;
+            /**
+             * Target Key Fifths
+             * @default null
+             */
+            target_key_fifths: number | null;
+            /** Workspace Id */
+            workspace_id: string;
+        };
+        /** ScoreVariantPage */
+        ScoreVariantPage: {
+            /** Items */
+            items: components["schemas"]["ScoreVariant"][];
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+            /** Session Id */
+            session_id: string;
+            /** Workspace Id */
+            workspace_id: string;
+        };
+        /** ScoreVariantRequest */
+        ScoreVariantRequest: {
+            /** Baseline Alignment Artifact Id */
+            baseline_alignment_artifact_id: string;
+            /** Baseline Musicxml Artifact Id */
+            baseline_musicxml_artifact_id: string;
+            /** @default automatic */
+            clef_policy: components["schemas"]["ScoreClefPolicy"];
+            /** Request Id */
+            request_id: string;
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+            /** Session Id */
+            session_id: string;
+            /**
+             * Target Key Fifths
+             * @default null
+             */
+            target_key_fifths: number | null;
+            /** Workspace Id */
+            workspace_id: string;
+        };
+        /**
+         * ScoreVariantRole
+         * @enum {string}
+         */
+        ScoreVariantRole: "baseline" | "automatic" | "enharmonic";
         /** Session */
         Session: {
             /**
@@ -1368,6 +1493,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Structured API error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listScoreVariants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ScoreVariantPage */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoreVariantPage"];
+                };
+            };
+            /** @description Structured API error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createScoreVariant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScoreVariantRequest"];
+            };
+        };
+        responses: {
+            /** @description ScoreVariant */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoreVariant"];
                 };
             };
             /** @description Structured API error */

@@ -659,10 +659,46 @@ def generate_score_variant(
         raise ValueError("current score snapshot is invalid")
     baseline = pointer.get("baseline")
     if not isinstance(baseline, dict):
-        raise ValueError(
-            "score snapshot predates deterministic baseline variants; "
-            "refresh the committed score first"
+        legacy_musicxml = (
+            session_directory / Path(str(pointer["musicxml"]["path"]))
+        ).resolve()
+        legacy_alignment = (
+            session_directory / Path(str(pointer["alignment"]["path"]))
+        ).resolve()
+        if (
+            baseline_musicxml_path.resolve() != legacy_musicxml
+            or baseline_alignment_path.resolve() != legacy_alignment
+            or not legacy_musicxml.is_file()
+            or not legacy_alignment.is_file()
+            or sha256_file(legacy_musicxml)
+            != str(pointer["musicxml"]["sha256"])
+            or sha256_file(legacy_alignment)
+            != str(pointer["alignment"]["sha256"])
+        ):
+            raise ValueError(
+                "variant request does not name the legacy score baseline"
+            )
+        baseline_options = normalized_options(clef_policy="preserve")
+        baseline_variant_id = score_variant_id(
+            baseline_musicxml_sha256=str(pointer["musicxml"]["sha256"]),
+            baseline_alignment_sha256=str(pointer["alignment"]["sha256"]),
+            options=baseline_options,
         )
+        baseline = _variant_record(
+            variant_id=baseline_variant_id,
+            role="baseline",
+            options=baseline_options,
+            baseline_musicxml_sha256=str(pointer["musicxml"]["sha256"]),
+            baseline_alignment_sha256=str(pointer["alignment"]["sha256"]),
+            musicxml=pointer["musicxml"],
+            alignment=pointer["alignment"],
+            postprocess=None,
+            created_at=str(pointer["generated_at"]),
+        )
+        pointer["baseline"] = baseline
+        pointer["variants"] = []
+        pointer["default_variant_id"] = baseline_variant_id
+        pointer["selected_variant_id"] = baseline_variant_id
     baseline_musicxml_path = baseline_musicxml_path.resolve()
     baseline_alignment_path = baseline_alignment_path.resolve()
     expected_musicxml = (
@@ -779,7 +815,9 @@ def generate_score_variant(
     variants.append(variant)
     root_manifest_path = snapshot_directory / "manifest.json"
     root_manifest = read_json(root_manifest_path)
+    root_manifest["baseline"] = baseline
     root_manifest["variants"] = variants
+    root_manifest["default_variant_id"] = pointer["default_variant_id"]
     write_json(root_manifest_path, root_manifest)
     pointer["variants"] = variants
     write_json(pointer_path, _select_variant(pointer, variant))

@@ -23,6 +23,9 @@ import type {
   RuntimeCapabilities,
   RuntimeRequest,
   ScoreJobStart,
+  ScoreVariant,
+  ScoreVariantPage,
+  ScoreVariantRequest,
   Session,
   SessionPage,
   WorkspacePage,
@@ -583,6 +586,48 @@ export class LocalRuntime implements AtpianoRuntime {
     return dataOrThrow(
       await this.#client.POST(
         "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/score-jobs",
+        {
+          ...abortOptions(request),
+          params: {
+            path: {
+              workspace_id: input.workspace_id,
+              session_id: input.session_id,
+            },
+          },
+          body: input,
+        },
+      ),
+    );
+  }
+
+  async listScoreVariants(
+    workspaceId: string,
+    sessionId: string,
+    request: RuntimeRequest,
+  ): Promise<ScoreVariantPage> {
+    return dataOrThrow(
+      await this.#client.GET(
+        "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/score-variants",
+        {
+          ...abortOptions(request),
+          params: {
+            path: {
+              workspace_id: workspaceId,
+              session_id: sessionId,
+            },
+          },
+        },
+      ),
+    );
+  }
+
+  async createScoreVariant(
+    input: ScoreVariantRequest,
+    request: RuntimeRequest,
+  ): Promise<ScoreVariant> {
+    return dataOrThrow(
+      await this.#client.POST(
+        "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/score-variants",
         {
           ...abortOptions(request),
           params: {

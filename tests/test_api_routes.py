@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import threading
 import time
 import urllib.error
@@ -11,6 +12,7 @@ from typing import Any
 from atpiano.contracts.schemas import (
     DeleteSessionRequest,
     ScoreJobStart,
+    ScoreVariantRequest,
 )
 from atpiano.corrected import CORRECTED_EVENT_SCHEMA, CorrectedSession
 from atpiano.corrected_export import write_corrected_exports
@@ -141,6 +143,41 @@ def _score_runner(
     }
 
 
+def _score_variant_runner(
+    input_musicxml: Path,
+    input_alignment: Path,
+    output_musicxml: Path,
+    output_alignment: Path,
+    clef_policy: str,
+    target_key_fifths: int | None,
+    runtime_directory: Path,
+) -> dict[str, Any]:
+    assert clef_policy == "automatic"
+    assert target_key_fifths == 6
+    shutil.copy2(input_musicxml, output_musicxml)
+    alignment = json.loads(input_alignment.read_text(encoding="utf-8"))
+    alignment["musicxml"] = {"sha256": sha256_file(output_musicxml)}
+    write_json(output_alignment, alignment)
+    return {
+        "schema_version": "test-score-variant-runner.v1",
+        "runtime_directory": str(runtime_directory),
+        "postprocess": {
+            "schema_version": "atpiano.score-postprocessor.v1",
+            "version": "deterministic-engraving-v1",
+            "key_signature": {
+                "source_fifths": -6,
+                "source_label": "Six flats",
+                "alternative_fifths": 6,
+                "alternative_label": "Six sharps",
+                "target_fifths": 6,
+                "target_label": "Six sharps",
+            },
+            "clefs": {"needs_review": False},
+            "needs_review": False,
+        },
+    }
+
+
 def _serve(server: Any) -> tuple[threading.Thread, str]:
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -190,6 +227,7 @@ def test_api_routes_read_explicit_history_without_retargeting_current(
         commit_model_factory=lambda: None,
         score_runtime=tmp_path / "runtime",
         score_runner=_score_runner,
+        score_variant_runner=_score_variant_runner,
     )
     thread, base_url = _serve(server)
     api = f"{base_url}/api/v1"
@@ -234,6 +272,7 @@ def test_api_score_job_and_artifacts_remain_targeted_to_history(
         commit_model_factory=lambda: None,
         score_runtime=tmp_path / "runtime",
         score_runner=_score_runner,
+        score_variant_runner=_score_variant_runner,
     )
     thread, base_url = _serve(server)
     api = f"{base_url}/api/v1"
@@ -289,6 +328,33 @@ def test_api_score_job_and_artifacts_remain_targeted_to_history(
             timeout=2,
         ) as response:
             alignment_body = json.load(response)
+        variants = _get(
+            f"{api}/workspaces/local/sessions/{older_id}/score-variants"
+        )
+        automatic = next(
+            item for item in variants["items"] if item["role"] == "automatic"
+        )
+        variant_request = ScoreVariantRequest(
+            workspace_id="local",
+            session_id=older_id,
+            baseline_musicxml_artifact_id=(
+                automatic["baseline_musicxml_artifact_id"]
+            ),
+            baseline_alignment_artifact_id=(
+                automatic["baseline_alignment_artifact_id"]
+            ),
+            target_key_fifths=6,
+            request_id="request-variant-1",
+        )
+        variant_status, enharmonic = _request_json(
+            f"{api}/workspaces/local/sessions/{older_id}/score-variants",
+            value=variant_request.model_dump(mode="json"),
+            origin=base_url,
+            method="POST",
+        )
+        selected_variants = _get(
+            f"{api}/workspaces/local/sessions/{older_id}/score-variants"
+        )
         legacy_current = _get(f"{base_url}/api/session")
     finally:
         server.shutdown()
@@ -302,6 +368,12 @@ def test_api_score_job_and_artifacts_remain_targeted_to_history(
     assert alignment["source_horizon_sample"] == 80
     assert b"score-partwise" in body
     assert alignment_body["summary"]["mapped_source_notes"] == 1
+    assert variant_status == 201
+    assert enharmonic["role"] == "enharmonic"
+    assert enharmonic["target_key_fifths"] == 6
+    assert next(
+        item for item in selected_variants["items"] if item["selected"]
+    )["score_variant_id"] == enharmonic["score_variant_id"]
     assert legacy_current["session_id"] == newer_id
 
 

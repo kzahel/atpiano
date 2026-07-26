@@ -24,6 +24,10 @@ from atpiano.contracts.schemas import (
     Horizon,
     OffsetState,
     Provenance,
+    ScoreClefPolicy,
+    ScoreVariant,
+    ScoreVariantPage,
+    ScoreVariantRole,
     Session,
     SessionPage,
     SessionStatus,
@@ -417,12 +421,33 @@ class LocalSessionStore:
                 pointer = read_json(score_pointer)
                 score_horizon = int(pointer["commit_sample"])
                 score_horizons[score_pointer.resolve()] = score_horizon
-                for section in ("midi", "musicxml", "alignment"):
-                    relative = Path(str(pointer[section]["path"]))
-                    candidate = (directory / relative).resolve()
-                    if candidate.is_relative_to(directory) and candidate.is_file():
-                        paths.append(candidate)
-                        score_horizons[candidate] = score_horizon
+                records = [
+                    pointer,
+                    *(
+                        [pointer["baseline"]]
+                        if isinstance(pointer.get("baseline"), dict)
+                        else []
+                    ),
+                    *(
+                        pointer["variants"]
+                        if isinstance(pointer.get("variants"), list)
+                        else []
+                    ),
+                ]
+                for record in records:
+                    if not isinstance(record, dict):
+                        continue
+                    for section in ("midi", "musicxml", "alignment"):
+                        if not isinstance(record.get(section), dict):
+                            continue
+                        relative = Path(str(record[section]["path"]))
+                        candidate = (directory / relative).resolve()
+                        if (
+                            candidate.is_relative_to(directory)
+                            and candidate.is_file()
+                        ):
+                            paths.append(candidate)
+                            score_horizons[candidate] = score_horizon
             except (KeyError, OSError, TypeError, ValueError):
                 pass
         unique_paths = sorted({path.resolve() for path in paths if path.is_file()})
@@ -526,31 +551,203 @@ class LocalSessionStore:
                 commit_sample = int(manifest["commit_sample"])
             except (KeyError, OSError, TypeError, ValueError):
                 continue
-            for section in ("musicxml", "alignment"):
-                try:
-                    resolved = (
-                        directory / Path(str(manifest[section]["path"]))
-                    ).resolve()
-                    if (
-                        resolved.parent != snapshot.resolve()
-                        or not resolved.is_file()
-                        or str(manifest[section]["sha256"])
-                        != sha256_file(resolved)
-                    ):
-                        continue
-                except (KeyError, OSError, TypeError, ValueError):
+            records = [
+                manifest,
+                *(
+                    [manifest["baseline"]]
+                    if isinstance(manifest.get("baseline"), dict)
+                    else []
+                ),
+                *(
+                    manifest["variants"]
+                    if isinstance(manifest.get("variants"), list)
+                    else []
+                ),
+            ]
+            for record in records:
+                if not isinstance(record, dict):
                     continue
-                artifacts.append(
-                    (
-                        self._artifact(
-                            session_id,
+                for section in ("musicxml", "alignment"):
+                    if not isinstance(record.get(section), dict):
+                        continue
+                    try:
+                        resolved = (
+                            directory / Path(str(record[section]["path"]))
+                        ).resolve()
+                        if (
+                            not resolved.is_relative_to(snapshot.resolve())
+                            or not resolved.is_file()
+                            or str(record[section]["sha256"])
+                            != sha256_file(resolved)
+                        ):
+                            continue
+                    except (KeyError, OSError, TypeError, ValueError):
+                        continue
+                    artifacts.append(
+                        (
+                            self._artifact(
+                                session_id,
+                                resolved,
+                                source_horizon_sample=commit_sample,
+                            ),
                             resolved,
-                            source_horizon_sample=commit_sample,
-                        ),
-                        resolved,
+                        )
                     )
+        return list(
+            {
+                path.resolve(): (artifact, path)
+                for artifact, path in artifacts
+            }.values()
+        )
+
+    def score_variants(self, session_id: str) -> ScoreVariantPage:
+        directory = self.resolve(session_id)
+        pointer_path = directory / "score" / "current.json"
+        if not pointer_path.is_file():
+            raise LocalSessionNotFoundError("score snapshot does not exist")
+        pointer = read_json(pointer_path)
+        if (
+            pointer.get("schema_version") != SCORE_SNAPSHOT_SCHEMA
+            or pointer.get("session_id") != session_id
+            or not score_snapshot_is_plausible(pointer)
+        ):
+            raise LocalSessionNotFoundError("score snapshot does not exist")
+        baseline = pointer.get("baseline")
+        if isinstance(baseline, dict):
+            records = [
+                baseline,
+                *(
+                    pointer["variants"]
+                    if isinstance(pointer.get("variants"), list)
+                    else []
+                ),
+            ]
+        else:
+            records = [
+                {
+                    "variant_id": (
+                        "score-variant:legacy-"
+                        f"{str(pointer['musicxml']['sha256'])[:16]}"
+                    ),
+                    "role": "baseline",
+                    "label": "Legacy model score",
+                    "created_at": pointer["generated_at"],
+                    "options": {
+                        "clef_policy": "preserve",
+                        "target_key_fifths": None,
+                    },
+                    "musicxml": pointer["musicxml"],
+                    "alignment": pointer["alignment"],
+                    "postprocess": None,
+                    "needs_review": False,
+                }
+            ]
+            baseline = records[0]
+        selected_id = pointer.get(
+            "selected_variant_id",
+            records[0].get("variant_id"),
+        )
+        baseline_musicxml_path = (
+            directory / Path(str(baseline["musicxml"]["path"]))
+        ).resolve()
+        baseline_alignment_path = (
+            directory / Path(str(baseline["alignment"]["path"]))
+        ).resolve()
+        baseline_musicxml = self._artifact(
+            session_id,
+            baseline_musicxml_path,
+            source_horizon_sample=int(pointer["commit_sample"]),
+        )
+        baseline_alignment = self._artifact(
+            session_id,
+            baseline_alignment_path,
+            source_horizon_sample=int(pointer["commit_sample"]),
+        )
+        variants: list[ScoreVariant] = []
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            musicxml = self._artifact(
+                session_id,
+                directory / Path(str(record["musicxml"]["path"])),
+                source_horizon_sample=int(pointer["commit_sample"]),
+            )
+            alignment = self._artifact(
+                session_id,
+                directory / Path(str(record["alignment"]["path"])),
+                source_horizon_sample=int(pointer["commit_sample"]),
+            )
+            options = record.get("options")
+            if not isinstance(options, dict):
+                raise ValueError("score variant options are invalid")
+            postprocess = record.get("postprocess")
+            key_state = (
+                postprocess.get("key_signature", {})
+                if isinstance(postprocess, dict)
+                else {}
+            )
+            target_fifths = options.get("target_key_fifths")
+            source_fifths = key_state.get("source_fifths")
+            alternative_fifths = key_state.get("alternative_fifths")
+            variants.append(
+                ScoreVariant(
+                    workspace_id=LOCAL_WORKSPACE_ID,
+                    session_id=session_id,
+                    score_variant_id=str(record["variant_id"]),
+                    role=ScoreVariantRole(str(record["role"])),
+                    label=str(record["label"]),
+                    baseline_musicxml_artifact_id=(
+                        baseline_musicxml.artifact_id
+                    ),
+                    baseline_alignment_artifact_id=(
+                        baseline_alignment.artifact_id
+                    ),
+                    musicxml_artifact_id=musicxml.artifact_id,
+                    alignment_artifact_id=alignment.artifact_id,
+                    source_horizon_sample=int(pointer["commit_sample"]),
+                    clef_policy=ScoreClefPolicy(
+                        str(options["clef_policy"])
+                    ),
+                    target_key_fifths=(
+                        int(target_fifths)
+                        if isinstance(target_fifths, int)
+                        else None
+                    ),
+                    key_fifths=(
+                        int(target_fifths)
+                        if isinstance(target_fifths, int)
+                        else int(source_fifths)
+                        if isinstance(source_fifths, int)
+                        else None
+                    ),
+                    available_enharmonic_fifths=(
+                        int(alternative_fifths)
+                        if target_fifths is None
+                        and isinstance(alternative_fifths, int)
+                        else None
+                    ),
+                    available_enharmonic_label=(
+                        str(key_state["alternative_label"])
+                        if target_fifths is None
+                        and isinstance(
+                            key_state.get("alternative_label"),
+                            str,
+                        )
+                        else None
+                    ),
+                    selected=record.get("variant_id") == selected_id,
+                    needs_review=bool(record.get("needs_review", False)),
+                    created_at=_parse_time(
+                        record["created_at"],
+                        field="score_variant.created_at",
+                    ),
                 )
-        return artifacts
+            )
+        return ScoreVariantPage(
+            workspace_id=LOCAL_WORKSPACE_ID,
+            session_id=session_id,
+            items=tuple(variants),
+        )
 
     def list_artifacts(
         self,

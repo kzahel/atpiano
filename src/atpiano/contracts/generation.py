@@ -183,6 +183,22 @@ def build_openapi_document() -> dict[str, Any]:
                 "responses": _response("Job", status="202"),
             }
         },
+        (
+            "/api/v1/workspaces/{workspace_id}/sessions/{session_id}"
+            "/score-variants"
+        ): {
+            "get": {
+                "operationId": "listScoreVariants",
+                "parameters": [workspace_id, session_id],
+                "responses": _response("ScoreVariantPage"),
+            },
+            "post": {
+                "operationId": "createScoreVariant",
+                "parameters": [workspace_id, session_id],
+                "requestBody": _request("ScoreVariantRequest"),
+                "responses": _response("ScoreVariant", status="201"),
+            },
+        },
         "/api/v1/jobs/{job_id}": {
             "get": {
                 "operationId": "getJob",

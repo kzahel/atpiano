@@ -57,6 +57,12 @@ describe("shared application", () => {
     expect(screen.getByRole("heading", { name: "Detected keys" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Committed score" })).toBeTruthy();
     expect(
+      await screen.findByRole("button", {
+        name: "Enharmonic key · Six sharps",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByLabelText("Engraving")).toBeTruthy();
+    expect(
       (await screen.findByRole(
         "button",
         { name: "Play recorded audio" },

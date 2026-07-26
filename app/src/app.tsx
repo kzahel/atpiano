@@ -33,6 +33,7 @@ import type {
   Artifact,
   EventPage,
   Job,
+  ScoreVariant,
   Session,
 } from "./runtime/atpiano-runtime.js";
 import { useRuntime } from "./runtime/runtime-context.js";
@@ -229,11 +230,43 @@ export function App() {
       }),
     enabled: workspace !== undefined && selectedSessionId !== null,
   });
-  const scoreArtifact = artifacts.data?.items.find(
+  const fallbackScoreArtifact = artifacts.data?.items.find(
     (artifact) => artifact.kind === "musicxml",
   );
-  const scoreAlignmentArtifact = artifacts.data?.items.find(
+  const fallbackScoreAlignmentArtifact = artifacts.data?.items.find(
     (artifact) => artifact.kind === "score-alignment",
+  );
+  const scoreVariants = useQuery({
+    queryKey: ["score-variants", workspace?.workspace_id, selectedSessionId],
+    queryFn: ({ signal }) =>
+      runtime.listScoreVariants(
+        workspace!.workspace_id,
+        selectedSessionId!,
+        {
+          requestId: requestId("score-variants"),
+          signal,
+        },
+      ),
+    enabled:
+      workspace !== undefined &&
+      selectedSessionId !== null &&
+      fallbackScoreArtifact !== undefined,
+  });
+  const selectedScoreVariant = scoreVariants.data?.items.find(
+    (variant) => variant.selected,
+  );
+  const scoreArtifact = artifacts.data?.items.find(
+    (artifact) =>
+      artifact.artifact_id === selectedScoreVariant?.musicxml_artifact_id,
+  ) ?? fallbackScoreArtifact;
+  const scoreAlignmentArtifact = artifacts.data?.items.find(
+    (artifact) =>
+      artifact.artifact_id === selectedScoreVariant?.alignment_artifact_id,
+  ) ?? fallbackScoreAlignmentArtifact;
+  const baselineScoreArtifact = artifacts.data?.items.find(
+    (artifact) =>
+      artifact.artifact_id ===
+        selectedScoreVariant?.baseline_musicxml_artifact_id,
   );
   const audioArtifacts = useMemo(
     () => {
@@ -581,6 +614,87 @@ export function App() {
       setNotice(error instanceof Error ? error.message : String(error));
     },
   });
+
+  const scoreVariantMutation = useMutation({
+    mutationFn: async (variant: {
+      readonly baselineMusicXmlArtifactId: string;
+      readonly baselineAlignmentArtifactId: string;
+      readonly clefPolicy: "preserve" | "automatic";
+      readonly targetKeyFifths: number | null;
+    }) => {
+      const target = selectedSession.data;
+      if (!target) throw new Error("No score session is selected.");
+      return runtime.createScoreVariant(
+        {
+          schema_version: "atpiano.contract.v1",
+          workspace_id: target.workspace_id,
+          session_id: target.session_id,
+          baseline_musicxml_artifact_id:
+            variant.baselineMusicXmlArtifactId,
+          baseline_alignment_artifact_id:
+            variant.baselineAlignmentArtifactId,
+          clef_policy: variant.clefPolicy,
+          target_key_fifths: variant.targetKeyFifths,
+          request_id: requestId("score-variant"),
+        },
+        { requestId: requestId("score-variant-create") },
+      );
+    },
+    onSuccess: async (variant) => {
+      setNotice(`Selected ${variant.label}.`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["artifacts"] }),
+        queryClient.invalidateQueries({ queryKey: ["score-variants"] }),
+      ]);
+    },
+    onError: (error) => {
+      setNotice(error instanceof Error ? error.message : String(error));
+    },
+  });
+
+  const selectScoreVariant = useCallback(
+    (variant: ScoreVariant) => {
+      scoreVariantMutation.mutate({
+        baselineMusicXmlArtifactId:
+          variant.baseline_musicxml_artifact_id,
+        baselineAlignmentArtifactId:
+          variant.baseline_alignment_artifact_id,
+        clefPolicy: variant.clef_policy,
+        targetKeyFifths: variant.target_key_fifths,
+      });
+    },
+    [scoreVariantMutation],
+  );
+
+  const createEnharmonicVariant = useCallback(() => {
+    if (
+      !selectedScoreVariant ||
+      selectedScoreVariant.available_enharmonic_fifths === null
+    ) {
+      return;
+    }
+    scoreVariantMutation.mutate({
+      baselineMusicXmlArtifactId:
+        selectedScoreVariant.baseline_musicxml_artifact_id,
+      baselineAlignmentArtifactId:
+        selectedScoreVariant.baseline_alignment_artifact_id,
+      clefPolicy: "automatic",
+      targetKeyFifths:
+        selectedScoreVariant.available_enharmonic_fifths,
+    });
+  }, [scoreVariantMutation, selectedScoreVariant]);
+
+  const createAutomaticVariant = useCallback(() => {
+    if (!selectedScoreVariant) return;
+    scoreVariantMutation.mutate({
+      baselineMusicXmlArtifactId:
+        selectedScoreVariant.baseline_musicxml_artifact_id,
+      baselineAlignmentArtifactId:
+        selectedScoreVariant.baseline_alignment_artifact_id,
+      clefPolicy: "automatic",
+      targetKeyFifths: null,
+    });
+  }, [scoreVariantMutation, selectedScoreVariant]);
 
   const generateScore = useCallback(async () => {
     const target = selectedSession.data;
@@ -1023,6 +1137,9 @@ export function App() {
               scoreAlignment={scoreAlignment.data}
               scoreAlignmentError={scoreAlignment.error}
               scoreHorizonSample={scoreArtifact?.source_horizon_sample}
+              scoreVariants={scoreVariants.data?.items ?? []}
+              selectedScoreVariant={selectedScoreVariant}
+              scoreVariantBusy={scoreVariantMutation.isPending}
               audioSources={audioPlayback.data ?? []}
               audioUnavailableReason={
                 selected.status === "active"
@@ -1034,6 +1151,14 @@ export function App() {
               onInspect={setInspectionSample}
               onGenerateScore={() => void generateScore()}
               onOpenScoreReader={openScoreReader}
+              onSelectScoreVariant={selectScoreVariant}
+              onCreateAutomaticVariant={createAutomaticVariant}
+              onCreateEnharmonicVariant={createEnharmonicVariant}
+              onDownloadBaseline={
+                baselineScoreArtifact
+                  ? () => void downloadArtifact(baselineScoreArtifact)
+                  : undefined
+              }
             />
 
             <ArtifactPanel

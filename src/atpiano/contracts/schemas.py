@@ -141,6 +141,17 @@ class JobKind(str, Enum):
     UPLOAD = "upload"
 
 
+class ScoreClefPolicy(str, Enum):
+    PRESERVE = "preserve"
+    AUTOMATIC = "automatic"
+
+
+class ScoreVariantRole(str, Enum):
+    BASELINE = "baseline"
+    AUTOMATIC = "automatic"
+    ENHARMONIC = "enharmonic"
+
+
 class ErrorCode(str, Enum):
     INVALID_REQUEST = "invalid-request"
     INCOMPATIBLE_VERSION = "incompatible-version"
@@ -325,6 +336,32 @@ class ScoreSnapshot(VersionedContractModel):
     created_at: AwareDatetime
 
 
+class ScoreVariant(VersionedContractModel):
+    workspace_id: OpaqueId
+    session_id: OpaqueId
+    score_variant_id: OpaqueId
+    role: ScoreVariantRole
+    label: Annotated[str, StringConstraints(min_length=1, max_length=300)]
+    baseline_musicxml_artifact_id: OpaqueId
+    baseline_alignment_artifact_id: OpaqueId
+    musicxml_artifact_id: OpaqueId
+    alignment_artifact_id: OpaqueId
+    source_horizon_sample: SampleIndex
+    clef_policy: ScoreClefPolicy
+    target_key_fifths: Annotated[int, Field(ge=-7, le=7)] | None = None
+    key_fifths: Annotated[int, Field(ge=-7, le=7)] | None = None
+    available_enharmonic_fifths: (
+        Annotated[int, Field(ge=-7, le=7)] | None
+    ) = None
+    available_enharmonic_label: Annotated[
+        str,
+        StringConstraints(min_length=1, max_length=300),
+    ] | None = None
+    selected: bool
+    needs_review: bool
+    created_at: AwareDatetime
+
+
 ErrorDetail = str | int | float | bool | None
 
 
@@ -427,6 +464,16 @@ class ScoreJobStart(VersionedContractModel):
     request_id: OpaqueId
 
 
+class ScoreVariantRequest(VersionedContractModel):
+    workspace_id: OpaqueId
+    session_id: OpaqueId
+    baseline_musicxml_artifact_id: OpaqueId
+    baseline_alignment_artifact_id: OpaqueId
+    clef_policy: ScoreClefPolicy = ScoreClefPolicy.AUTOMATIC
+    target_key_fifths: Annotated[int, Field(ge=-7, le=7)] | None = None
+    request_id: OpaqueId
+
+
 class DeleteSessionRequest(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
@@ -478,6 +525,12 @@ class ArtifactPage(VersionedContractModel):
     next_cursor: Cursor | None = None
 
 
+class ScoreVariantPage(VersionedContractModel):
+    workspace_id: OpaqueId
+    session_id: OpaqueId
+    items: tuple[ScoreVariant, ...]
+
+
 class ErrorResponse(VersionedContractModel):
     error: AtpianoError
 
@@ -497,6 +550,7 @@ def contract_models() -> tuple[type[BaseModel], ...]:
         Provenance,
         Artifact,
         ScoreSnapshot,
+        ScoreVariant,
         AtpianoError,
         Job,
         RuntimeCapabilities,
@@ -505,6 +559,7 @@ def contract_models() -> tuple[type[BaseModel], ...]:
         CaptureStop,
         ReplayStart,
         ScoreJobStart,
+        ScoreVariantRequest,
         DeleteSessionRequest,
         DeleteSessionResult,
         ArtifactAccess,
@@ -512,6 +567,7 @@ def contract_models() -> tuple[type[BaseModel], ...]:
         SessionPage,
         EventPage,
         ArtifactPage,
+        ScoreVariantPage,
         ErrorResponse,
     )
 
