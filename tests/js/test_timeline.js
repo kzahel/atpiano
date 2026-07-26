@@ -128,6 +128,31 @@ assert.deepEqual(
   [60, 67]
 );
 
+assert.deepEqual(
+  timeline.noteDisplayInterval(
+    { onset_sample: 100, offset_sample: null },
+    500,
+    700
+  ),
+  { onsetSample: 100, offsetSample: 500, open: true }
+);
+assert.deepEqual(
+  timeline.noteDisplayInterval(
+    { onset_sample: 600, offset_sample: null },
+    500,
+    700
+  ),
+  { onsetSample: 600, offsetSample: 700, open: true }
+);
+assert.deepEqual(
+  timeline.noteDisplayInterval(
+    { onset_sample: 100, offset_sample: 800 },
+    500,
+    700
+  ),
+  { onsetSample: 100, offsetSample: 800, open: false }
+);
+
 const geometry = timeline.noteGeometry(
   { onset_sample: 100, offset_sample: 200, pitch: 60 },
   100,

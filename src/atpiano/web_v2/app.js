@@ -404,9 +404,18 @@ function drawTimeline() {
       event.pitch >= PITCH_MIN &&
       event.pitch <= PITCH_MAX
   );
+  const commitSample = Number(state.session?.horizons?.commit_sample || 0);
+  const audioHeadSample = Number(
+    state.session?.horizons?.audio_head_sample || 0
+  );
   for (const event of notes) {
-    const geometry = TIMELINE.noteGeometry(
+    const interval = TIMELINE.noteDisplayInterval(
       event,
+      commitSample,
+      audioHeadSample
+    );
+    const geometry = TIMELINE.noteGeometry(
+      { ...event, offset_sample: interval.offsetSample },
       sampleRate,
       range.startS,
       range.spanS,
@@ -419,6 +428,45 @@ function drawTimeline() {
     context.fillStyle = provisional ? "rgba(255, 189, 106, .30)" : "#73e1c1";
     context.strokeStyle = provisional ? "#ffbd6a" : "#99f0d7";
     context.lineWidth = provisional ? 1 : 0.5;
+    if (interval.open) {
+      const stubWidth = Math.max(
+        3,
+        Math.min(geometry.width, (0.18 / range.spanS) * plotWidth)
+      );
+      context.fillRect(
+        PITCH_GUTTER_WIDTH + geometry.x,
+        geometry.y + 0.5,
+        stubWidth,
+        geometry.height
+      );
+      context.strokeRect(
+        PITCH_GUTTER_WIDTH + geometry.x + 0.5,
+        geometry.y + 1,
+        stubWidth,
+        Math.max(1, geometry.height - 1)
+      );
+      const tailStart = Math.max(0, geometry.x + stubWidth);
+      const tailEnd = Math.min(plotWidth, geometry.x + geometry.width);
+      if (tailEnd > tailStart) {
+        context.strokeStyle = provisional
+          ? "rgba(255, 189, 106, .30)"
+          : "rgba(115, 225, 193, .30)";
+        context.lineWidth = 1;
+        context.setLineDash([3, 4]);
+        context.beginPath();
+        context.moveTo(
+          PITCH_GUTTER_WIDTH + tailStart,
+          geometry.y + geometry.height / 2
+        );
+        context.lineTo(
+          PITCH_GUTTER_WIDTH + tailEnd,
+          geometry.y + geometry.height / 2
+        );
+        context.stroke();
+        context.setLineDash([]);
+      }
+      continue;
+    }
     context.fillRect(
       PITCH_GUTTER_WIDTH + geometry.x,
       geometry.y + 0.5,
@@ -431,6 +479,17 @@ function drawTimeline() {
       geometry.width,
       Math.max(1, geometry.height - 1)
     );
+    if (geometry.x + geometry.width > plotWidth) {
+      const edgeX = PITCH_GUTTER_WIDTH + plotWidth - 1;
+      const middleY = geometry.y + geometry.height / 2;
+      context.strokeStyle = provisional ? "#ffbd6a" : "#99f0d7";
+      context.lineWidth = 1;
+      context.beginPath();
+      context.moveTo(edgeX - 4, geometry.y + 1);
+      context.lineTo(edgeX, middleY);
+      context.lineTo(edgeX - 4, geometry.y + geometry.height - 1);
+      context.stroke();
+    }
   }
 
   context.fillStyle = "#101512";
@@ -456,7 +515,6 @@ function drawTimeline() {
     context.fillRect(x, y, Math.max(2, endX - x), 11);
   }
 
-  const commitSample = Number(state.session?.horizons?.commit_sample || 0);
   const commitS = commitSample / sampleRate;
   if (commitS >= range.startS && commitS <= range.endS) {
     const x =

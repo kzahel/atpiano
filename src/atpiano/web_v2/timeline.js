@@ -165,6 +165,27 @@
     };
   }
 
+  function noteDisplayInterval(event, commitSample, audioHeadSample) {
+    const onsetSample = Number(event.onset_sample);
+    const offsetSample = event.offset_sample;
+    if (Number.isInteger(offsetSample)) {
+      return {
+        onsetSample,
+        offsetSample: Math.max(onsetSample, offsetSample),
+        open: false,
+      };
+    }
+    const boundary =
+      onsetSample <= Number(commitSample)
+        ? Number(commitSample)
+        : Number(audioHeadSample);
+    return {
+      onsetSample,
+      offsetSample: Math.max(onsetSample, boundary || onsetSample),
+      open: true,
+    };
+  }
+
   function noteGeometry(
     event,
     sampleRate,
@@ -197,6 +218,7 @@
     keyboardSnapshot,
     materialize,
     midiName,
+    noteDisplayInterval,
     visibleWindow,
     viewportQueryKey,
     noteGeometry,
