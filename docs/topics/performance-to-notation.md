@@ -184,7 +184,7 @@ barline ownership, and a monotonic `H_engrave`.
 ### Responsive score reader direction
 
 [`020-responsive-score-reader.md`](../tactical/020-responsive-score-reader.md)
-owns the planned dedicated reading view. It keeps the inline score as a
+owns the implemented dedicated reading view. It keeps the inline score as a
 workspace preview and opens one exact MusicXML artifact in a phone-, tablet-,
 and desktop-responsive reader with manual page turning and optional native
 fullscreen.
@@ -197,12 +197,13 @@ to a MusicXML measure ordinal, never only to a page number. A newer committed
 snapshot must not silently replace the pinned score while the performer is
 reading it.
 
-The current generated score supplies basic MusicXML scaling but no forced
-system or page breaks, so it is suitable for a first responsive reflow
-implementation. Imported scores with explicit layout directives require
-separate evidence. Responsive presentation should first exercise OSMD's page
-and custom-page formats; a renderer comparison is justified only if OSMD
-cannot supply stable pagination and measure anchoring.
+The shared OSMD adapter uses page and custom-page formats, honors explicit
+MusicXML system/page breaks, and derives page anchors from OSMD's graphical
+score model. Verified XML bytes reflow into one phone screen, one portrait
+page, or a readable two-page spread without changing the artifact identity.
+The first real-browser matrix passes; physical piano viewing, notched-device
+safe areas, and a representative Bluetooth keyboard pedal remain subjective
+profile-tuning checks.
 
 ### Two-phase paid oracle
 

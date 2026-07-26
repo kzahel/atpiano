@@ -2,11 +2,10 @@
 
 Topic: performance-to-notation
 
-Status: planned on 2026-07-26; implementation has not started. Implement after
-the score renderer work in
-[`018-score-playback-alignment.md`](018-score-playback-alignment.md) settles
-so both features share one retained OpenSheetMusicDisplay instance and reflow
-path.
+Status: implemented on 2026-07-26. Automated, migration-regression, and real
+Chrome viewport validation pass. Physical piano viewing and a representative
+Bluetooth page-turn pedal remain subjective acceptance checks rather than
+implementation blockers.
 
 ## Motivation
 
@@ -334,4 +333,69 @@ playback, and exports intact.
 
 ## Execution Record
 
-No implementation commits yet.
+The implementation landed as this bounded series:
+
+1. `60a5528` planned the responsive, exact-artifact reader contract.
+2. `aeb305b` kept known historical MusicXML snapshots addressable without
+   broadening the ordinary artifact list.
+3. `461c0a1` defined responsive layout profiles, durable reader routes,
+   spread clamping, and semantic page-anchor helpers.
+4. `c106c2a` kept the exact historical alignment paired with a retained
+   MusicXML snapshot addressable.
+5. `3eb095f` added the shared OSMD adapter and dedicated reader UI, verified
+   MusicXML fetches, responsive page/screen rendering, page turns, density,
+   native fullscreen, copied-route reloads, newer-score opt-in, and fixture
+   evidence.
+
+The app route pins the opaque MusicXML artifact ID, full SHA-256, source
+horizon, and optional alignment artifact ID. It fetches the known retained
+artifact directly, verifies the bytes before decoding, and does not derive
+reader identity from `score/current.json`. The inline preview and reader now
+share one React-facing OSMD adapter. The adapter uses `GraphicSheet.MusicPages`
+and each page's first graphical measure and source timestamp rather than SVG
+class-name or scroll-percentage inference.
+
+Reader layout measures the stage with `ResizeObserver`. Narrow or short stages
+use a custom screen-shaped OSMD page; taller stages use A4 portrait pages and
+only form a two-page spread when each page clears the readability threshold.
+OSMD receives explicit policies to honor authored MusicXML `new-system` and
+`new-page` directives. The deterministic fixture contains both directives
+plus enough ordinary measures to exercise derived pagination.
+
+Page turns only toggle already rendered page elements. Edge buttons, guarded
+`ArrowLeft`/`ArrowRight` and `PageUp`/`PageDown` keys, and a 54 CSS-pixel
+horizontal swipe threshold share the same clamped turn operation. Density,
+resize, rotation, and fullscreen re-render from the same verified XML bytes,
+then restore the aligned source sample or first visible measure. Toolbar
+controls use safe-area insets, 44 CSS-pixel targets, live page text, focus
+visibility, and reduced-motion overrides.
+
+Validation evidence:
+
+- `uv run atpiano migration-regression` passed at
+  `results/migration-regression/20260726T152349Z/report.json`: 88 Python tests,
+  six legacy JavaScript tests, five app Node tests, 40 Vitest UI tests,
+  generated-contract checks, TypeScript, npm audit, Ruff, JavaScript syntax,
+  and whitespace all passed.
+- `npm run build` produced the Vite production bundle successfully.
+- Real Chrome at 390 × 844 rendered one of seven screen pages without
+  horizontal overflow. A trusted horizontal swipe advanced to page 2.
+- Resizing that live reader to 844 × 390 retained page 2 and its semantic
+  anchor.
+- Real Chrome at a 1440 × 913 content viewport rendered pages 1–2 of four as
+  a readable two-page spread with distinct paper sheets. Changing density
+  while positioned on the last spread retained the page containing the same
+  source/measure anchor.
+- A trusted Chrome click entered native fullscreen and the control changed to
+  **Exit fullscreen**. Automated rejection coverage confirms the CSS
+  viewport-filling reader remains usable when native fullscreen is absent.
+- UI tests cover direct-link reload, full-checksum rejection, Browser Back,
+  explicit newer-score switching, focused-control key guards, edge and
+  keyboard turns, swipe turns, density persistence, and workspace recovery.
+
+Remaining subjective review is deliberately explicit: sight-read a
+representative generated score at the piano on target phone/tablet hardware,
+exercise an actual Bluetooth pedal that emits the supported keys, and inspect
+safe-area behavior on a notched device. Those checks may tune thresholds or
+default density; they do not change the exact-artifact, semantic-anchor, or
+manual-turn contracts implemented here.

@@ -30,4 +30,4 @@ execution record; continuing status and direction belong in the relevant
 | [`017-python-application-core.md`](017-python-application-core.md) | Planned | Phase 4 framework-independent Python services, thin local adapters, compact ordinary recording, bounded debug retention, and R4 parity gate |
 | [`018-score-playback-alignment.md`](018-score-playback-alignment.md) | Complete | Source-event-to-score alignment artifacts, synchronized OSMD playback cursor, and piano-roll playhead |
 | [`019-linux-development-validation.md`](019-linux-development-validation.md) | Complete | Fresh-clone x86_64 Linux gates, real model paths, platform-neutral fixes, dependency footprint, and same-process scheduling evidence |
-| [`020-responsive-score-reader.md`](020-responsive-score-reader.md) | Planned | Exact-snapshot responsive score reader with phone, tablet, desktop, page-turn, and fullscreen layouts |
+| [`020-responsive-score-reader.md`](020-responsive-score-reader.md) | Implemented | Exact-snapshot responsive score reader with phone, tablet, desktop, page-turn, and fullscreen layouts |
