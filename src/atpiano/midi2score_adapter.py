@@ -42,6 +42,7 @@ def main() -> int:
     import torch
     from config import MyModelConfig
     from models.roformer import Roformer
+    from music21 import defaults, metadata
     from utils import quantize_path
 
     started = time.perf_counter()
@@ -61,6 +62,9 @@ def main() -> int:
         kv_cache=True,
         verbose=False,
     )
+    score.metadata = metadata.Metadata()
+    score.metadata.title = "Performance"
+    defaults.author = ""
     output_path = args.output_musicxml.resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     score.write("musicxml", fp=str(output_path))
