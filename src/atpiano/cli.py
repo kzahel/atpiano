@@ -185,6 +185,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Transkun execution device (default: cpu)",
     )
     corrected_workbench_parser.add_argument(
+        "--commit-threads",
+        type=int,
+        default=2,
+        help="maximum Transkun CPU threads (default: 2)",
+    )
+    corrected_workbench_parser.add_argument(
         "--score-runtime",
         type=Path,
         default=Path("results/midi2score-runtime"),
@@ -238,6 +244,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--commit-device",
         default="cpu",
         help="Transkun execution device (default: cpu)",
+    )
+    shared_app_parser.add_argument(
+        "--commit-threads",
+        type=int,
+        default=2,
+        help="maximum Transkun CPU threads (default: 2)",
     )
     shared_app_parser.add_argument(
         "--score-runtime",
@@ -373,6 +385,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             port=args.port,
             open_browser=not args.no_open,
             commit_device=args.commit_device,
+            commit_threads=args.commit_threads,
             minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
             replay_manifest=args.replay,
             replay_repeat=args.repeat,
@@ -389,6 +402,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             port=args.port,
             open_browser=not args.no_open,
             commit_device=args.commit_device,
+            commit_threads=args.commit_threads,
             minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
             replay_manifest=args.replay,
             replay_repeat=args.repeat,

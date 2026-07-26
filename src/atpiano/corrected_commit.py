@@ -61,7 +61,12 @@ class CommitModel(Protocol):
 class TranskunCommitModel:
     """Pinned Transkun 2.0.1 adapter with no file or subprocess boundary."""
 
-    def __init__(self, *, device: str = "cpu") -> None:
+    def __init__(
+        self,
+        *,
+        device: str = "cpu",
+        thread_limit: int | None = None,
+    ) -> None:
         try:
             import moduleconf
             import torch
@@ -70,6 +75,14 @@ class TranskunCommitModel:
             raise RuntimeError(
                 "Transkun is unavailable; run `uv sync --extra corrected`"
             ) from error
+        if thread_limit is not None:
+            if thread_limit <= 0:
+                raise ValueError("Transkun thread limit must be positive")
+            torch.set_num_threads(thread_limit)
+            try:
+                torch.set_num_interop_threads(1)
+            except RuntimeError:
+                pass
 
         package_root = Path(transkun.__file__).resolve().parent
         self.checkpoint_path = package_root / "pretrained" / "2.0.pt"
@@ -92,6 +105,7 @@ class TranskunCommitModel:
         self._torch = torch
         self._model = model
         self.device = device
+        self.thread_limit = thread_limit
         self.sample_rate_hz = int(model.fs)
         self.load_s = (
             time.perf_counter_ns() - load_started_ns
@@ -169,6 +183,7 @@ class TranskunCommitModel:
             "version": version("transkun"),
             "adapter": "atpiano-transkun-trailing-v1",
             "device": self.device,
+            "thread_limit": self.thread_limit,
             "sample_rate_hz": self.sample_rate_hz,
             "checkpoint": str(self.checkpoint_path),
             "checkpoint_sha256": self.checkpoint_sha256,
@@ -762,6 +777,7 @@ class CorrectedCommitLane:
                 "minimum_context_frames": self.minimum_context_frames,
                 "onset_match_frames": self.onset_match_frames,
                 "decode_count": self._decode_index,
+                "next_decode_head": self._next_decode_head,
                 "degraded_mode": self.hop_frames > self.base_hop_frames,
                 "degraded_reason": self._degraded_reason,
                 "degraded_transition_count": self._degraded_transition_count,

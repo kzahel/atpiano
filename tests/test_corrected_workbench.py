@@ -190,6 +190,7 @@ def test_corrected_workbench_is_separate_loopback_app(tmp_path: Path) -> None:
         preview_model_factory=_FakePreviewModel,
         commit_model_factory=_FakeCommitModel,
         minimum_free_bytes=0,
+        isolate_models=False,
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -273,10 +274,12 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
     assert v2.repeat == 3
     assert v2.silence_seconds == 1.5
     assert v2.no_wait is True
+    assert v2.commit_threads == 2
     assert v3.command == "workbench-v3"
     assert v3.port == 8102
     assert v3.repeat == 2
     assert v3.workspace == Path("results/workbench-v3")
+    assert v3.commit_threads == 2
 
 
 def test_corrected_workbench_can_serve_the_shared_app_shell(
@@ -296,6 +299,7 @@ def test_corrected_workbench_can_serve_the_shared_app_shell(
         preview_model_factory=_FakePreviewModel,
         commit_model_factory=_FakeCommitModel,
         minimum_free_bytes=0,
+        isolate_models=False,
         web_root=web_root,
         application_mode="shared-react-v3",
     )
@@ -377,6 +381,7 @@ def test_corrected_workbench_generates_committed_score_in_background(
         preview_model_factory=_FakePreviewModel,
         commit_model_factory=_FakeCommitModel,
         minimum_free_bytes=0,
+        isolate_models=False,
         score_runtime=tmp_path / "runtime",
         score_runner=_fake_score_runner,
     )
@@ -428,6 +433,7 @@ def test_microphone_websocket_uses_corrected_session_and_exports(
         preview_model_factory=_FakePreviewModel,
         commit_model_factory=_FakeCommitModel,
         minimum_free_bytes=0,
+        isolate_models=False,
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -555,6 +561,7 @@ def test_microphone_acknowledges_pcm_while_commit_lane_is_blocked(
         preview_model_factory=_FakePreviewModel,
         commit_model_factory=_BlockingCommitModel,
         minimum_free_bytes=0,
+        isolate_models=False,
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -659,6 +666,7 @@ def test_server_driven_replay_uses_same_review_and_export_surface(
         preview_model_factory=_FakePreviewModel,
         commit_model_factory=_FakeCommitModel,
         minimum_free_bytes=0,
+        isolate_models=False,
         replay_manifest=fixture_directory / "input.json",
         replay_repeat=2,
         replay_realtime=False,

@@ -14,6 +14,7 @@ import uuid
 import webbrowser
 from collections.abc import Callable
 from datetime import datetime, timezone
+from functools import partial
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -60,6 +61,7 @@ from atpiano.corrected_export import (
 from atpiano.corrected_pipeline import CorrectedSessionPipeline
 from atpiano.corrected_preview import CorrectedPreviewLane
 from atpiano.live import LiveWindowModel, parse_pcm_block
+from atpiano.model_worker import CommitModelWorker, PreviewModelWorker
 from atpiano.score_snapshot import (
     SCORE_SNAPSHOT_SCHEMA,
     ScoreRunner,
@@ -103,10 +105,17 @@ def _default_preview_model() -> LiveWindowModel:
     return BasicPitchLiveModel()
 
 
-def _default_commit_model(*, device: str) -> CommitModel:
+def _default_commit_model(
+    *,
+    device: str,
+    thread_limit: int | None = None,
+) -> CommitModel:
     from atpiano.corrected_commit import TranskunCommitModel
 
-    return TranskunCommitModel(device=device)
+    return TranskunCommitModel(
+        device=device,
+        thread_limit=thread_limit,
+    )
 
 
 class CorrectedWorkbenchServer(ThreadingHTTPServer):
@@ -128,6 +137,8 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         score_runner: ScoreRunner | None = None,
         web_root: Path = WEB_ROOT,
         application_mode: str = "corrected-workbench-v2",
+        isolate_models: bool = True,
+        commit_threads: int | None = 2,
     ) -> None:
         if minimum_free_bytes < 0:
             raise ValueError("minimum free bytes cannot be negative")
@@ -135,6 +146,8 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             raise ValueError("replay repetition count must be positive")
         if replay_silence_s < 0:
             raise ValueError("replay silence cannot be negative")
+        if commit_threads is not None and commit_threads <= 0:
+            raise ValueError("commit worker thread limit must be positive")
         self.workspace_directory = workspace_directory.resolve()
         self.workspace_directory.mkdir(parents=True, exist_ok=True)
         self.session_store = LocalSessionStore(self.workspace_directory)
@@ -149,6 +162,8 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self.score_runner = score_runner
         self.web_root = web_root.resolve()
         self.application_mode = application_mode
+        self.isolate_models = isolate_models
+        self.commit_threads = commit_threads
         self.state_lock = threading.Lock()
         self.model_lock = threading.Lock()
         self.score_lock = threading.Lock()
@@ -212,10 +227,46 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
     def get_models(self) -> tuple[LiveWindowModel, CommitModel]:
         with self.model_lock:
             if self._preview_model is None:
-                self._preview_model = self.preview_model_factory()
+                self._preview_model = (
+                    PreviewModelWorker(self.preview_model_factory)
+                    if self.isolate_models
+                    else self.preview_model_factory()
+                )
             if self._commit_model is None:
-                self._commit_model = self.commit_model_factory()
+                self._commit_model = (
+                    CommitModelWorker(
+                        self.commit_model_factory,
+                        thread_limit=self.commit_threads,
+                    )
+                    if self.isolate_models
+                    else self.commit_model_factory()
+                )
             return self._preview_model, self._commit_model
+
+    def model_worker_status(self) -> list[dict[str, Any]]:
+        with self.model_lock:
+            models = (self._preview_model, self._commit_model)
+        result: list[dict[str, Any]] = []
+        for model in models:
+            status = getattr(model, "status", None)
+            if status is not None:
+                result.append(status())
+        return result
+
+    def server_close(self) -> None:
+        with self.state_lock:
+            pipeline = self._active_pipeline
+        if pipeline is not None and not pipeline.wait(0):
+            pipeline.abort(RuntimeError("local server stopped during capture"))
+        with self.model_lock:
+            models = (self._preview_model, self._commit_model)
+            self._preview_model = None
+            self._commit_model = None
+        for model in models:
+            close = getattr(model, "close", None)
+            if close is not None:
+                close()
+        super().server_close()
 
     def claim_session(self, *, source: str) -> tuple[str, Path]:
         with self.state_lock:
@@ -351,6 +402,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                 "recovery": "bounded indexed sequence query",
             },
             "pipeline": pipeline.status() if pipeline is not None else None,
+            "workers": self.model_worker_status(),
             "duration_s": (audio_frames / sample_rate_hz if sample_rate_hz else 0.0),
             "exports_ready": bool(
                 directory is not None and (directory / "exports" / "manifest.json").is_file()
@@ -1533,6 +1585,8 @@ def create_corrected_workbench_server(
     preview_model_factory: PreviewModelFactory = _default_preview_model,
     commit_model_factory: CommitModelFactory | None = None,
     commit_device: str = "cpu",
+    commit_threads: int | None = 2,
+    isolate_models: bool = True,
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
     replay_manifest: Path | None = None,
     replay_repeat: int = 1,
@@ -1543,12 +1597,18 @@ def create_corrected_workbench_server(
     web_root: Path = WEB_ROOT,
     application_mode: str = "corrected-workbench-v2",
 ) -> CorrectedWorkbenchServer:
-    factory = commit_model_factory or (lambda: _default_commit_model(device=commit_device))
+    factory = commit_model_factory or partial(
+        _default_commit_model,
+        device=commit_device,
+        thread_limit=commit_threads,
+    )
     return CorrectedWorkbenchServer(
         workspace_directory,
         port=port,
         preview_model_factory=preview_model_factory,
         commit_model_factory=factory,
+        commit_threads=commit_threads,
+        isolate_models=isolate_models,
         minimum_free_bytes=minimum_free_bytes,
         replay_manifest=replay_manifest,
         replay_repeat=replay_repeat,
@@ -1567,6 +1627,7 @@ def serve_corrected_workbench(
     port: int = 8001,
     open_browser: bool = True,
     commit_device: str = "cpu",
+    commit_threads: int | None = 2,
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
     replay_manifest: Path | None = None,
     replay_repeat: int = 1,
@@ -1581,6 +1642,7 @@ def serve_corrected_workbench(
         workspace_directory,
         port=port,
         commit_device=commit_device,
+        commit_threads=commit_threads,
         minimum_free_bytes=minimum_free_bytes,
         replay_manifest=replay_manifest,
         replay_repeat=replay_repeat,
@@ -1612,6 +1674,7 @@ def serve_shared_application(
     port: int = 8002,
     open_browser: bool = True,
     commit_device: str = "cpu",
+    commit_threads: int | None = 2,
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
     replay_manifest: Path | None = None,
     replay_repeat: int = 1,
@@ -1631,6 +1694,7 @@ def serve_shared_application(
         port=port,
         open_browser=open_browser,
         commit_device=commit_device,
+        commit_threads=commit_threads,
         minimum_free_bytes=minimum_free_bytes,
         replay_manifest=replay_manifest,
         replay_repeat=replay_repeat,

@@ -445,6 +445,7 @@ class CorrectedPreviewLane:
                 "left_guard_s": self.left_guard_s,
                 "right_guard_s": self.right_guard_s,
                 "processed": self._window_index,
+                "next_start_s": self._next_window_start_s,
             },
             "retention": {
                 "native_window_limit": self.native_retention_windows,
