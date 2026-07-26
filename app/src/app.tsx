@@ -355,6 +355,39 @@ export function App() {
     selectedSessionId,
   ]);
 
+  useEffect(() => {
+    if (
+      !scoreJobQuery.error ||
+      scoreJob === null ||
+      (scoreJob.status !== "pending" && scoreJob.status !== "running")
+    ) {
+      return;
+    }
+    const message = scoreJobQuery.error instanceof Error
+      ? scoreJobQuery.error.message
+      : String(scoreJobQuery.error);
+    setScoreJob({
+      ...scoreJob,
+      status: "failed",
+      completed_at: new Date().toISOString(),
+      error: {
+        schema_version: "atpiano.contract.v1",
+        error_id: `error:${scoreJob.job_id}:poll`,
+        code: "internal",
+        message,
+        retryable: true,
+        workspace_id: scoreJob.workspace_id,
+        session_id: scoreJob.session_id,
+        capture_id: null,
+        job_id: scoreJob.job_id,
+      },
+    });
+    setAutoScoringSessionId((sessionId) =>
+      sessionId === scoreJob.session_id ? null : sessionId,
+    );
+    setNotice(message);
+  }, [scoreJob, scoreJobQuery.error]);
+
   useEffect(() => setEventPage(null), [selectedSessionId]);
 
   useEffect(() => {

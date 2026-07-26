@@ -161,6 +161,49 @@ describe("shared application", () => {
     expect(screen.getByRole("heading", { name: "Piano roll" })).toBeTruthy();
   });
 
+  it("leaves rendering state when score-job polling fails", async () => {
+    const user = userEvent.setup();
+    const fixture = createFixtureRuntime();
+    const runtime = new Proxy(fixture, {
+      get(target, property) {
+        if (property === "startScoreJob") {
+          return async (
+            ...args: Parameters<AtpianoRuntime["startScoreJob"]>
+          ) => {
+            const job = await target.startScoreJob(...args);
+            return {
+              ...job,
+              status: "running" as const,
+              completed_at: null,
+              artifact_ids: [],
+              error: null,
+            };
+          };
+        }
+        if (property === "getJob") {
+          return async () => {
+            throw new Error("Score job status unavailable");
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) satisfies AtpianoRuntime;
+    renderApp(runtime);
+    expect(await screen.findByRole("heading", { name: "Morning progression" }))
+      .toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Refresh score" }));
+
+    expect(await screen.findByText("Score job status unavailable")).toBeTruthy();
+    expect(
+      screen.getByText("Score rendering failed. Your performance is still safe."),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Refresh score" }),
+    ).not.toHaveProperty("disabled", true);
+  });
+
   it("subscribes through the live audio head before the session snapshot advances", async () => {
     const fixture = createFixtureRuntime();
     let subscribedThrough = 0;
