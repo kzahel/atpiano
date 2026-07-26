@@ -24,6 +24,7 @@ from atpiano.corrected_workbench import (
 )
 from atpiano.fixture import generate_fixture
 from atpiano.live import LiveModelOutput, PcmBlock, pack_pcm_block
+from atpiano.util import sha256_file, write_json
 
 
 class _FakePreviewModel:
@@ -66,18 +67,66 @@ class _FakeCommitModel:
 
 def _fake_score_runner(
     input_midi: Path,
+    input_notes: Path,
     output_musicxml: Path,
+    output_alignment: Path,
     runtime_directory: Path,
 ) -> dict[str, Any]:
     assert input_midi.is_file()
+    source = json.loads(input_notes.read_text(encoding="utf-8"))
     output_musicxml.write_text(
         """<score-partwise version="4.0">
 <part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
-<part id="P1"><measure number="1"><note><pitch><step>C</step>
+<part id="P1"><measure number="1"><note id="test-note-1"><pitch><step>C</step>
 <octave>4</octave></pitch><duration>1</duration></note></measure></part>
 </score-partwise>
 """,
         encoding="utf-8",
+    )
+    note = source["notes"][0]
+    segment = {
+        "musicxml_note_id": "test-note-1",
+        "part": 1,
+        "pitch": note["pitch"],
+        "score_time_quarters": {"numerator": 0, "denominator": 1},
+        "score_duration_quarters": {"numerator": 1, "denominator": 1},
+        "tie": None,
+    }
+    write_json(
+        output_alignment,
+        {
+            "schema_version": "atpiano.score-alignment.v1",
+            "session_id": source["session_id"],
+            "sample_rate_hz": source["sample_rate_hz"],
+            "source": {
+                "schema_version": source["schema_version"],
+                "sha256": sha256_file(input_notes),
+            },
+            "musicxml": {"sha256": sha256_file(output_musicxml)},
+            "summary": {
+                "source_notes": 1,
+                "mapped_source_notes": 1,
+                "unmatched_source_notes": 0,
+                "musicxml_note_elements": 1,
+                "inserted_score_note_elements": 0,
+            },
+            "rows": [
+                {
+                    "source_index": 0,
+                    "event_id": note["event_id"],
+                    "pitch": note["pitch"],
+                    "onset_sample": note["onset_sample"],
+                    "offset_sample": note["offset_sample"],
+                    "status": "mapped",
+                    "score_time_quarters": {
+                        "numerator": 0,
+                        "denominator": 1,
+                    },
+                    "segments": [segment],
+                }
+            ],
+            "inserted_score_segments": [],
+        },
     )
     return {
         "schema_version": "test-score-runner.v1",

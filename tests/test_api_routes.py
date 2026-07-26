@@ -16,6 +16,7 @@ from atpiano.corrected import CORRECTED_EVENT_SCHEMA, CorrectedSession
 from atpiano.corrected_export import write_corrected_exports
 from atpiano.corrected_workbench import create_corrected_workbench_server
 from atpiano.live import PcmBlock
+from atpiano.util import sha256_file, write_json
 
 
 def _session(
@@ -73,18 +74,66 @@ def _session(
 
 def _score_runner(
     input_midi: Path,
+    input_notes: Path,
     output_musicxml: Path,
+    output_alignment: Path,
     runtime_directory: Path,
 ) -> dict[str, Any]:
     assert input_midi.is_file()
+    source = json.loads(input_notes.read_text(encoding="utf-8"))
     output_musicxml.write_text(
         """<score-partwise version="4.0">
 <part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
-<part id="P1"><measure number="1"><note><pitch><step>C</step>
+<part id="P1"><measure number="1"><note id="test-note-1"><pitch><step>C</step>
 <octave>4</octave></pitch><duration>1</duration></note></measure></part>
 </score-partwise>
 """,
         encoding="utf-8",
+    )
+    note = source["notes"][0]
+    segment = {
+        "musicxml_note_id": "test-note-1",
+        "part": 1,
+        "pitch": note["pitch"],
+        "score_time_quarters": {"numerator": 0, "denominator": 1},
+        "score_duration_quarters": {"numerator": 1, "denominator": 1},
+        "tie": None,
+    }
+    write_json(
+        output_alignment,
+        {
+            "schema_version": "atpiano.score-alignment.v1",
+            "session_id": source["session_id"],
+            "sample_rate_hz": source["sample_rate_hz"],
+            "source": {
+                "schema_version": source["schema_version"],
+                "sha256": sha256_file(input_notes),
+            },
+            "musicxml": {"sha256": sha256_file(output_musicxml)},
+            "summary": {
+                "source_notes": 1,
+                "mapped_source_notes": 1,
+                "unmatched_source_notes": 0,
+                "musicxml_note_elements": 1,
+                "inserted_score_note_elements": 0,
+            },
+            "rows": [
+                {
+                    "source_index": 0,
+                    "event_id": note["event_id"],
+                    "pitch": note["pitch"],
+                    "onset_sample": note["onset_sample"],
+                    "offset_sample": note["offset_sample"],
+                    "status": "mapped",
+                    "score_time_quarters": {
+                        "numerator": 0,
+                        "denominator": 1,
+                    },
+                    "segments": [segment],
+                }
+            ],
+            "inserted_score_segments": [],
+        },
     )
     return {
         "schema_version": "test-score-runner.v1",
@@ -217,6 +266,11 @@ def test_api_score_job_and_artifacts_remain_targeted_to_history(
             for item in artifacts["items"]
             if item["filename"] == "score.musicxml"
         )
+        alignment = next(
+            item
+            for item in artifacts["items"]
+            if item["kind"] == "score-alignment"
+        )
         access = _get(
             f"{api}/workspaces/local/sessions/{older_id}"
             f"/artifacts/{musicxml['artifact_id']}/access"
@@ -226,6 +280,15 @@ def test_api_score_job_and_artifacts_remain_targeted_to_history(
             timeout=2,
         ) as response:
             body = response.read()
+        alignment_access = _get(
+            f"{api}/workspaces/local/sessions/{older_id}"
+            f"/artifacts/{alignment['artifact_id']}/access"
+        )
+        with urllib.request.urlopen(
+            f"{base_url}{alignment_access['url']}",
+            timeout=2,
+        ) as response:
+            alignment_body = json.load(response)
         legacy_current = _get(f"{base_url}/api/session")
     finally:
         server.shutdown()
@@ -236,6 +299,7 @@ def test_api_score_job_and_artifacts_remain_targeted_to_history(
     assert job["session_id"] == older_id
     assert access["session_id"] == older_id
     assert b"score-partwise" in body
+    assert alignment_body["summary"]["mapped_source_notes"] == 1
     assert legacy_current["session_id"] == newer_id
 
 

@@ -142,6 +142,18 @@ class LocalSessionStore:
         score_pointer = directory / "score" / "current.json"
         if score_pointer.is_file() and self._valid_score_pointer(score_pointer):
             kinds.append(ArtifactKind.MUSICXML)
+            try:
+                pointer = read_json(score_pointer)
+                alignment = (
+                    directory / Path(str(pointer["alignment"]["path"]))
+                ).resolve()
+                if (
+                    alignment.is_relative_to(directory)
+                    and alignment.is_file()
+                ):
+                    kinds.append(ArtifactKind.SCORE_ALIGNMENT)
+            except (KeyError, OSError, TypeError, ValueError):
+                pass
         return tuple(kinds)
 
     @staticmethod
@@ -373,7 +385,7 @@ class LocalSessionStore:
             paths.append(score_pointer)
             try:
                 pointer = read_json(score_pointer)
-                for section in ("midi", "musicxml"):
+                for section in ("midi", "musicxml", "alignment"):
                     relative = Path(str(pointer[section]["path"]))
                     candidate = (directory / relative).resolve()
                     if candidate.is_relative_to(directory) and candidate.is_file():
@@ -401,6 +413,8 @@ class LocalSessionStore:
                 if path.suffix in {".mid", ".midi"}
                 else ArtifactKind.MUSICXML
                 if path.suffix == ".musicxml"
+                else ArtifactKind.SCORE_ALIGNMENT
+                if path.name == "alignment.json"
                 else ArtifactKind.MANIFEST
             )
             relative = path.relative_to(directory).as_posix()

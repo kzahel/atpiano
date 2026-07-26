@@ -198,6 +198,7 @@
           "midi",
           "musicxml",
           "score-input-midi",
+          "score-alignment",
           "manifest",
           "diagnostic"
         ],

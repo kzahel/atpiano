@@ -15,6 +15,12 @@ from typing import Any
 from atpiano.corrected import CORRECTED_SESSION_SCHEMA
 from atpiano.corrected_export import iter_latest_committed_index, write_midi
 from atpiano.notation import summarize_musicxml
+from atpiano.score_alignment import (
+    SCORE_ALIGNMENT_SCHEMA,
+    SCORE_INPUT_NOTES_SCHEMA,
+    score_input_notes_document,
+    validate_score_alignment,
+)
 from atpiano.util import read_json, sha256_file, utc_now, write_json
 
 SCORE_SNAPSHOT_SCHEMA = "atpiano.committed-score-snapshot.v1"
@@ -32,7 +38,7 @@ SCORE_TIMEOUT_S = 180
 MAX_SCORE_NOTE_EXPANSION_RATIO = 4
 MAX_SCORE_NOTE_EXPANSION_ALLOWANCE = 16
 
-ScoreRunner = Callable[[Path, Path, Path], dict[str, Any]]
+ScoreRunner = Callable[[Path, Path, Path, Path, Path], dict[str, Any]]
 
 
 def score_snapshot_is_plausible(manifest: dict[str, Any]) -> bool:
@@ -220,7 +226,9 @@ def setup_score_runtime(runtime_directory: Path) -> dict[str, Any]:
 def run_score_adapter(
     runtime_directory: Path,
     input_midi: Path,
+    input_notes: Path,
     output_musicxml: Path,
+    output_alignment: Path,
 ) -> dict[str, Any]:
     runtime = inspect_score_runtime(runtime_directory)
     if not runtime["available"]:
@@ -239,8 +247,12 @@ def run_score_adapter(
                 str(paths["checkpoint"]),
                 "--input-midi",
                 str(input_midi.resolve()),
+                "--input-notes",
+                str(input_notes.resolve()),
                 "--output-musicxml",
                 str(output_musicxml.resolve()),
+                "--output-alignment",
+                str(output_alignment.resolve()),
             ],
             check=True,
             capture_output=True,
@@ -306,7 +318,17 @@ def generate_score_snapshot(
     snapshot_directory = score_root / "snapshots" / f"{commit_sample:016d}"
     snapshot_directory.mkdir(parents=True, exist_ok=True)
     midi_path = snapshot_directory / "committed.mid"
+    source_notes_path = snapshot_directory / "source-notes.json"
     musicxml_path = snapshot_directory / "score.musicxml"
+    alignment_path = snapshot_directory / "alignment.json"
+    write_json(
+        source_notes_path,
+        score_input_notes_document(
+            session_id=str(session["session_id"]),
+            sample_rate_hz=sample_rate_hz,
+            notes=notes,
+        ),
+    )
     note_count, pedal_count = write_midi(
         midi_path,
         notes,
@@ -315,15 +337,32 @@ def generate_score_snapshot(
     if pedal_count:
         raise RuntimeError("score snapshot unexpectedly included pedal events")
     execute = runner or (
-        lambda input_path, output_path, runtime_path: run_score_adapter(
-            runtime_path,
-            input_path,
-            output_path,
+        lambda input_path, source_path, output_path, alignment_output, runtime_path: (
+            run_score_adapter(
+                runtime_path,
+                input_path,
+                source_path,
+                output_path,
+                alignment_output,
+            )
         )
     )
-    adapter = execute(midi_path, musicxml_path, runtime_directory.resolve())
+    adapter = execute(
+        midi_path,
+        source_notes_path,
+        musicxml_path,
+        alignment_path,
+        runtime_directory.resolve(),
+    )
     summary = summarize_musicxml(musicxml_path.read_bytes())
     _validate_score_output(note_count, summary)
+    alignment_summary = validate_score_alignment(
+        read_json(alignment_path),
+        source_notes_path=source_notes_path,
+        musicxml_path=musicxml_path,
+    )
+    if alignment_summary["source_notes"] != note_count:
+        raise RuntimeError("score alignment source count differs from snapshot")
     manifest = {
         "schema_version": SCORE_SNAPSHOT_SCHEMA,
         "session_id": session["session_id"],
@@ -337,11 +376,23 @@ def generate_score_snapshot(
             "path": str(midi_path.relative_to(session_directory)),
             "sha256": sha256_file(midi_path),
         },
+        "source_notes": {
+            "schema_version": SCORE_INPUT_NOTES_SCHEMA,
+            "path": str(source_notes_path.relative_to(session_directory)),
+            "sha256": sha256_file(source_notes_path),
+        },
         "musicxml": {
             "path": str(musicxml_path.relative_to(session_directory)),
             "sha256": sha256_file(musicxml_path),
             "bytes": musicxml_path.stat().st_size,
             "summary": summary,
+        },
+        "alignment": {
+            "schema_version": SCORE_ALIGNMENT_SCHEMA,
+            "path": str(alignment_path.relative_to(session_directory)),
+            "sha256": sha256_file(alignment_path),
+            "bytes": alignment_path.stat().st_size,
+            "summary": alignment_summary,
         },
         "adapter": adapter,
     }

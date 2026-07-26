@@ -122,6 +122,7 @@ class ArtifactKind(str, Enum):
     MIDI = "midi"
     MUSICXML = "musicxml"
     SCORE_INPUT_MIDI = "score-input-midi"
+    SCORE_ALIGNMENT = "score-alignment"
     MANIFEST = "manifest"
     DIAGNOSTIC = "diagnostic"
 

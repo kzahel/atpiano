@@ -240,7 +240,7 @@ export interface components {
          * ArtifactKind
          * @enum {string}
          */
-        ArtifactKind: "audio" | "event-history" | "midi" | "musicxml" | "score-input-midi" | "manifest" | "diagnostic";
+        ArtifactKind: "audio" | "event-history" | "midi" | "musicxml" | "score-input-midi" | "score-alignment" | "manifest" | "diagnostic";
         /** ArtifactPage */
         ArtifactPage: {
             /** Items */

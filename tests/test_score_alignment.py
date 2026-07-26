@@ -1,0 +1,185 @@
+from __future__ import annotations
+
+import json
+from copy import deepcopy
+from pathlib import Path
+
+import pytest
+
+from atpiano.score_alignment import (
+    score_input_notes_document,
+    validate_score_alignment,
+)
+from atpiano.util import sha256_file, write_json
+
+
+def _source_document() -> dict:
+    return score_input_notes_document(
+        session_id="alignment-test",
+        sample_rate_hz=1_000,
+        notes=[
+            {
+                "event_id": "later-c",
+                "pitch": 60,
+                "onset_sample": 200,
+                "offset_sample": 500,
+                "velocity": 80,
+            },
+            {
+                "event_id": "chord-g",
+                "pitch": 67,
+                "onset_sample": 100,
+                "offset_sample": 700,
+                "velocity": 90,
+            },
+            {
+                "event_id": "chord-e",
+                "pitch": 64,
+                "onset_sample": 100,
+                "offset_sample": 700,
+                "velocity": 90,
+            },
+        ],
+    )
+
+
+def _alignment(source_path: Path, musicxml_path: Path) -> dict:
+    source = json.loads(source_path.read_text(encoding="utf-8"))
+    rows = []
+    identifiers = ["note-e", "note-g", "note-c-a", "note-c-b"]
+    for index, note in enumerate(source["notes"]):
+        segment_ids = (
+            identifiers[index : index + 1]
+            if index < 2
+            else identifiers[2:]
+        )
+        score_time = (
+            {"numerator": 0, "denominator": 1}
+            if index < 2
+            else {"numerator": 1, "denominator": 1}
+        )
+        rows.append(
+            {
+                "source_index": index,
+                "event_id": note["event_id"],
+                "pitch": note["pitch"],
+                "onset_sample": note["onset_sample"],
+                "offset_sample": note["offset_sample"],
+                "status": "mapped",
+                "score_time_quarters": score_time,
+                "segments": [
+                    {
+                        "musicxml_note_id": identifier,
+                        "part": 1,
+                        "pitch": note["pitch"],
+                        "score_time_quarters": {
+                            "numerator": 1 + segment_index,
+                            "denominator": 1,
+                        }
+                        if index == 2
+                        else score_time,
+                        "score_duration_quarters": {
+                            "numerator": 1,
+                            "denominator": 1,
+                        },
+                        "tie": (
+                            ["start", "stop"][segment_index]
+                            if index == 2
+                            else None
+                        ),
+                    }
+                    for segment_index, identifier in enumerate(segment_ids)
+                ],
+            }
+        )
+    return {
+        "schema_version": "atpiano.score-alignment.v1",
+        "session_id": source["session_id"],
+        "sample_rate_hz": source["sample_rate_hz"],
+        "source": {
+            "schema_version": source["schema_version"],
+            "sha256": sha256_file(source_path),
+        },
+        "musicxml": {"sha256": sha256_file(musicxml_path)},
+        "summary": {
+            "source_notes": 3,
+            "mapped_source_notes": 3,
+            "unmatched_source_notes": 0,
+            "musicxml_note_elements": 4,
+            "inserted_score_note_elements": 0,
+        },
+        "rows": rows,
+        "inserted_score_segments": [],
+    }
+
+
+def test_score_alignment_orders_chords_and_preserves_tie_segments(
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "source-notes.json"
+    musicxml_path = tmp_path / "score.musicxml"
+    write_json(source_path, _source_document())
+    musicxml_path.write_text(
+        """<score-partwise version="4.0">
+<part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+<part id="P1"><measure number="1">
+<note id="note-e"><pitch><step>E</step><octave>4</octave></pitch></note>
+<note id="note-g"><chord/><pitch><step>G</step><octave>4</octave></pitch></note>
+<note id="note-c-a"><pitch><step>C</step><octave>4</octave></pitch></note>
+<note id="note-c-b"><pitch><step>C</step><octave>4</octave></pitch></note>
+</measure></part></score-partwise>
+""",
+        encoding="utf-8",
+    )
+    source = _source_document()
+    assert [note["event_id"] for note in source["notes"]] == [
+        "chord-e",
+        "chord-g",
+        "later-c",
+    ]
+
+    summary = validate_score_alignment(
+        _alignment(source_path, musicxml_path),
+        source_notes_path=source_path,
+        musicxml_path=musicxml_path,
+    )
+
+    assert summary == {
+        "source_notes": 3,
+        "mapped_source_notes": 3,
+        "unmatched_source_notes": 0,
+        "musicxml_note_elements": 4,
+        "inserted_score_note_elements": 0,
+    }
+
+
+def test_score_alignment_rejects_nonmonotonic_score_positions(
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "source-notes.json"
+    musicxml_path = tmp_path / "score.musicxml"
+    write_json(source_path, _source_document())
+    musicxml_path.write_text(
+        """<score-partwise version="4.0">
+<part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+<part id="P1"><measure number="1">
+<note id="note-e"><pitch><step>E</step><octave>4</octave></pitch></note>
+<note id="note-g"><pitch><step>G</step><octave>4</octave></pitch></note>
+<note id="note-c-a"><pitch><step>C</step><octave>4</octave></pitch></note>
+<note id="note-c-b"><pitch><step>C</step><octave>4</octave></pitch></note>
+</measure></part></score-partwise>
+""",
+        encoding="utf-8",
+    )
+    alignment = deepcopy(_alignment(source_path, musicxml_path))
+    alignment["rows"][2]["score_time_quarters"] = {
+        "numerator": -1,
+        "denominator": 1,
+    }
+
+    with pytest.raises(ValueError, match="not monotonic"):
+        validate_score_alignment(
+            alignment,
+            source_notes_path=source_path,
+            musicxml_path=musicxml_path,
+        )
