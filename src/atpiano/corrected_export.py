@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import sqlite3
+import subprocess
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
@@ -18,6 +21,7 @@ DEFAULT_QUERY_LIMIT = 1024
 MAX_QUERY_LIMIT = 4096
 MIDI_TICKS_PER_BEAT = 480
 MIDI_TEMPO_US_PER_BEAT = 500_000
+PLAYBACK_BITRATE = "128k"
 
 _LATEST_JOIN = """
     FROM events AS latest
@@ -295,6 +299,7 @@ def write_corrected_exports(session_directory: Path) -> dict[str, Any]:
         iter_latest_committed_index(database_path),
         sample_rate_hz=sample_rate_hz,
     )
+    playback = write_playback_audio(session_directory)
     manifest = {
         "schema_version": CORRECTED_EXPORT_SCHEMA,
         "session_id": session["session_id"],
@@ -317,5 +322,76 @@ def write_corrected_exports(session_directory: Path) -> dict[str, Any]:
             "selection": "latest committed revision per identity",
         },
     }
+    if playback is not None:
+        manifest["playback"] = playback
     write_json(export_directory / "manifest.json", manifest)
     return manifest
+
+
+def write_playback_audio(
+    session_directory: Path,
+    *,
+    ffmpeg_executable: str | None = None,
+) -> dict[str, Any] | None:
+    """Create one seekable MP3 derivative without replacing source WAVs."""
+
+    session_directory = session_directory.resolve()
+    ffmpeg = ffmpeg_executable or shutil.which("ffmpeg")
+    segments = sorted((session_directory / "audio").glob("*.wav"))
+    if ffmpeg is None or not segments:
+        return None
+
+    playback_directory = session_directory / "playback"
+    playback_directory.mkdir(exist_ok=True)
+    concat_path = session_directory / "audio" / ".playback-concat.txt"
+    temporary_path = playback_directory / ".session.mp3"
+    final_path = playback_directory / "session.mp3"
+    concat_path.write_text(
+        "".join(f"file '{segment.name}'\n" for segment in segments),
+        encoding="utf-8",
+    )
+    try:
+        subprocess.run(
+            [
+                ffmpeg,
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-nostdin",
+                "-y",
+                "-f",
+                "concat",
+                "-safe",
+                "1",
+                "-i",
+                str(concat_path),
+                "-map_metadata",
+                "-1",
+                "-codec:a",
+                "libmp3lame",
+                "-b:a",
+                PLAYBACK_BITRATE,
+                "-write_xing",
+                "1",
+                str(temporary_path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        os.replace(temporary_path, final_path)
+    except (OSError, subprocess.CalledProcessError):
+        temporary_path.unlink(missing_ok=True)
+        return None
+    finally:
+        concat_path.unlink(missing_ok=True)
+
+    return {
+        "path": final_path.relative_to(session_directory).as_posix(),
+        "sha256": sha256_file(final_path),
+        "byte_count": final_path.stat().st_size,
+        "media_type": "audio/mpeg",
+        "codec": "mp3",
+        "bitrate": PLAYBACK_BITRATE,
+        "source": "derived from the complete segmented WAV source",
+    }

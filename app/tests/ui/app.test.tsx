@@ -55,6 +55,12 @@ describe("shared application", () => {
     ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Detected keys" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Committed score" })).toBeTruthy();
+    expect(
+      (await screen.findByRole(
+        "button",
+        { name: "Play recorded audio" },
+      )) as HTMLButtonElement,
+    ).not.toHaveProperty("disabled", true);
 
     await user.click(screen.getByText("Piano roll", { selector: "label" }));
 

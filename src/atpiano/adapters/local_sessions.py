@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import mimetypes
 import re
 from datetime import datetime, timezone
@@ -351,8 +352,20 @@ class LocalSessionStore:
     def _artifact_candidates(self, session_id: str) -> list[tuple[Artifact, Path]]:
         directory = self.resolve(session_id)
         session = self.get_session(session_id)
+        audio_horizons: dict[Path, int] = {}
+        audio_index = directory / "audio" / "segments.jsonl"
+        if audio_index.is_file():
+            for line in audio_index.read_text(encoding="utf-8").splitlines():
+                if not line:
+                    continue
+                row = json.loads(line)
+                segment_path = (audio_index.parent / str(row["path"])).resolve()
+                audio_horizons[segment_path] = (
+                    int(row["first_sample"]) + int(row["frame_count"])
+                )
         paths = [
             *sorted((directory / "audio").glob("*.wav")),
+            *sorted((directory / "playback").glob("*.mp3")),
             *sorted((directory / "exports").glob("*")),
         ]
         score_pointer = directory / "score" / "current.json"
@@ -381,7 +394,7 @@ class LocalSessionStore:
             media_type = media_type or "application/octet-stream"
             kind = (
                 ArtifactKind.AUDIO
-                if path.suffix == ".wav"
+                if path.suffix in {".wav", ".mp3"}
                 else ArtifactKind.EVENT_HISTORY
                 if path.suffix == ".jsonl"
                 else ArtifactKind.MIDI
@@ -410,7 +423,10 @@ class LocalSessionStore:
                 filename=path.name,
                 sha256=digest,
                 byte_count=path.stat().st_size,
-                source_horizon_sample=session.source_frame_count,
+                source_horizon_sample=audio_horizons.get(
+                    path,
+                    session.source_frame_count,
+                ),
                 created_at=datetime.fromtimestamp(
                     path.stat().st_mtime,
                     tz=timezone.utc,

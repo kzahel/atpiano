@@ -1,6 +1,11 @@
 import type { Artifact } from "../runtime/atpiano-runtime.js";
 
 function artifactLabel(artifact: Artifact): string {
+  if (artifact.kind === "audio") {
+    return artifact.media_type === "audio/mpeg"
+      ? "Playback audio"
+      : "Lossless source audio";
+  }
   if (artifact.kind === "midi") return "Performance MIDI";
   if (artifact.kind === "musicxml") return "MusicXML score";
   if (artifact.kind === "event-history") return "Event history";

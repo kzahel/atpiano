@@ -4,12 +4,14 @@ import json
 from pathlib import Path
 
 import mido
+import pytest
 
 from atpiano.corrected import CORRECTED_EVENT_SCHEMA, CorrectedSession
 from atpiano.corrected_export import (
     query_history_index,
     query_materialized_index,
     write_corrected_exports,
+    write_playback_audio,
 )
 
 
@@ -121,3 +123,39 @@ def test_exports_preserve_history_and_emit_latest_notes_and_pedals(
     assert [message.type for message in messages].count("note_on") == 1
     assert [message.type for message in messages].count("note_off") == 1
     assert [message.type for message in messages].count("control_change") == 2
+
+
+def test_playback_mp3_is_derived_without_replacing_wav_segments(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = tmp_path / "session"
+    audio = session / "audio"
+    audio.mkdir(parents=True)
+    first = audio / "000000.wav"
+    second = audio / "000001.wav"
+    first.write_bytes(b"first-lossless-segment")
+    second.write_bytes(b"second-lossless-segment")
+    observed: dict[str, object] = {}
+
+    def fake_run(arguments: list[str], **_options: object) -> None:
+        observed["arguments"] = arguments
+        observed["concat"] = Path(arguments[arguments.index("-i") + 1]).read_text(
+            encoding="utf-8"
+        )
+        Path(arguments[-1]).write_bytes(b"derived-mp3")
+
+    monkeypatch.setattr("atpiano.corrected_export.subprocess.run", fake_run)
+
+    result = write_playback_audio(
+        session,
+        ffmpeg_executable="/fake/ffmpeg",
+    )
+
+    assert result is not None
+    assert result["media_type"] == "audio/mpeg"
+    assert result["path"] == "playback/session.mp3"
+    assert observed["concat"] == "file '000000.wav'\nfile '000001.wav'\n"
+    assert first.read_bytes() == b"first-lossless-segment"
+    assert second.read_bytes() == b"second-lossless-segment"
+    assert (session / "playback" / "session.mp3").read_bytes() == b"derived-mp3"

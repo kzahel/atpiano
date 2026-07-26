@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-query";
 
 import { ArtifactPanel } from "./components/artifact-panel.js";
+import type { AudioPlaybackSource } from "./components/audio-playback.js";
 import { CaptureDeck } from "./components/capture-deck.js";
 import { PerformanceViews } from "./components/performance-views.js";
 import { SessionRail } from "./components/session-rail.js";
@@ -207,6 +208,57 @@ export function App() {
   const scoreArtifact = artifacts.data?.items.find(
     (artifact) => artifact.kind === "musicxml",
   );
+  const audioArtifacts = useMemo(
+    () => {
+      const available = (artifacts.data?.items ?? []).filter(
+        (artifact) => artifact.kind === "audio",
+      );
+      const compressed = available.filter(
+        (artifact) => artifact.media_type === "audio/mpeg",
+      );
+      return (compressed.length ? compressed : available)
+        .sort(
+          (left, right) =>
+            left.source_horizon_sample - right.source_horizon_sample ||
+            left.filename.localeCompare(right.filename),
+        );
+    },
+    [artifacts.data?.items],
+  );
+  const audioPlayback = useQuery({
+    queryKey: [
+      "audio-playback",
+      selectedSessionId,
+      ...audioArtifacts.map((artifact) => artifact.artifact_id),
+    ],
+    queryFn: async ({ signal }): Promise<AudioPlaybackSource[]> => {
+      const startSamples = audioArtifacts.map(
+        (_, index) =>
+          index === 0 ? 0 : audioArtifacts[index - 1]!.source_horizon_sample,
+      );
+      return Promise.all(
+        audioArtifacts.map(async (artifact, index) => {
+          const access = await runtime.getArtifactAccess(
+            artifact.workspace_id,
+            artifact.session_id,
+            artifact.artifact_id,
+            { requestId: requestId("audio-access"), signal },
+          );
+          const source = {
+            artifactId: artifact.artifact_id,
+            url: new URL(access.url, window.location.origin).href,
+            startSample: startSamples[index]!,
+            endSample: artifact.source_horizon_sample,
+          };
+          return source;
+        }),
+      );
+    },
+    enabled:
+      audioArtifacts.length > 0 &&
+      selectedSession.data?.status !== "active",
+    staleTime: Infinity,
+  });
   const scoreXml = useQuery({
     queryKey: ["artifact-content", scoreArtifact?.artifact_id],
     queryFn: async ({ signal }) => {
@@ -705,6 +757,14 @@ export function App() {
               scoreXml={scoreXml.data}
               scoreXmlError={scoreXml.error}
               scoreHorizonSample={scoreArtifact?.source_horizon_sample}
+              audioSources={audioPlayback.data ?? []}
+              audioUnavailableReason={
+                selected.status === "active"
+                  ? "Playback available after Stop"
+                  : audioPlayback.isLoading
+                    ? "Loading recorded audio"
+                    : "Recorded audio unavailable"
+              }
               onInspect={setInspectionSample}
               onGenerateScore={() => void generateScore()}
             />

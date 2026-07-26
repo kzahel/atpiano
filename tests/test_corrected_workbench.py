@@ -135,6 +135,15 @@ def test_corrected_workbench_is_separate_loopback_app(tmp_path: Path) -> None:
             page = response.read()
         assert b"Corrected notes" in page
         assert b"Committed score" in page
+        range_request = urllib.request.Request(
+            f"{base_url}/",
+            headers={"Range": "bytes=5-14"},
+        )
+        with urllib.request.urlopen(range_request, timeout=2) as response:
+            assert response.status == 206
+            assert response.headers["Accept-Ranges"] == "bytes"
+            assert response.headers["Content-Range"] == f"bytes 5-14/{len(page)}"
+            assert response.read() == page[5:15]
         html = page.decode("utf-8")
         app = (Path(__file__).parents[1] / "src/atpiano/web_v2/app.js").read_text(encoding="utf-8")
         styles = (Path(__file__).parents[1] / "src/atpiano/web_v2/styles.css").read_text(

@@ -146,6 +146,8 @@ function artifact(target: Session, kind: Artifact["kind"], filename: string): Ar
     media_type:
       kind === "musicxml"
         ? "application/vnd.recordare.musicxml+xml"
+        : kind === "audio"
+          ? "audio/wav"
         : kind === "midi"
           ? "audio/midi"
           : "application/json",
@@ -177,6 +179,7 @@ function record(
 ): FixtureSessionData {
   const artifacts = withArtifacts
     ? [
+        artifact(value, "audio", "000000.wav"),
         artifact(value, "midi", "session.mid"),
         artifact(value, "event-history", "session.jsonl"),
         artifact(value, "musicxml", "score.musicxml"),

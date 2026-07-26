@@ -135,6 +135,41 @@ def test_local_artifacts_are_explicit_and_path_safe(tmp_path: Path) -> None:
         store.get_artifact_with_path(session_id, "artifact:missing")
 
 
+def test_audio_artifacts_expose_each_segment_source_horizon(tmp_path: Path) -> None:
+    session_id = "20260726T100000-aaaaaaaaaaaa"
+    session = CorrectedSession(
+        tmp_path / session_id,
+        session_id=session_id,
+        sample_rate_hz=8_000,
+        source="replay",
+        realtime=False,
+        segment_s=0.001,
+        minimum_free_bytes=0,
+    )
+    session.accept_block(
+        PcmBlock(
+            sequence=0,
+            first_sample=0,
+            frame_count=12,
+            sample_rate_hz=8_000,
+            page_sent_ms=0.0,
+            worklet_time_s=0.0015,
+            pcm_s16le=b"\0\0" * 12,
+        ),
+        received_ns=1,
+    )
+    session.finalize()
+
+    audio = [
+        artifact
+        for artifact in LocalSessionStore(tmp_path).list_artifacts(session_id).items
+        if artifact.kind.value == "audio"
+    ]
+
+    assert [artifact.filename for artifact in audio] == ["000000.wav", "000001.wav"]
+    assert [artifact.source_horizon_sample for artifact in audio] == [8, 12]
+
+
 def test_local_catalog_hides_pathological_score_snapshot(tmp_path: Path) -> None:
     session_id = "20260726T100000-aaaaaaaaaaaa"
     session = _session(tmp_path, session_id)

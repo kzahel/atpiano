@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  AudioPlayback,
+  type AudioPlaybackSource,
+} from "./audio-playback.js";
 import { formatClock, noteName } from "../lib/format.js";
 import { noteDisplaySegments } from "../lib/note-display.js";
 import { pedalDisplaySegment } from "../lib/pedal-display.js";
@@ -79,25 +83,6 @@ function PianoKeyboard({
           />
         ))}
       </div>
-      <label className="inspection-control">
-        <span>
-          Inspect source time
-          <output>{formatClock(sample, session.sample_rate_hz)}</output>
-        </span>
-        <input
-          type="range"
-          min={0}
-          max={session.source_frame_count}
-          value={sample}
-          step={Math.max(1, Math.round(session.sample_rate_hz / 100))}
-          onChange={(event) => onInspect(Number(event.currentTarget.value))}
-        />
-      </label>
-      {inspectionSample !== null && (
-        <button className="text-button" type="button" onClick={() => onInspect(null)}>
-          Follow latest attack
-        </button>
-      )}
     </section>
   );
 }
@@ -372,6 +357,8 @@ export function PerformanceViews({
   scoreXml,
   scoreXmlError,
   scoreHorizonSample,
+  audioSources,
+  audioUnavailableReason,
   onInspect,
   onGenerateScore,
 }: {
@@ -387,11 +374,21 @@ export function PerformanceViews({
   readonly scoreXml: string | undefined;
   readonly scoreXmlError: Error | null;
   readonly scoreHorizonSample: number | undefined;
+  readonly audioSources: readonly AudioPlaybackSource[];
+  readonly audioUnavailableReason: string;
   readonly onInspect: (sample: number | null) => void;
   readonly onGenerateScore: () => void;
 }) {
   return (
     <div className="performance-views">
+      <AudioPlayback
+        sources={audioSources}
+        totalSamples={session.source_frame_count}
+        sampleRateHz={session.sample_rate_hz}
+        inspectionSample={inspectionSample}
+        onInspect={onInspect}
+        unavailableReason={audioUnavailableReason}
+      />
       {showScore && (
         <ScorePreview
           session={session}

@@ -679,18 +679,50 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         size = path.stat().st_size
+        start = 0
+        end = max(0, size - 1)
+        status = HTTPStatus.OK
+        range_header = self.headers.get("Range")
+        if range_header:
+            match = re.fullmatch(r"bytes=(\d*)-(\d*)", range_header.strip())
+            if match is None or size == 0:
+                self.send_response(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.end_headers()
+                return
+            first, last = match.groups()
+            if not first:
+                suffix_length = int(last)
+                start = max(0, size - suffix_length)
+            else:
+                start = int(first)
+            if last and first:
+                end = min(end, int(last))
+            if start >= size or end < start:
+                self.send_response(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.end_headers()
+                return
+            status = HTTPStatus.PARTIAL_CONTENT
+        content_length = end - start + 1
         content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-        self.send_response(HTTPStatus.OK)
+        self.send_response(status)
         self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(size))
+        self.send_header("Content-Length", str(content_length))
+        self.send_header("Accept-Ranges", "bytes")
+        if status == HTTPStatus.PARTIAL_CONTENT:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         if not include_body:
             return
         with path.open("rb") as handle:
-            while block := handle.read(64 * 1024):
+            handle.seek(start)
+            remaining = content_length
+            while remaining and (block := handle.read(min(64 * 1024, remaining))):
                 if not self._write_body(block):
                     return
+                remaining -= len(block)
 
     def _current_export(self, request_path: str) -> Path | None:
         name = EXPORT_ASSETS.get(request_path)
