@@ -96,13 +96,36 @@ def test_segmented_event_store_materializes_latest_revision(tmp_path: Path) -> N
             _event("later", 1, 12, lifecycle="committed", lane="commit"),
         ]
     )
+    concurrent = store.append(
+        [
+            _event(
+                "keep",
+                2,
+                2,
+                lifecycle="committed",
+                lane="commit",
+                offset_sample=9,
+            )
+        ]
+    )
 
-    assert [event["sequence"] for event in first + second] == [1, 2, 3, 4, 5]
-    assert [event["event_id"] for event in store.query_materialized(0, 10)] == ["keep"]
+    assert [event["sequence"] for event in first + second + concurrent] == [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+    ]
+    assert concurrent[0]["lane_revision"] == 2
+    assert concurrent[0]["revision"] == 3
+    visible = store.query_materialized(0, 10)
+    assert [event["event_id"] for event in visible] == ["keep"]
+    assert visible[0]["offset_sample"] == 9
     assert [event["event_id"] for event in store.query_materialized(10, 20)] == [
         "later"
     ]
-    assert [event["sequence"] for event in store.query_since(2)] == [3, 4, 5]
+    assert [event["sequence"] for event in store.query_since(2)] == [3, 4, 5, 6]
     assert (tmp_path / "events" / "000000.jsonl").is_file()
     assert (tmp_path / "events" / "000001.jsonl").is_file()
     store.close()

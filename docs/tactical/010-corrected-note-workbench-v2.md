@@ -403,3 +403,72 @@ it holds the PCM ring to 40 source seconds, native evidence to three configured
 windows, and active identities to one configured working-set identity. Actual
 RSS, CPU, 48 kHz disk growth, and model-duty evidence still require the later
 representative longevity run.
+
+### Trailing commit Lane B
+
+Implemented the optional Transkun 2.0.1 CPU lane on 2026-07-26. Ordinary v1
+installation remains free of PyTorch; `uv sync --extra corrected` installs the
+pinned v2 dependency. The adapter reads PCM directly, resamples at the model
+boundary, invokes Transkun's native overlapping `transcribe` path, and records:
+
+```text
+checkpoint SHA-256:
+50a80010effc2a59ffcd068a95cd2b29bd7f23a27a3515bc3ccd209c89a3d44c
+configuration SHA-256:
+d3d989214eb148230ee5df476d994dcde6af595904d3f968f1221d2e3bea5ac6
+Transkun: 2.0.1
+Torch: 2.13.0
+device: CPU
+```
+
+The session centrally serializes revision numbers because Lane A and Lane B
+can propose a revision for the same stable identity concurrently. Each row
+also retains the lane's proposed revision. A focused failure test first
+reproduced the uniqueness collision; the indexed store now assigns one global
+monotonic revision before appending evidence.
+
+The musical fixture used seven ordinary trailing decodes plus one bounded Stop
+tail flush:
+
+```text
+buffer / hop / right guard: 28 s / 4 s / 4 s
+decode count: 8
+inference total / mean / max: 22.455 s / 2.807 s / 3.105 s
+compute duty over 42 s of source: 0.535
+matched preview identities: 132
+preview retractions: 56
+commit-only additions: 32
+open tails later closed: 26
+pending-tail high water / final: 5 / 0
+latest committed notes: 147
+latest committed pedal intervals: 12
+final H_commit lag: 0 s after bounded tail flush
+```
+
+An independent full-file Transkun decode over the same finite fixture produced
+148 notes and 11 pedal intervals. Treating that result as the stitching
+control, not acoustic truth:
+
+```text
+rolling/control onset F1 at 50 ms: 0.936
+rolling/control onset F1 at 25 ms: 0.936
+rolling/control note-with-offset F1: 0.827
+matched pedal onsets: 10 / 11
+matched pedal offsets within 200 ms: 9 / 10
+```
+
+Against the generated reference MIDI, the rolling commit has perfect onset
+precision and 0.742 recall, for 0.852 F1 at both 25 and 50 ms. The full-file
+control is 0.855 F1. The renderer is synthetic, so this comparison tests
+aligned behavior rather than target-piano quality.
+
+The ignored rolling evidence is `results/workbench-v2-corrected-2/`. The first
+attempt correctly failed on the cross-lane revision collision and remains
+ignored diagnostic evidence. Fake-lane tests separately require stable
+identity reuse, unmatched-preview retraction, commit-only addition, sustain
+pedal, open-tail closure, final flush, and monotonic commit bands.
+
+One limitation is explicit: the full-file control's predicted soft-pedal
+interval lasts almost the entire take, longer than Lane B's 28-second outer
+context. The rolling lane closes it when left context expires. This is a
+bounded-context disagreement, not hidden parity.

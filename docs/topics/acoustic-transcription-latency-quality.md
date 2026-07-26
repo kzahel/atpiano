@@ -344,6 +344,24 @@ This confirms the two-lane split the implemented architecture already has: a
 small causal model for the rolling live feed, and Transkun on Stop for the
 final backfill and any score conversion.
 
+### Trailing Transkun commit implementation
+
+Tactical
+[`010-corrected-note-workbench-v2.md`](../tactical/010-corrected-note-workbench-v2.md)
+implements Transkun 2.0.1 as a continuous trailing commit lane rather than a
+growing full-session rerun. On the 42-second aligned musical fixture, a
+28-second outer buffer, 4-second hop, and 4-second right guard require eight
+CPU decodes totaling 22.455 seconds. The rolling result contains 147 committed
+notes versus 148 from a separate full-file control.
+
+Rolling-to-control onset F1 is 0.936 at both 25 and 50 ms, and
+note-with-offset F1 is 0.827. The rolling result matches 10 of 11 control pedal
+onsets; nine matched offsets fall within 200 ms. This reproduces the earlier
+93–96 percent simulated onset-parity range with the real stitching and
+persistence path. It does not establish acoustic accuracy, and a control
+soft-pedal interval longer than the outer buffer remains an explicit bounded
+context disagreement.
+
 ## Accepted Pipeline Boundary
 
 ```text

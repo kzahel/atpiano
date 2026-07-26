@@ -63,8 +63,22 @@ The bounded v2 Lane A has since landed behind `replay-v2 --preview`. On the
 aligned 42-second musical fixture it processed 161 real Basic Pitch windows,
 retained the configured final 32 after 129 evictions, and ended with `H_prov`
 1.101 seconds behind capture. Its 181 latest non-retracted identities score
-0.860 onset F1 at 50 ms and 0.850 at 25 ms. This is provisional evidence:
-Lane B and the separate browser application are still in progress.
+0.860 onset F1 at 50 ms and 0.850 at 25 ms. This is the provisional baseline
+against which Lane B corrections are measured.
+
+The trailing Transkun Lane B now lands behind `replay-v2 --commit` with the
+optional `corrected` dependency extra. On the aligned musical fixture, eight
+bounded CPU decodes consume 22.455 seconds total over 42 seconds of source.
+The lane corrects 132 preview identities in place, retracts 56, adds 32,
+closes 26 open boundary tails, preserves 12 pedal intervals, and flushes
+`H_commit` to the source head at Stop.
+
+Compared with one independent full-file Transkun control, the final 147-note
+rolling transcript scores 0.936 onset F1 at 25 and 50 ms and 0.827
+note-with-offset F1. Ten of 11 control pedal onsets match and nine of those
+offsets are within 200 ms. This passes the planned onset-parity band but is not
+exact equivalence. The separate browser app, review, export, and representative
+longevity runs remain in progress.
 
 ## Desired Experience
 

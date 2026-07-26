@@ -102,6 +102,8 @@ def runtime_provenance() -> dict[str, Any]:
                 "numpy",
                 "partitura",
                 "pretty_midi",
+                "torch",
+                "transkun",
             )
         },
     }

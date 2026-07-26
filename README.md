@@ -167,6 +167,17 @@ uv run atpiano replay-v2 \
   --no-wait --preview
 ```
 
+Install the optional corrected-note lane and add `--commit` to replace settled
+preview spans with trailing Transkun output:
+
+```text
+uv sync --extra corrected
+uv run atpiano replay-v2 \
+  ../atpiano-artifacts/musical-loop-input/input.json \
+  ../atpiano-artifacts/workbench-v2-corrected-check \
+  --no-wait --preview --commit
+```
+
 Run the untouched Basic Pitch file path:
 
 ```text

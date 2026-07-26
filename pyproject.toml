@@ -20,6 +20,9 @@ dependencies = [
 capture = [
   "sounddevice>=0.5,<1",
 ]
+corrected = [
+  "transkun==2.0.1",
+]
 
 [project.scripts]
 atpiano = "atpiano.cli:main"

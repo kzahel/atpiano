@@ -91,6 +91,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="run the bounded Basic Pitch provisional lane",
     )
+    corrected_replay_parser.add_argument(
+        "--commit",
+        action="store_true",
+        help="run the trailing Transkun corrected-note lane",
+    )
+    corrected_replay_parser.add_argument(
+        "--commit-device",
+        default="cpu",
+        help="Transkun execution device (default: cpu)",
+    )
     review_parser = subparsers.add_parser(
         "review",
         help="serve a local browser reviewer for a completed run",
@@ -257,6 +267,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             from atpiano.live import BasicPitchLiveModel
 
             preview_model = BasicPitchLiveModel()
+        commit_model = None
+        if args.commit:
+            from atpiano.corrected_commit import TranskunCommitModel
+
+            commit_model = TranskunCommitModel(device=args.commit_device)
         manifest = run_corrected_replay(
             args.input_manifest,
             args.session_directory,
@@ -265,6 +280,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             block_samples=args.block_samples,
             minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
             preview_model=preview_model,
+            commit_model=commit_model,
         )
         print(args.session_directory / "session.json")
         print(f"source frames: {manifest['source_frame_count']}")

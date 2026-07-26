@@ -279,9 +279,36 @@ class SegmentedEventStore:
         assigned: list[dict[str, Any]] = []
         by_segment: dict[int, list[dict[str, Any]]] = {}
         with self._lock:
-            for event in events:
+            pending_events = list(events)
+            for event in pending_events:
                 self._validate(event)
+            event_ids = sorted({str(event.get("event_id")) for event in pending_events})
+            latest_revisions: dict[str, int] = {}
+            if event_ids:
+                placeholders = ",".join("?" for _ in event_ids)
+                rows = self._database.execute(
+                    f"""
+                    SELECT event_id, MAX(revision)
+                    FROM events
+                    WHERE event_id IN ({placeholders})
+                    GROUP BY event_id
+                    """,
+                    event_ids,
+                ).fetchall()
+                latest_revisions = {
+                    str(event_id): int(revision)
+                    for event_id, revision in rows
+                }
+            for event in pending_events:
                 row = dict(event)
+                event_id = str(row["event_id"])
+                requested_revision = int(row["revision"])
+                row["lane_revision"] = requested_revision
+                row["revision"] = max(
+                    requested_revision,
+                    latest_revisions.get(event_id, 0) + 1,
+                )
+                latest_revisions[event_id] = row["revision"]
                 row["sequence"] = self.next_sequence
                 self.next_sequence += 1
                 assigned.append(row)
@@ -423,6 +450,7 @@ class CorrectedSession:
         session_id: str,
         sample_rate_hz: int,
         source: str,
+        realtime: bool = True,
         pcm_ring_s: float = DEFAULT_PCM_RING_S,
         segment_s: float = DEFAULT_SEGMENT_S,
         minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
@@ -439,6 +467,8 @@ class CorrectedSession:
         self.session_id = session_id
         self.sample_rate_hz = sample_rate_hz
         self.source = source
+        self.realtime = realtime
+        self.origin_monotonic_ns = time.perf_counter_ns()
         self.started_at = utc_now()
         self.next_sequence = 0
         self.closed = False
@@ -473,6 +503,7 @@ class CorrectedSession:
             "session_id": self.session_id,
             "status": status,
             "source": self.source,
+            "realtime": self.realtime,
             "sample_rate_hz": self.sample_rate_hz,
             "started_at": self.started_at,
             "completed_at": utc_now() if status != "active" else None,
@@ -654,6 +685,7 @@ def run_corrected_replay(
     segment_s: float = DEFAULT_SEGMENT_S,
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
     preview_model: Any | None = None,
+    commit_model: Any | None = None,
 ) -> dict[str, Any]:
     if repeat <= 0:
         raise ValueError("corrected replay repetition count must be positive")
@@ -678,6 +710,7 @@ def run_corrected_replay(
         session_id=session_directory.name,
         sample_rate_hz=sample_rate_hz,
         source="replay",
+        realtime=realtime,
         pcm_ring_s=pcm_ring_s,
         segment_s=segment_s,
         minimum_free_bytes=minimum_free_bytes,
@@ -686,6 +719,10 @@ def run_corrected_replay(
         from atpiano.corrected_preview import CorrectedPreviewLane
 
         session.add_lane(CorrectedPreviewLane(session, model=preview_model))
+    if commit_model is not None:
+        from atpiano.corrected_commit import CorrectedCommitLane
+
+        session.add_lane(CorrectedCommitLane(session, model=commit_model))
     sequence = 0
     session_origin_ns = time.perf_counter_ns()
     try:
