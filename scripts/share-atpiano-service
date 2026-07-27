@@ -38,6 +38,7 @@ log_size="${ATPIANO_SERVICE_LOG_SIZE:-5M}"
 bind_address="${ATPIANO_BIND_ADDRESS:-192.168.1.104}"
 port="${ATPIANO_PORT:-8002}"
 public_origin="${ATPIANO_PUBLIC_ORIGIN:-https://atpiano.graehlarts.com}"
+model_idle_timeout_seconds="${ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS:-600}"
 
 if [[ ! "${log_file_count}" =~ ^[1-9][0-9]*$ ]]; then
   printf 'error: ATPIANO_SERVICE_LOG_COUNT must be a positive integer.\n' >&2
@@ -45,6 +46,10 @@ if [[ ! "${log_file_count}" =~ ^[1-9][0-9]*$ ]]; then
 fi
 if [[ ! "${log_size}" =~ ^[1-9][0-9]*[BKMG]$ ]]; then
   printf 'error: ATPIANO_SERVICE_LOG_SIZE must look like 5M or 500K.\n' >&2
+  exit 64
+fi
+if [[ ! "${model_idle_timeout_seconds}" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)$ ]]; then
+  printf 'error: ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS must be nonnegative.\n' >&2
   exit 64
 fi
 
@@ -113,6 +118,8 @@ render_plist() {
     "${bind_address}" "${generated_plist}"
   /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_PORT -string \
     "${port}" "${generated_plist}"
+  /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS -string \
+    "${model_idle_timeout_seconds}" "${generated_plist}"
   /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_PUBLIC_ORIGIN -string \
     "${public_origin}" "${generated_plist}"
   /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_SERVICE_LOG_COUNT -string \
@@ -162,6 +169,7 @@ print_status() {
   printf 'Listener: %s:%s (%s)\n' \
     "${bind_address}" "${port}" "$([[ -n "${listener}" ]] && printf 'ready' || printf 'not ready')"
   printf 'Public origin: %s\n' "${public_origin}"
+  printf 'Model idle timeout: %s seconds\n' "${model_idle_timeout_seconds}"
   printf 'Logs: %s\n' "${log_directory}"
 }
 
@@ -183,7 +191,7 @@ start_service() {
 
   render_plist
   record_lifecycle \
-    "event=start_requested label=${service_label} repository=${repository_directory} bind=${bind_address} port=${port}"
+    "event=start_requested label=${service_label} repository=${repository_directory} bind=${bind_address} port=${port} model_idle_timeout_seconds=${model_idle_timeout_seconds}"
   if ! /bin/launchctl bootstrap "${service_domain}" "${generated_plist}"; then
     record_lifecycle "event=start_failed label=${service_label}"
     printf 'error: launchd could not bootstrap %s; inspect %s.\n' \

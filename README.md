@@ -141,6 +141,13 @@ installed as a login item, so a reboot leaves it stopped until the explicit
 `start` command is run again. Use `restart`, `logs --follow`, or `stop` for
 the corresponding lifecycle operations.
 
+Capture models remain unloaded until the first microphone or replay session.
+After a session fully settles, warmed model workers remain available for ten
+minutes and then unload. A new capture cancels pending eviction, and the next
+capture after eviction loads fresh workers on demand. Set
+`ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS` when registering the service to change
+the delay; zero retains warmed workers until the service stops.
+
 Both the service and the lower-level `scripts/share-atpiano` foreground
 launcher are intentionally macOS-only and fail with an explicit explanation
 on Linux. The foreground launcher remains useful for direct diagnosis.

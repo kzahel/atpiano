@@ -12,6 +12,7 @@ fi
 bind_address="${ATPIANO_BIND_ADDRESS:-192.168.1.104}"
 port="${ATPIANO_PORT:-8002}"
 public_origin="${ATPIANO_PUBLIC_ORIGIN:-https://atpiano.graehlarts.com}"
+model_idle_timeout_seconds="${ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS:-600}"
 uv_path="${ATPIANO_UV:-$(command -v uv || true)}"
 
 if [[ -z "${uv_path}" || ! -x "${uv_path}" ]]; then
@@ -23,5 +24,6 @@ exec /usr/bin/caffeinate -im "${uv_path}" run atpiano workbench-v3 \
   --bind "${bind_address}" \
   --port "${port}" \
   --public-origin "${public_origin}" \
+  --model-idle-timeout-seconds "${model_idle_timeout_seconds}" \
   --no-open \
   "$@"

@@ -33,6 +33,7 @@ from atpiano.adapters.local_sessions import (
 )
 from atpiano.adapters.local_storage import LocalStorageAdapter
 from atpiano.application import (
+    DEFAULT_MODEL_IDLE_TIMEOUT_S,
     ApplicationNotFoundError,
     ApplicationServices,
     CaptureApplicationService,
@@ -136,6 +137,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         preview_model_factory: PreviewModelFactory = _default_preview_model,
         commit_model_factory: CommitModelFactory,
         minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
+        model_idle_timeout_s: float = DEFAULT_MODEL_IDLE_TIMEOUT_S,
         replay_manifest: Path | None = None,
         replay_repeat: int = 1,
         replay_silence_s: float = 0.0,
@@ -203,6 +205,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self.preview_model_factory = preview_model_factory
         self.commit_model_factory = commit_model_factory
         self.minimum_free_bytes = minimum_free_bytes
+        self.model_idle_timeout_s = model_idle_timeout_s
         score_executor = LocalScoreExecutor(
             score_runtime.resolve(),
             score_runner=score_runner,
@@ -251,6 +254,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             finalizer=storage.finalize_session,
             replay_source=replay_source,
             storage=storage,
+            model_idle_timeout_s=model_idle_timeout_s,
         )
         scores = ScoreApplicationService(
             self.session_store,
@@ -1309,6 +1313,7 @@ def create_corrected_workbench_server(
     correction_mode: str = "auto",
     backend_profile_path: Path | None = None,
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
+    model_idle_timeout_s: float = DEFAULT_MODEL_IDLE_TIMEOUT_S,
     replay_manifest: Path | None = None,
     replay_repeat: int = 1,
     replay_silence_s: float = 0.0,
@@ -1340,6 +1345,7 @@ def create_corrected_workbench_server(
         correction_mode=correction_mode,
         backend_profile_path=backend_profile_path,
         minimum_free_bytes=minimum_free_bytes,
+        model_idle_timeout_s=model_idle_timeout_s,
         replay_manifest=replay_manifest,
         replay_repeat=replay_repeat,
         replay_silence_s=replay_silence_s,
@@ -1368,6 +1374,7 @@ def serve_corrected_workbench(
     correction_mode: str = "auto",
     backend_profile_path: Path | None = None,
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
+    model_idle_timeout_s: float = DEFAULT_MODEL_IDLE_TIMEOUT_S,
     replay_manifest: Path | None = None,
     replay_repeat: int = 1,
     replay_silence_s: float = 0.0,
@@ -1391,6 +1398,7 @@ def serve_corrected_workbench(
         correction_mode=correction_mode,
         backend_profile_path=backend_profile_path,
         minimum_free_bytes=minimum_free_bytes,
+        model_idle_timeout_s=model_idle_timeout_s,
         replay_manifest=replay_manifest,
         replay_repeat=replay_repeat,
         replay_silence_s=replay_silence_s,
@@ -1432,6 +1440,7 @@ def serve_shared_application(
     correction_mode: str = "auto",
     backend_profile_path: Path | None = None,
     minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
+    model_idle_timeout_s: float = DEFAULT_MODEL_IDLE_TIMEOUT_S,
     replay_manifest: Path | None = None,
     replay_repeat: int = 1,
     replay_silence_s: float = 0.0,
@@ -1460,6 +1469,7 @@ def serve_shared_application(
         correction_mode=correction_mode,
         backend_profile_path=backend_profile_path,
         minimum_free_bytes=minimum_free_bytes,
+        model_idle_timeout_s=model_idle_timeout_s,
         replay_manifest=replay_manifest,
         replay_repeat=replay_repeat,
         replay_silence_s=replay_silence_s,

@@ -111,6 +111,13 @@ class LocalModelPool:
                 result.append(status())
         return result
 
+    def loaded(self) -> bool:
+        with self._lock:
+            return (
+                self._preview_model is not None
+                or self._commit_model is not None
+            )
+
     def resolve_correction_mode(
         self,
         commit_model: CommitModel,
@@ -146,7 +153,7 @@ class LocalModelPool:
         )
         return selected.value, reason, profile.profile_id
 
-    def close(self) -> None:
+    def unload(self) -> None:
         with self._lock:
             models = (self._preview_model, self._commit_model)
             self._preview_model = None
@@ -155,6 +162,9 @@ class LocalModelPool:
             close = getattr(model, "close", None)
             if close is not None:
                 close()
+
+    def close(self) -> None:
+        self.unload()
 
     def inject_commit_for_test(self, model: CommitModel) -> None:
         with self._lock:

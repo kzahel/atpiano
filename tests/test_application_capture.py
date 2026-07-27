@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pytest
 
 from atpiano.adapters.local_replay import LocalReplaySource
 from atpiano.adapters.local_sessions import LocalSessionStore
@@ -40,8 +42,11 @@ class _UnavailableModelPool:
     def __init__(self) -> None:
         self.preview_model = _PreviewModel()
         self.closed = False
+        self.is_loaded = False
+        self.unload_count = 0
 
     def preview(self) -> _PreviewModel:
+        self.is_loaded = True
         return self.preview_model
 
     def commit(self) -> Any:
@@ -53,11 +58,75 @@ class _UnavailableModelPool:
     def status(self) -> list[dict[str, Any]]:
         return []
 
+    def loaded(self) -> bool:
+        return self.is_loaded
+
+    def unload(self) -> None:
+        self.is_loaded = False
+        self.unload_count += 1
+
     def resolve_correction_mode(self, *_args: Any, **_kwargs: Any) -> Any:
         raise AssertionError("unavailable correction mode was resolved")
 
     def close(self) -> None:
+        self.unload()
         self.closed = True
+
+
+class _ManualTimer:
+    def __init__(
+        self,
+        delay_s: float,
+        callback: Callable[[], None],
+    ) -> None:
+        self.delay_s = delay_s
+        self.callback = callback
+        self.started = False
+        self.cancelled = False
+
+    def start(self) -> None:
+        self.started = True
+
+    def cancel(self) -> None:
+        self.cancelled = True
+
+    def fire(self) -> None:
+        self.callback()
+
+
+class _ManualTimerFactory:
+    def __init__(self) -> None:
+        self.timers: list[_ManualTimer] = []
+
+    def __call__(
+        self,
+        delay_s: float,
+        callback: Callable[[], None],
+    ) -> _ManualTimer:
+        timer = _ManualTimer(delay_s, callback)
+        self.timers.append(timer)
+        return timer
+
+
+def _stop_empty_capture(service: CaptureApplicationService) -> None:
+    service.stop_microphone(
+        frame_count=0,
+        block_count=0,
+        transport={
+            "sent_frame_count": 0,
+            "sent_block_count": 0,
+            "acknowledged_frame_count": 0,
+            "acknowledged_block_count": 0,
+            "socket_buffered_bytes_at_stop": 0,
+            "socket_buffered_bytes_high_water": 0,
+        },
+    )
+    assert service.wait_for_settlement(timeout=2)
+    for _ in range(100):
+        if service.state()["status"] == "complete":
+            return
+        time.sleep(0.01)
+    raise AssertionError("capture settlement callback did not complete")
 
 
 def test_capture_service_owns_start_pcm_stop_and_settlement_without_http(
@@ -167,3 +236,117 @@ def test_capture_service_replay_uses_same_pipeline_without_http(
         == 2
     )
     service.close()
+
+
+def test_capture_service_unloads_models_after_settled_idle_timeout(
+    tmp_path: Path,
+) -> None:
+    models = _UnavailableModelPool()
+    timers = _ManualTimerFactory()
+    service = CaptureApplicationService(
+        LocalSessionStore(tmp_path),
+        models,
+        minimum_free_bytes=0,
+        free_bytes=lambda: 10_000,
+        finalizer=lambda _session: None,
+        model_idle_timeout_s=30,
+        model_idle_timer_factory=timers,
+    )
+
+    service.start_microphone(
+        sample_rate_hz=8_000,
+        client_metadata={},
+    )
+    assert service.model_pool_status() == {
+        "loaded": True,
+        "idle": False,
+        "idle_timeout_s": 30,
+        "idle_since": None,
+        "eviction_deadline": None,
+        "last_unloaded_at": None,
+    }
+    assert timers.timers == []
+
+    _stop_empty_capture(service)
+    status = service.model_pool_status()
+    assert status["loaded"] is True
+    assert status["idle"] is True
+    assert status["idle_since"] is not None
+    assert status["eviction_deadline"] is not None
+    assert len(timers.timers) == 1
+    assert timers.timers[0].delay_s == 30
+    assert timers.timers[0].started is True
+
+    timers.timers[0].fire()
+    status = service.model_pool_status()
+    assert status["loaded"] is False
+    assert status["idle"] is False
+    assert status["eviction_deadline"] is None
+    assert status["last_unloaded_at"] is not None
+    assert models.unload_count == 1
+    service.close()
+
+
+def test_new_capture_invalidates_stale_model_eviction(
+    tmp_path: Path,
+) -> None:
+    models = _UnavailableModelPool()
+    timers = _ManualTimerFactory()
+    service = CaptureApplicationService(
+        LocalSessionStore(tmp_path),
+        models,
+        minimum_free_bytes=0,
+        free_bytes=lambda: 10_000,
+        finalizer=lambda _session: None,
+        model_idle_timeout_s=30,
+        model_idle_timer_factory=timers,
+    )
+    service.start_microphone(sample_rate_hz=8_000, client_metadata={})
+    _stop_empty_capture(service)
+    stale_timer = timers.timers[0]
+
+    service.start_microphone(sample_rate_hz=8_000, client_metadata={})
+    assert stale_timer.cancelled is True
+    stale_timer.fire()
+    assert service.model_pool_status()["loaded"] is True
+    assert models.unload_count == 0
+
+    service.abort_microphone(RuntimeError("test cleanup"))
+    service.close()
+
+
+def test_zero_model_idle_timeout_keeps_models_loaded(
+    tmp_path: Path,
+) -> None:
+    models = _UnavailableModelPool()
+    timers = _ManualTimerFactory()
+    service = CaptureApplicationService(
+        LocalSessionStore(tmp_path),
+        models,
+        minimum_free_bytes=0,
+        free_bytes=lambda: 10_000,
+        finalizer=lambda _session: None,
+        model_idle_timeout_s=0,
+        model_idle_timer_factory=timers,
+    )
+    service.start_microphone(sample_rate_hz=8_000, client_metadata={})
+    _stop_empty_capture(service)
+
+    status = service.model_pool_status()
+    assert status["loaded"] is True
+    assert status["idle"] is True
+    assert status["eviction_deadline"] is None
+    assert timers.timers == []
+    service.close()
+
+
+def test_negative_model_idle_timeout_is_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="idle timeout"):
+        CaptureApplicationService(
+            LocalSessionStore(tmp_path),
+            _UnavailableModelPool(),
+            minimum_free_bytes=0,
+            free_bytes=lambda: 10_000,
+            finalizer=lambda _session: None,
+            model_idle_timeout_s=-1,
+        )

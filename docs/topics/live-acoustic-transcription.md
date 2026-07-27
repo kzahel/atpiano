@@ -28,8 +28,13 @@ service. Storage validation has also proved one-hour and three-hour compact
 recordings seek to the exact source-clock range across every deterministic
 repeat boundary. A 2.10-hour M4 Pro real-model soak also completed with full
 commit coverage. R4 accepted application parity and compact retention on
-2026-07-27. A same-duration Linux soak is retained only as the narrower
-host-specific gap documented in Tactical 022.
+2026-07-27. Local models still load only on first use and now unload after ten
+fully settled idle minutes by default. The capture application cancels a
+pending eviction when a new session claims ownership, rejects stale timer
+callbacks by generation, and exposes the current load and deadline state for
+diagnosis. A zero timeout retains the former keep-warm behavior. A
+same-duration Linux soak is retained only as the narrower host-specific gap
+documented in Tactical 022.
 
 ## Scope And Relationship
 

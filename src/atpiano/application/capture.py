@@ -6,7 +6,7 @@ import threading
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -29,6 +29,30 @@ from atpiano.live import LiveWindowModel, PcmBlock
 from atpiano.util import utc_now
 
 CORRECTED_WORKBENCH_SCHEMA = "atpiano.corrected-workbench.v1"
+DEFAULT_MODEL_IDLE_TIMEOUT_S = 10 * 60
+
+
+class ModelIdleTimer(Protocol):
+    """Cancelable delayed callback used for deterministic idle eviction."""
+
+    def start(self) -> None: ...
+
+    def cancel(self) -> None: ...
+
+
+ModelIdleTimerFactory = Callable[
+    [float, Callable[[], None]],
+    ModelIdleTimer,
+]
+
+
+def _daemon_timer(
+    delay_s: float,
+    callback: Callable[[], None],
+) -> ModelIdleTimer:
+    timer = threading.Timer(delay_s, callback)
+    timer.daemon = True
+    return timer
 
 
 class CaptureModelPool(Protocol):
@@ -43,6 +67,10 @@ class CaptureModelPool(Protocol):
     def models(self) -> tuple[LiveWindowModel, CommitModel]: ...
 
     def status(self) -> list[dict[str, Any]]: ...
+
+    def loaded(self) -> bool: ...
+
+    def unload(self) -> None: ...
 
     def resolve_correction_mode(
         self,
@@ -102,7 +130,11 @@ class CaptureApplicationService:
         finalizer: SessionFinalizer,
         replay_source: ReplaySource | None = None,
         storage: StorageApplicationService | None = None,
+        model_idle_timeout_s: float = DEFAULT_MODEL_IDLE_TIMEOUT_S,
+        model_idle_timer_factory: ModelIdleTimerFactory = _daemon_timer,
     ) -> None:
+        if model_idle_timeout_s < 0:
+            raise ValueError("model idle timeout cannot be negative")
         self._repository = repository
         self._models = model_pool
         self.minimum_free_bytes = minimum_free_bytes
@@ -119,6 +151,14 @@ class CaptureApplicationService:
         self._error: str | None = None
         self._received_blocks = 0
         self._last_event_sequence = 0
+        self._model_idle_timeout_s = model_idle_timeout_s
+        self._model_idle_timer_factory = model_idle_timer_factory
+        self._model_idle_timer: ModelIdleTimer | None = None
+        self._model_idle_generation = 0
+        self._model_idle_since: str | None = None
+        self._model_eviction_deadline: str | None = None
+        self._model_last_unloaded_at: str | None = None
+        self._closed = False
         self._load_latest_session()
 
     @staticmethod
@@ -184,6 +224,8 @@ class CaptureApplicationService:
 
     def close(self) -> None:
         with self._lock:
+            self._closed = True
+            self._cancel_model_idle_eviction_locked()
             pipeline = self._active_pipeline
         if pipeline is not None and not pipeline.wait(0):
             pipeline.abort(
@@ -202,6 +244,61 @@ class CaptureApplicationService:
 
     def worker_status(self) -> list[dict[str, Any]]:
         return self._models.status()
+
+    def model_pool_status(self) -> dict[str, Any]:
+        with self._lock:
+            loaded = self._models.loaded()
+            return {
+                "loaded": loaded,
+                "idle": loaded and self._model_idle_since is not None,
+                "idle_timeout_s": self._model_idle_timeout_s,
+                "idle_since": self._model_idle_since,
+                "eviction_deadline": self._model_eviction_deadline,
+                "last_unloaded_at": self._model_last_unloaded_at,
+            }
+
+    def _cancel_model_idle_eviction_locked(self) -> None:
+        self._model_idle_generation += 1
+        timer = self._model_idle_timer
+        self._model_idle_timer = None
+        self._model_idle_since = None
+        self._model_eviction_deadline = None
+        if timer is not None:
+            timer.cancel()
+
+    def _schedule_model_idle_eviction_locked(self) -> None:
+        self._cancel_model_idle_eviction_locked()
+        if self._closed or not self._models.loaded():
+            return
+        idle_at = datetime.now(timezone.utc)
+        self._model_idle_since = idle_at.isoformat()
+        if self._model_idle_timeout_s == 0:
+            return
+        self._model_eviction_deadline = (
+            idle_at + timedelta(seconds=self._model_idle_timeout_s)
+        ).isoformat()
+        generation = self._model_idle_generation
+        timer = self._model_idle_timer_factory(
+            self._model_idle_timeout_s,
+            lambda: self._unload_idle_models(generation),
+        )
+        self._model_idle_timer = timer
+        timer.start()
+
+    def _unload_idle_models(self, generation: int) -> None:
+        with self._lock:
+            if (
+                self._closed
+                or generation != self._model_idle_generation
+                or self._active_session is not None
+                or self._active_pipeline is not None
+                or self._status in {"warming", "active", "stopping"}
+            ):
+                return
+            self._model_idle_timer = None
+            self._model_eviction_deadline = None
+            self._models.unload()
+            self._model_last_unloaded_at = utc_now()
 
     def resolve_correction_mode(
         self,
@@ -224,6 +321,7 @@ class CaptureApplicationService:
                 raise RuntimeError(
                     "another corrected session is already active"
                 )
+            self._cancel_model_idle_eviction_locked()
             session_id = _new_session_id()
             directory = self._repository.new_session_directory(session_id)
             self._session_id = session_id
@@ -254,6 +352,7 @@ class CaptureApplicationService:
             self._active_pipeline = None
             self._status = "complete"
             self._error = None
+            self._schedule_model_idle_eviction_locked()
 
     def fail_session(self, error: Exception) -> None:
         with self._lock:
@@ -261,6 +360,7 @@ class CaptureApplicationService:
             self._active_pipeline = None
             self._status = "failed"
             self._error = f"{type(error).__name__}: {error}"
+            self._schedule_model_idle_eviction_locked()
 
     def begin_stop(self) -> None:
         with self._lock:
@@ -670,6 +770,7 @@ class CaptureApplicationService:
                 pipeline.status() if pipeline is not None else None
             ),
             "workers": self.worker_status(),
+            "model_pool": self.model_pool_status(),
             "duration_s": duration_s,
             "exports_ready": bool(
                 session_id is not None

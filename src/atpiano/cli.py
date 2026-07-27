@@ -48,6 +48,20 @@ def _add_storage_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_model_lifecycle_arguments(
+    parser: argparse.ArgumentParser,
+) -> None:
+    parser.add_argument(
+        "--model-idle-timeout-seconds",
+        type=float,
+        default=10 * 60,
+        help=(
+            "unload warmed capture models this long after settlement; "
+            "0 keeps them loaded (default: 600)"
+        ),
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="atpiano",
@@ -320,6 +334,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="isolated MIDI2ScoreTransformer runtime directory",
     )
     _add_storage_arguments(corrected_workbench_parser)
+    _add_model_lifecycle_arguments(corrected_workbench_parser)
     shared_app_parser = subparsers.add_parser(
         "workbench-v3",
         help="run the shared React performance workspace",
@@ -406,6 +421,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="isolated MIDI2ScoreTransformer runtime directory",
     )
     _add_storage_arguments(shared_app_parser)
+    _add_model_lifecycle_arguments(shared_app_parser)
     score_setup_parser = subparsers.add_parser(
         "setup-midi2score",
         help="install the internal MIDI2ScoreTransformer runtime",
@@ -579,6 +595,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             correction_mode=args.correction_mode,
             backend_profile_path=args.backend_profile,
             minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
+            model_idle_timeout_s=args.model_idle_timeout_seconds,
             replay_manifest=args.replay,
             replay_repeat=args.repeat,
             replay_silence_s=args.silence_seconds,
@@ -607,6 +624,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             correction_mode=args.correction_mode,
             backend_profile_path=args.backend_profile,
             minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
+            model_idle_timeout_s=args.model_idle_timeout_seconds,
             replay_manifest=args.replay,
             replay_repeat=args.repeat,
             replay_silence_s=args.silence_seconds,

@@ -7,6 +7,7 @@ import sys
 import numpy as np
 import pytest
 
+from atpiano.adapters.local_models import LocalModelPool
 from atpiano.corrected_commit import CommitModelOutput
 from atpiano.live import LiveModelOutput
 from atpiano.model_worker import CommitModelWorker, PreviewModelWorker
@@ -132,3 +133,39 @@ def test_commit_worker_rejects_malformed_native_output() -> None:
             worker.transcribe(bytes(12), source_sample_rate_hz=8_000)
     finally:
         worker.close()
+
+
+def test_local_model_pool_unloads_and_lazily_reloads_models() -> None:
+    previews: list[_PreviewModel] = []
+    commits: list[_CommitModel] = []
+
+    def preview_factory() -> _PreviewModel:
+        model = _PreviewModel()
+        previews.append(model)
+        return model
+
+    def commit_factory() -> _CommitModel:
+        model = _CommitModel()
+        commits.append(model)
+        return model
+
+    pool = LocalModelPool(
+        preview_model_factory=preview_factory,
+        commit_model_factory=commit_factory,
+        isolate_models=False,
+        commit_threads=2,
+        correction_mode="after-stop",
+        backend_profile_path=None,
+    )
+    assert pool.loaded() is False
+    first_preview = pool.preview()
+    first_commit = pool.commit()
+    assert pool.loaded() is True
+
+    pool.unload()
+    assert pool.loaded() is False
+    assert pool.preview() is not first_preview
+    assert pool.commit() is not first_commit
+    assert len(previews) == 2
+    assert len(commits) == 2
+    pool.close()

@@ -75,3 +75,7 @@ def test_launchd_template_is_on_demand_and_supervised() -> None:
         job["EnvironmentVariables"]["ATPIANO_SHARE_SCRIPT"]
         == "__ATPIANO_SHARE_SCRIPT__"
     )
+    assert (
+        job["EnvironmentVariables"]["ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS"]
+        == "__ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS__"
+    )

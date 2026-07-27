@@ -17,6 +17,8 @@
     <string>__ATPIANO_BIND_ADDRESS__</string>
     <key>ATPIANO_PORT</key>
     <string>__ATPIANO_PORT__</string>
+    <key>ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS</key>
+    <string>__ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS__</string>
     <key>ATPIANO_PUBLIC_ORIGIN</key>
     <string>__ATPIANO_PUBLIC_ORIGIN__</string>
     <key>ATPIANO_SERVICE_LOG_COUNT</key>

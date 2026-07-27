@@ -352,6 +352,13 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
             "--retain-wav",
         ]
     )
+    kept_warm = parser.parse_args(
+        [
+            "workbench-v3",
+            "--model-idle-timeout-seconds",
+            "0",
+        ]
+    )
     profile = parser.parse_args(
         [
             "profile-backend",
@@ -372,6 +379,7 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
     assert v2.debug_retention is True
     assert v2.debug_byte_cap_mib == 2
     assert v2.debug_max_age_hours == 1.5
+    assert v2.model_idle_timeout_seconds == 600
     assert v2.commit_threads == 2
     assert v2.correction_mode == "auto"
     assert v2.backend_profile == Path(
@@ -387,7 +395,9 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
     assert v3.public_origin == "https://atpiano.kzahel.com"
     assert v3.compact_recordings is True
     assert v3.debug_retention is False
+    assert v3.model_idle_timeout_seconds == 600
     assert retained_wav.compact_recordings is False
+    assert kept_warm.model_idle_timeout_seconds == 0
     assert profile.repeat == 2
     assert profile.warmup_seconds == 16.0
     assert profile.commit_threads == 2
