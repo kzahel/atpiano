@@ -74,7 +74,7 @@ class StorageApplicationService:
         self,
         backend: StorageBackend,
         *,
-        compact_recordings: bool = False,
+        compact_recordings: bool = True,
         debug_policy: DebugRetentionPolicy = DebugRetentionPolicy(),
     ) -> None:
         self._backend = backend

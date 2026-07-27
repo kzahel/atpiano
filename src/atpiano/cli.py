@@ -9,14 +9,26 @@ from pathlib import Path
 
 
 def _add_storage_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
+    recording_policy = parser.add_mutually_exclusive_group()
+    recording_policy.add_argument(
         "--compact-recordings",
+        dest="compact_recordings",
         action="store_true",
         help=(
             "retain verified 128 kbps MP3 and retire new-session WAV "
-            "source after settlement"
+            "source after settlement (default; compatibility alias)"
         ),
     )
+    recording_policy.add_argument(
+        "--retain-wav",
+        dest="compact_recordings",
+        action="store_false",
+        help=(
+            "retain new-session WAV source alongside MP3 for debugging "
+            "or future retranscription"
+        ),
+    )
+    parser.set_defaults(compact_recordings=True)
     parser.add_argument(
         "--debug-retention",
         action="store_true",

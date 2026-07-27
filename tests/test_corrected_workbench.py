@@ -346,6 +346,12 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
             "https://atpiano.kzahel.com",
         ]
     )
+    retained_wav = parser.parse_args(
+        [
+            "workbench-v3",
+            "--retain-wav",
+        ]
+    )
     profile = parser.parse_args(
         [
             "profile-backend",
@@ -379,8 +385,9 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
     assert v3.commit_threads == 2
     assert v3.correction_mode == "auto"
     assert v3.public_origin == "https://atpiano.kzahel.com"
-    assert v3.compact_recordings is False
+    assert v3.compact_recordings is True
     assert v3.debug_retention is False
+    assert retained_wav.compact_recordings is False
     assert profile.repeat == 2
     assert profile.warmup_seconds == 16.0
     assert profile.commit_threads == 2
@@ -920,7 +927,6 @@ def test_phase4_replay_retires_raw_only_after_compact_verification(
         correction_mode="delayed",
         replay_manifest=fixture_directory / "input.json",
         replay_realtime=False,
-        compact_recordings=True,
     )
     try:
         server.start_replay()
@@ -968,7 +974,7 @@ def test_phase4_replay_retires_raw_only_after_compact_verification(
         server.server_close()
 
 
-def test_replay_settles_with_raw_recording_when_correction_is_unavailable(
+def test_retain_wav_policy_keeps_raw_when_correction_is_unavailable(
     tmp_path: Path,
 ) -> None:
     fixture_directory = tmp_path / "fixture"
@@ -983,6 +989,7 @@ def test_replay_settles_with_raw_recording_when_correction_is_unavailable(
         correction_mode="unavailable",
         replay_manifest=fixture_directory / "input.json",
         replay_realtime=False,
+        compact_recordings=False,
     )
     try:
         server.start_replay()
