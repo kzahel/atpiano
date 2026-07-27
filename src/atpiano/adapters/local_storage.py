@@ -685,17 +685,21 @@ class LocalStorageAdapter:
             for path in diagnostics.rglob("*"):
                 if not path.is_file() or path.name == ".pin.json":
                     continue
-                size = path.stat().st_size
+                try:
+                    metadata = path.stat()
+                except FileNotFoundError:
+                    continue
+                size = metadata.st_size
                 if pinned:
                     pinned_bytes += size
                     continue
-                if path.stat().st_mtime < cutoff:
+                if metadata.st_mtime < cutoff:
                     path.unlink(missing_ok=True)
                     removed_bytes += size
                     removed_files += 1
                 else:
                     candidates.append(
-                        (path.stat().st_mtime, path, size)
+                        (metadata.st_mtime, path, size)
                     )
         candidates.sort(key=lambda item: (item[0], item[1].as_posix()))
         retained_bytes = sum(item[2] for item in candidates)
@@ -872,8 +876,12 @@ class LocalStorageAdapter:
             for path in root.rglob("*"):
                 if not path.is_file():
                     continue
+                try:
+                    size = path.stat().st_size
+                except FileNotFoundError:
+                    continue
                 category = self._category(path)
-                categories[category] += path.stat().st_size
+                categories[category] += size
                 file_counts[category] += 1
         return {
             "bytes": categories,

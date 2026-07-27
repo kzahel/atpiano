@@ -6,6 +6,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from atpiano.adapters.local_storage import LocalStorageAdapter
 from atpiano.application.storage import (
     DebugRetentionPolicy,
@@ -249,3 +251,36 @@ def test_recovery_removes_known_partial_without_touching_old_sessions(
     )
     assert not (old.directory / "application.json").exists()
     assert list((old.directory / "audio").glob("*.wav")) == old_wavs
+
+
+def test_accounting_tolerates_atomic_temporary_file_rename(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_id = "20260727T100006-111111111111"
+    session = _complete_session(tmp_path, session_id, frame_count=8)
+    service = StorageApplicationService(LocalStorageAdapter(tmp_path))
+    service.initialize_session(session_id)
+    temporary = session.directory / ".horizons.json.tmp"
+    temporary.write_bytes(b"temporary")
+    original_stat = Path.stat
+    target_calls = 0
+
+    def racing_stat(path: Path, *args: Any, **kwargs: Any) -> Any:
+        nonlocal target_calls
+        if path == temporary:
+            target_calls += 1
+            if target_calls == 2:
+                temporary.unlink()
+                raise FileNotFoundError(temporary)
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", racing_stat)
+
+    report = service.accounting(
+        session_id=session_id,
+        duration_s=1.0,
+        minimum_free_bytes=0,
+    )
+
+    assert report["current_session"]["total_bytes"] > 0
