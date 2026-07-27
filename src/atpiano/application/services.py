@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from atpiano.application.scores import ScoreApplicationService
 from atpiano.application.sessions import SessionApplicationService
 
 
@@ -12,3 +13,4 @@ class ApplicationServices:
     """Application operations exposed to transport adapters."""
 
     sessions: SessionApplicationService
+    scores: ScoreApplicationService

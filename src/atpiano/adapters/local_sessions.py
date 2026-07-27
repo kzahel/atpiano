@@ -601,17 +601,10 @@ class LocalSessionStore:
         )
 
     def score_variants(self, session_id: str) -> ScoreVariantPage:
+        pointer = self.current_score_snapshot(session_id)
+        if pointer is None:
+            raise LocalSessionNotFoundError("score snapshot does not exist")
         directory = self.resolve(session_id)
-        pointer_path = directory / "score" / "current.json"
-        if not pointer_path.is_file():
-            raise LocalSessionNotFoundError("score snapshot does not exist")
-        pointer = read_json(pointer_path)
-        if (
-            pointer.get("schema_version") != SCORE_SNAPSHOT_SCHEMA
-            or pointer.get("session_id") != session_id
-            or not score_snapshot_is_plausible(pointer)
-        ):
-            raise LocalSessionNotFoundError("score snapshot does not exist")
         baseline = pointer.get("baseline")
         if isinstance(baseline, dict):
             records = [
@@ -748,6 +741,26 @@ class LocalSessionStore:
             session_id=session_id,
             items=tuple(variants),
         )
+
+    def current_score_snapshot(
+        self,
+        session_id: str,
+    ) -> dict[str, Any] | None:
+        directory = self.resolve(session_id)
+        pointer_path = directory / "score" / "current.json"
+        if not pointer_path.is_file():
+            return None
+        try:
+            pointer = read_json(pointer_path)
+        except (OSError, ValueError):
+            return None
+        if (
+            pointer.get("schema_version") != SCORE_SNAPSHOT_SCHEMA
+            or pointer.get("session_id") != session_id
+            or not score_snapshot_is_plausible(pointer)
+        ):
+            return None
+        return pointer
 
     def list_artifacts(
         self,

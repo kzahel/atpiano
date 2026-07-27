@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from atpiano.contracts.schemas import (
     Artifact,
@@ -74,6 +74,13 @@ class SessionRepository(Protocol):
     ) -> tuple[Artifact, Path]: ...
 
     def score_variants(self, session_id: str) -> ScoreVariantPage: ...
+
+    def current_score_snapshot(
+        self,
+        session_id: str,
+    ) -> dict[str, Any] | None: ...
+
+    def resolve(self, session_id: str) -> Path: ...
 
     def trash_session(
         self,

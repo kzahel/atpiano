@@ -23,6 +23,7 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 from pydantic import ValidationError
 
+from atpiano.adapters.local_scores import LocalScoreExecutor
 from atpiano.adapters.local_sessions import (
     LOCAL_WORKSPACE_ID,
     LocalSessionConflictError,
@@ -32,6 +33,7 @@ from atpiano.adapters.local_sessions import (
 from atpiano.application import (
     ApplicationNotFoundError,
     ApplicationServices,
+    ScoreApplicationService,
     SessionApplicationService,
 )
 from atpiano.backend_profile import (
@@ -48,8 +50,6 @@ from atpiano.contracts.schemas import (
     ErrorCode,
     ErrorResponse,
     Job,
-    JobKind,
-    RunStatus,
     RuntimeCapabilities,
     RuntimeMode,
     ScoreJobStart,
@@ -82,12 +82,8 @@ from atpiano.corrected_preview import CorrectedPreviewLane
 from atpiano.live import LiveWindowModel, parse_pcm_block
 from atpiano.model_worker import CommitModelWorker, PreviewModelWorker
 from atpiano.score_snapshot import (
-    SCORE_SNAPSHOT_SCHEMA,
     ScoreRunner,
     ScoreVariantRunner,
-    generate_score_snapshot,
-    generate_score_variant,
-    inspect_score_runtime,
     score_snapshot_is_plausible,
 )
 from atpiano.util import read_json, utc_now, write_json
@@ -95,7 +91,6 @@ from atpiano.websocket import encode_frame, encode_json, read_frame, websocket_a
 
 CORRECTED_WORKBENCH_SCHEMA = "atpiano.corrected-workbench.v1"
 CORRECTED_STREAM_SCHEMA = "atpiano.corrected-stream.v1"
-CORRECTED_SCORE_STATE_SCHEMA = "atpiano.corrected-score-state.v1"
 MAX_CLIENT_METADATA_BYTES = 16 * 1024
 MAX_VISIBLE_RANGE_S = 120.0
 DEFAULT_MINIMUM_FREE_BYTES = 2 * 1024**3
@@ -202,12 +197,6 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self.workspace_directory = workspace_directory.resolve()
         self.workspace_directory.mkdir(parents=True, exist_ok=True)
         self.session_store = LocalSessionStore(self.workspace_directory)
-        self.application = ApplicationServices(
-            sessions=SessionApplicationService(
-                self.session_store,
-                workspace_id=LOCAL_WORKSPACE_ID,
-            )
-        )
         self.preview_model_factory = preview_model_factory
         self.commit_model_factory = commit_model_factory
         self.minimum_free_bytes = minimum_free_bytes
@@ -215,9 +204,11 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self.replay_repeat = replay_repeat
         self.replay_silence_s = replay_silence_s
         self.replay_realtime = replay_realtime
-        self.score_runtime = score_runtime.resolve()
-        self.score_runner = score_runner
-        self.score_variant_runner = score_variant_runner
+        score_executor = LocalScoreExecutor(
+            score_runtime.resolve(),
+            score_runner=score_runner,
+            score_variant_runner=score_variant_runner,
+        )
         self.web_root = web_root.resolve()
         self.application_mode = application_mode
         self.isolate_models = isolate_models
@@ -231,7 +222,6 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         )
         self.state_lock = threading.Lock()
         self.model_lock = threading.Lock()
-        self.score_lock = threading.Lock()
         self._preview_model: LiveWindowModel | None = None
         self._commit_model: CommitModel | None = None
         self._active_session: CorrectedSession | None = None
@@ -242,15 +232,21 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self._error: str | None = None
         self._received_blocks = 0
         self._last_event_sequence = 0
-        self._score_status = "idle"
-        self._score_error: str | None = None
-        self._score_session_id: str | None = None
-        self._score_commit_sample: int | None = None
-        self._score_job_id: str | None = None
-        self._score_created_at: datetime | None = None
-        self._score_started_at: datetime | None = None
-        self._score_completed_at: datetime | None = None
         self._load_latest_session()
+        sessions = SessionApplicationService(
+            self.session_store,
+            workspace_id=LOCAL_WORKSPACE_ID,
+        )
+        scores = ScoreApplicationService(
+            self.session_store,
+            score_executor,
+            workspace_id=LOCAL_WORKSPACE_ID,
+            current_session_id=self.current_session_id,
+        )
+        self.application = ApplicationServices(
+            sessions=sessions,
+            scores=scores,
+        )
         super().__init__((bind, port), CorrectedWorkbenchHandler)
 
     def asset_path(self, request_path: str) -> Path | None:
@@ -511,6 +507,10 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                 return self._session_id
             return None
 
+    def current_session_id(self) -> str | None:
+        with self.state_lock:
+            return self._session_id
+
     def public_state(self) -> dict[str, Any]:
         with self.state_lock:
             status = self._status
@@ -614,97 +614,13 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             self.fail_session(error)
 
     def _runtime_state(self) -> dict[str, Any]:
-        if self.score_runner is not None:
-            return {
-                "available": True,
-                "directory": str(self.score_runtime),
-                "injected_runner": True,
-            }
-        return inspect_score_runtime(self.score_runtime)
-
-    def _score_target(
-        self,
-        session_id: str | None,
-    ) -> tuple[str | None, Path | None, int]:
-        state = self.public_state()
-        current_session = state.get("session")
-        current_session_id = (
-            str(current_session.get("session_id"))
-            if isinstance(current_session, dict) and current_session.get("session_id")
-            else None
-        )
-        target_session_id = session_id or current_session_id
-        if target_session_id is None:
-            return None, None, 0
-        if target_session_id == current_session_id:
-            directory = self.current_directory()
-            horizons = state.get("horizons")
-            commit_sample = (
-                int(horizons.get("commit_sample", 0))
-                if isinstance(horizons, dict)
-                else 0
-            )
-            return target_session_id, directory, commit_sample
-        directory = self.session_store.resolve(target_session_id)
-        horizons = read_json(directory / "horizons.json")
-        return target_session_id, directory, int(horizons.get("commit_sample", 0))
+        return self.application.scores.runtime_state()
 
     def public_score_state(
         self,
         session_id: str | None = None,
     ) -> dict[str, Any]:
-        target_session_id, directory, current_commit_sample = self._score_target(
-            session_id
-        )
-        snapshot: dict[str, Any] | None = None
-        if directory is not None:
-            snapshot_path = directory / "score" / "current.json"
-            if snapshot_path.is_file():
-                try:
-                    candidate = read_json(snapshot_path)
-                    if (
-                        candidate.get("schema_version") == SCORE_SNAPSHOT_SCHEMA
-                        and candidate.get("session_id") == target_session_id
-                        and score_snapshot_is_plausible(candidate)
-                    ):
-                        snapshot = candidate
-                except (OSError, ValueError):
-                    pass
-        with self.score_lock:
-            job_status = self._score_status
-            job_error = self._score_error
-            job_session_id = self._score_session_id
-            job_commit_sample = self._score_commit_sample
-        if job_session_id != target_session_id:
-            job_status = "complete" if snapshot is not None else "idle"
-            job_error = None
-        elif job_status == "idle" and snapshot is not None:
-            job_status = "complete"
-        runtime = self._runtime_state()
-        running = job_status == "running" and job_session_id == target_session_id
-        return {
-            "schema_version": CORRECTED_SCORE_STATE_SCHEMA,
-            "status": job_status,
-            "error": job_error,
-            "runtime": runtime,
-            "session_id": target_session_id,
-            "commit_sample": current_commit_sample,
-            "job": {
-                "session_id": job_session_id,
-                "commit_sample": job_commit_sample,
-            },
-            "snapshot": snapshot,
-            "stale": bool(
-                snapshot is not None
-                and int(snapshot.get("commit_sample", -1)) != current_commit_sample
-            ),
-            "can_generate": bool(
-                runtime["available"]
-                and target_session_id
-                and current_commit_sample > 0
-                and not running
-            ),
-        }
+        return self.application.scores.state(session_id)
 
     def start_score(
         self,
@@ -712,164 +628,19 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         *,
         expected_commit_sample: int | None = None,
     ) -> Job:
-        runtime = self._runtime_state()
-        if not runtime["available"]:
-            raise RuntimeError(str(runtime["error"]))
-        target_session_id, directory, commit_sample = self._score_target(session_id)
-        if directory is None or target_session_id is None:
-            raise ValueError("no corrected session is available to score")
-        if commit_sample <= 0:
-            raise ValueError("the session has no committed prefix to score yet")
-        if (
-            expected_commit_sample is not None
-            and expected_commit_sample != commit_sample
-        ):
-            raise ValueError("score request commit horizon is stale")
-        job_id = f"job-score:{uuid.uuid4().hex[:16]}"
-        created_at = datetime.now(timezone.utc)
-        with self.score_lock:
-            if self._score_status == "running":
-                raise RuntimeError("a committed score snapshot is already running")
-            self._score_status = "running"
-            self._score_error = None
-            self._score_session_id = target_session_id
-            self._score_commit_sample = commit_sample
-            self._score_job_id = job_id
-            self._score_created_at = created_at
-            self._score_started_at = created_at
-            self._score_completed_at = None
-        thread = threading.Thread(
-            target=self._run_score,
-            args=(job_id, target_session_id, directory, commit_sample),
-            name=f"atpiano-score-{target_session_id}",
-            daemon=True,
+        return self.application.scores.start(
+            session_id,
+            expected_commit_sample=expected_commit_sample,
         )
-        thread.start()
-        return self.score_job(job_id)
-
-    def _run_score(
-        self,
-        job_id: str,
-        session_id: str,
-        directory: Path,
-        commit_sample: int,
-    ) -> None:
-        try:
-            generate_score_snapshot(
-                directory,
-                self.score_runtime,
-                commit_sample=commit_sample,
-                runner=self.score_runner,
-            )
-        except Exception as error:
-            with self.score_lock:
-                if (
-                    self._score_job_id == job_id
-                    and
-                    self._score_session_id == session_id
-                    and self._score_commit_sample == commit_sample
-                ):
-                    self._score_status = "failed"
-                    self._score_error = str(error)
-                    self._score_completed_at = datetime.now(timezone.utc)
-        else:
-            with self.score_lock:
-                if (
-                    self._score_job_id == job_id
-                    and
-                    self._score_session_id == session_id
-                    and self._score_commit_sample == commit_sample
-                ):
-                    self._score_status = "complete"
-                    self._score_error = None
-                    self._score_completed_at = datetime.now(timezone.utc)
 
     def score_job(self, job_id: str) -> Job:
-        with self.score_lock:
-            if job_id != self._score_job_id:
-                raise LocalSessionNotFoundError("job does not exist")
-            status = self._score_status
-            error_text = self._score_error
-            session_id = self._score_session_id
-            commit_sample = self._score_commit_sample
-            created_at = self._score_created_at
-            started_at = self._score_started_at
-            completed_at = self._score_completed_at
-        if (
-            session_id is None
-            or commit_sample is None
-            or created_at is None
-        ):
-            raise LocalSessionNotFoundError("job does not exist")
-        error = (
-            AtpianoError(
-                error_id=f"error:{job_id}",
-                code=ErrorCode.INTERNAL,
-                message=error_text or "Score generation failed.",
-                retryable=True,
-                workspace_id=LOCAL_WORKSPACE_ID,
-                session_id=session_id,
-                job_id=job_id,
-            )
-            if status == "failed"
-            else None
-        )
-        return Job(
-            workspace_id=LOCAL_WORKSPACE_ID,
-            session_id=session_id,
-            job_id=job_id,
-            kind=JobKind.SCORE,
-            status=RunStatus(status),
-            input_horizon_sample=commit_sample,
-            created_at=created_at,
-            started_at=started_at,
-            completed_at=completed_at,
-            error=error,
-        )
+        return self.application.scores.job(job_id)
 
     def create_score_variant(
         self,
         request: ScoreVariantRequest,
     ) -> ScoreVariant:
-        with self.score_lock:
-            if self._score_status == "running":
-                raise RuntimeError(
-                    "a committed score snapshot is already running"
-                )
-        directory = self.session_store.resolve(request.session_id)
-        musicxml, musicxml_path = (
-            self.session_store.get_artifact_with_path(
-                request.session_id,
-                request.baseline_musicxml_artifact_id,
-            )
-        )
-        alignment, alignment_path = (
-            self.session_store.get_artifact_with_path(
-                request.session_id,
-                request.baseline_alignment_artifact_id,
-            )
-        )
-        if (
-            musicxml.kind.value != "musicxml"
-            or alignment.kind.value != "score-alignment"
-        ):
-            raise ValueError("score variant request requires baseline artifacts")
-        record = generate_score_variant(
-            directory,
-            self.score_runtime,
-            baseline_musicxml_path=musicxml_path,
-            baseline_alignment_path=alignment_path,
-            clef_policy=request.clef_policy.value,
-            target_key_fifths=request.target_key_fifths,
-            runner=self.score_variant_runner,
-        )
-        return next(
-            variant
-            for variant in self.session_store.score_variants(
-                request.session_id
-            ).items
-            if variant.score_variant_id == record["variant_id"]
-        )
+        return self.application.scores.create_variant(request)
 
     def delete_api_session(self, session_id: str) -> dict[str, Any]:
         with self.state_lock:
@@ -880,12 +651,9 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                 if self._status in {"warming", "active", "stopping"}
                 else None
             )
-            with self.score_lock:
-                running_score_session_id = (
-                    self._score_session_id
-                    if self._score_status == "running"
-                    else None
-                )
+            running_score_session_id = (
+                self.application.scores.running_session_id()
+            )
             result = self.application.sessions.delete_session(
                 LOCAL_WORKSPACE_ID,
                 session_id,
