@@ -40,5 +40,5 @@ execution record; continuing status and direction belong in the relevant
 | [`027-mobile-session-navigation.md`](027-mobile-session-navigation.md) | Complete | Touch-friendly off-canvas session history and navigation on narrow screens |
 | [`028-score-alignment-reconciliation.md`](028-score-alignment-reconciliation.md) | Complete | Exact-pitch monotonic reconciliation between source events and generated score attacks |
 | [`029-durable-macos-share-service.md`](029-durable-macos-share-service.md) | Implemented | On-demand launchd supervision, persistent lifecycle logs, and explicit macOS-only service controls |
-| [`030-early-tauri-sidecar-boundary.md`](030-early-tauri-sidecar-boundary.md) | Active | Self-contained macOS arm64 Tauri shell, authenticated Python sidecar, CPU model pack, bundle inventory, and R5 gate |
+| [`030-early-tauri-sidecar-boundary.md`](030-early-tauri-sidecar-boundary.md) | Implemented; at R5 hold | Self-contained macOS arm64 Tauri shell, authenticated Python sidecar, CPU model pack, bundle inventory, and R5 gate |
 | [`030-idle-model-worker-eviction.md`](030-idle-model-worker-eviction.md) | Implemented | Lazy model loading plus generation-safe worker eviction ten minutes after full capture settlement |

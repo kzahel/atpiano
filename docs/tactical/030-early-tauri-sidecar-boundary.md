@@ -4,8 +4,11 @@ Master phase: 5. Early Tauri skeleton
 
 Topic: multi-tenant-hybrid-service-architecture
 
-Status: **authorized and active on 2026-07-27 after accepted R4.** This
-tactical ends at R5. It does not open the complete local-desktop Phase 6.
+Status: **implemented and held for R5 human review on 2026-07-27.** The
+review packet is
+[`r5-desktop-boundary-review.md`](../r5-desktop-boundary-review.md).
+This tactical ends at R5. It does not open the complete local-desktop
+Phase 6.
 
 ## Outcome
 
@@ -298,5 +301,92 @@ workspaces.
 7. Prepare R5, update living docs, and stop for explicit review.
 
 ## Execution Record
+
+Implementation completed through the R5 hold on 2026-07-27.
+
+The final artifact is an unsigned macOS arm64 `.app` plus a review ZIP. It
+contains the accepted React production application, a thin Tauri 2 shell,
+standalone CPython 3.10.19, 86 inventoried Python distributions, the pinned
+Basic Pitch and Transkun model pack, and relocated FFmpeg/FFprobe plus their
+non-system libraries. The sidecar uses CPU execution and the internal score
+runtime is absent.
+
+The final audit reconciles 13,586 installed files and 1,044,680,287 bytes.
+The ZIP is 345,419,478 bytes. Python packages account for 900,387,579
+installed bytes; model assets 56,680,490; the Python runtime and manifests
+38,811,893; media tools 35,661,472; and the Rust shell plus embedded
+frontend 8,795,440. The audit covers 384 Mach-O files and finds no unsupported
+architecture, escaping library reference, accelerator package, score asset,
+dev distribution, removable dependency-test namespace, anonymous cache, or
+escaping symlink.
+
+PyTorch itself imports `torch.testing` and
+`torch.testing._internal.logging_tensor` during ordinary import/checkpoint
+startup. Its 5,166,878 bytes are classified as a demonstrated runtime
+requirement rather than removable test material. All other dependency
+`test`, `tests`, and `testing` namespaces are pruned and a survivor fails the
+audit.
+
+The review ZIP was extracted below `/tmp`. The executable retained its mode
+and launched under `env -i` with no Python, venv, `uv`, repository, or
+Homebrew path assistance. The observed child was the bundled
+`python3 -I -B -m atpiano.desktop_sidecar`. Post-launch cache scans and the
+full audit found the app unchanged. A measured app close plus child exit/reap
+took 0.511 seconds.
+
+The packaged 42-second replay completed with exact 2,016,000-frame source and
+commit horizons, pinned model hashes, CPU execution, one MP3, zero WAV, and
+13 retained files. Cold sidecar readiness was 4.719 seconds and total
+settlement 31.721 seconds in the final pruned run. The v2 parity report passed
+exact source, horizon, model, device, and artifact checks; event-count
+tolerances; a pairwise musical floor; and tight quality deltas against the
+same 198-note golden reference. Absolute packaged-versus-direct deltas were
+0.010 onset F1, 0.012 frame F1, 0.027 note-plus-offset F1, and 1.99% final
+note count.
+
+Wrong protocol metadata failed before ready with a bounded versioned error and
+no token disclosure. Killing the packaged sidecar produced the visible
+restart screen. Relaunch started a fresh embedded child and listed the two
+completed application-data sessions. Rust lifecycle tests cover ready
+compatibility and size, duplicate bootstrap reads, one-shot unexpected
+failure, direct-launch resource fallback, and child cleanup.
+
+The webview capability was reduced from Tauri's broad core default to only
+event listen/unlisten. It has no shell, filesystem, dialog, updater, tray,
+menu, image, or remote-origin plugin grant. The one registered custom command
+returns validated bootstrap material, and the CSP admits bundled content plus
+Tauri IPC and authenticated loopback transport.
+
+The final validation report includes the complete Python suite, Ruff, Node
+contract tests, Vitest, TypeScript, production Vite build, Rust formatting,
+Clippy with warnings denied, Rust tests, staging smoke, final bundle audit,
+outside-repository launch, failure/recovery demonstrations, and direct/package
+real replay. Generated artifacts and reports remain ignored.
+
+Commit series:
+
+- `fc7cad6` — Open early Tauri sidecar phase
+- `31466ee` — Add authenticated desktop sidecar boundary
+- `2bea032` — Add supervised Tauri desktop shell
+- `5f01d49` — Build self-contained macOS runtime
+- `9eb0918` — Keep warming replay state readable
+- `c7bf236` — Harden repeatable desktop packaging
+- `a9fd8bc` — Validate packaged golden replay
+- `5ff5dc6` — Measure desktop review bundle
+- `e94c814` — Exercise desktop shell lifecycle states
+- `cb969ce` — Harden direct desktop launch fallback
+- `5b045ac` — Narrow desktop webview capabilities
+- `ba8bf48` — Keep packaged Python runtime immutable
+- `5fc4803` — Stabilize desktop replay parity gate
+- `63ac9f2` — Account for compressed desktop components
+- `1350a54` — Prune packaged distribution test material
+
+Known gaps are deliberate Phase 5 exclusions: signing, notarization, a DMG,
+updates, public distribution compliance, microphone parity, settings,
+SQLite/re-indexing, model acquisition, network-disabled daily-use validation,
+the unresolved score runtime, and every platform except macOS arm64. The
+bundle is still large because the accepted CPU inference path includes Torch,
+llvmlite, SciPy, and the model assets. R5 must be explicitly accepted before
+Phase 6 opens.
 
 No implementation commits yet.

@@ -3,7 +3,8 @@
 Topic: multi-tenant-hybrid-service-architecture
 
 Status: **accepted target architecture as of 2026-07-26; Phases 1 through 4
-are complete and R2, R3, and R4 are accepted.** Phase 4 is recorded under
+are complete and R2, R3, and R4 are accepted. Phase 5 implementation has
+reached the R5 human hold.** Phase 4 is recorded under
 [`017-python-application-core.md`](../tactical/017-python-application-core.md)
 and Phase 3 under
 [`016-shared-react-application.md`](../tactical/016-shared-react-application.md)
@@ -15,13 +16,20 @@ controller estimates instead of merging them as apparent stuck sustain,
 and it provides seekable recorded-audio playback synchronized to exact
 source-sample inspection.
 
-Phase 5 is active under
+Phase 5 is implemented through its bounded review slice under
 [`030-early-tauri-sidecar-boundary.md`](../tactical/030-early-tauri-sidecar-boundary.md).
-Its first lane is an unsigned, self-contained macOS arm64 Tauri development
-application with a CPU-only Python sidecar, separate model manifest,
-authenticated loopback IPC, real golden replay, and measured bundle contents.
-Windows, Linux, final signing, updates, microphone parity, and the unresolved
-score runtime remain outside that bounded R5 proof.
+The unsigned, self-contained macOS arm64 Tauri development application now
+contains a standalone Python runtime, CPU-only model pack, relocated media
+tools, authenticated loopback IPC, thin Rust supervision, the shared React
+workspace, real golden replay, and reconciled installed/compressed bundle
+inventories. Its archive launches outside the repository with Python
+development state cleared, preserves history, fails visibly on sidecar exit,
+and passes direct-versus-packaged reference-relative parity. The exact R5
+review packet is
+[`r5-desktop-boundary-review.md`](../r5-desktop-boundary-review.md).
+Phase 6 remains closed until explicit acceptance. Windows, Linux, final
+signing, updates, microphone parity, and the unresolved score runtime remain
+outside this bounded proof.
 
 The local Python path now composes framework-independent application services
 for sessions, capture, score jobs, storage, artifacts, and recoverable

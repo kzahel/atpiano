@@ -65,6 +65,17 @@ Current direction and research questions live in [`docs/topics/`](docs/topics/RE
 Acoustic-model benchmarking, live browser transcription, and downstream
 performance-to-notation conversion have separate owners there.
 
+## Desktop R5 Review
+
+The early Tauri/process-boundary implementation has reached its explicit R5
+human hold. The unsigned macOS arm64 app bundles the shared React workspace,
+standalone Python 3.10, CPU model pack, and media tools; it does not require
+the checkout or hosted login at runtime. Launch actions, replay and
+failure/recovery evidence, bundle inventory, privilege map, known exclusions,
+and the acceptance request are in
+[`docs/r5-desktop-boundary-review.md`](docs/r5-desktop-boundary-review.md).
+This is not permission to begin the signed, microphone-complete Phase 6.
+
 ## Authoritative Performance Workspace (v3)
 
 Install the corrected-note Python dependencies and the pinned frontend
