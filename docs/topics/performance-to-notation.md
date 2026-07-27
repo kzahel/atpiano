@@ -22,7 +22,10 @@ Tactical 021 now retains the model baseline and publishes deterministic
 and a safe paired enharmonic signature can be selected without rerunning the
 transformer.
 This is not yet progressive engraving or a permanent consumer-stack
-selection, and the leading score converter has no published license. See
+selection. The leading score converter's GitHub source and checkpoint still
+have no explicit published license, although the paper is CC BY 4.0 and the
+user provisionally authorized an internal-only desktop test on the assumption
+that the checkpoint follows it. See
 [`008-score-pipeline-bakeoff.md`](../tactical/008-score-pipeline-bakeoff.md)
 and
 [`012-committed-score-snapshots.md`](../tactical/012-committed-score-snapshots.md),
@@ -58,8 +61,10 @@ The accepted
 [`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md)
 treats notation conversion as a session-addressed, versioned job that can run
 in a hosted worker or local desktop sidecar. MIDI2ScoreTransformer remains
-permitted only for isolated internal use under the current acceptance. Its
-unconfirmed license blocks public hosted operation, desktop bundling, and
+permitted only for isolated internal use under the current acceptance.
+Tactical 031 may place it in a separately marked, opt-in internal desktop
+bundle for private testing. Its unconfirmed source and checkpoint notices
+continue to block public hosted operation, ordinary desktop archives, and
 model-pack distribution until rights are resolved or a licensed converter
 satisfies the same job and artifact contracts.
 

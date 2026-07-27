@@ -3,8 +3,9 @@
 Topic: multi-tenant-hybrid-service-architecture
 
 Status: **accepted target architecture as of 2026-07-26; Phases 1 through 4
-are complete and R2, R3, and R4 are accepted. Phase 5 implementation has
-reached the R5 human hold.** Phase 4 is recorded under
+are complete and R2, R3, and R4 are accepted. Phase 5 reached R5 and now has
+one bounded internal-score revision in progress; R5 remains open.** Phase 4 is
+recorded under
 [`017-python-application-core.md`](../tactical/017-python-application-core.md)
 and Phase 3 under
 [`016-shared-react-application.md`](../tactical/016-shared-react-application.md)
@@ -27,9 +28,12 @@ development state cleared, preserves history, fails visibly on sidecar exit,
 and passes direct-versus-packaged reference-relative parity. The exact R5
 review packet is
 [`r5-desktop-boundary-review.md`](../r5-desktop-boundary-review.md).
-Phase 6 remains closed until explicit acceptance. Windows, Linux, final
-signing, updates, microphone parity, and the unresolved score runtime remain
-outside this bounded proof.
+Phase 6 remains closed until explicit acceptance. Tactical 031 now owns a
+separate opt-in internal build of the unresolved score runtime after the user
+provisionally accepted the checkpoint as following the paper's CC BY 4.0
+terms for internal testing. The ordinary R5 and every public artifact remain
+score-free. Windows, Linux, final signing, updates, and microphone parity
+remain outside this bounded proof.
 
 The local Python path now composes framework-independent application services
 for sessions, capture, score jobs, storage, artifacts, and recoverable
@@ -675,11 +679,13 @@ The desktop application additionally requires:
 - validated filesystem roots and artifact paths; and
 - secrets in operating-system credential storage rather than SQLite or logs.
 
-MIDI2ScoreTransformer currently has no confirmed published license. It may
-remain an isolated internal research dependency under the user's current
-acceptance, but its checkpoint or implementation must not be publicly
-bundled, distributed in a model pack, or operated as part of a public hosted
-offering until the rights are resolved. A licensed replacement or
+MIDI2ScoreTransformer currently has no confirmed published license for its
+GitHub source or v0.0.1 checkpoint. The paper's Zenodo and arXiv records are
+CC BY 4.0, and on 2026-07-27 the user provisionally accepted the checkpoint as
+following those terms for a private internal desktop test. Tactical 031 may
+therefore stage an explicitly internal-only build, but neither the checkpoint
+nor implementation may enter a public archive, model pack, hosted offering,
+or release until their own rights are confirmed. A licensed replacement or
 reimplementation may satisfy the same score-worker contract.
 
 ## Observability And Operations
