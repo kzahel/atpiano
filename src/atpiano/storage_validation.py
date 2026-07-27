@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import math
 import resource
+import subprocess
 import sys
 import time
+import wave
 from pathlib import Path
 from typing import Any
 
@@ -86,6 +88,132 @@ def _open_file_count() -> int | None:
             except OSError:
                 continue
     return None
+
+
+def _verify_repeat_alignment(
+    input_manifest: Path,
+    recording_path: Path,
+    *,
+    repeat: int,
+    sample_rate_hz: int,
+) -> dict[str, Any]:
+    manifest = read_json(input_manifest)
+    audio = manifest["audio"]
+    input_path = (
+        input_manifest.parent / str(audio["path"])
+    ).resolve()
+    with wave.open(str(input_path), "rb") as source:
+        if (
+            source.getnchannels() != 1
+            or source.getsampwidth() != 2
+            or source.getframerate() != sample_rate_hz
+        ):
+            raise ValueError(
+                "storage alignment validation requires mono PCM16 WAV"
+            )
+        source_samples = np.frombuffer(
+            source.readframes(source.getnframes()),
+            dtype="<i2",
+        ).astype(np.float64)
+    probe_frames = min(
+        max(1, round(0.2 * sample_rate_hz)),
+        source_samples.shape[0],
+    )
+    candidates = range(
+        0,
+        source_samples.shape[0] - probe_frames + 1,
+        probe_frames,
+    )
+    probe_start = max(
+        candidates,
+        key=lambda start: float(
+            np.linalg.norm(
+                source_samples[start : start + probe_frames]
+                - np.mean(
+                    source_samples[
+                        start : start + probe_frames
+                    ]
+                )
+            )
+        ),
+    )
+    expected = source_samples[
+        probe_start : probe_start + probe_frames
+    ]
+    expected = expected - np.mean(expected)
+    expected_norm = float(np.linalg.norm(expected))
+    if expected_norm == 0:
+        raise ValueError("storage alignment probe is silent")
+    correlations: list[float] = []
+    for repetition in range(repeat):
+        first_sample = (
+            repetition * source_samples.shape[0] + probe_start
+        )
+        seek_s = first_sample / sample_rate_hz
+        decoded = subprocess.run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-ss",
+                f"{seek_s:.9f}",
+                "-i",
+                str(recording_path),
+                "-t",
+                f"{probe_frames / sample_rate_hz:.9f}",
+                "-ac",
+                "1",
+                "-ar",
+                str(sample_rate_hz),
+                "-f",
+                "s16le",
+                "-",
+            ],
+            check=True,
+            capture_output=True,
+        ).stdout
+        observed = np.frombuffer(decoded, dtype="<i2").astype(
+            np.float64
+        )
+        if observed.shape[0] != probe_frames:
+            raise ValueError(
+                "compact recording seek returned the wrong frame count"
+            )
+        observed = observed - np.mean(observed)
+        observed_norm = float(np.linalg.norm(observed))
+        correlation = (
+            float(np.dot(observed, expected))
+            / observed_norm
+            / expected_norm
+            if observed_norm
+            else 0.0
+        )
+        correlations.append(correlation)
+    threshold = 0.9
+    minimum = min(correlations)
+    if minimum < threshold:
+        raise ValueError(
+            "compact recording seek is not aligned to repetition "
+            f"boundaries: {minimum:.3f} < {threshold:.3f}"
+        )
+    worst_repetition = correlations.index(minimum)
+    return {
+        "method": (
+            "decode a non-silent 200 ms source-clock range after every "
+            "repetition boundary and compare it with the input WAV"
+        ),
+        "boundary_count": repeat,
+        "probe_offset_samples": probe_start,
+        "probe_frame_count": probe_frames,
+        "correlation_threshold": threshold,
+        "minimum_correlation": minimum,
+        "mean_correlation": sum(correlations) / len(correlations),
+        "maximum_correlation": max(correlations),
+        "worst_repetition": worst_repetition,
+        "first_repetition_correlation": correlations[0],
+        "last_repetition_correlation": correlations[-1],
+    }
 
 
 def run_storage_validation(
@@ -196,6 +324,14 @@ def run_storage_validation(
         recording_bytes = int(
             recording["recording"]["byte_count"]
         )
+        alignment = _verify_repeat_alignment(
+            input_manifest,
+            session_directory / str(
+                recording["recording"]["path"]
+            ),
+            repeat=repeat,
+            sample_rate_hz=sample_rate_hz,
+        )
         evidence = {
             "schema_version": STORAGE_VALIDATION_SCHEMA,
             "recorded_at": utc_now(),
@@ -225,6 +361,7 @@ def run_storage_validation(
                 "open_files_after_settlement": _open_file_count(),
             },
             "recording": recording,
+            "alignment": alignment,
             "pipeline": pipeline,
             "storage": accounting,
             "measured_recording_bytes_per_hour": (
@@ -237,6 +374,9 @@ def run_storage_validation(
                 "compact_recording_verified": True,
                 "raw_wav_segments_retained": 0,
                 "ordinary_debug_files_retained": 0,
+                "every_repetition_boundary_aligned": (
+                    alignment["boundary_count"] == repeat
+                ),
                 "category_total_reconciles": (
                     accounting["workspace"]["total_bytes"]
                     == sum(

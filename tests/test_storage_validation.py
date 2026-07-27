@@ -36,5 +36,8 @@ def test_storage_validation_emits_reconciled_evidence(
         "compact_recording_verified": True,
         "raw_wav_segments_retained": 0,
         "ordinary_debug_files_retained": 0,
+        "every_repetition_boundary_aligned": True,
         "category_total_reconciles": True,
     }
+    assert evidence["alignment"]["boundary_count"] == 1
+    assert evidence["alignment"]["minimum_correlation"] >= 0.9
