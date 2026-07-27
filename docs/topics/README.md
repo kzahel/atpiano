@@ -22,6 +22,10 @@ normally reuse the document slug in its `Topic:` trailers.
   transcription, persistence, and export into the browser; the exact ONNX
   artifact executes under a web WASM runtime, while real-browser parity and
   end-to-end behavior remain unvalidated.
+- [`desktop-score-runtime-footprint.md`](desktop-score-runtime-footprint.md):
+  measured internal desktop score footprint, duplicated dependency evidence,
+  inference-only checkpoint opportunity, safe pruning order, and parity
+  gates.
 - [`live-acoustic-transcription.md`](live-acoustic-transcription.md):
   browser prototype whose strict-onset decoder, room gate, physical keyboard,
   grand-staff stream, confidence controls, and source-timing guides are

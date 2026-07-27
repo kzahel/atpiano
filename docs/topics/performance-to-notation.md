@@ -33,6 +33,9 @@ plus the current evidence in
 [`018-score-playback-alignment.md`](../tactical/018-score-playback-alignment.md)
 and
 [`028-score-alignment-reconciliation.md`](../tactical/028-score-alignment-reconciliation.md).
+Desktop dependency and checkpoint sizing, deduplication, and inference-safe
+pruning now have a separate continuing owner in
+[`desktop-score-runtime-footprint.md`](desktop-score-runtime-footprint.md).
 
 The product goal is fixed and narrow: legible engraved sheet music the
 performer can sight read back. Lead sheets and chord-symbol summaries do not

@@ -98,6 +98,10 @@ their results cross process or network boundaries.
 [`performance-to-notation.md`](performance-to-notation.md) owns score
 semantics and readability. This topic treats score generation as a
 session-addressed job and score output as a versioned artifact.
+[`desktop-score-runtime-footprint.md`](desktop-score-runtime-footprint.md)
+owns the measured score-runtime size, inference-minimal dependency direction,
+and parity gates for reducing that internal bundle without weakening the
+process or release boundaries.
 [`browser-only-wasm-deployment.md`](browser-only-wasm-deployment.md) remains
 an optional client-side executor investigation, not the product architecture
 or a constraint on model quality.

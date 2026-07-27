@@ -21,3 +21,6 @@
 - `linux-development-portability` — reproducible Linux development gates,
   platform-neutral local copy, real model execution, optional-model dependency
   gaps, and local live-scheduling evidence
+- `desktop-score-runtime-footprint` — measured desktop score dependency and
+  checkpoint footprint, inference-minimal packaging, and parity-preserving
+  reduction
