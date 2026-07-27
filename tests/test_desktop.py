@@ -22,6 +22,7 @@ from atpiano.desktop import (
     apply_model_pack,
     create_handshake,
     create_ready,
+    desktop_runtime_environment,
     load_model_pack,
     model_pack_sha256,
     validate_desktop_token,
@@ -37,6 +38,20 @@ from atpiano.util import sha256_path, write_json
 DESKTOP_ORIGIN = "tauri://localhost"
 DESKTOP_TOKEN = "ab" * 32
 IS_MACOS_ARM64 = platform.system() == "Darwin" and platform.machine() == "arm64"
+
+
+def test_desktop_runtime_environment_redirects_library_caches(
+    tmp_path: Path,
+) -> None:
+    environment = desktop_runtime_environment(tmp_path / "workspace")
+    cache_root = (tmp_path / "workspace" / ".runtime-cache").resolve()
+
+    assert environment["PYTHONDONTWRITEBYTECODE"] == "1"
+    assert environment["PYTHONNOUSERSITE"] == "1"
+    assert environment["NUMBA_CACHE_DIR"] == str(cache_root / "numba")
+    assert environment["MPLCONFIGDIR"] == str(cache_root / "matplotlib")
+    assert environment["XDG_CACHE_HOME"] == str(cache_root)
+    assert environment["HF_HOME"] == str(cache_root / "huggingface")
 
 
 def _write_model_pack(root: Path) -> Path:
@@ -373,9 +388,7 @@ def test_sidecar_starts_authenticated_and_stops_on_parent_eof(
         if not readable:
             process.terminate()
             process.wait(timeout=5)
-            pytest.fail(
-                f"sidecar did not become ready: {process.stderr.read()}"
-            )
+            pytest.fail(f"sidecar did not become ready: {process.stderr.read()}")
         ready_line = process.stdout.readline()
         ready = json.loads(ready_line)
         assert ready["protocol_version"] == DESKTOP_PROTOCOL_VERSION

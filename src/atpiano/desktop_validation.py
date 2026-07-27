@@ -17,7 +17,11 @@ from pathlib import Path
 from typing import Any
 
 from atpiano.corrected_workbench import create_corrected_workbench_server
-from atpiano.desktop import apply_model_pack, load_model_pack
+from atpiano.desktop import (
+    apply_model_pack,
+    desktop_runtime_environment,
+    load_model_pack,
+)
 from atpiano.midi import MidiNote, load_notes
 from atpiano.notation import summarize_musicxml
 from atpiano.quality import score_notes
@@ -53,11 +57,7 @@ def normalized_event_digest(session_directory: Path) -> tuple[int, str]:
     for line in export.read_text(encoding="utf-8").splitlines():
         event = json.loads(line)
         events.append(
-            {
-                key: value
-                for key, value in event.items()
-                if key not in VOLATILE_EVENT_FIELDS
-            }
+            {key: value for key, value in event.items() if key not in VOLATILE_EVENT_FIELDS}
         )
     encoded_events = sorted(
         json.dumps(
@@ -239,8 +239,7 @@ def run_packaged_replay(
         "ATPIANO_DESKTOP_TOKEN": token,
         "ATPIANO_EXECUTION_BACKEND": "cpu",
         "CUDA_VISIBLE_DEVICES": "",
-        "PYTHONDONTWRITEBYTECODE": "1",
-        "PYTHONNOUSERSITE": "1",
+        **desktop_runtime_environment(workspace),
     }
     started = time.monotonic()
     process = subprocess.Popen(
@@ -433,8 +432,7 @@ def compare_replays(
             / export_denominator
         ),
         "exact_normalized_export_match": (
-            direct_events["normalized_export_sha256"]
-            == packaged_events["normalized_export_sha256"]
+            direct_events["normalized_export_sha256"] == packaged_events["normalized_export_sha256"]
         ),
     }
     musical_tolerance = {
@@ -455,21 +453,17 @@ def compare_replays(
     )
     golden_quality_delta = {
         "onset_f1_50_ms": abs(
-            direct_golden["onset"]["50_ms"]["f1"]
-            - packaged_golden["onset"]["50_ms"]["f1"]
+            direct_golden["onset"]["50_ms"]["f1"] - packaged_golden["onset"]["50_ms"]["f1"]
         ),
         "onset_f1_25_ms": abs(
-            direct_golden["onset"]["25_ms"]["f1"]
-            - packaged_golden["onset"]["25_ms"]["f1"]
+            direct_golden["onset"]["25_ms"]["f1"] - packaged_golden["onset"]["25_ms"]["f1"]
         ),
         "note_with_offset_f1": abs(
-            direct_golden["note_with_offset"]["f1"]
-            - packaged_golden["note_with_offset"]["f1"]
+            direct_golden["note_with_offset"]["f1"] - packaged_golden["note_with_offset"]["f1"]
         ),
         "frame_f1": abs(direct_golden["frame"]["f1"] - packaged_golden["frame"]["f1"]),
         "matched_velocity_mae": abs(
-            direct_golden["matched_velocity_mae"]
-            - packaged_golden["matched_velocity_mae"]
+            direct_golden["matched_velocity_mae"] - packaged_golden["matched_velocity_mae"]
         ),
         "final_note_count_relative": (
             abs(len(direct_notes) - len(packaged_notes)) / golden_note_denominator
@@ -493,15 +487,12 @@ def compare_replays(
         "models": packaged["models"] == direct["models"],
         "artifacts": packaged["artifacts"] == direct["artifacts"],
         "golden_reference": (
-            packaged["golden_reference"]["note_count"]
-            == direct["golden_reference"]["note_count"]
+            packaged["golden_reference"]["note_count"] == direct["golden_reference"]["note_count"]
         ),
         "event_tolerance": (
             event_tolerance["preview_emissions_equal"]
-            and event_tolerance["commit_emission_relative_delta"]
-            <= MAX_EVENT_RELATIVE_DELTA
-            and event_tolerance["export_count_relative_delta"]
-            <= MAX_EVENT_RELATIVE_DELTA
+            and event_tolerance["commit_emission_relative_delta"] <= MAX_EVENT_RELATIVE_DELTA
+            and event_tolerance["export_count_relative_delta"] <= MAX_EVENT_RELATIVE_DELTA
         ),
         "pairwise_musical_floor": (
             musical_tolerance["onset_f1_50_ms"] >= MIN_PAIRWISE_ONSET_F1
@@ -513,11 +504,9 @@ def compare_replays(
         "golden_quality_delta": (
             golden_quality_delta["onset_f1_50_ms"] <= MAX_GOLDEN_ONSET_F1_DELTA
             and golden_quality_delta["onset_f1_25_ms"] <= MAX_GOLDEN_ONSET_F1_DELTA
-            and golden_quality_delta["note_with_offset_f1"]
-            <= MAX_GOLDEN_NOTE_OFFSET_F1_DELTA
+            and golden_quality_delta["note_with_offset_f1"] <= MAX_GOLDEN_NOTE_OFFSET_F1_DELTA
             and golden_quality_delta["frame_f1"] <= MAX_GOLDEN_FRAME_F1_DELTA
-            and golden_quality_delta["matched_velocity_mae"]
-            <= MAX_GOLDEN_VELOCITY_MAE_DELTA
+            and golden_quality_delta["matched_velocity_mae"] <= MAX_GOLDEN_VELOCITY_MAE_DELTA
             and golden_quality_delta["final_note_count_relative"]
             <= MAX_GOLDEN_NOTE_COUNT_RELATIVE_DELTA
         ),

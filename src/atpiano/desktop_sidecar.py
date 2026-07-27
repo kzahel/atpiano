@@ -20,6 +20,7 @@ from atpiano.desktop import (
     apply_model_pack,
     create_handshake,
     create_ready,
+    desktop_runtime_environment,
     load_model_pack,
     validate_desktop_token,
 )
@@ -87,6 +88,7 @@ def _start_shutdown_watcher(
     signal.signal(signal.SIGTERM, handle_signal)
 
     if monitor_stdin:
+
         def watch_stdin() -> None:
             try:
                 sys.stdin.buffer.read(1)
@@ -102,6 +104,7 @@ def _start_shutdown_watcher(
 
 def run(arguments: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(arguments)
+    os.environ.update(desktop_runtime_environment(args.workspace))
     raw_token = os.environ.pop(DESKTOP_TOKEN_ENV, "")
     token = validate_desktop_token(raw_token)
     if args.expected_protocol != DESKTOP_PROTOCOL_VERSION:

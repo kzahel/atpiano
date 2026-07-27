@@ -26,6 +26,19 @@ DESKTOP_WEBSOCKET_PREFIX = f"{DESKTOP_PROTOCOL_VERSION}."
 MAX_DESKTOP_READY_BYTES = 64 * 1024
 
 
+def desktop_runtime_environment(workspace: Path) -> dict[str, str]:
+    """Keep library-generated caches in mutable app data, not the bundle."""
+    cache_root = workspace.resolve() / ".runtime-cache"
+    return {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONNOUSERSITE": "1",
+        "NUMBA_CACHE_DIR": str(cache_root / "numba"),
+        "MPLCONFIGDIR": str(cache_root / "matplotlib"),
+        "XDG_CACHE_HOME": str(cache_root),
+        "HF_HOME": str(cache_root / "huggingface"),
+    }
+
+
 class ModelAsset(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -63,9 +76,7 @@ class DesktopReady(BaseModel):
 
     schema_version: Literal["atpiano.desktop-ready.v1"] = DESKTOP_READY_SCHEMA
     protocol_version: Literal["atpiano.desktop.v1"] = DESKTOP_PROTOCOL_VERSION
-    contract_schema_version: Literal[
-        "atpiano.contract.v1"
-    ] = CONTRACT_SCHEMA_VERSION
+    contract_schema_version: Literal["atpiano.contract.v1"] = CONTRACT_SCHEMA_VERSION
     sidecar_version: str
     host: Literal["127.0.0.1"] = "127.0.0.1"
     port: int = Field(gt=0, le=65535)
@@ -79,14 +90,10 @@ class DesktopReady(BaseModel):
 class DesktopHandshake(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal[
-        "atpiano.desktop-handshake.v1"
-    ] = DESKTOP_HANDSHAKE_SCHEMA
+    schema_version: Literal["atpiano.desktop-handshake.v1"] = DESKTOP_HANDSHAKE_SCHEMA
     compatible: Literal[True] = True
     protocol_version: Literal["atpiano.desktop.v1"] = DESKTOP_PROTOCOL_VERSION
-    contract_schema_version: Literal[
-        "atpiano.contract.v1"
-    ] = CONTRACT_SCHEMA_VERSION
+    contract_schema_version: Literal["atpiano.contract.v1"] = CONTRACT_SCHEMA_VERSION
     pcm_protocol_version: str = PCM_PROTOCOL_VERSION
     sidecar_version: str
     python_version: str
@@ -101,9 +108,7 @@ class DesktopHandshake(BaseModel):
 
 def validate_desktop_token(raw_token: str) -> str:
     if DESKTOP_TOKEN_PATTERN.fullmatch(raw_token) is None:
-        raise ValueError(
-            "desktop token must be 32 bytes encoded as lowercase hex"
-        )
+        raise ValueError("desktop token must be 32 bytes encoded as lowercase hex")
     return raw_token
 
 
@@ -116,42 +121,30 @@ def load_model_pack(path: Path) -> ModelPack:
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError, UnicodeDecodeError) as error:
-        raise ValueError(
-            f"model pack manifest is unreadable: {error}"
-        ) from error
+        raise ValueError(f"model pack manifest is unreadable: {error}") from error
     pack = ModelPack.model_validate(document)
     root = path.resolve().parent
     for asset in pack.assets:
         candidate = (root / asset.path).resolve()
         if root != candidate and root not in candidate.parents:
-            raise ValueError(
-                f"model asset escapes its pack: {asset.asset_id}"
-            )
+            raise ValueError(f"model asset escapes its pack: {asset.asset_id}")
         if asset.kind == "file" and not candidate.is_file():
             raise ValueError(f"model asset is missing: {asset.asset_id}")
         if asset.kind == "directory" and not candidate.is_dir():
             raise ValueError(f"model asset is missing: {asset.asset_id}")
         if sha256_path(candidate) != asset.sha256:
-            raise ValueError(
-                f"model asset hash mismatch: {asset.asset_id}"
-            )
+            raise ValueError(f"model asset hash mismatch: {asset.asset_id}")
     return pack
 
 
 def apply_model_pack(pack: ModelPack, manifest_path: Path) -> None:
     root = manifest_path.resolve().parent
     assets = {asset.asset_id: root / asset.path for asset in pack.assets}
-    os.environ["ATPIANO_BASIC_PITCH_MODEL"] = str(
-        assets["basic-pitch-icassp-2022"]
-    )
+    os.environ["ATPIANO_BASIC_PITCH_MODEL"] = str(assets["basic-pitch-icassp-2022"])
     transkun = assets["transkun-2.0"]
     os.environ["ATPIANO_TRANSKUN_CHECKPOINT"] = str(transkun)
     config = next(
-        (
-            root / asset.path
-            for asset in pack.assets
-            if asset.asset_id == "transkun-2.0-config"
-        ),
+        (root / asset.path for asset in pack.assets if asset.asset_id == "transkun-2.0-config"),
         transkun.with_suffix(".conf"),
     )
     if not config.is_file():

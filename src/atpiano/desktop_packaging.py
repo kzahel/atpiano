@@ -21,7 +21,11 @@ from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from atpiano.desktop import MODEL_PACK_SCHEMA, ModelPack
+from atpiano.desktop import (
+    MODEL_PACK_SCHEMA,
+    ModelPack,
+    desktop_runtime_environment,
+)
 from atpiano.musical_fixture import generate_musical_fixture
 from atpiano.score_snapshot import (
     MIDI2SCORE_CHECKPOINT_SHA256,
@@ -122,9 +126,7 @@ def _repository_root() -> Path:
 
 
 def _expected_stage_root() -> Path:
-    return (
-        _repository_root() / "app" / "src-tauri" / "resources" / "desktop-runtime"
-    ).resolve()
+    return (_repository_root() / "app" / "src-tauri" / "resources" / "desktop-runtime").resolve()
 
 
 def _require_macos_arm64() -> None:
@@ -328,9 +330,7 @@ def _homebrew_formula(path: Path) -> str | None:
         index = parts.index("Cellar")
         return parts[index + 1] if index + 1 < len(parts) else None
     opt_indices = [
-        index
-        for index, part in enumerate(parts)
-        if part == "opt" and index + 1 < len(parts)
+        index for index, part in enumerate(parts) if part == "opt" and index + 1 < len(parts)
     ]
     if opt_indices:
         return parts[opt_indices[-1] + 1]
@@ -470,9 +470,7 @@ def bundle_media_tools(runtime_root: Path) -> dict[str, Any]:
             {
                 "name": value["name"],
                 "license": value.get("license"),
-                "installed_versions": [
-                    item["version"] for item in value.get("installed", [])
-                ],
+                "installed_versions": [item["version"] for item in value.get("installed", [])],
             }
         )
     return {
@@ -664,14 +662,10 @@ def stage_internal_score_runtime(
     source_runtime = source_runtime.resolve()
     source_state = inspect_score_runtime(source_runtime)
     if not source_state["available"]:
-        raise RuntimeError(
-            f"internal score runtime is unavailable: {source_state['error']}"
-        )
+        raise RuntimeError(f"internal score runtime is unavailable: {source_state['error']}")
     source_repository = source_runtime / "MIDI2ScoreTransformer"
     source_checkpoint = source_runtime / "MIDI2ScoreTF.ckpt"
-    source_python_packages = (
-        source_runtime / ".venv" / "lib" / "python3.11" / "site-packages"
-    )
+    source_python_packages = source_runtime / ".venv" / "lib" / "python3.11" / "site-packages"
     if not source_python_packages.is_dir():
         raise RuntimeError("internal score runtime Python packages are missing")
     repository_commit = _run(
@@ -747,9 +741,7 @@ def stage_internal_score_runtime(
             "paper_license": "CC-BY-4.0",
             "paper_record": INTERNAL_SCORE_PAPER_URL,
             "source_license": "unconfirmed",
-            "release_gate": (
-                "confirm source and checkpoint rights before distribution"
-            ),
+            "release_gate": ("confirm source and checkpoint rights before distribution"),
         },
         "python": python_version,
         "python_provenance": python_provenance,
@@ -797,9 +789,7 @@ def _stage_fixture(runtime_root: Path) -> None:
 
 def _path_size(path: Path) -> int:
     return sum(
-        child.lstat().st_size
-        for child in path.rglob("*")
-        if child.is_file() or child.is_symlink()
+        child.lstat().st_size for child in path.rglob("*") if child.is_file() or child.is_symlink()
     )
 
 
@@ -821,9 +811,7 @@ def inventory(root: Path) -> dict[str, Any]:
         top_level.append(
             {
                 "path": child.name,
-                "bytes": (
-                    _path_size(child) if child.is_dir() else child.lstat().st_size
-                ),
+                "bytes": (_path_size(child) if child.is_dir() else child.lstat().st_size),
             }
         )
     return {
@@ -900,9 +888,7 @@ def relocate_runtime_native(
             relative = Path(dependency).relative_to(python_source)
             target = runtime_root / relative
             if not target.is_file():
-                raise RuntimeError(
-                    f"copied Python dependency is missing: {relative.as_posix()}"
-                )
+                raise RuntimeError(f"copied Python dependency is missing: {relative.as_posix()}")
             changes.append((dependency, _loader_path(binary, target)))
         install_id = _otool_id(binary)
         needs_id = install_id is not None and install_id.startswith(str(python_source))
@@ -963,10 +949,7 @@ def _audit_distributions(
             raise RuntimeError(f"forbidden development package: {package['name']}")
     for path in root.rglob("*"):
         if path.name in FORBIDDEN_BASENAMES:
-            if (
-                allow_internal_score_runtime
-                and INTERNAL_SCORE_RUNTIME_NAME in path.parts
-            ):
+            if allow_internal_score_runtime and INTERNAL_SCORE_RUNTIME_NAME in path.parts:
                 continue
             raise RuntimeError(f"forbidden score runtime asset: {path.name}")
 
@@ -1000,9 +983,7 @@ def _audit_internal_score_runtime(
     score_root = runtime_root / INTERNAL_SCORE_RUNTIME_NAME
     state = inspect_score_runtime(score_root)
     if not state["available"]:
-        raise RuntimeError(
-            f"internal score runtime failed validation: {state['error']}"
-        )
+        raise RuntimeError(f"internal score runtime failed validation: {state['error']}")
     runtime_manifest = state["manifest"]
     license_state = runtime_manifest.get("license", {})
     if (
@@ -1090,9 +1071,7 @@ def _audit_native(root: Path) -> list[dict[str, Any]]:
 def component_inventory(root: Path) -> dict[str, Any]:
     root = root.resolve()
     runtime_root = (
-        root / "Contents" / "Resources" / "desktop-runtime"
-        if root.suffix == ".app"
-        else root
+        root / "Contents" / "Resources" / "desktop-runtime" if root.suffix == ".app" else root
     )
     categories: dict[str, dict[str, int]] = {}
 
@@ -1163,8 +1142,7 @@ def component_inventory(root: Path) -> dict[str, Any]:
             "bytes": sum(path.lstat().st_size for path in runtime_required_testing),
             "file_count": len(runtime_required_testing),
             "namespaces": [
-                "/".join(namespace)
-                for namespace in sorted(REQUIRED_RUNTIME_TEST_NAMESPACES)
+                "/".join(namespace) for namespace in sorted(REQUIRED_RUNTIME_TEST_NAMESPACES)
             ],
             "policy": (
                 "retained only where the package imports its public "
@@ -1273,9 +1251,7 @@ def audit_root(
     if not root.is_dir():
         raise RuntimeError(f"bundle root does not exist: {root}")
     runtime_root = (
-        root / "Contents" / "Resources" / "desktop-runtime"
-        if root.suffix == ".app"
-        else root
+        root / "Contents" / "Resources" / "desktop-runtime" if root.suffix == ".app" else root
     )
     if not (runtime_root / "bundle-manifest.json").is_file():
         raise RuntimeError("desktop runtime manifest is missing")
@@ -1363,6 +1339,7 @@ def smoke_sidecar(
     token = secrets.token_hex(32)
     environment = os.environ.copy()
     environment["ATPIANO_DESKTOP_TOKEN"] = token
+    environment.update(desktop_runtime_environment(working_directory / "workspace"))
     command: list[str | Path] = [
         runtime_root / "bin" / "python3",
         "-I",
@@ -1410,9 +1387,7 @@ def smoke_sidecar(
             )
         except urllib.error.HTTPError as error:
             if error.code != 401:
-                raise RuntimeError(
-                    "desktop sidecar returned an unexpected auth status"
-                ) from error
+                raise RuntimeError("desktop sidecar returned an unexpected auth status") from error
         else:
             raise RuntimeError("desktop sidecar accepted an unauthenticated request")
         request = urllib.request.Request(
@@ -1516,9 +1491,7 @@ def stage_runtime(
             staged,
             Path(temporary_directory),
             score_runtime=(
-                staged / INTERNAL_SCORE_RUNTIME_NAME
-                if include_internal_score_runtime
-                else None
+                staged / INTERNAL_SCORE_RUNTIME_NAME if include_internal_score_runtime else None
             ),
         )
         manifest = {
