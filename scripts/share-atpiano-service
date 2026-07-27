@@ -1,0 +1,296 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+system_name="$(uname -s 2>/dev/null || printf 'unknown')"
+if [[ "${system_name}" != "Darwin" ]]; then
+  printf 'error: scripts/share-atpiano-service requires macOS launchd; detected %s.\n' \
+    "${system_name}" >&2
+  printf 'This on-demand public-sharing service is not supported on Linux.\n' >&2
+  exit 69
+fi
+
+service_label="com.graehlarts.atpiano-share"
+user_id="$(id -u)"
+service_domain="gui/${user_id}"
+service_target="${service_domain}/${service_label}"
+script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repository_directory="$(cd "${script_directory}/.." && pwd)"
+template_path="${script_directory}/launchd/${service_label}.plist.in"
+runtime_directory="${ATPIANO_SERVICE_RUNTIME_DIR:-${repository_directory}/results/share-atpiano-service}"
+generated_plist="${runtime_directory}/${service_label}.plist"
+generated_runner="${runtime_directory}/share-atpiano-service-runner"
+account_name="$(id -un)"
+account_directory="$(/usr/bin/dscl . -read "/Users/${account_name}" NFSHomeDirectory |
+  /usr/bin/sed -n 's/^NFSHomeDirectory: //p')"
+
+if [[ -z "${account_directory}" ]]; then
+  printf 'error: could not resolve the home directory for macOS user %s.\n' \
+    "${account_name}" >&2
+  exit 69
+fi
+
+log_directory="${ATPIANO_SERVICE_LOG_DIR:-${account_directory}/Library/Logs/atpiano}"
+lifecycle_log="${log_directory}/share.lifecycle.log"
+stdout_log="${log_directory}/share.stdout.log"
+stderr_log="${log_directory}/share.stderr.log"
+log_file_count="${ATPIANO_SERVICE_LOG_COUNT:-5}"
+log_size="${ATPIANO_SERVICE_LOG_SIZE:-5M}"
+bind_address="${ATPIANO_BIND_ADDRESS:-192.168.1.104}"
+port="${ATPIANO_PORT:-8002}"
+public_origin="${ATPIANO_PUBLIC_ORIGIN:-https://atpiano.graehlarts.com}"
+
+if [[ ! "${log_file_count}" =~ ^[1-9][0-9]*$ ]]; then
+  printf 'error: ATPIANO_SERVICE_LOG_COUNT must be a positive integer.\n' >&2
+  exit 64
+fi
+if [[ ! "${log_size}" =~ ^[1-9][0-9]*[BKMG]$ ]]; then
+  printf 'error: ATPIANO_SERVICE_LOG_SIZE must look like 5M or 500K.\n' >&2
+  exit 64
+fi
+
+timestamp() {
+  date -u '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+record_lifecycle() {
+  mkdir -p "${log_directory}"
+  printf '%s %s\n' "$(timestamp)" "$*" >>"${lifecycle_log}"
+}
+
+service_is_loaded() {
+  /bin/launchctl print "${service_target}" >/dev/null 2>&1
+}
+
+port_listener() {
+  /usr/sbin/lsof -nP -iTCP:"${port}" -sTCP:LISTEN 2>/dev/null || true
+}
+
+prepare_stream_log() {
+  current_path="$1"
+  archive_path="${current_path}.archive"
+  if [[ ! -e "${archive_path}" ]]; then
+    if [[ -e "${current_path}" ]]; then
+      mv "${current_path}" "${archive_path}"
+    else
+      touch "${archive_path}"
+    fi
+  fi
+  if [[ ! -e "${current_path}" ]]; then
+    ln "${archive_path}" "${current_path}"
+  fi
+}
+
+render_plist() {
+  if [[ ! -x /usr/sbin/rotatelogs ]]; then
+    printf 'error: this macOS host does not provide /usr/sbin/rotatelogs.\n' >&2
+    return 69
+  fi
+  uv_path="${ATPIANO_UV:-$(command -v uv || true)}"
+  if [[ -z "${uv_path}" || ! -x "${uv_path}" ]]; then
+    printf 'error: no executable uv was found; set ATPIANO_UV to its absolute path.\n' >&2
+    return 69
+  fi
+  npm_path="$(command -v npm || true)"
+  if [[ -z "${npm_path}" || ! -x "${npm_path}" ]]; then
+    printf 'error: no executable npm was found; it is required to build the shared app.\n' >&2
+    return 69
+  fi
+  service_path="$(dirname "${npm_path}"):$(dirname "${uv_path}"):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+  mkdir -p "${runtime_directory}" "${log_directory}"
+  touch "${lifecycle_log}"
+  prepare_stream_log "${stdout_log}"
+  prepare_stream_log "${stderr_log}"
+  cp "${script_directory}/share-atpiano-service-runner" "${generated_runner}"
+  chmod 700 "${generated_runner}"
+  cp "${template_path}" "${generated_plist}"
+  /usr/bin/plutil -replace ProgramArguments.0 -string \
+    "${generated_runner}" "${generated_plist}"
+  /usr/bin/plutil -remove ProgramArguments.1 "${generated_plist}"
+  /usr/bin/plutil -replace WorkingDirectory -string \
+    "${repository_directory}" "${generated_plist}"
+  /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_BIND_ADDRESS -string \
+    "${bind_address}" "${generated_plist}"
+  /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_PORT -string \
+    "${port}" "${generated_plist}"
+  /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_PUBLIC_ORIGIN -string \
+    "${public_origin}" "${generated_plist}"
+  /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_SERVICE_LOG_COUNT -string \
+    "${log_file_count}" "${generated_plist}"
+  /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_SERVICE_LOG_SIZE -string \
+    "${log_size}" "${generated_plist}"
+  /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_SERVICE_LIFECYCLE_LOG -string \
+    "${lifecycle_log}" "${generated_plist}"
+  /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_SERVICE_STDERR_LOG -string \
+    "${stderr_log}" "${generated_plist}"
+  /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_SERVICE_STDOUT_LOG -string \
+    "${stdout_log}" "${generated_plist}"
+  /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_SHARE_SCRIPT -string \
+    "${script_directory}/share-atpiano" "${generated_plist}"
+  /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_UV -string \
+    "${uv_path}" "${generated_plist}"
+  /usr/bin/plutil -replace EnvironmentVariables.PATH -string \
+    "${service_path}" "${generated_plist}"
+  /usr/bin/plutil -lint "${generated_plist}" >/dev/null
+  chmod 600 "${generated_plist}"
+}
+
+print_status() {
+  if ! service_is_loaded; then
+    printf 'Atpiano share service: stopped\n'
+    printf 'Label: %s\n' "${service_label}"
+    printf 'Logs: %s\n' "${log_directory}"
+    return 3
+  fi
+
+  service_details="$(/bin/launchctl print "${service_target}")"
+  service_state="$(printf '%s\n' "${service_details}" |
+    /usr/bin/sed -n 's/^[[:space:]]*state = //p' | /usr/bin/head -1)"
+  service_pid="$(printf '%s\n' "${service_details}" |
+    /usr/bin/sed -n 's/^[[:space:]]*pid = //p' | /usr/bin/head -1)"
+  service_runs="$(printf '%s\n' "${service_details}" |
+    /usr/bin/sed -n 's/^[[:space:]]*runs = //p' | /usr/bin/head -1)"
+  last_exit="$(printf '%s\n' "${service_details}" |
+    /usr/bin/sed -n 's/^[[:space:]]*last exit code = //p' | /usr/bin/head -1)"
+  listener="$(port_listener)"
+
+  printf 'Atpiano share service: %s\n' "${service_state:-loaded}"
+  printf 'Label: %s\n' "${service_label}"
+  printf 'PID: %s\n' "${service_pid:-not reported}"
+  printf 'Runs: %s\n' "${service_runs:-not reported}"
+  printf 'Last exit: %s\n' "${last_exit:-not reported}"
+  printf 'Listener: %s:%s (%s)\n' \
+    "${bind_address}" "${port}" "$([[ -n "${listener}" ]] && printf 'ready' || printf 'not ready')"
+  printf 'Public origin: %s\n' "${public_origin}"
+  printf 'Logs: %s\n' "${log_directory}"
+}
+
+start_service() {
+  if service_is_loaded; then
+    printf 'Atpiano share service is already loaded.\n'
+    print_status
+    return 0
+  fi
+
+  existing_listener="$(port_listener)"
+  if [[ -n "${existing_listener}" ]]; then
+    printf 'error: TCP port %s is already occupied before the service starts:\n' \
+      "${port}" >&2
+    printf '%s\n' "${existing_listener}" >&2
+    printf 'Stop the foreground server or choose ATPIANO_PORT before retrying.\n' >&2
+    return 69
+  fi
+
+  render_plist
+  record_lifecycle \
+    "event=start_requested label=${service_label} repository=${repository_directory} bind=${bind_address} port=${port}"
+  if ! /bin/launchctl bootstrap "${service_domain}" "${generated_plist}"; then
+    record_lifecycle "event=start_failed label=${service_label}"
+    printf 'error: launchd could not bootstrap %s; inspect %s.\n' \
+      "${service_label}" "${stderr_log}" >&2
+    return 1
+  fi
+
+  attempt=0
+  while [[ "${attempt}" -lt 300 ]]; do
+    if [[ -n "$(port_listener)" ]]; then
+      record_lifecycle "event=started label=${service_label} port=${port}"
+      printf 'Atpiano share service started.\n'
+      print_status
+      return 0
+    fi
+    if ! service_is_loaded; then
+      break
+    fi
+    attempt=$((attempt + 1))
+    sleep 0.1
+  done
+
+  record_lifecycle "event=start_timeout label=${service_label} port=${port}"
+  /bin/launchctl bootout "${service_target}" >/dev/null 2>&1 || true
+  printf 'error: the service did not listen on port %s within 30 seconds.\n' \
+    "${port}" >&2
+  printf 'Inspect logs with: scripts/share-atpiano-service logs\n' >&2
+  return 1
+}
+
+stop_service() {
+  if ! service_is_loaded; then
+    printf 'Atpiano share service is already stopped.\n'
+    return 0
+  fi
+
+  record_lifecycle "event=stop_requested label=${service_label}"
+  if ! /bin/launchctl bootout "${service_target}"; then
+    record_lifecycle "event=stop_failed label=${service_label}"
+    printf 'error: launchd could not stop %s.\n' "${service_label}" >&2
+    return 1
+  fi
+
+  attempt=0
+  while [[ "${attempt}" -lt 100 ]] && service_is_loaded; do
+    attempt=$((attempt + 1))
+    sleep 0.1
+  done
+  if service_is_loaded; then
+    record_lifecycle "event=stop_timeout label=${service_label}"
+    printf 'error: launchd still reports %s as loaded.\n' "${service_label}" >&2
+    return 1
+  fi
+
+  record_lifecycle "event=stopped label=${service_label}"
+  printf 'Atpiano share service stopped.\n'
+}
+
+show_logs() {
+  follow_logs="false"
+  if [[ "${1:-}" == "--follow" || "${1:-}" == "-f" ]]; then
+    follow_logs="true"
+  elif [[ -n "${1:-}" ]]; then
+    printf 'error: logs accepts only --follow or -f.\n' >&2
+    return 64
+  fi
+
+  mkdir -p "${log_directory}"
+  touch "${lifecycle_log}"
+  prepare_stream_log "${stdout_log}"
+  prepare_stream_log "${stderr_log}"
+  if [[ "${follow_logs}" == "true" ]]; then
+    tail -n "${ATPIANO_SERVICE_LOG_LINES:-120}" -F \
+      "${lifecycle_log}" "${stdout_log}" "${stderr_log}"
+  else
+    tail -n "${ATPIANO_SERVICE_LOG_LINES:-120}" \
+      "${lifecycle_log}" "${stdout_log}" "${stderr_log}"
+  fi
+}
+
+usage() {
+  printf 'Usage: scripts/share-atpiano-service {start|stop|restart|status|logs [--follow]}\n'
+  printf '\n'
+  printf 'This is an on-demand macOS launchd service. It does not install a login item\n'
+  printf 'and will not start again after reboot until "start" is run explicitly.\n'
+}
+
+command_name="${1:-}"
+case "${command_name}" in
+  start)
+    start_service
+    ;;
+  stop)
+    stop_service
+    ;;
+  restart)
+    stop_service
+    start_service
+    ;;
+  status)
+    print_status
+    ;;
+  logs)
+    show_logs "${2:-}"
+    ;;
+  *)
+    usage >&2
+    exit 64
+    ;;
+esac

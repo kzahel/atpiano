@@ -37,3 +37,6 @@ execution record; continuing status and direction belong in the relevant
 | [`024-score-reader-engraving-density.md`](024-score-reader-engraving-density.md) | Implemented | Visible system spacing and meaningful Large, Comfortable, and Compact reader engraving profiles |
 | [`025-public-live-caddy.md`](025-public-live-caddy.md) | Implemented | Temporary Caddy sharing of the real local React and Python/model application over the LAN through the Pi |
 | [`026-empty-score-feedback.md`](026-empty-score-feedback.md) | Implemented | Explicit no-piano-notes score feedback with preserved job-error details in the shared application |
+| [`027-mobile-session-navigation.md`](027-mobile-session-navigation.md) | Complete | Touch-friendly off-canvas session history and navigation on narrow screens |
+| [`028-score-alignment-reconciliation.md`](028-score-alignment-reconciliation.md) | Complete | Exact-pitch monotonic reconciliation between source events and generated score attacks |
+| [`029-durable-macos-share-service.md`](029-durable-macos-share-service.md) | Implemented | On-demand launchd supervision, persistent lifecycle logs, and explicit macOS-only service controls |

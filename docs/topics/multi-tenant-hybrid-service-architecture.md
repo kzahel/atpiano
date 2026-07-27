@@ -15,10 +15,12 @@ source-sample inspection. Playback prefers a replaceable MP3 derivative while
 the current local adapter retains segmented WAV source audio. Phase 4 is
 planned under
 [`017-python-application-core.md`](../tactical/017-python-application-core.md)
-but has not started. The Pi's existing public Caddy service can now proxy the
-real Mac-hosted React and Python/model application over the LAN for a short
-public trial; this is not evidence of the hosted service, accounts, durable
-cloud persistence, or multi-tenant isolation.**
+but has not started. The Pi's existing public Caddy service can proxy the real
+Mac-hosted React and Python/model application over the LAN for a short public
+trial. Its Mac upstream now runs as an on-demand, restart-supervised launchd
+job with retained lifecycle and process logs; it deliberately does not
+register as a reboot or login service. This remains no evidence of the hosted
+service, accounts, durable cloud persistence, or multi-tenant isolation.**
 Versioned Pydantic contracts, generated OpenAPI/TypeScript, the
 `AtpianoRuntime` boundary, an executable fixture provider, and explicit local
 compatibility paths exist. R2 feedback removed the generic `product`

@@ -119,17 +119,33 @@ part of `migration-regression`.
 ## Temporary Public Trial
 
 The Pi's live Caddy service proxies `https://atpiano.graehlarts.com` over the
-LAN to this Mac. Start the authoritative v3 application on the configured
-address and port:
+LAN to this Mac. The public upstream is an on-demand macOS `launchd` service:
 
 ```text
-scripts/share-atpiano
+scripts/share-atpiano-service start
+scripts/share-atpiano-service status
+scripts/share-atpiano-service logs
 ```
 
-The URL works only while this Mac and the command are running. The application
-binds to this Mac's LAN address; its explicit `--public-origin` option
-trusts only the configured HTTPS hostname for browser actions and microphone
-WebSockets.
+The service survives a terminal closing, restarts after an unexpected exit,
+and retains lifecycle, stdout, and stderr logs under
+`~/Library/Logs/atpiano/`. Stdout and stderr use five-file, 5 MiB circular
+rotation by default. It is registered directly from this repository, not
+installed as a login item, so a reboot leaves it stopped until the explicit
+`start` command is run again. Use `restart`, `logs --follow`, or `stop` for
+the corresponding lifecycle operations.
+
+Both the service and the lower-level `scripts/share-atpiano` foreground
+launcher are intentionally macOS-only and fail with an explicit explanation
+on Linux. The foreground launcher remains useful for direct diagnosis.
+
+The URL works only while this Mac and the service are running. The application
+binds to this Mac's LAN address; its explicit `--public-origin` option trusts
+only the configured HTTPS hostname for browser actions and microphone
+WebSockets. Override `ATPIANO_BIND_ADDRESS`, `ATPIANO_PORT`,
+`ATPIANO_PUBLIC_ORIGIN`, `ATPIANO_UV`, or `ATPIANO_SERVICE_LOG_DIR` when
+registering the service to change its generated launch configuration.
+`ATPIANO_SERVICE_LOG_SIZE` and `ATPIANO_SERVICE_LOG_COUNT` adjust rotation.
 
 Machine-dependent microphone, real Transkun, internal score-runtime, and
 long-soak lanes remain explicit rather than being counted as unattended

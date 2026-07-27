@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+system_name="$(uname -s 2>/dev/null || printf 'unknown')"
+if [[ "${system_name}" != "Darwin" ]]; then
+  printf 'error: scripts/share-atpiano-service-runner requires macOS launchd; detected %s.\n' \
+    "${system_name}" >&2
+  exit 69
+fi
+
+lifecycle_log="${ATPIANO_SERVICE_LIFECYCLE_LOG:?launchd did not configure the lifecycle log}"
+stdout_log="${ATPIANO_SERVICE_STDOUT_LOG:?launchd did not configure the stdout log}"
+stderr_log="${ATPIANO_SERVICE_STDERR_LOG:?launchd did not configure the stderr log}"
+share_script="${ATPIANO_SHARE_SCRIPT:?launchd did not configure the share script}"
+log_file_count="${ATPIANO_SERVICE_LOG_COUNT:-5}"
+log_size="${ATPIANO_SERVICE_LOG_SIZE:-5M}"
+child_pid=""
+received_signal=""
+
+mkdir -p "$(dirname "${lifecycle_log}")"
+exec > >(
+  /usr/sbin/rotatelogs -f -n "${log_file_count}" -L "${stdout_log}" \
+    "${stdout_log}.archive" "${log_size}"
+)
+exec 2> >(
+  /usr/sbin/rotatelogs -f -n "${log_file_count}" -L "${stderr_log}" \
+    "${stderr_log}.archive" "${log_size}"
+)
+
+timestamp() {
+  date -u '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+record_lifecycle() {
+  event_line="$(timestamp) $*"
+  printf '%s\n' "${event_line}"
+  printf '%s\n' "${event_line}" >>"${lifecycle_log}" || true
+}
+
+forward_signal() {
+  received_signal="$1"
+  record_lifecycle \
+    "event=signal_received signal=${received_signal} runner_pid=$$ child_pid=${child_pid:-none}"
+  if [[ -n "${child_pid}" ]] && kill -0 "${child_pid}" 2>/dev/null; then
+    kill "-${received_signal}" "${child_pid}" 2>/dev/null || true
+  fi
+}
+
+trap 'forward_signal HUP' HUP
+trap 'forward_signal INT' INT
+trap 'forward_signal TERM' TERM
+
+record_lifecycle "event=runner_start runner_pid=$$ parent_pid=$PPID"
+"${share_script}" &
+child_pid=$!
+record_lifecycle "event=server_start child_pid=${child_pid}"
+
+wait "${child_pid}"
+exit_status=$?
+if kill -0 "${child_pid}" 2>/dev/null; then
+  wait "${child_pid}"
+  exit_status=$?
+fi
+
+record_lifecycle \
+  "event=server_exit child_pid=${child_pid} status=${exit_status} signal=${received_signal:-none}"
+record_lifecycle "event=runner_exit runner_pid=$$ status=${exit_status}"
+exit "${exit_status}"

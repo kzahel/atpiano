@@ -13,6 +13,14 @@ one bounded implementation slice and becomes its execution record when the
 slice lands. Completed tacticals are historical evidence; current topic docs
 own continuing guidance.
 
+The temporary public application is an on-demand macOS service. After
+completing and validating a code change that affects the shared live
+application, run `scripts/share-atpiano-service status`. If the service is
+active, restart it with `scripts/share-atpiano-service restart` and verify the
+public homepage and capability API. Do not start an inactive service merely
+because code changed. The service commands are intentionally unsupported on
+Linux; report that the live restart was skipped when validation occurs there.
+
 Documentation roles:
 
 - Architecture and reference docs own durable system shape and external facts.

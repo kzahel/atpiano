@@ -1,11 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+system_name="$(uname -s 2>/dev/null || printf 'unknown')"
+if [[ "${system_name}" != "Darwin" ]]; then
+  printf 'error: scripts/share-atpiano requires macOS because it uses caffeinate; detected %s.\n' \
+    "${system_name}" >&2
+  printf 'Use "uv run atpiano workbench-v3" for an ordinary local server on this host.\n' >&2
+  exit 69
+fi
+
 bind_address="${ATPIANO_BIND_ADDRESS:-192.168.1.104}"
 port="${ATPIANO_PORT:-8002}"
 public_origin="${ATPIANO_PUBLIC_ORIGIN:-https://atpiano.graehlarts.com}"
+uv_path="${ATPIANO_UV:-$(command -v uv || true)}"
 
-exec caffeinate -im uv run atpiano workbench-v3 \
+if [[ -z "${uv_path}" || ! -x "${uv_path}" ]]; then
+  printf 'error: no executable uv was found; set ATPIANO_UV to its absolute path.\n' >&2
+  exit 69
+fi
+
+exec /usr/bin/caffeinate -im "${uv_path}" run atpiano workbench-v3 \
   --bind "${bind_address}" \
   --port "${port}" \
   --public-origin "${public_origin}" \

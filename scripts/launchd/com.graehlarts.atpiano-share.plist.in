@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.graehlarts.atpiano-share</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__ATPIANO_RUNNER__</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__ATPIANO_WORKING_DIRECTORY__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>ATPIANO_BIND_ADDRESS</key>
+    <string>__ATPIANO_BIND_ADDRESS__</string>
+    <key>ATPIANO_PORT</key>
+    <string>__ATPIANO_PORT__</string>
+    <key>ATPIANO_PUBLIC_ORIGIN</key>
+    <string>__ATPIANO_PUBLIC_ORIGIN__</string>
+    <key>ATPIANO_SERVICE_LOG_COUNT</key>
+    <string>__ATPIANO_LOG_COUNT__</string>
+    <key>ATPIANO_SERVICE_LOG_SIZE</key>
+    <string>__ATPIANO_LOG_SIZE__</string>
+    <key>ATPIANO_SERVICE_LIFECYCLE_LOG</key>
+    <string>__ATPIANO_LIFECYCLE_LOG__</string>
+    <key>ATPIANO_SERVICE_STDERR_LOG</key>
+    <string>__ATPIANO_STDERR_LOG__</string>
+    <key>ATPIANO_SERVICE_STDOUT_LOG</key>
+    <string>__ATPIANO_STDOUT_LOG__</string>
+    <key>ATPIANO_SHARE_SCRIPT</key>
+    <string>__ATPIANO_SHARE_SCRIPT__</string>
+    <key>ATPIANO_UV</key>
+    <string>__ATPIANO_UV__</string>
+    <key>PATH</key>
+    <string>__ATPIANO_PATH__</string>
+    <key>PYTHONUNBUFFERED</key>
+    <string>1</string>
+  </dict>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Interactive</string>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>ExitTimeOut</key>
+  <integer>30</integer>
+  <key>StandardOutPath</key>
+  <string>/dev/null</string>
+  <key>StandardErrorPath</key>
+  <string>/dev/null</string>
+  <key>Umask</key>
+  <integer>18</integer>
+</dict>
+</plist>
