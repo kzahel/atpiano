@@ -7,6 +7,7 @@ runtime_root="${repository_root}/app/src-tauri/resources/desktop-runtime"
 report_root="${repository_root}/results/desktop-phase5"
 app_bundle="${repository_root}/app/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Atpiano.app"
 tauri_target="${repository_root}/app/src-tauri/target"
+review_archive="${report_root}/Atpiano-R5-macos-arm64-unsigned.zip"
 
 stage_runtime() {
   mkdir -p "${report_root}"
@@ -54,10 +55,17 @@ case "${1:-}" in
         --bundles app \
         --no-sign
     )
+    archive_staging="${review_archive}.tmp"
+    rm -f "${archive_staging}"
+    ditto -c -k --sequesterRsrc --keepParent \
+      "${app_bundle}" \
+      "${archive_staging}"
+    mv -f "${archive_staging}" "${review_archive}"
     (
       cd "${repository_root}"
       uv run python -m atpiano.desktop_packaging audit \
         --root "${app_bundle}" \
+        --archive "${review_archive}" \
         --report "${report_root}/bundle-audit.json"
     )
     printf '%s\n' "${app_bundle}"

@@ -7,9 +7,11 @@ import pytest
 
 from atpiano.desktop import load_model_pack
 from atpiano.desktop_packaging import (
+    _audit_anonymous_caches,
     _audit_distributions,
     _audit_symlinks,
     _stage_fixture,
+    component_inventory,
     inventory,
     stage_model_pack,
 )
@@ -72,6 +74,11 @@ def test_bundle_audit_rejects_accelerator_and_score_assets(
             tmp_path,
             [{"name": "torch", "version": "2"}],
         )
+    with pytest.raises(RuntimeError, match="development package"):
+        _audit_distributions(
+            tmp_path,
+            [{"name": "pytest", "version": "8"}],
+        )
 
 
 def test_model_pack_manifest_has_no_absolute_paths(tmp_path: Path) -> None:
@@ -105,3 +112,38 @@ def test_desktop_stages_the_golden_musical_fixture(
     assert manifest["input_id"] == "deterministic-musical-loop-v1"
     assert manifest["audio"]["duration_s"] == 42.0
     assert manifest["audio"]["frame_count"] == 2_016_000
+
+
+def test_component_inventory_reconciles_staged_runtime(
+    tmp_path: Path,
+) -> None:
+    paths = (
+        "bin/python3.10",
+        "bin/ffmpeg",
+        "fixture/input.json",
+        "lib/media/libcodec.dylib",
+        "lib/python3.10/site-packages/example/module.py",
+        "model-pack/model-pack.json",
+    )
+    for relative in paths:
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(relative.encode("utf-8"))
+
+    summary = component_inventory(tmp_path)
+
+    assert summary["installed_bytes"] == inventory(tmp_path)["total_bytes"]
+    assert set(summary["categories"]) == {
+        "golden_replay_fixture",
+        "media_tools",
+        "model_pack",
+        "python_packages",
+        "python_runtime_and_manifest",
+    }
+
+
+def test_bundle_audit_rejects_anonymous_cache(tmp_path: Path) -> None:
+    (tmp_path / "__pycache__").mkdir()
+
+    with pytest.raises(RuntimeError, match="anonymous cache"):
+        _audit_anonymous_caches(tmp_path)

@@ -37,6 +37,12 @@ FORBIDDEN_DISTRIBUTION_PREFIXES = (
     "rocm-",
     "triton",
 )
+FORBIDDEN_DEV_DISTRIBUTIONS = {
+    "hypothesis",
+    "mypy",
+    "pytest",
+    "ruff",
+}
 FORBIDDEN_BASENAMES = {
     "MIDI2ScoreTF.ckpt",
     "midi2score-runtime",
@@ -498,13 +504,13 @@ def _prune_runtime(runtime_root: Path) -> None:
     for direct_url in site_packages.rglob("direct_url.json"):
         direct_url.unlink()
     for cache in sorted(
-        site_packages.rglob("__pycache__"),
+        runtime_root.rglob("__pycache__"),
         key=lambda path: len(path.parts),
         reverse=True,
     ):
         if cache.is_dir():
             shutil.rmtree(cache)
-    for bytecode in site_packages.rglob("*.py[co]"):
+    for bytecode in runtime_root.rglob("*.py[co]"):
         bytecode.unlink()
     keep = {"python", "python3", "python3.10", "ffmpeg", "ffprobe"}
     for entry in (runtime_root / "bin").iterdir():
@@ -526,17 +532,27 @@ for distribution in metadata.distributions():
     license_classifiers = [
         item for item in classifiers if item.startswith("License ::")
     ]
+    installed = []
+    for relative in distribution.files or []:
+        path = distribution.locate_file(relative)
+        try:
+            if path.is_file():
+                installed.append(path.stat().st_size)
+        except OSError:
+            continue
     items.append({
         "name": value.get("Name", distribution.name),
         "version": distribution.version,
         "license": value.get("License"),
         "license_expression": value.get("License-Expression"),
         "license_classifiers": license_classifiers,
+        "installed_bytes": sum(installed),
+        "installed_file_count": len(installed),
     })
 print(json.dumps(sorted(items, key=lambda item: item["name"].lower())))
 """
     result = _run(
-        [runtime_root / "bin" / "python3", "-I", "-c", script],
+        [runtime_root / "bin" / "python3", "-I", "-B", "-c", script],
         capture_output=True,
     )
     return json.loads(result.stdout)
@@ -736,6 +752,10 @@ def _audit_distributions(
             raise RuntimeError(
                 f"forbidden accelerator package: {package['name']}"
             )
+        if normalized in FORBIDDEN_DEV_DISTRIBUTIONS:
+            raise RuntimeError(
+                f"forbidden development package: {package['name']}"
+            )
     for path in root.rglob("*"):
         if path.name in FORBIDDEN_BASENAMES:
             raise RuntimeError(
@@ -779,7 +799,115 @@ def _audit_native(root: Path) -> list[dict[str, Any]]:
     return native
 
 
-def audit_root(root: Path) -> dict[str, Any]:
+def component_inventory(root: Path) -> dict[str, Any]:
+    root = root.resolve()
+    runtime_root = (
+        root / "Contents" / "Resources" / "desktop-runtime"
+        if root.suffix == ".app"
+        else root
+    )
+    categories: dict[str, dict[str, int]] = {}
+
+    def record(category: str, path: Path) -> None:
+        entry = categories.setdefault(
+            category,
+            {"bytes": 0, "file_count": 0},
+        )
+        entry["bytes"] += path.lstat().st_size
+        entry["file_count"] += 1
+
+    test_material = []
+    for path in root.rglob("*"):
+        if not (path.is_file() or path.is_symlink()):
+            continue
+        try:
+            runtime_relative = path.relative_to(runtime_root)
+        except ValueError:
+            relative = path.relative_to(root)
+            if relative.parts[:2] == ("Contents", "MacOS"):
+                category = "rust_shell_and_embedded_frontend"
+            elif relative.parts[:2] == ("Contents", "Resources"):
+                category = "app_resources"
+            else:
+                category = "app_metadata"
+        else:
+            parts = runtime_relative.parts
+            if parts[:1] == ("model-pack",):
+                category = "model_pack"
+            elif parts[:1] == ("fixture",):
+                category = "golden_replay_fixture"
+            elif parts[:3] == (
+                "lib",
+                "python3.10",
+                "site-packages",
+            ):
+                category = "python_packages"
+                lowered = {part.lower() for part in parts[3:]}
+                if lowered & {"test", "tests", "testing"}:
+                    test_material.append(path)
+            elif (
+                parts[:2] == ("lib", "media")
+                or runtime_relative.as_posix()
+                in {"bin/ffmpeg", "bin/ffprobe"}
+            ):
+                category = "media_tools"
+            else:
+                category = "python_runtime_and_manifest"
+        record(category, path)
+
+    installed_bytes = sum(
+        entry["bytes"] for entry in categories.values()
+    )
+    native = _native_candidates(root)
+    test_largest = sorted(
+        (
+            {
+                "path": path.relative_to(runtime_root).as_posix(),
+                "bytes": path.lstat().st_size,
+            }
+            for path in test_material
+        ),
+        key=lambda item: item["bytes"],
+        reverse=True,
+    )[:10]
+    return {
+        "installed_bytes": installed_bytes,
+        "categories": categories,
+        "native_files": {
+            "bytes": sum(path.lstat().st_size for path in native),
+            "file_count": len(native),
+            "overlaps_reconciled_categories": True,
+        },
+        "distribution_test_material": {
+            "bytes": sum(path.lstat().st_size for path in test_material),
+            "file_count": len(test_material),
+            "largest_files": test_largest,
+            "policy": (
+                "distribution-provided modules retained where runtime "
+                "imports require them; development distributions excluded"
+            ),
+        },
+    }
+
+
+def _audit_anonymous_caches(root: Path) -> list[str]:
+    forbidden = {"__pycache__", ".cache", "pip-cache", "uv-cache"}
+    found = [
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_dir() and path.name in forbidden
+    ]
+    if found:
+        raise RuntimeError(
+            f"anonymous cache directory is bundled: {found[0]}"
+        )
+    return found
+
+
+def audit_root(
+    root: Path,
+    archive: Path | None = None,
+) -> dict[str, Any]:
     root = root.resolve()
     if not root.is_dir():
         raise RuntimeError(f"bundle root does not exist: {root}")
@@ -793,20 +921,56 @@ def audit_root(root: Path) -> dict[str, Any]:
     packages = _package_inventory(runtime_root)
     _audit_distributions(runtime_root, packages)
     symlinks = _audit_symlinks(root)
+    anonymous_caches = _audit_anonymous_caches(root)
     native = _audit_native(root)
-    return {
+    complete_inventory = inventory(root)
+    components = component_inventory(root)
+    if components["installed_bytes"] != complete_inventory["total_bytes"]:
+        raise RuntimeError("component inventory does not reconcile")
+    largest_packages = sorted(
+        (
+            {
+                "name": package["name"],
+                "version": package["version"],
+                "installed_bytes": package["installed_bytes"],
+            }
+            for package in packages
+        ),
+        key=lambda item: item["installed_bytes"],
+        reverse=True,
+    )[:10]
+    result = {
         "schema_version": BUNDLE_AUDIT_SCHEMA,
         "created_at": utc_now(),
         "root": str(root),
         "runtime_relative_path": runtime_root.relative_to(root).as_posix(),
-        "inventory": inventory(root),
+        "inventory": complete_inventory,
+        "components": components,
         "package_count": len(packages),
+        "largest_packages": largest_packages,
         "symlinks": symlinks,
         "native_files": native,
         "forbidden_accelerator_packages": [],
+        "forbidden_development_packages": [],
         "forbidden_score_runtime_assets": [],
+        "anonymous_cache_directories": anonymous_caches,
         "status": "passed",
     }
+    if archive is not None:
+        archive = archive.resolve()
+        if not archive.is_file():
+            raise RuntimeError("desktop review archive is missing")
+        compressed_bytes = archive.stat().st_size
+        result["archive"] = {
+            "path": str(archive),
+            "format": "zip",
+            "compressed_bytes": compressed_bytes,
+            "installed_bytes": components["installed_bytes"],
+            "compression_ratio": (
+                compressed_bytes / components["installed_bytes"]
+            ),
+        }
+    return result
 
 
 def smoke_sidecar(
@@ -820,6 +984,7 @@ def smoke_sidecar(
         [
             runtime_root / "bin" / "python3",
             "-I",
+            "-B",
             "-m",
             "atpiano.desktop_sidecar",
             "--workspace",
@@ -938,6 +1103,7 @@ def stage_runtime(output: Path, report: Path) -> dict[str, Any]:
                 [
                     staged / "bin" / "python3",
                     "-I",
+                    "-B",
                     "-c",
                     imports,
                 ],
@@ -986,6 +1152,7 @@ def build_parser() -> argparse.ArgumentParser:
     audit = commands.add_parser("audit")
     audit.add_argument("--root", type=Path, required=True)
     audit.add_argument("--report", type=Path, required=True)
+    audit.add_argument("--archive", type=Path)
     return parser
 
 
@@ -994,7 +1161,7 @@ def run(arguments: Sequence[str] | None = None) -> int:
     if args.command == "stage":
         result = stage_runtime(args.output, args.report)
     else:
-        result = audit_root(args.root)
+        result = audit_root(args.root, args.archive)
         write_json(args.report, result)
     print(json.dumps(result["inventory"], sort_keys=True))
     return 0
