@@ -180,6 +180,43 @@ def test_encoder_failure_preserves_raw_and_reports_incomplete(
     )
 
 
+def test_decode_verification_failure_preserves_raw_and_compact_copy(
+    tmp_path: Path,
+) -> None:
+    session_id = "20260727T100007-222222222222"
+    session = _complete_session(tmp_path, session_id)
+
+    class DecodeFailureRunner(_SuccessfulMediaRunner):
+        def __call__(
+            self,
+            arguments: list[str],
+            **options: Any,
+        ) -> subprocess.CompletedProcess[str]:
+            if arguments[-1] == "-":
+                raise subprocess.CalledProcessError(1, arguments)
+            return super().__call__(arguments, **options)
+
+    service = StorageApplicationService(
+        LocalStorageAdapter(
+            tmp_path,
+            ffmpeg_executable="/fake/ffmpeg",
+            ffprobe_executable="/fake/ffprobe",
+            process_runner=DecodeFailureRunner(),
+        ),
+        compact_recordings=True,
+    )
+    service.initialize_session(session_id)
+
+    service.finalize_session(session)
+
+    recording = read_json(session.directory / "recording.json")
+    assert recording["state"] == "incomplete"
+    assert recording["raw_source"]["state"] == "retained"
+    assert recording["recording"]["path"] == "playback/session.mp3"
+    assert (session.directory / "playback" / "session.mp3").is_file()
+    assert list((session.directory / "audio").glob("*.wav"))
+
+
 def test_debug_retention_rotates_oldest_unpinned_and_exports_pin(
     tmp_path: Path,
 ) -> None:
@@ -284,3 +321,47 @@ def test_accounting_tolerates_atomic_temporary_file_rename(
     )
 
     assert report["current_session"]["total_bytes"] > 0
+
+
+def test_sequential_compacted_sessions_leave_only_reported_files(
+    tmp_path: Path,
+) -> None:
+    session_ids = (
+        "20260727T100008-333333333333",
+        "20260727T100009-444444444444",
+    )
+    sessions = [
+        _complete_session(tmp_path, session_id)
+        for session_id in session_ids
+    ]
+    service = StorageApplicationService(
+        LocalStorageAdapter(
+            tmp_path,
+            ffmpeg_executable="/fake/ffmpeg",
+            ffprobe_executable="/fake/ffprobe",
+            process_runner=_SuccessfulMediaRunner(),
+        ),
+        compact_recordings=True,
+    )
+
+    for session in sessions:
+        service.initialize_session(session.session_id)
+        service.finalize_session(session)
+
+    report = service.accounting(
+        session_id=session_ids[-1],
+        duration_s=1.0,
+        minimum_free_bytes=0,
+    )
+    workspace = report["workspace"]
+    assert workspace["file_counts"]["recordings"] == 2
+    assert workspace["bytes"]["temporary_raw"] == 0
+    assert workspace["bytes"]["debug"] == 0
+    assert workspace["total_bytes"] == sum(
+        workspace["bytes"].values()
+    )
+    assert not [
+        path
+        for path in tmp_path.rglob("*")
+        if path.is_file() and path.name.startswith(".")
+    ]
