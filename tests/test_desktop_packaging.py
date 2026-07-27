@@ -9,6 +9,7 @@ from atpiano.desktop import load_model_pack
 from atpiano.desktop_packaging import (
     _audit_distributions,
     _audit_symlinks,
+    _stage_fixture,
     inventory,
     stage_model_pack,
 )
@@ -88,3 +89,19 @@ def test_model_pack_manifest_has_no_absolute_paths(tmp_path: Path) -> None:
         not Path(asset["path"]).is_absolute()
         for asset in document["assets"]
     )
+
+
+def test_desktop_stages_the_golden_musical_fixture(
+    tmp_path: Path,
+) -> None:
+    _stage_fixture(tmp_path)
+
+    manifest = json.loads(
+        (tmp_path / "fixture" / "input.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert manifest["input_id"] == "deterministic-musical-loop-v1"
+    assert manifest["audio"]["duration_s"] == 42.0
+    assert manifest["audio"]["frame_count"] == 2_016_000

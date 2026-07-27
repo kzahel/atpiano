@@ -6,6 +6,7 @@ repository_root="$(cd "${script_directory}/.." && pwd)"
 runtime_root="${repository_root}/app/src-tauri/resources/desktop-runtime"
 report_root="${repository_root}/results/desktop-phase5"
 app_bundle="${repository_root}/app/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Atpiano.app"
+tauri_target="${repository_root}/app/src-tauri/target"
 
 stage_runtime() {
   mkdir -p "${report_root}"
@@ -17,12 +18,27 @@ stage_runtime() {
   )
 }
 
+unlock_generated_outputs() {
+  local generated
+  for generated in \
+    "${tauri_target}/debug/desktop-runtime" \
+    "${tauri_target}/release/desktop-runtime" \
+    "${tauri_target}/aarch64-apple-darwin/release/desktop-runtime" \
+    "${app_bundle}"
+  do
+    if [[ -d "${generated}" ]]; then
+      chmod -R u+w "${generated}"
+    fi
+  done
+}
+
 case "${1:-}" in
   stage)
     stage_runtime
     ;;
   dev)
     stage_runtime
+    unlock_generated_outputs
     (
       cd "${repository_root}/app"
       ATPIANO_DESKTOP_RUNTIME_ROOT="${runtime_root}" npx tauri dev
@@ -30,6 +46,7 @@ case "${1:-}" in
     ;;
   build)
     stage_runtime
+    unlock_generated_outputs
     (
       cd "${repository_root}/app"
       npx tauri build \

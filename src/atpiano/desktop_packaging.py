@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from atpiano.desktop import MODEL_PACK_SCHEMA, ModelPack
-from atpiano.fixture import generate_fixture
+from atpiano.musical_fixture import generate_musical_fixture
 from atpiano.util import sha256_file, sha256_path, utc_now, write_json
 
 PYTHON_KEY = "cpython-3.10.19-macos-aarch64-none"
@@ -337,7 +337,9 @@ def _copy_external_dependency(
             )
         return copied[name]
     shutil.copy2(resolved, destination)
-    destination.chmod(destination.stat().st_mode | stat.S_IXUSR)
+    destination.chmod(
+        destination.stat().st_mode | stat.S_IWUSR | stat.S_IXUSR
+    )
     copied[name] = destination
     origins[name] = resolved
     return destination
@@ -359,7 +361,9 @@ def bundle_media_tools(runtime_root: Path) -> dict[str, Any]:
     for name, source in sources.items():
         destination = binaries / name
         shutil.copy2(source, destination)
-        destination.chmod(destination.stat().st_mode | stat.S_IXUSR)
+        destination.chmod(
+            destination.stat().st_mode | stat.S_IWUSR | stat.S_IXUSR
+        )
         staged[name] = destination
 
     copied: dict[str, Path] = {}
@@ -540,7 +544,7 @@ print(json.dumps(sorted(items, key=lambda item: item["name"].lower())))
 
 def _stage_fixture(runtime_root: Path) -> None:
     fixture = runtime_root / "fixture"
-    manifest = generate_fixture(fixture)
+    manifest = generate_musical_fixture(fixture)
     manifest["created_at"] = "2026-07-27T00:00:00+00:00"
     write_json(fixture / "input.json", manifest)
 
