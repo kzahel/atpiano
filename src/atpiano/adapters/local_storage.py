@@ -897,17 +897,25 @@ class LocalStorageAdapter:
         minimum_free_bytes: int,
     ) -> dict[str, Any]:
         workspace = self._usage(self.workspace_directory)
-        current = (
-            self._usage(self._session_directory(session_id))
-            if session_id is not None
-            else {
-                "bytes": {name: 0 for name in STORAGE_CATEGORIES},
-                "file_counts": {
-                    name: 0 for name in STORAGE_CATEGORIES
-                },
-                "total_bytes": 0,
-            }
-        )
+        empty = {
+            "bytes": {name: 0 for name in STORAGE_CATEGORIES},
+            "file_counts": {
+                name: 0 for name in STORAGE_CATEGORIES
+            },
+            "total_bytes": 0,
+        }
+        if session_id is None:
+            current = empty
+        else:
+            try:
+                current = self._usage(
+                    self._session_directory(session_id)
+                )
+            except LookupError:
+                # Replay claims an ID before its model-loading thread creates
+                # the session directory. Warming-state accounting must remain
+                # readable during that bounded interval.
+                current = empty
         projected = {
             name: (
                 value * 3600 / duration_s

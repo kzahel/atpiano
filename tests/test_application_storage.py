@@ -139,6 +139,21 @@ def test_storage_service_compacts_only_after_verified_publication(
     assert accounting["current_session"]["bytes"]["temporary_raw"] == 0
 
 
+def test_storage_accounting_accepts_warming_session_claim(
+    tmp_path: Path,
+) -> None:
+    service = StorageApplicationService(LocalStorageAdapter(tmp_path))
+
+    accounting = service.accounting(
+        session_id="20260727T100000-aaaaaaaaaaaa",
+        duration_s=0.0,
+        minimum_free_bytes=0,
+    )
+
+    assert accounting["current_session"]["total_bytes"] == 0
+    assert accounting["current_session"]["duration_s"] == 0.0
+
+
 def test_encoder_failure_preserves_raw_and_reports_incomplete(
     tmp_path: Path,
 ) -> None:
