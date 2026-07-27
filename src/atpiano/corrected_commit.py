@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -86,8 +87,18 @@ class TranskunCommitModel:
                 pass
 
         package_root = Path(transkun.__file__).resolve().parent
-        self.checkpoint_path = package_root / "pretrained" / "2.0.pt"
-        self.config_path = package_root / "pretrained" / "2.0.conf"
+        self.checkpoint_path = Path(
+            os.environ.get(
+                "ATPIANO_TRANSKUN_CHECKPOINT",
+                str(package_root / "pretrained" / "2.0.pt"),
+            )
+        ).resolve()
+        self.config_path = Path(
+            os.environ.get(
+                "ATPIANO_TRANSKUN_CONFIG",
+                str(package_root / "pretrained" / "2.0.conf"),
+            )
+        ).resolve()
         manager = moduleconf.parseFromFile(str(self.config_path))
         model_class = manager["Model"].module.TransKun
         config = manager["Model"].config

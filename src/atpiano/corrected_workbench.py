@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import json
 import mimetypes
 import re
@@ -71,6 +72,11 @@ from atpiano.corrected_export import (
     query_materialized_index,
 )
 from atpiano.corrected_pipeline import CorrectedSessionPipeline
+from atpiano.desktop import (
+    DESKTOP_WEBSOCKET_PREFIX,
+    DesktopHandshake,
+    validate_desktop_token,
+)
 from atpiano.live import LiveWindowModel, parse_pcm_block
 from atpiano.score_snapshot import (
     ScoreRunner,
@@ -152,6 +158,9 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         correction_mode: str = "auto",
         backend_profile_path: Path | None = None,
         public_origin: str | None = None,
+        desktop_origin: str | None = None,
+        desktop_token: str | None = None,
+        desktop_handshake: DesktopHandshake | None = None,
         compact_recordings: bool = True,
         debug_retention: bool = False,
         debug_byte_cap: int = 64 * 1024**2,
@@ -190,6 +199,21 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                 raise ValueError(
                     "public origin must be an HTTPS origin without a path"
                 )
+        if desktop_token is None:
+            if desktop_origin is not None or desktop_handshake is not None:
+                raise ValueError(
+                    "desktop origin and handshake require desktop authentication"
+                )
+        else:
+            validate_desktop_token(desktop_token)
+            if desktop_origin != "tauri://localhost":
+                raise ValueError(
+                    "desktop origin must be the bundled Tauri origin"
+                )
+            if desktop_handshake is None:
+                raise ValueError(
+                    "desktop authentication requires a handshake"
+                )
         self.workspace_directory = workspace_directory.resolve()
         self.workspace_directory.mkdir(parents=True, exist_ok=True)
         self.session_store = LocalSessionStore(self.workspace_directory)
@@ -217,6 +241,9 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self.commit_threads = commit_threads
         self.correction_mode = correction_mode
         self.public_origin = public_origin
+        self.desktop_origin = desktop_origin
+        self.desktop_token = desktop_token
+        self.desktop_handshake = desktop_handshake
         self.backend_profile_path = (
             backend_profile_path.resolve()
             if backend_profile_path is not None
@@ -417,7 +444,34 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         }
         if self.server.public_origin is not None:
             trusted_origins.add(self.server.public_origin)
+        if self.server.desktop_origin is not None:
+            trusted_origins.add(self.server.desktop_origin)
         return self.headers.get("Origin") in trusted_origins
+
+    def _send_desktop_cors_headers(self) -> None:
+        if (
+            self.server.desktop_origin is not None
+            and self.headers.get("Origin") == self.server.desktop_origin
+        ):
+            self.send_header(
+                "Access-Control-Allow-Origin",
+                self.server.desktop_origin,
+            )
+            self.send_header("Vary", "Origin")
+
+    def _require_desktop_auth(self, request_path: str) -> bool:
+        token = self.server.desktop_token
+        if token is None or request_path == "/api/live":
+            return True
+        authorization = self.headers.get("Authorization", "")
+        expected = f"Bearer {token}"
+        if hmac.compare_digest(authorization, expected):
+            return True
+        self._send_json(
+            {"error": "desktop authentication is required"},
+            HTTPStatus.UNAUTHORIZED,
+        )
+        return False
 
     def _send_json(
         self,
@@ -429,6 +483,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        self._send_desktop_cors_headers()
         self.end_headers()
         self._write_body(body)
 
@@ -480,6 +535,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         if status == HTTPStatus.PARTIAL_CONTENT:
             self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
         self.send_header("Cache-Control", "no-store")
+        self._send_desktop_cors_headers()
         self.end_headers()
         if not include_body:
             return
@@ -755,6 +811,16 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             return
         parsed = urlsplit(self.path)
         request_path = unquote(parsed.path)
+        if not self._require_desktop_auth(request_path):
+            return
+        if (
+            request_path == "/desktop/v1/handshake"
+            and self.server.desktop_handshake is not None
+        ):
+            self._send_json(
+                self.server.desktop_handshake.model_dump(mode="json")
+            )
+            return
         if self._get_api(
             request_path,
             parse_qs(parsed.query),
@@ -806,6 +872,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             return
         parsed = urlsplit(self.path)
         request_path = unquote(parsed.path)
+        if not self._require_desktop_auth(request_path):
+            return
         if self._get_api(
             request_path,
             parse_qs(parsed.query),
@@ -830,6 +898,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         if not self._require_local_host():
             return
         request_path = unquote(urlsplit(self.path).path)
+        if not self._require_desktop_auth(request_path):
+            return
         if not self._origin_is_trusted():
             if request_path.startswith("/api/v1/"):
                 self._send_api_error(
@@ -993,6 +1063,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         if not self._require_local_host():
             return
         request_path = unquote(urlsplit(self.path).path)
+        if not self._require_desktop_auth(request_path):
+            return
         match = re.fullmatch(
             r"/api/v1/workspaces/([^/]+)/sessions/([^/]+)",
             request_path,
@@ -1060,6 +1132,54 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             )
             return
         self._send_json(result)
+
+    def do_OPTIONS(self) -> None:
+        if not self._require_local_host():
+            return
+        if (
+            self.server.desktop_origin is None
+            or self.headers.get("Origin") != self.server.desktop_origin
+        ):
+            self._send_json(
+                {"error": "desktop preflight origin is not trusted"},
+                HTTPStatus.FORBIDDEN,
+            )
+            return
+        method = self.headers.get("Access-Control-Request-Method", "")
+        if method not in {"GET", "HEAD", "POST", "DELETE"}:
+            self._send_json(
+                {"error": "desktop preflight method is not allowed"},
+                HTTPStatus.FORBIDDEN,
+            )
+            return
+        requested_headers = {
+            value.strip().lower()
+            for value in self.headers.get(
+                "Access-Control-Request-Headers",
+                "",
+            ).split(",")
+            if value.strip()
+        }
+        if not requested_headers.issubset(
+            {"authorization", "content-type", "range"}
+        ):
+            self._send_json(
+                {"error": "desktop preflight headers are not allowed"},
+                HTTPStatus.FORBIDDEN,
+            )
+            return
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self._send_desktop_cors_headers()
+        self.send_header(
+            "Access-Control-Allow-Methods",
+            "GET, HEAD, POST, DELETE",
+        )
+        self.send_header(
+            "Access-Control-Allow-Headers",
+            "Authorization, Content-Type, Range",
+        )
+        self.send_header("Access-Control-Max-Age", "600")
+        self.end_headers()
 
     def _get_events(self, query: dict[str, list[str]]) -> None:
         state = self.server.public_state()
@@ -1130,6 +1250,24 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                 HTTPStatus.FORBIDDEN,
             )
             return False
+        desktop_protocol: str | None = None
+        if self.server.desktop_token is not None:
+            desktop_protocol = (
+                f"{DESKTOP_WEBSOCKET_PREFIX}{self.server.desktop_token}"
+            )
+            provided_protocol = self.headers.get(
+                "Sec-WebSocket-Protocol",
+                "",
+            ).strip()
+            if not hmac.compare_digest(
+                provided_protocol,
+                desktop_protocol,
+            ):
+                self._send_json(
+                    {"error": "desktop WebSocket authentication is required"},
+                    HTTPStatus.UNAUTHORIZED,
+                )
+                return False
         if (
             self.headers.get("Upgrade", "").lower() != "websocket"
             or "upgrade" not in self.headers.get("Connection", "").lower()
@@ -1149,6 +1287,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         self.send_header("Upgrade", "websocket")
         self.send_header("Connection", "Upgrade")
         self.send_header("Sec-WebSocket-Accept", accept)
+        if desktop_protocol is not None:
+            self.send_header("Sec-WebSocket-Protocol", desktop_protocol)
         self.end_headers()
         self.close_connection = True
         return True
@@ -1324,6 +1464,9 @@ def create_corrected_workbench_server(
     web_root: Path = WEB_ROOT,
     application_mode: str = "corrected-workbench-v2",
     public_origin: str | None = None,
+    desktop_origin: str | None = None,
+    desktop_token: str | None = None,
+    desktop_handshake: DesktopHandshake | None = None,
     compact_recordings: bool = True,
     debug_retention: bool = False,
     debug_byte_cap: int = 64 * 1024**2,
@@ -1356,6 +1499,9 @@ def create_corrected_workbench_server(
         web_root=web_root,
         application_mode=application_mode,
         public_origin=public_origin,
+        desktop_origin=desktop_origin,
+        desktop_token=desktop_token,
+        desktop_handshake=desktop_handshake,
         compact_recordings=compact_recordings,
         debug_retention=debug_retention,
         debug_byte_cap=debug_byte_cap,

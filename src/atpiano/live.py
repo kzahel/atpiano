@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import struct
 import time
 import wave
@@ -219,7 +220,12 @@ class BasicPitchLiveModel:
         self.overlapping_frames = 30
         self.left_guard_samples = 10 * FFT_HOP
         self.right_guard_samples = 20 * FFT_HOP
-        self.model_path = Path(ICASSP_2022_MODEL_PATH).resolve()
+        self.model_path = Path(
+            os.environ.get(
+                "ATPIANO_BASIC_PITCH_MODEL",
+                str(ICASSP_2022_MODEL_PATH),
+            )
+        ).resolve()
         self.model = Model(self.model_path)
         self.decoder_policy = decoder_policy
 
