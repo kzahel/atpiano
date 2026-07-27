@@ -342,6 +342,37 @@ fn monitor_child(
     });
 }
 
+fn configure_sidecar_environment(
+    command: &mut Command,
+    runtime: &Path,
+    workspace: &Path,
+    credential: &str,
+) {
+    let cache_root = workspace.join(".runtime-cache");
+    let path = format!(
+        "{}:{}",
+        runtime.join("bin").display(),
+        env::var("PATH").unwrap_or_default()
+    );
+    command
+        .env("ATPIANO_DESKTOP_TOKEN", credential)
+        .env("ATPIANO_EXECUTION_BACKEND", "cpu")
+        .env("CUDA_VISIBLE_DEVICES", "")
+        .env("PYTHONDONTWRITEBYTECODE", "1")
+        .env("PYTHONNOUSERSITE", "1")
+        .env("NUMBA_CACHE_DIR", cache_root.join("numba"))
+        .env("MPLCONFIGDIR", cache_root.join("matplotlib"))
+        .env("XDG_CACHE_HOME", &cache_root)
+        .env("HF_HOME", cache_root.join("huggingface"))
+        .env("PATH", path)
+        .env_remove("PYTHONHOME")
+        .env_remove("PYTHONPATH")
+        .env_remove("VIRTUAL_ENV")
+        .env_remove("ATPIANO_BASIC_PITCH_MODEL")
+        .env_remove("ATPIANO_TRANSKUN_CHECKPOINT")
+        .env_remove("ATPIANO_TRANSKUN_CONFIG");
+}
+
 fn start_sidecar(
     app: &tauri::AppHandle,
     status: Arc<RwLock<RuntimeStatus>>,
@@ -369,11 +400,6 @@ fn start_sidecar(
             .map_err(|error| format!("could not create desktop workspace: {error}"))?;
 
         let credential = token()?;
-        let path = format!(
-            "{}:{}",
-            runtime.join("bin").display(),
-            env::var("PATH").unwrap_or_default()
-        );
         let mut command = Command::new(&python);
         command
             .arg("-I")
@@ -394,21 +420,10 @@ fn start_sidecar(
             .arg(CONTRACT_SCHEMA)
             .arg("--score-runtime")
             .arg(&score_runtime)
-            .env("ATPIANO_DESKTOP_TOKEN", &credential)
-            .env("ATPIANO_EXECUTION_BACKEND", "cpu")
-            .env("CUDA_VISIBLE_DEVICES", "")
-            .env("PYTHONDONTWRITEBYTECODE", "1")
-            .env("PYTHONNOUSERSITE", "1")
-            .env("PATH", path)
-            .env_remove("PYTHONHOME")
-            .env_remove("PYTHONPATH")
-            .env_remove("VIRTUAL_ENV")
-            .env_remove("ATPIANO_BASIC_PITCH_MODEL")
-            .env_remove("ATPIANO_TRANSKUN_CHECKPOINT")
-            .env_remove("ATPIANO_TRANSKUN_CONFIG")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        configure_sidecar_environment(&mut command, &runtime, &workspace, &credential);
         let mut child = command
             .spawn()
             .map_err(|error| format!("could not start the local engine: {error}"))?;
@@ -611,6 +626,29 @@ mod tests {
             resource_dir_for_executable(Path::new("/tmp/atpiano-desktop")),
             None
         );
+    }
+
+    #[test]
+    fn redirects_runtime_caches_outside_the_bundle() {
+        let mut command = Command::new("/bundle/runtime/bin/python3");
+        configure_sidecar_environment(
+            &mut command,
+            Path::new("/bundle/runtime"),
+            Path::new("/data/workspace"),
+            "credential",
+        );
+        let environment = command.get_envs().collect::<Vec<_>>();
+
+        for (key, expected) in [
+            ("NUMBA_CACHE_DIR", "/data/workspace/.runtime-cache/numba"),
+            ("MPLCONFIGDIR", "/data/workspace/.runtime-cache/matplotlib"),
+            ("XDG_CACHE_HOME", "/data/workspace/.runtime-cache"),
+            ("HF_HOME", "/data/workspace/.runtime-cache/huggingface"),
+        ] {
+            assert!(environment
+                .iter()
+                .any(|(name, value)| *name == key && value.is_some_and(|value| value == expected)));
+        }
     }
 
     #[test]
