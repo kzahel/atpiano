@@ -176,6 +176,36 @@ def build_parser() -> argparse.ArgumentParser:
         default=2.0,
         help="stop before free space falls below this reserve (default: 2)",
     )
+    storage_validation_parser = subparsers.add_parser(
+        "validate-storage",
+        help="run accelerated Phase 4 compact-storage validation",
+    )
+    storage_validation_parser.add_argument(
+        "input_manifest",
+        type=Path,
+    )
+    storage_validation_parser.add_argument(
+        "workspace",
+        type=Path,
+    )
+    storage_validation_parser.add_argument(
+        "--minimum-hours",
+        type=float,
+        default=1.0,
+        help="minimum continuous source-clock duration (default: 1)",
+    )
+    storage_validation_parser.add_argument(
+        "--minimum-free-gib",
+        type=float,
+        default=2.0,
+        help="protected free-space reserve (default: 2 GiB)",
+    )
+    storage_validation_parser.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=900.0,
+        help="wall-clock validation timeout (default: 900)",
+    )
     review_parser = subparsers.add_parser(
         "review",
         help="serve a local browser reviewer for a completed run",
@@ -500,6 +530,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(args.output_directory / "backend-profile.json")
         print(f"recommendation: {profile.recommendation.value}")
         print(f"service ratio: {profile.timing.service_ratio:.3f}")
+        return 0
+    if args.command == "validate-storage":
+        from atpiano.storage_validation import (
+            run_storage_validation,
+        )
+
+        evidence_path, evidence = run_storage_validation(
+            args.input_manifest,
+            args.workspace,
+            minimum_hours=args.minimum_hours,
+            minimum_free_bytes=round(
+                args.minimum_free_gib * 1024**3
+            ),
+            timeout_s=args.timeout_seconds,
+        )
+        print(evidence_path)
+        print(
+            "source hours: "
+            f"{evidence['source']['duration_s'] / 3600:.3f}"
+        )
+        print(
+            "recording bytes/hour: "
+            f"{evidence['measured_recording_bytes_per_hour']:.0f}"
+        )
         return 0
     if args.command == "workbench-v2":
         from atpiano.corrected_workbench import serve_corrected_workbench
