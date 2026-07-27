@@ -15,6 +15,14 @@ controller estimates instead of merging them as apparent stuck sustain,
 and it provides seekable recorded-audio playback synchronized to exact
 source-sample inspection.
 
+Phase 5 is active under
+[`030-early-tauri-sidecar-boundary.md`](../tactical/030-early-tauri-sidecar-boundary.md).
+Its first lane is an unsigned, self-contained macOS arm64 Tauri development
+application with a CPU-only Python sidecar, separate model manifest,
+authenticated loopback IPC, real golden replay, and measured bundle contents.
+Windows, Linux, final signing, updates, microphone parity, and the unresolved
+score runtime remain outside that bounded R5 proof.
+
 The local Python path now composes framework-independent application services
 for sessions, capture, score jobs, storage, artifacts, and recoverable
 deletion over explicit local adapters. Replay and microphone use the same

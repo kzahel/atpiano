@@ -5,7 +5,7 @@ Topic: multi-tenant-hybrid-service-architecture
 Status: accepted master plan on 2026-07-26; Phases 1 through 4 are complete
 and R2, R3, and R4 are accepted. On 2026-07-27 the user accepted application
 parity and selected verified MP3 retention with explicit WAV opt-in. Phase 5
-is ready but has not been opened. This document tracks the staged migration
+is active under Tactical 030. This document tracks the staged migration
 program and its human review gates. Each phase must create one or more smaller
 numbered tacticals before implementation.
 
@@ -65,7 +65,7 @@ result, and commit range.
 | 2. Contracts and structure | Complete (`e2c2b9d^..9f8dd16`) | [`015`](015-contracts-and-structure.md) | R2 accepted 2026-07-26 |
 | 3. Shared React application | Complete | [`016`](016-shared-react-application.md) | R3 accepted 2026-07-26 |
 | 4. Python application core | Complete | [`022`](022-durable-capture-worker-isolation.md), [`023`](023-backend-capability-degradation.md), then [`017`](017-python-application-core.md) | R4 accepted 2026-07-27 |
-| 5. Early Tauri skeleton | Ready; not opened | Not created | Required desktop-boundary review |
+| 5. Early Tauri skeleton | Active | [`030`](030-early-tauri-sidecar-boundary.md) | **R5 desktop-boundary review required** |
 | 6. Complete local desktop | Blocked by Phase 5 | Not created | Required daily-use review |
 | 7. Hosted service | Blocked by Phase 6 | Not created | Required hosted and tenancy review |
 | 8. Collaboration, distribution, and limited sync | Blocked by Phase 7 | Not created | Separate release and sync reviews |
