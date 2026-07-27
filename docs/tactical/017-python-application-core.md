@@ -8,16 +8,16 @@ Topic: session-workspace-management
 
 Topic: long-session-storage-retention
 
-Status: **implemented and automated locally on 2026-07-27; awaiting R4
-manual parity and compact-retention approval before Phase 4 can be
-accepted.** Catalog, capture, settlement, score jobs, replay, artifacts,
+Status: **complete and accepted at R4 on 2026-07-27.** Catalog, capture,
+settlement, score jobs, replay, artifacts,
 recoverable deletion, recording finalization, accounting, debug retention,
 and recovery now run through framework-independent application services.
 The one-hour and three-hour storage validations pass with verified 128 kbps
 MP3 publication, complete source mapping, boundary-aligned seeking, no
 retained WAV or ordinary debug data, and reconciled category totals.
-Compact retirement remains explicitly opt-in and the shared public service
-continues to retain WAV plus MP3 until R4 decides the lossy-storage tradeoff.
+Verified MP3 retention is now the ordinary default for new v2/v3 sessions.
+The explicit `--retain-wav` option preserves lossless source for debugging or
+future retranscription, and existing sessions are never migrated.
 Tactical 022's separate 2.10-hour real-model soak also completed on the M4
 Pro with full commit coverage, bounded pending state, and no anonymous
 temporary files. Its narrower same-duration Linux-host interpretation remains
@@ -200,9 +200,9 @@ mark compaction incomplete in pipeline status, and keep WAV playback working.
 Never delete the only usable recording.
 
 The compact-retention mode applies only to sessions created through the new
-Phase 4 core. It remains explicitly enabled during implementation and becomes
-the ordinary default only if R4 accepts the lossy-storage tradeoff. No
-background migration touches older sessions.
+Phase 4 core. R4 accepted it as the ordinary default on 2026-07-27.
+`--retain-wav` opts a new process into retained lossless source. No background
+migration touches older sessions.
 
 ### 5. Pipeline status and bounded local debug data
 
@@ -240,7 +240,7 @@ free-space reserve. Capture warns through existing status/error mechanisms
 and stops explicitly before it can no longer safely publish another bounded
 unit. It does not automatically delete user sessions.
 
-No new React storage-management screen is required. R4 receives the
+No new React storage-management screen is required. R4 received the
 machine-readable report and a concise before/after summary; a later additive
 runtime capability may expose it in the product UI.
 
@@ -320,9 +320,9 @@ runtime capability may expose it in the product UI.
 - Several sequential sessions leave no unexplained bytes outside the reported
   recording, event/index, derived, debug, temporary, and trash categories.
 
-## Manual Validation And R4 Review Gate
+## Manual Validation And R4 Acceptance
 
-R4 receives one compact review build and:
+R4 received one compact review build and:
 
 - one deterministic replay command and one microphone action;
 - New, history, selected-versus-active identity, Stop/settling, timeline,
@@ -339,21 +339,21 @@ R4 receives one compact review build and:
 - the exact automated test report and commit range; and
 - known differences and intentionally deferred work.
 
-The user decides both whether basic application behavior survived extraction
-and whether MP3-only ordinary retention is an acceptable local default.
-Phase 4 is not accepted and Phase 5 does not begin until both decisions are
-explicit.
+The user reported that the application “works perfect” and then explicitly
+selected MP3-only ordinary retention with retained WAV available as an
+opt-in. Both decisions were recorded on 2026-07-27. R4 and Phase 4 are
+accepted; Phase 5 is ready to receive a separate bounded tactical.
 
 ## Rollback Or Disable Path
 
 The extracted services remain behind the existing local runtime adapter, so
 the independently runnable v1 and v2 commands remain fallbacks.
 
-Compact retention is enabled only for newly created Phase 4 sessions during
-implementation. Disabling it before R4 returns new sessions to the retained
-WAV-plus-MP3 behavior. A session whose WAV was already retired still has its
-verified MP3 and declared source mapping; Phase 4 never claims that deleted
-lossless source can be reconstructed.
+Compact retention applies only to newly created Phase 4 sessions. Launching
+with `--retain-wav` keeps WAV plus MP3 for newly created sessions in that
+process. A session whose WAV was already retired still has its verified MP3
+and declared source mapping; Phase 4 never claims that deleted lossless source
+can be reconstructed.
 
 No existing session tree is rewritten. Reverting the application extraction
 does not require a data migration.
@@ -401,6 +401,8 @@ The implementation landed as a bounded commit series:
     compact-session reconciliation regressions.
 11. `fd4f224` kept terminal interrupts in the parent so spawned workers shut
     down without noisy child tracebacks.
+12. `d072cd7` made verified MP3 retention the ordinary default and added the
+    explicit `--retain-wav` lossless-source override.
 
 Automated evidence on 2026-07-27:
 
@@ -429,21 +431,16 @@ Automated evidence on 2026-07-27:
   pin/export, unavailable correction, low-disk refusal, MP3-only artifact
   discovery, and application-only service calls have focused tests.
 - The restarted shared service returned HTTP 200 from the public homepage and
-  the expected local/microphone/replay/score capability document. Its compact
-  flag remains off.
+  the expected local/microphone/replay/score capability document. After R4 it
+  runs the accepted compact default.
 
 Generated evidence is untracked under:
 
 - `results/phase4-storage-one-hour-20260727-evidence.json`
 - `results/phase4-storage-three-hour-20260727-evidence.json`
 - `results/backend-profile-phase4-soak-20260727/backend-profile.json`
-- `results/migration-regression/phase4-r4-20260727/report.json`
+- `results/migration-regression/phase4-r4-accepted-20260727/report.json`
 
-R4 still requires the listed human parity pass, one physical microphone
-action, old-WAV and new-MP3 playback/scrubbing review, the encoder-failure
-demonstration, and an explicit decision on whether compact MP3 retention
-becomes the ordinary default.
-
-The concise launch command, behavior comparison, storage summary, code map,
-known differences, and review checklist are in
+The accepted behavior comparison, storage summary, code map, review evidence,
+and user decisions are in
 [`r4-python-core-storage-review.md`](../r4-python-core-storage-review.md).

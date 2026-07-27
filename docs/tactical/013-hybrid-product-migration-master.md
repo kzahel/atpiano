@@ -2,10 +2,10 @@
 
 Topic: multi-tenant-hybrid-service-architecture
 
-Status: accepted master plan on 2026-07-26; Phases 1 through 3 are complete,
-R2 and R3 are accepted, and the Phase 4 implementation and automated evidence
-are complete. R4 manual application parity and compact-retention approval are
-the required hold before Phase 5. This document tracks the staged migration
+Status: accepted master plan on 2026-07-26; Phases 1 through 4 are complete
+and R2, R3, and R4 are accepted. On 2026-07-27 the user accepted application
+parity and selected verified MP3 retention with explicit WAV opt-in. Phase 5
+is ready but has not been opened. This document tracks the staged migration
 program and its human review gates. Each phase must create one or more smaller
 numbered tacticals before implementation.
 
@@ -64,8 +64,8 @@ result, and commit range.
 | 1. Freeze and characterize | Complete (`3aabcda^..0bca270`) | [`014`](014-freeze-migration-baseline.md) | R1 accepted; no ambiguity |
 | 2. Contracts and structure | Complete (`e2c2b9d^..9f8dd16`) | [`015`](015-contracts-and-structure.md) | R2 accepted 2026-07-26 |
 | 3. Shared React application | Complete | [`016`](016-shared-react-application.md) | R3 accepted 2026-07-26 |
-| 4. Python application core | Implemented and automated; R4 open | [`022`](022-durable-capture-worker-isolation.md), [`023`](023-backend-capability-degradation.md), then [`017`](017-python-application-core.md) | **Required parity and storage review; hold before Phase 5** |
-| 5. Early Tauri skeleton | Blocked by Phase 4 approval | Not created | Required desktop-boundary review |
+| 4. Python application core | Complete | [`022`](022-durable-capture-worker-isolation.md), [`023`](023-backend-capability-degradation.md), then [`017`](017-python-application-core.md) | R4 accepted 2026-07-27 |
+| 5. Early Tauri skeleton | Ready; not opened | Not created | Required desktop-boundary review |
 | 6. Complete local desktop | Blocked by Phase 5 | Not created | Required daily-use review |
 | 7. Hosted service | Blocked by Phase 6 | Not created | Required hosted and tenancy review |
 | 8. Collaboration, distribution, and limited sync | Blocked by Phase 7 | Not created | Separate release and sync reviews |
@@ -474,11 +474,13 @@ application and code structure are a sound foundation. Do not create or begin
 the Phase 5 Tauri tactical until this review receives explicit approval.
 
 The implementation and automated evidence completed on 2026-07-27. The
-hands-on packet is
+hands-on record is
 [`r4-python-core-storage-review.md`](../r4-python-core-storage-review.md).
-R4 remains open until the user completes that packet and explicitly decides
-both application parity and whether verified MP3-only retention should become
-the default for new local sessions.
+The user reported that the application “works perfect,” accepted the
+application direction, and selected verified MP3-only retention for ordinary
+new sessions. Lossless WAV remains available through the explicit
+`--retain-wav` option. R4 is accepted; Phase 5 may open only through its own
+bounded tactical.
 
 ## Phase 5 — Prove The Tauri And Sidecar Boundary Early
 

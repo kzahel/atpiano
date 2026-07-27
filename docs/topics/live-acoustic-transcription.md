@@ -27,9 +27,9 @@ of HTTP. Microphone and replay now use the same sample-indexed application
 service. Storage validation has also proved one-hour and three-hour compact
 recordings seek to the exact source-clock range across every deterministic
 repeat boundary. A 2.10-hour M4 Pro real-model soak also completed with full
-commit coverage. R4's physical microphone and parity review remain open; a
-same-duration Linux soak is retained only as the narrower host-specific gap
-documented in Tactical 022.
+commit coverage. R4 accepted application parity and compact retention on
+2026-07-27. A same-duration Linux soak is retained only as the narrower
+host-specific gap documented in Tactical 022.
 
 ## Scope And Relationship
 
@@ -153,16 +153,14 @@ plays and seeks across the session rather than treating the prior inspection
 range as a permanently paused control. Local artifact delivery supports byte
 ranges so a seek addresses the requested audio time.
 
-After Stop, the compatibility/default local workflow derives one 128 kbps MP3
-from the complete bounded WAV segment sequence while retaining PCM16 WAV.
-Phase 4 adds an explicitly enabled compact policy: only after all enabled
-model lanes settle, the MP3 is atomically published, fully decoded, probed
-against the source range, and durably mapped before WAV retirement. Encoder,
-verification, or cursor failure retains WAV. One-hour and three-hour
-validation decoded aligned probes after all 86 and 258 repeat boundaries.
-Compact retirement remains off in the shared public service until R4 accepts
-the interim lossy-storage choice; MP3 is not declared a permanent archival
-codec or a transcription-safe future source.
+After Stop, the ordinary v2/v3 workflow derives one 128 kbps MP3 from the
+complete bounded WAV segment sequence. Only after all enabled model lanes
+settle is the MP3 atomically published, fully decoded, probed against the
+source range, and durably mapped before WAV retirement. Encoder, verification,
+or cursor failure retains WAV, and `--retain-wav` preserves it deliberately.
+One-hour and three-hour validation decoded aligned probes after all 86 and 258
+repeat boundaries. R4 accepted this compact default; MP3 is not declared a
+permanent archival codec or a transcription-safe future source.
 
 V2 now also has an independently toggleable committed Score view. It is an
 explicit, on-demand downstream snapshot rather than part of either acoustic

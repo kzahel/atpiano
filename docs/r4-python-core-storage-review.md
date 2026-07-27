@@ -1,8 +1,9 @@
 # R4 Python Core And Storage Review
 
-Status: ready for human review on 2026-07-27. Phase 5 remains blocked until
-the user explicitly accepts both application parity and the compact-retention
-default.
+Status: **accepted on 2026-07-27.** The user accepted application parity and
+selected verified MP3-only retention as the ordinary default, with WAV
+retention available as an explicit opt-in. Phase 5 is ready but has not been
+opened.
 
 ## What Changed
 
@@ -14,16 +15,16 @@ Python services. Microphone and deterministic replay now enter the same
 sample-indexed capture service. Filesystem, model, replay, score-process, and
 FFmpeg details live behind local adapters.
 
-The storage slice is intentionally observable but still opt-in. New sessions
-started with `--compact-recordings` publish and completely decode-check a
-128 kbps MP3, record its checksum and source-sample mapping, and only then
-retire their WAV segments. Any encoder, decode, probe, publication, or
-model-read-cursor failure preserves usable WAV. Existing sessions are read
-without migration. The ordinary shared service still keeps WAV plus MP3.
+New sessions publish and completely decode-check a 128 kbps MP3, record its
+checksum and source-sample mapping, and only then retire their WAV segments.
+Any encoder, decode, probe, publication, or model-read-cursor failure
+preserves usable WAV. `--retain-wav` keeps lossless source deliberately.
+Existing sessions are read without migration.
 
-## One Launch Command
+## Acceptance Launch Command
 
-From the repository root, launch an isolated compact review workspace:
+The accepted review used this isolated compact workspace. The final flag is
+now a compatibility alias for the ordinary default:
 
 ```bash
 uv run atpiano workbench-v3 \
@@ -82,14 +83,13 @@ Phase 4 session; it does not rewrite the prior one.
 | Artifacts | Session-addressed and range-readable | Centralized classification and access |
 | Delete | Recoverable, guarded for active work | Service-owned guard and trash operation |
 | Historical formats | Read without migration | Unmarked session trees are untouched |
-| Ordinary recording | Retained WAV plus playback MP3 | Still the default in the shared service |
-| Compact review mode | Not previously available | Verified MP3, then raw retirement |
+| Ordinary recording | Retained WAV plus playback MP3 | Verified MP3, then raw retirement |
+| Lossless override | Not previously required | `--retain-wav` keeps WAV plus MP3 |
 
 There is no intentional wire-contract or React interaction change. The
 Python suite, shared-runtime tests, contract drift check, typecheck, and
-production build all pass. R4 is still important because tests cannot decide
-whether the experience feels intact or whether lossy MP3-only retention is
-the right local default.
+production build all pass. The human review accepted both the experience and
+the interim lossy-retention tradeoff.
 
 ## Storage Evidence
 
@@ -143,7 +143,8 @@ adapter imports from `atpiano.application`.
 - Phase 1: `3aabcda^..0bca270`
 - Phase 2: `e2c2b9d^..9f8dd16`
 - Phase 3: `a9805fd^..6d35751`
-- Phase 4 application extraction: `1ca6032^..fd4f224`
+- Phase 4 application extraction and accepted default:
+  `1ca6032^..d072cd7`
 - Slow-host prerequisite details:
   [`022-durable-capture-worker-isolation.md`](tactical/022-durable-capture-worker-isolation.md)
   and
@@ -159,15 +160,16 @@ Final automated results:
 - `npm run build --prefix app`: passed with the existing large-OSMD-chunk
   advisory.
 - `uv run atpiano migration-regression --output
-  results/migration-regression/phase4-r4-20260727/report.json`: passed.
+  results/migration-regression/phase4-r4-accepted-20260727/report.json`:
+  passed.
 
 ## Known Differences And Decisions
 
-- Compact retirement is opt-in pending R4; the active shared service keeps
-  its safer WAV-plus-MP3 default.
-- MP3 is lossy and is not declared the permanent archival or
-  retranscription format. Accepting it means new compact sessions no longer
-  have lossless WAV after verified settlement.
+- Compact retirement is the accepted ordinary default. `--retain-wav` is the
+  explicit debugging or future-retranscription override.
+- MP3 is lossy and is not declared the permanent archival or retranscription
+  format. Ordinary new sessions no longer have lossless WAV after verified
+  settlement.
 - Debug retention has a tested service and CLI policy but no new React
   storage-management screen.
 - Interrupted arbitrary transcription is preserved and marked failed; it is
@@ -175,14 +177,12 @@ Final automated results:
 - The same-duration real-model soak ran on macOS. The decisive shorter Linux
   browser/profile checks pass, but a same-duration Linux soak remains a
   host-specific evidence gap.
-- A consentful physical microphone action remains human-only.
 
-## Approval
+## Acceptance Record
 
-Please answer both:
+The user reported that the application “works perfect,” accepting basic
+behavior and the extracted direction. The user then selected WAV retirement
+after verified MP3 publication and requested retained WAV as an opt-in. Commit
+`d072cd7` implements that decision as the default plus `--retain-wav`.
 
-1. Does the basic application behavior and extracted code direction pass R4?
-2. Should verified MP3-only retention become the default for newly created
-   local sessions, or should WAV plus MP3 remain the default?
-
-No Phase 5 tactical or Tauri work begins before both decisions are explicit.
+R4 is closed. Phase 5 may begin only through its own bounded tactical.

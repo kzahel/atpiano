@@ -6,11 +6,11 @@ Status: accepted foundation on 2026-07-26; Phase 3 and R3 are complete under
 [`016-shared-react-application.md`](../tactical/016-shared-react-application.md).
 The Phase 4 extraction is implemented locally under
 [`017-python-application-core.md`](../tactical/017-python-application-core.md)
-and awaits R4. Framework-independent services now own catalog and historical
-reads, capture identity, score targets, artifact access, and recoverable
-deletion while the local filesystem remains an adapter. Existing session
-artifacts remain authoritative and no historical directory is migrated while
-being read.
+and accepted at R4. Framework-independent services now own catalog and
+historical reads, capture identity, score targets, artifact access, and
+recoverable deletion while the local filesystem remains an adapter. Existing
+session artifacts remain authoritative and no historical directory is
+migrated while being read.
 
 ## Scope And Relationship
 
@@ -31,14 +31,14 @@ continues to own score inference and rendering quality. This topic owns how
 the workspace selects and addresses those session-bound products.
 [`long-session-storage-retention.md`](long-session-storage-retention.md) owns
 ordinary-session disk growth, bounded local debug retention, disk budgets, and
-the still-open recording-codec decision; session history and deletion apply
-that policy without redefining it.
+the still-open permanent recording-codec decision; session history and
+deletion apply that policy without redefining it.
 
 Phase 4 has moved catalog, capture coordination, historical reads, score jobs,
 artifacts, retention, and deletion into one framework-independent application
 boundary. Direct application tests exercise those services without HTTP.
 The React runtime contract and accepted selected-versus-active behavior remain
-stable; R4 still needs to confirm that parity manually.
+stable; R4 confirmed that parity on 2026-07-27.
 
 [`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md)
 owns the accepted hosted-plus-Tauri product architecture, including accounts,

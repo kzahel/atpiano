@@ -2,18 +2,18 @@
 
 Topic: long-session-storage-retention
 
-Status: **the first Phase 4 storage implementation and automated duration
-evidence completed on 2026-07-27 under
-[`017-python-application-core.md`](../tactical/017-python-application-core.md);
-the compact MP3 default still awaits R4 approval.** New Phase 4 sessions can
-explicitly retain a verified 128 kbps MP3 and retire raw WAV only after every
-enabled lane settles. Ordinary diagnostics are off at their write sites.
-Debug retention is separate, byte- and age-bounded, rotatable, pinnable, and
-exportable. Actual workspace/current-session categories and projected
-bytes/hour are reported. Existing sessions are never migrated. The shared
-public service keeps compact retirement disabled until R4 decides the lossy
-tradeoff. Permanent codec, workspace quota, and automatic user-session
-cleanup remain unselected. Slow-host evidence adds a retirement constraint:
+Status: **the Phase 4 storage implementation, automated duration evidence,
+and R4 default decision completed on 2026-07-27 under
+[`017-python-application-core.md`](../tactical/017-python-application-core.md).**
+New Phase 4 sessions ordinarily retain a verified 128 kbps MP3 and retire raw
+WAV only after every enabled lane settles. `--retain-wav` explicitly keeps
+lossless source for debugging or future retranscription. Ordinary diagnostics
+are off at their write sites. Debug retention is separate, byte- and
+age-bounded, rotatable, pinnable, and exportable. Actual
+workspace/current-session categories and projected bytes/hour are reported.
+Existing sessions are never migrated. Permanent codec, workspace quota, and
+automatic user-session cleanup remain unselected. Slow-host evidence adds a
+retirement constraint:
 Tactical
 [`022-durable-capture-worker-isolation.md`](../tactical/022-durable-capture-worker-isolation.md)
 keeps lossless source addressable until every enabled model-read cursor has
@@ -72,27 +72,28 @@ linearly. About 117 MiB per take is live native-model windows. This can be
 useful for a deliberate debugging run, but it is not an acceptable default
 for ordinary practice.
 
-V2 bounds memory with a roughly 40-second PCM ring, segmented disk audio,
+At Phase 4 entry, v2 bounded memory with a roughly 40-second PCM ring,
+segmented disk audio,
 capped recent native windows, bounded event queries, and no whole-file Stop
-pass. Its current 48 kHz mono PCM16 recording grows by 96,000 bytes per source
-second, or 345.6 MB/hour before small container overhead. V2 therefore fixes
-the unbounded-memory problem, but its stopped-session disk policy is still
-unfinished.
+pass. Its 48 kHz mono PCM16 recording grew by 96,000 bytes per source second,
+or 345.6 MB/hour before small container overhead. V2 therefore fixed the
+unbounded-memory problem before it fixed the stopped-session disk policy.
 
-After Stop, V2 also derives one 128 kbps MP3 from the complete WAV segment
+After Stop, v2 also derived one 128 kbps MP3 from the complete WAV segment
 sequence. The browser prefers that file for seekable playback and synchronized
 scrubbing, and falls back to the WAV segments when FFmpeg is unavailable. The
 MP3 grows by roughly 57.6 MB/hour; the measured 37.6-second review session
 produced a 602,540-byte file.
 
-The MP3 is currently an additional playback cache. It does not replace or
-remove the segmented PCM source, so current stopped-session audio growth is
-roughly 403 MB/hour for WAV plus MP3. This playback feature does not by itself
-solve the storage concern or select the long-term recording format.
+Before Phase 4 the MP3 was only an additional playback cache, making
+stopped-session audio growth roughly 403 MB/hour for WAV plus MP3. The
+accepted Phase 4 default now retires WAV after verification and measures about
+57.6 MB/hour. `--retain-wav` restores the prior lossless-source behavior when
+requested.
 
-Normalized notes, pedal events, revisions, indexes, and a compact manifest
-are expected to be much smaller than audio. That expectation still needs an
-actual per-category measurement over hour-long and multi-hour runs.
+Normalized notes, pedal events, revisions, indexes, and compact manifests are
+reported separately. The one-hour and three-hour measurements below replace
+the earlier size assumption with actual category totals.
 
 ## Data Classes
 
@@ -293,11 +294,12 @@ That extraction:
 8. measure candidate recording encodings only after the inventory identifies
    audio as the remaining dominant category.
 
-The existing MP3 is the interim Phase 4 implementation choice, not a permanent
-codec selection. R4 must review its measured storage behavior and the explicit
-loss of new sessions' WAV source before it becomes the ordinary default.
-Other codec work remains a later measured decision and should not be bundled
-with cloud quotas, permanent deletion, or a general artifact-schema rewrite.
+The existing MP3 is the accepted interim Phase 4 default, not a permanent
+codec selection. R4 accepted its measured storage behavior and the explicit
+loss of new sessions' WAV source on 2026-07-27, with `--retain-wav` available
+as the lossless-source opt-in. Other codec work remains a later measured
+decision and should not be bundled with cloud quotas, permanent deletion, or
+a general artifact-schema rewrite.
 
 ## Acceptance Evidence
 

@@ -27,7 +27,7 @@ execution record; continuing status and direction belong in the relevant
 | [`014-freeze-migration-baseline.md`](014-freeze-migration-baseline.md) | Complete | Phase 1 migration baseline, regression command, retained application behavior, golden fixtures, and R1 handoff |
 | [`015-contracts-and-structure.md`](015-contracts-and-structure.md) | Complete | Phase 2 versioned contracts, runtime boundary, explicit local session API, dependency structure, and accepted R2 review |
 | [`016-shared-react-application.md`](016-shared-react-application.md) | Complete | Phase 3 shared React workspace, local and fixture runtimes, accepted R3 interactions, score isolation, and synchronized playback |
-| [`017-python-application-core.md`](017-python-application-core.md) | Implemented; R4 open | Phase 4 framework-independent Python services, thin local adapters, compact ordinary recording, bounded debug retention, and R4 parity gate |
+| [`017-python-application-core.md`](017-python-application-core.md) | Complete; R4 accepted | Phase 4 framework-independent Python services, thin local adapters, compact ordinary recording, bounded debug retention, and R4 parity gate |
 | [`018-score-playback-alignment.md`](018-score-playback-alignment.md) | Complete | Source-event-to-score alignment artifacts, synchronized OSMD playback cursor, and piano-roll playhead |
 | [`019-linux-development-validation.md`](019-linux-development-validation.md) | Complete | Fresh-clone x86_64 Linux gates, real model paths, platform-neutral fixes, dependency footprint, and same-process scheduling evidence |
 | [`020-responsive-score-reader.md`](020-responsive-score-reader.md) | Implemented | Exact-snapshot responsive score reader with phone, tablet, desktop, page-turn, and fullscreen layouts |

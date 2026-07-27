@@ -84,6 +84,12 @@ and provides synchronized recorded-audio playback, provisional and corrected
 notes, piano-roll and keyboard inspection, session history, artifacts, and
 recoverable deletion.
 
+After successful settlement, new v3 sessions keep a verified 128 kbps MP3 and
+retire their temporary WAV source by default. Launch with `--retain-wav` when
+lossless source should remain available for debugging or future
+retranscription. Existing session directories are never migrated by this
+policy.
+
 Engraved score snapshots are optional and isolated from capture. To enable the
 current internal score experiment, install its runtime once:
 
