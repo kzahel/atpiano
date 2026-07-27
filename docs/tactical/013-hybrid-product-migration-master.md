@@ -3,11 +3,11 @@
 Topic: multi-tenant-hybrid-service-architecture
 
 Status: accepted master plan on 2026-07-26; Phases 1 through 3 are complete,
-R2 and R3 are accepted, and Phase 4 is active through the slow-host
-prerequisites in Tacticals 022 and 023. The remaining application extraction
-in Tactical 017 follows their local implementation and Linux validation. This
-document tracks the staged migration program and its human review gates. Each
-phase must create one or more smaller numbered tacticals before implementation.
+R2 and R3 are accepted, and the Phase 4 implementation and automated evidence
+are complete. R4 manual application parity and compact-retention approval are
+the required hold before Phase 5. This document tracks the staged migration
+program and its human review gates. Each phase must create one or more smaller
+numbered tacticals before implementation.
 
 ## Outcome
 
@@ -64,7 +64,7 @@ result, and commit range.
 | 1. Freeze and characterize | Complete (`3aabcda^..0bca270`) | [`014`](014-freeze-migration-baseline.md) | R1 accepted; no ambiguity |
 | 2. Contracts and structure | Complete (`e2c2b9d^..9f8dd16`) | [`015`](015-contracts-and-structure.md) | R2 accepted 2026-07-26 |
 | 3. Shared React application | Complete | [`016`](016-shared-react-application.md) | R3 accepted 2026-07-26 |
-| 4. Python application core | Active; slow-host boundary first | [`022`](022-durable-capture-worker-isolation.md), [`023`](023-backend-capability-degradation.md), then [`017`](017-python-application-core.md) | **Required parity and storage review; hold before Phase 5** |
+| 4. Python application core | Implemented and automated; R4 open | [`022`](022-durable-capture-worker-isolation.md), [`023`](023-backend-capability-degradation.md), then [`017`](017-python-application-core.md) | **Required parity and storage review; hold before Phase 5** |
 | 5. Early Tauri skeleton | Blocked by Phase 4 approval | Not created | Required desktop-boundary review |
 | 6. Complete local desktop | Blocked by Phase 5 | Not created | Required daily-use review |
 | 7. Hosted service | Blocked by Phase 6 | Not created | Required hosted and tenancy review |
@@ -472,6 +472,13 @@ This is the required hold before Phase 5. Provide a compact review build and:
 The user decides whether basic functionality is intact and whether the new
 application and code structure are a sound foundation. Do not create or begin
 the Phase 5 Tauri tactical until this review receives explicit approval.
+
+The implementation and automated evidence completed on 2026-07-27. The
+hands-on packet is
+[`r4-python-core-storage-review.md`](../r4-python-core-storage-review.md).
+R4 remains open until the user completes that packet and explicitly decides
+both application parity and whether verified MP3-only retention should become
+the default for new local sessions.
 
 ## Phase 5 — Prove The Tauri And Sidecar Boundary Early
 

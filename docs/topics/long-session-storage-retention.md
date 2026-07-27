@@ -2,14 +2,19 @@
 
 Topic: long-session-storage-retention
 
-Status: direction clarified and scheduled under
-[`017-python-application-core.md`](../tactical/017-python-application-core.md)
-on 2026-07-26. The immediate product concern is that long sessions and local
-debug data must not consume surprising or unbounded disk space. Phase 4 will
-exercise the existing 128 kbps MP3 as the interim ordinary retained recording
-for new sessions, subject to measured R4 review. Permanent codec, concrete
-quota, and cleanup defaults remain unselected. Slow-host evidence adds a
-retirement constraint: Tactical
+Status: **the first Phase 4 storage implementation and automated duration
+evidence completed on 2026-07-27 under
+[`017-python-application-core.md`](../tactical/017-python-application-core.md);
+the compact MP3 default still awaits R4 approval.** New Phase 4 sessions can
+explicitly retain a verified 128 kbps MP3 and retire raw WAV only after every
+enabled lane settles. Ordinary diagnostics are off at their write sites.
+Debug retention is separate, byte- and age-bounded, rotatable, pinnable, and
+exportable. Actual workspace/current-session categories and projected
+bytes/hour are reported. Existing sessions are never migrated. The shared
+public service keeps compact retirement disabled until R4 decides the lossy
+tradeoff. Permanent codec, workspace quota, and automatic user-session
+cleanup remain unselected. Slow-host evidence adds a retirement constraint:
+Tactical
 [`022-durable-capture-worker-isolation.md`](../tactical/022-durable-capture-worker-isolation.md)
 keeps lossless source addressable until every enabled model-read cursor has
 passed it, while Tactical
@@ -199,21 +204,77 @@ yet. Automatically deleting a player's older recordings would be a separate
 product decision and must not be introduced as a side effect of debug
 rotation.
 
-## Next Bounded Implementation Slice
+## Phase 4 Implementation Evidence
+
+The application storage service owns policy while a local adapter owns
+filesystem enumeration, FFmpeg/FFprobe, free-space reads, atomic publication,
+debug archives, and recovery. Each new core session receives an explicit
+marker, so startup recovery and compaction ignore historical directories.
+
+Compact finalization proceeds in this order:
+
+1. export normalized history/MIDI and encode a temporary MP3;
+2. atomically publish and fsync the MP3;
+3. decode the complete file, probe its stream, and verify duration and sample
+   rate against the accepted source range;
+4. durably publish `recording.json` with checksum, byte count, encoder
+   settings, complete source segment mapping, and a
+   `retirement-pending` state;
+5. retire raw segments and their active index; and
+6. durably publish the final raw-retired state.
+
+Encoder absence, encoder failure, decode/probe failure, or an incomplete
+model read cursor preserves WAV and records incomplete compaction. Startup
+removes known partial output and can finish a verified
+`retirement-pending` cleanup. It does not guess about anonymous files.
+
+The reproducible validation command is:
+
+```bash
+uv run atpiano validate-storage \
+  results/musical-loop-validation/input.json \
+  results/phase4-storage-one-hour-20260727 \
+  --minimum-hours 1
+```
+
+The 2026-07-27 one-hour result covered 3,612 source seconds. It retained one
+57,792,812-byte MP3, measured 57,600,809 recording bytes/hour, retired 61 WAV
+segments totaling 346,754,684 bytes, retained no debug or temporary/raw
+bytes, observed at most 12 open files, and reconciled all 62,363,855 bytes by
+category.
+
+The three-hour result covered 10,836 source seconds. It retained one
+173,376,812-byte MP3, measured 57,600,270 recording bytes/hour, retired 181
+WAV segments totaling 1,040,263,964 bytes, retained no debug or temporary/raw
+bytes, again observed at most 12 open files, and reconciled all 187,004,781
+bytes. Pending commit offsets, preview native windows, debug bytes, and
+temporary files were all zero after settlement.
+
+Both runs decoded a non-silent 200 ms probe after every repetition boundary:
+86 probes for one hour and 258 for three hours. Every probe, including the
+first and last, correlated `0.904307` with the exact input-WAV range. This
+checks source-clock seeking rather than accepting duration metadata alone.
+
+The machine-readable evidence is intentionally untracked under
+`results/phase4-storage-*-20260727-evidence.json`.
+
+## Completed Bounded Implementation Slice
 
 The slow-host prerequisite has now supplied part of this contract. Accepted
 PCM is durable before worker scheduling, commit catch-up reads ranges older
 than the memory ring, Stop settlement retains a compact pipeline summary, and
 browser transport high-water is stored separately. A process interruption
 marks an explicit preserved failure instead of leaving a permanent stopping
-session. This does not complete the category inventory, debug budgets, raw
-retirement policy, or automatic settlement continuation described below.
+session. Phase 4 now adds the category inventory, explicit debug budgets, raw
+retirement, and known-partial recovery described below. Automatic
+continuation of arbitrary interrupted transcription work remains out of
+scope; interruption is recorded as failed but preserved.
 
-Storage ownership and the first compact-retention implementation are folded
-into Phase 4 rather than landing in the proof-of-concept HTTP server. The
-bounded execution plan is
+Storage ownership and the first compact-retention implementation landed in
+Phase 4 rather than the proof-of-concept HTTP server. The bounded execution
+record is
 [`017-python-application-core.md`](../tactical/017-python-application-core.md).
-Within that extraction:
+That extraction:
 
 1. inventory every file written during one v1 and one v2 session, including
    WAV source segments, the derived playback MP3, temporary, debug, cache,
@@ -264,6 +325,7 @@ Long local sessions are storage-safe enough to advertise when:
   separately designed retention policy;
 - recording codec, quality, segment duration, and measured bytes/hour;
 - which derived exports are cached versus regenerated;
-- the debug byte cap, expiry interval, and pin/export workflow; and
+- permanent debug byte/age defaults beyond the current configurable local
+  implementation; and
 - how much pipeline status is sufficient to diagnose common failures without
   turning the default session into a trace archive.

@@ -21,6 +21,15 @@ isolated measurements. Their host-independent implementation now passes
 locally. The 2026-07-27 Linux profile selects after-Stop, and real Chrome
 acceptance now preserves real-time ingest, prompt Stop, reload settlement, and
 Basic Pitch responsiveness under a separately saturated Transkun worker.
+The Phase 4 application-core extraction subsequently moved capture ownership,
+PCM acceptance, Stop, settlement, model lifecycle, and replay composition out
+of HTTP. Microphone and replay now use the same sample-indexed application
+service. Storage validation has also proved one-hour and three-hour compact
+recordings seek to the exact source-clock range across every deterministic
+repeat boundary. A 2.10-hour M4 Pro real-model soak also completed with full
+commit coverage. R4's physical microphone and parity review remain open; a
+same-duration Linux soak is retained only as the narrower host-specific gap
+documented in Tactical 022.
 
 ## Scope And Relationship
 
@@ -144,11 +153,16 @@ plays and seeks across the session rather than treating the prior inspection
 range as a permanently paused control. Local artifact delivery supports byte
 ranges so a seek addresses the requested audio time.
 
-After Stop, the current local workflow derives one 128 kbps MP3 from the
-complete bounded WAV segment sequence. MP3 is a seekable browser-delivery
-cache, not the transcription source: segmented PCM16 WAV remains intact and
-is also the playback fallback when FFmpeg is unavailable. This does not
-resolve the separate archival-codec and storage-retention decision.
+After Stop, the compatibility/default local workflow derives one 128 kbps MP3
+from the complete bounded WAV segment sequence while retaining PCM16 WAV.
+Phase 4 adds an explicitly enabled compact policy: only after all enabled
+model lanes settle, the MP3 is atomically published, fully decoded, probed
+against the source range, and durably mapped before WAV retirement. Encoder,
+verification, or cursor failure retains WAV. One-hour and three-hour
+validation decoded aligned probes after all 86 and 258 repeat boundaries.
+Compact retirement remains off in the shared public service until R4 accepts
+the interim lossy-storage choice; MP3 is not declared a permanent archival
+codec or a transcription-safe future source.
 
 V2 now also has an independently toggleable committed Score view. It is an
 explicit, on-demand downstream snapshot rather than part of either acoustic
@@ -178,9 +192,10 @@ test hold their declared rings, native windows, identities, pending offsets,
 and indexed delivery pages within fixed bounds. Real 42–84 second Transkun
 runs remained below the four-second hop, while a forced slow-adapter test
 proves that v2 exposes degraded mode and raises the hop no farther than eight
-seconds. A physical browser microphone audition and multi-hour real-model soak
-remain recommended evidence; no ambient microphone was activated
-automatically.
+seconds. A later 2.10-hour M4 Pro Transkun soak completed 950 decodes with full
+commit coverage, bounded pending state, and no temporary files. A consentful
+physical browser microphone audition remains recommended evidence; no ambient
+microphone was activated automatically.
 
 The first x86_64 Linux Chrome fake-microphone run adds necessary negative
 evidence. At 24 displayed seconds, the real React/AudioWorklet/WebSocket path
@@ -243,8 +258,10 @@ capture. Its first decode took 14.566 seconds, but the audio head continued at
 capture cadence and Basic Pitch remained one second behind. Runtime evidence
 then demoted the session one way to after-Stop with the explicit eight-second
 maximum-hop reason. The session stopped promptly, reattached, and completed
-all accepted audio and exports. A multi-hour real-model soak and physical
-browser-microphone review remain open.
+all accepted audio and exports. The separate 2.10-hour macOS real-model soak
+has now passed. A same-duration Linux rerun remains only under the strict
+host-specific reading of Tactical 022, and physical browser-microphone review
+remains open.
 
 ## Desired Experience
 

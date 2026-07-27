@@ -3,7 +3,10 @@
 Topic: multi-tenant-hybrid-service-architecture
 
 Status: **accepted target architecture as of 2026-07-26; Phases 1 through 3
-are complete, R2 and R3 are accepted, and Phase 3 is recorded under
+are complete, R2 and R3 are accepted, and Phase 4 is implemented locally
+through
+[`017-python-application-core.md`](../tactical/017-python-application-core.md)
+but awaits R4 parity and retention approval.** Phase 3 is recorded under
 [`016-shared-react-application.md`](../tactical/016-shared-react-application.md)
 with its live-feedback, horizon presentation, score publication sanity, and
 session-addressed review URLs corrected through R3 feedback. Stop progress and
@@ -11,16 +14,24 @@ automatic post-settle scoring are also implemented. React now preserves
 distinct inferred sustain and soft-pedal lanes and flags unusually long
 controller estimates instead of merging them as apparent stuck sustain,
 and it provides seekable recorded-audio playback synchronized to exact
-source-sample inspection. Playback prefers a replaceable MP3 derivative while
-the current local adapter retains segmented WAV source audio. Phase 4 is
-planned under
-[`017-python-application-core.md`](../tactical/017-python-application-core.md)
-but has not started. The Pi's existing public Caddy service can proxy the real
-Mac-hosted React and Python/model application over the LAN for a short public
-trial. Its Mac upstream now runs as an on-demand, restart-supervised launchd
-job with retained lifecycle and process logs; it deliberately does not
-register as a reboot or login service. This remains no evidence of the hosted
-service, accounts, durable cloud persistence, or multi-tenant isolation.**
+source-sample inspection.
+
+The local Python path now composes framework-independent application services
+for sessions, capture, score jobs, storage, artifacts, and recoverable
+deletion over explicit local adapters. Replay and microphone use the same
+sample-indexed capture service. New Phase 4 sessions may explicitly retain a
+verified 128 kbps MP3 and retire WAV source after every enabled lane settles;
+the public service keeps that option off pending R4. Ordinary diagnostics are
+off, bounded debug retention is separate, and one-hour/three-hour category
+evidence is reproducible. This is local modularity evidence, not evidence of
+hosted accounts, authorization, PostgreSQL, object storage, cloud durability,
+or multi-tenant isolation.
+
+The Pi's existing public Caddy service can proxy the real Mac-hosted React and
+Python/model application over the LAN for a short public trial. Its Mac
+upstream now runs as an on-demand, restart-supervised launchd job with
+retained lifecycle and process logs; it deliberately does not register as a
+reboot or login service.
 Versioned Pydantic contracts, generated OpenAPI/TypeScript, the
 `AtpianoRuntime` boundary, an executable fixture provider, and explicit local
 compatibility paths exist. R2 feedback removed the generic `product`

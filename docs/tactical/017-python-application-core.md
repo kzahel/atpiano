@@ -8,17 +8,21 @@ Topic: session-workspace-management
 
 Topic: long-session-storage-retention
 
-Status: planned and authorized on 2026-07-26 after accepted R3 review and
-storage-direction clarification. Its application-core implementation has not
-started. The Linux browser evidence subsequently made
-[`022-durable-capture-worker-isolation.md`](022-durable-capture-worker-isolation.md)
-and
-[`023-backend-capability-degradation.md`](023-backend-capability-degradation.md)
-prerequisite Phase 4 slices. Their host-independent work has landed; this
-tactical remains paused while Tactical 022's multi-hour real-model soak stays
-open. The decisive Linux profile, Chrome, saturated-worker, Stop, reload, and
-settlement checks passed on 2026-07-27, and Tactical 023 is complete. R4
-remains the combined parity and storage-behavior review before Phase 5.
+Status: **implemented and automated locally on 2026-07-27; awaiting R4
+manual parity and compact-retention approval before Phase 4 can be
+accepted.** Catalog, capture, settlement, score jobs, replay, artifacts,
+recoverable deletion, recording finalization, accounting, debug retention,
+and recovery now run through framework-independent application services.
+The one-hour and three-hour storage validations pass with verified 128 kbps
+MP3 publication, complete source mapping, boundary-aligned seeking, no
+retained WAV or ordinary debug data, and reconciled category totals.
+Compact retirement remains explicitly opt-in and the shared public service
+continues to retain WAV plus MP3 until R4 decides the lossy-storage tradeoff.
+Tactical 022's separate 2.10-hour real-model soak also completed on the M4
+Pro with full commit coverage, bounded pending state, and no anonymous
+temporary files. Its narrower same-duration Linux-host interpretation remains
+documented there rather than being inferred from deterministic storage
+models.
 
 ## Entry Evidence
 
@@ -28,10 +32,10 @@ remains the combined parity and storage-behavior review before Phase 5.
   is accepted with deterministic replay, microphone capture, Stop, history,
   recoverable deletion, score jobs, artifacts, and synchronized audio
   playback.
-- The current local provider reaches those behaviors through the
-  proof-of-concept `CorrectedWorkbenchServer`, which still owns HTTP, capture,
+- At entry, the local provider reached those behaviors through the
+  proof-of-concept `CorrectedWorkbenchServer`, which owned HTTP, capture,
   session selection, score-job state, artifact finalization, and recovery in
-  one composition.
+  one composition. It now delegates those policies to application services.
 - `LocalSessionStore` supplies useful session-addressed filesystem behavior,
   but it is an adapter rather than the application policy owner.
 - Current stopped sessions retain segmented 48 kHz PCM16 WAV at about
@@ -42,10 +46,9 @@ remains the combined parity and storage-behavior review before Phase 5.
   not ordinary user-session content.
 - The former WebSocket ingest path invoked preview and commit lanes
   synchronously. Slow Transkun inference on Linux blocked PCM acceptance and
-  exposed Stop settlement as transport failure. Tactical 022 has corrected
-  that call path and passed the decisive Linux browser rerun. Its separate
-  multi-hour real-model soak remains before broader extraction preserves the
-  new behavior.
+  exposed Stop settlement as transport failure. Tactical 022 corrected that
+  call path, passed the decisive Linux browser rerun, and later completed a
+  2.10-hour M4 Pro real-model soak with full commit coverage.
 
 ## User-Visible Outcome
 
@@ -355,7 +358,7 @@ lossless source can be reconstructed.
 No existing session tree is rewritten. Reverting the application extraction
 does not require a data migration.
 
-## Planned Implementation Sequence
+## Implementation Sequence
 
 1. Land Tactical 022's durable ingest, worker isolation, and asynchronous Stop
    contract, then Tactical 023's measured degradation policy.
@@ -374,4 +377,73 @@ does not require a data migration.
 
 ## Execution Record
 
-No implementation commits yet.
+The implementation landed as a bounded commit series:
+
+1. `1ca6032` introduced the framework-independent session catalog,
+   historical-read, artifact, and recoverable-delete boundary.
+2. `8931f8b` extracted frozen-target score-job coordination and local score
+   execution.
+3. `c2eef8d` extracted capture ownership, model lifecycle, PCM acceptance,
+   Stop, settlement, and interrupted-session recovery.
+4. `2d2d4bc` routed deterministic replay through the same capture service as
+   microphone PCM.
+5. `d9284f0` added application-owned compact recording, accounting, debug
+   retention, and local encoder/filesystem adapters.
+6. `78bbd04` integrated storage finalization with capture settlement, made
+   ordinary diagnostics off at their write sites, and exposed opt-in CLI
+   policy.
+7. `3ba0829` added the reproducible `validate-storage` duration command.
+8. `d3e73b8` fixed the atomic-publication race found by the first one-hour
+   accounting pass.
+9. `f27d072` made duration validation decode and compare a source-clock probe
+   after every replay repetition boundary.
+10. `f3eecac` added explicit decode-verification preservation and repeated
+    compact-session reconciliation regressions.
+11. `fd4f224` kept terminal interrupts in the parent so spawned workers shut
+    down without noisy child tracebacks.
+
+Automated evidence on 2026-07-27:
+
+- `uv run pytest -q`: 148 passed, with one existing third-party deprecation
+  warning.
+- `npm test --prefix app`: five Node contract/runtime tests and 46 Vitest
+  tests passed across 11 files.
+- `npm run typecheck --prefix app`, contract generation check, and production
+  Vite build passed. The existing large OpenSheetMusicDisplay chunk warning
+  remains.
+- The one-hour command used 86 repetitions and retained one 57,792,812-byte
+  MP3 for 3,612 seconds of 48 kHz source. Measured recording growth was
+  57,600,809 bytes/hour. It retired 61 WAV segments totaling 346,754,684
+  bytes, retained zero debug or temporary bytes, observed at most 12 open
+  files, and reconciled all 62,363,855 workspace bytes.
+- The three-hour command used 258 repetitions and retained one
+  173,376,812-byte MP3 for 10,836 seconds. It retired 181 WAV segments
+  totaling 1,040,263,964 bytes, retained zero debug or temporary bytes,
+  observed at most 12 open files, and reconciled all 187,004,781 workspace
+  bytes.
+- Both duration runs decoded a non-silent 200 ms range after every repetition
+  boundary. All 86 and 258 probes respectively correlated `0.904307` with the
+  exact input-WAV source range, including the first and final repetitions.
+- Encoder failure, compact verification failure handling, known partial-file
+  restart cleanup, old-session non-migration, debug byte/age rotation,
+  pin/export, unavailable correction, low-disk refusal, MP3-only artifact
+  discovery, and application-only service calls have focused tests.
+- The restarted shared service returned HTTP 200 from the public homepage and
+  the expected local/microphone/replay/score capability document. Its compact
+  flag remains off.
+
+Generated evidence is untracked under:
+
+- `results/phase4-storage-one-hour-20260727-evidence.json`
+- `results/phase4-storage-three-hour-20260727-evidence.json`
+- `results/backend-profile-phase4-soak-20260727/backend-profile.json`
+- `results/migration-regression/phase4-r4-20260727/report.json`
+
+R4 still requires the listed human parity pass, one physical microphone
+action, old-WAV and new-MP3 playback/scrubbing review, the encoder-failure
+demonstration, and an explicit decision on whether compact MP3 retention
+becomes the ordinary default.
+
+The concise launch command, behavior comparison, storage summary, code map,
+known differences, and review checklist are in
+[`r4-python-core-storage-review.md`](../r4-python-core-storage-review.md).

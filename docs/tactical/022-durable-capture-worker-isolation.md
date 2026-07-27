@@ -10,8 +10,9 @@ Topic: long-session-storage-retention
 
 Status: **implemented locally on 2026-07-26; the decisive x86_64 Linux profile,
 60-second browser, saturated-worker, Stop, reload, and settlement checks passed
-on 2026-07-27. A multi-hour real-model soak remains open.** This is the first
-Phase 4 implementation slice.
+on 2026-07-27. A 2.10-hour real-model soak subsequently passed on the M4 Pro.
+The tactical retains only the stricter same-duration Linux-soak reading of its
+mandatory-host wording.** This is the first Phase 4 implementation slice.
 
 ## Entry Evidence
 
@@ -334,7 +335,36 @@ all accepted frames. The session completed with the explicit demotion reason,
 bounded pending state, checksummed audio and exports, and no temporary files.
 
 This establishes the decisive Linux worker-isolation contract and completes
-Tactical 023's real-host acceptance. Tactical 022 remains open only for its
-separately required multi-hour real-model soak. A consentful physical
-microphone review and automatic continuation across a full server-process exit
-also remain outside this result.
+Tactical 023's real-host acceptance. A consentful physical microphone review
+and automatic continuation across a full server-process exit remain outside
+this result.
+
+### Multi-hour real-model soak on 2026-07-27
+
+The separate macOS soak used the same checksummed 42-second, 48 kHz musical
+fixture for 180 continuous-clock repetitions: 362,880,000 frames and 7,560
+source seconds, or 2.10 hours. Isolated Transkun 2.0.1 ran on CPU with two
+threads and the recorded checkpoint/config identities.
+
+The session completed in 3,688.7 wall seconds. All 950 sequential decodes
+covered the full source horizon. Mean decode wall time was 3.878 seconds,
+p95 was 4.095 seconds, maximum was 4.797 seconds, and total decode work was
+3,684.141 seconds. The 0.487 service ratio selected **delayed** because the
+maximum decode exceeded the four-second live hop, but it remained below the
+eight-second maximum. The scheduler demoted once, reached but did not exceed
+the 384,000-frame maximum hop, and ended with no commit lag.
+
+Pending offsets ended at zero and reached a high-water of six; there was no
+per-block or per-decode object queue. The append-only event index passed
+SQLite integrity checking with 32,062 revisions and 29,167 materialized
+events. All 126 WAV segments matched their SHA-256 declarations, were
+contiguous from sample zero through 362,880,000, and accounted for
+725,765,544 bytes. No anonymous dot or `.tmp` file remained.
+
+This closes the general multi-hour real-model longevity gap and supports the
+Phase 4 extraction. It does not pretend that the macOS service ratio is Linux
+performance. If “Mandatory Linux Acceptance” requires the multi-hour soak
+itself, rather than the decisive Linux browser/profile checks plus a
+multi-hour real-model host soak, that narrower Linux rerun remains explicit.
+The untracked evidence is
+`results/backend-profile-phase4-soak-20260727/backend-profile.json`.

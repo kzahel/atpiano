@@ -4,11 +4,13 @@ Topic: session-workspace-management
 
 Status: accepted foundation on 2026-07-26; Phase 3 and R3 are complete under
 [`016-shared-react-application.md`](../tactical/016-shared-react-application.md).
-The Phase 4 extraction is planned under
-[`017-python-application-core.md`](../tactical/017-python-application-core.md).
-Existing session artifacts remain authoritative while explicit catalog,
-session-addressed reads, capture identity, score targets, and recoverable
-deletion are exposed through additive `/api/v1` routes.
+The Phase 4 extraction is implemented locally under
+[`017-python-application-core.md`](../tactical/017-python-application-core.md)
+and awaits R4. Framework-independent services now own catalog and historical
+reads, capture identity, score targets, artifact access, and recoverable
+deletion while the local filesystem remains an adapter. Existing session
+artifacts remain authoritative and no historical directory is migrated while
+being read.
 
 ## Scope And Relationship
 
@@ -32,10 +34,11 @@ ordinary-session disk growth, bounded local debug retention, disk budgets, and
 the still-open recording-codec decision; session history and deletion apply
 that policy without redefining it.
 
-Phase 4 moves catalog, capture coordination, historical reads, score jobs,
+Phase 4 has moved catalog, capture coordination, historical reads, score jobs,
 artifacts, retention, and deletion into one framework-independent application
-boundary. The React runtime contract and accepted selected-versus-active
-behavior remain stable during that extraction.
+boundary. Direct application tests exercise those services without HTTP.
+The React runtime contract and accepted selected-versus-active behavior remain
+stable; R4 still needs to confirm that parity manually.
 
 [`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md)
 owns the accepted hosted-plus-Tauri product architecture, including accounts,
