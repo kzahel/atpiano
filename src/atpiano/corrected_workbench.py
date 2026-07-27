@@ -29,6 +29,11 @@ from atpiano.adapters.local_sessions import (
     LocalSessionNotFoundError,
     LocalSessionStore,
 )
+from atpiano.application import (
+    ApplicationNotFoundError,
+    ApplicationServices,
+    SessionApplicationService,
+)
 from atpiano.backend_profile import (
     BackendSchedulerIdentity,
     read_backend_profile,
@@ -51,7 +56,6 @@ from atpiano.contracts.schemas import (
     ScoreVariant,
     ScoreVariantRequest,
     SourceKind,
-    WorkspacePage,
 )
 from atpiano.corrected import (
     CorrectedSession,
@@ -198,6 +202,12 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self.workspace_directory = workspace_directory.resolve()
         self.workspace_directory.mkdir(parents=True, exist_ok=True)
         self.session_store = LocalSessionStore(self.workspace_directory)
+        self.application = ApplicationServices(
+            sessions=SessionApplicationService(
+                self.session_store,
+                workspace_id=LOCAL_WORKSPACE_ID,
+            )
+        )
         self.preview_model_factory = preview_model_factory
         self.commit_model_factory = commit_model_factory
         self.minimum_free_bytes = minimum_free_bytes
@@ -876,7 +886,8 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                     if self._score_status == "running"
                     else None
                 )
-            result = self.session_store.trash_session(
+            result = self.application.sessions.delete_session(
+                LOCAL_WORKSPACE_ID,
                 session_id,
                 active_session_id=active_session_id,
                 running_score_session_id=running_score_session_id,
@@ -1138,10 +1149,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                 self._send_json(capabilities.model_dump(mode="json"))
                 return True
             if request_path == f"{prefix}/workspaces":
-                page = WorkspacePage(
-                    items=(self.server.session_store.workspace(),),
-                    next_cursor=None,
-                )
+                page = self.server.application.sessions.list_workspaces()
                 self._send_json(page.model_dump(mode="json"))
                 return True
             job_match = re.fullmatch(f"{prefix}/jobs/([^/]+)", request_path)
@@ -1155,9 +1163,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             )
             if sessions_match:
                 workspace_id = sessions_match.group(1)
-                if workspace_id != LOCAL_WORKSPACE_ID:
-                    raise LocalSessionNotFoundError("workspace does not exist")
-                page = self.server.session_store.list_sessions(
+                page = self.server.application.sessions.list_sessions(
+                    workspace_id,
                     cursor=query.get("cursor", [None])[0],
                     limit=self._api_query_limit(query),
                     active_session_id=self.server.active_session_id(),
@@ -1170,9 +1177,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             )
             if event_match:
                 workspace_id, session_id = event_match.groups()
-                if workspace_id != LOCAL_WORKSPACE_ID:
-                    raise LocalSessionNotFoundError("workspace does not exist")
-                page = self.server.session_store.events(
+                page = self.server.application.sessions.get_events(
+                    workspace_id,
                     session_id,
                     start_sample=int(query.get("start_sample", ["0"])[0]),
                     end_sample=int(query.get("end_sample", ["0"])[0]),
@@ -1187,9 +1193,10 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             )
             if horizon_match:
                 workspace_id, session_id = horizon_match.groups()
-                if workspace_id != LOCAL_WORKSPACE_ID:
-                    raise LocalSessionNotFoundError("workspace does not exist")
-                horizon = self.server.session_store.horizon(session_id)
+                horizon = self.server.application.sessions.get_horizon(
+                    workspace_id,
+                    session_id,
+                )
                 self._send_json(horizon.model_dump(mode="json"))
                 return True
             artifacts_match = re.fullmatch(
@@ -1198,9 +1205,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             )
             if artifacts_match:
                 workspace_id, session_id = artifacts_match.groups()
-                if workspace_id != LOCAL_WORKSPACE_ID:
-                    raise LocalSessionNotFoundError("workspace does not exist")
-                page = self.server.session_store.list_artifacts(
+                page = self.server.application.sessions.list_artifacts(
+                    workspace_id,
                     session_id,
                     cursor=query.get("cursor", [None])[0],
                     limit=self._api_query_limit(query),
@@ -1216,11 +1222,12 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             )
             if variants_match:
                 workspace_id, session_id = variants_match.groups()
-                if workspace_id != LOCAL_WORKSPACE_ID:
-                    raise LocalSessionNotFoundError(
-                        "workspace does not exist"
+                page = (
+                    self.server.application.sessions.list_score_variants(
+                        workspace_id,
+                        session_id,
                     )
-                page = self.server.session_store.score_variants(session_id)
+                )
                 self._send_json(page.model_dump(mode="json"))
                 return True
             artifact_match = re.fullmatch(
@@ -1234,9 +1241,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                 workspace_id, session_id, artifact_id, operation = (
                     artifact_match.groups()
                 )
-                if workspace_id != LOCAL_WORKSPACE_ID:
-                    raise LocalSessionNotFoundError("workspace does not exist")
-                artifact, path = self.server.session_store.get_artifact_with_path(
+                artifact, path = self.server.application.sessions.get_artifact(
+                    workspace_id,
                     session_id,
                     artifact_id,
                 )
@@ -1264,15 +1270,17 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             )
             if session_match:
                 workspace_id, session_id = session_match.groups()
-                if workspace_id != LOCAL_WORKSPACE_ID:
-                    raise LocalSessionNotFoundError("workspace does not exist")
-                session = self.server.session_store.get_session(
+                session = self.server.application.sessions.get_session(
+                    workspace_id,
                     session_id,
                     active_session_id=self.server.active_session_id(),
                 )
                 self._send_json(session.model_dump(mode="json"))
                 return True
-        except LocalSessionNotFoundError as error:
+        except (
+            ApplicationNotFoundError,
+            LocalSessionNotFoundError,
+        ) as error:
             self._send_api_error(
                 str(error),
                 code=ErrorCode.NOT_FOUND,
@@ -1413,7 +1421,10 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     or request.session_id != session_id
                 ):
                     raise ValueError("score request target does not match its path")
-                target = self.server.session_store.get_session(session_id)
+                target = self.server.application.sessions.get_session(
+                    workspace_id,
+                    session_id,
+                )
                 if (
                     request.transcription_run_id
                     != target.current_transcription_run_id
