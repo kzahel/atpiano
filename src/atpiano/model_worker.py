@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import multiprocessing
 import os
+import signal
 import sys
 import threading
 import time
@@ -68,6 +69,7 @@ def _worker_main(
     thread_limit: int | None,
 ) -> None:
     try:
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
         _apply_thread_limit(thread_limit)
         model = factory()
         _limit_loaded_torch(thread_limit)

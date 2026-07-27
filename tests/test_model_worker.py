@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import signal
+import sys
 
 import numpy as np
 import pytest
@@ -92,6 +94,24 @@ def test_commit_worker_spawns_with_thread_budget() -> None:
         assert output.source_frame_count == 6
         assert output.model_frame_count == 8_000
         assert worker.status()["thread_limit"] == 2
+    finally:
+        worker.close()
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="POSIX process-signal behavior",
+)
+def test_commit_worker_ignores_terminal_interrupt() -> None:
+    worker = CommitModelWorker(_CommitModel, thread_limit=1)
+    try:
+        os.kill(worker.status()["pid"], signal.SIGINT)
+        output = worker.transcribe(
+            bytes(12),
+            source_sample_rate_hz=8_000,
+        )
+        assert output.source_frame_count == 6
+        assert worker.status()["alive"] is True
     finally:
         worker.close()
 
