@@ -24,7 +24,7 @@ const MAX_READY_BYTES: usize = 64 * 1024;
 const MAX_HANDSHAKE_BYTES: u64 = 1024 * 1024;
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopRuntimeInfo {
     base_url: String,
@@ -268,6 +268,30 @@ fn last_stderr(lines: &Arc<Mutex<Vec<String>>>, credential: &str) -> String {
     last.replace(credential, "[redacted]")
 }
 
+fn record_unexpected_exit(
+    status: &RwLock<RuntimeStatus>,
+    expected_shutdown: bool,
+    exit_status: &str,
+    detail: &str,
+) -> Option<String> {
+    if expected_shutdown {
+        return None;
+    }
+    let message = if detail.is_empty() {
+        format!("The local engine stopped unexpectedly ({exit_status}).")
+    } else {
+        format!("The local engine stopped unexpectedly ({exit_status}): {detail}")
+    };
+    if let Ok(mut state) = status.write() {
+        if matches!(*state, RuntimeStatus::Failed(_)) {
+            return None;
+        }
+        *state = RuntimeStatus::Failed(message.clone());
+        return Some(message);
+    }
+    None
+}
+
 fn monitor_child(
     app: tauri::AppHandle,
     child: Arc<Mutex<Child>>,
@@ -283,16 +307,13 @@ fn monitor_child(
             .and_then(|mut child| child.try_wait().ok())
             .flatten();
         if let Some(exit_status) = exit_status {
-            if !expected_shutdown.load(Ordering::SeqCst) {
-                let detail = last_stderr(&stderr_lines, &credential);
-                let message = if detail.is_empty() {
-                    format!("The local engine stopped unexpectedly ({exit_status}).")
-                } else {
-                    format!("The local engine stopped unexpectedly ({exit_status}): {detail}")
-                };
-                if let Ok(mut state) = status.write() {
-                    *state = RuntimeStatus::Failed(message.clone());
-                }
+            let detail = last_stderr(&stderr_lines, &credential);
+            if let Some(message) = record_unexpected_exit(
+                &status,
+                expected_shutdown.load(Ordering::SeqCst),
+                &exit_status.to_string(),
+                &detail,
+            ) {
                 let _ = app.emit("desktop-runtime-failed", message);
             }
             return;
@@ -475,10 +496,8 @@ fn start_sidecar(
     }
 }
 
-#[tauri::command]
-fn desktop_runtime(state: tauri::State<'_, DesktopState>) -> Result<DesktopRuntimeInfo, String> {
-    match state
-        .status
+fn current_runtime_info(status: &RwLock<RuntimeStatus>) -> Result<DesktopRuntimeInfo, String> {
+    match status
         .read()
         .map_err(|_| "desktop runtime state is unavailable".to_string())?
         .clone()
@@ -487,6 +506,11 @@ fn desktop_runtime(state: tauri::State<'_, DesktopState>) -> Result<DesktopRunti
         RuntimeStatus::Failed(error) => Err(error),
         RuntimeStatus::Initializing => Err("The local engine is still starting.".to_string()),
     }
+}
+
+#[tauri::command]
+fn desktop_runtime(state: tauri::State<'_, DesktopState>) -> Result<DesktopRuntimeInfo, String> {
+    current_runtime_info(&state.status)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -533,6 +557,22 @@ pub fn run() {
 mod tests {
     use super::*;
 
+    fn runtime_info_fixture() -> DesktopRuntimeInfo {
+        DesktopRuntimeInfo {
+            base_url: "http://127.0.0.1:49152".to_string(),
+            bearer_token: "a".repeat(64),
+            web_socket_protocol: format!("{DESKTOP_PROTOCOL}.{}", "a".repeat(64)),
+            protocol_version: DESKTOP_PROTOCOL.to_string(),
+            contract_schema_version: CONTRACT_SCHEMA.to_string(),
+            sidecar_version: "0.1.0".to_string(),
+            platform: "macos".to_string(),
+            architecture: "arm64".to_string(),
+            execution_backend: "cpu".to_string(),
+            model_pack_id: MODEL_PACK_ID.to_string(),
+            model_pack_sha256: "b".repeat(64),
+        }
+    }
+
     #[test]
     fn validates_bounded_ready_record() {
         let document = br#"{"schema_version":"atpiano.desktop-ready.v1","protocol_version":"atpiano.desktop.v1","contract_schema_version":"atpiano.contract.v1","sidecar_version":"0.1.0","host":"127.0.0.1","port":49152,"platform":"macos","architecture":"arm64","execution_backend":"cpu","model_pack_id":"atpiano-cpu-models-2026.07","model_pack_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#;
@@ -542,6 +582,77 @@ mod tests {
         let ready = read_ready(&mut reader).expect("ready record");
         validate_ready(&ready).expect("compatible record");
         assert_eq!(ready.port, 49152);
+    }
+
+    #[test]
+    fn rejects_oversized_ready_record() {
+        let oversized = vec![b'a'; MAX_READY_BYTES + 1];
+        let mut reader = BufReader::new(&oversized[..]);
+
+        let error = read_ready(&mut reader).expect_err("bounded record");
+
+        assert!(error.contains("exceeded its bound"));
+    }
+
+    #[test]
+    fn duplicate_bootstrap_reads_do_not_change_state() {
+        let expected = runtime_info_fixture();
+        let status = RwLock::new(RuntimeStatus::Ready(Box::new(expected.clone())));
+
+        let first = current_runtime_info(&status).expect("first bootstrap");
+        let second = current_runtime_info(&status).expect("second bootstrap");
+
+        assert_eq!(first, expected);
+        assert_eq!(second, expected);
+    }
+
+    #[test]
+    fn unexpected_exit_records_one_bounded_failure() {
+        let status = RwLock::new(RuntimeStatus::Ready(Box::new(runtime_info_fixture())));
+
+        let message = record_unexpected_exit(&status, false, "status: 7", "engine failed")
+            .expect("unexpected failure");
+
+        assert_eq!(
+            message,
+            "The local engine stopped unexpectedly (status: 7): engine failed"
+        );
+        assert!(matches!(
+            &*status.read().expect("runtime state"),
+            RuntimeStatus::Failed(error) if error == &message
+        ));
+        assert!(record_unexpected_exit(&status, false, "status: 8", "another failure").is_none());
+        assert!(record_unexpected_exit(&status, true, "status: 0", "").is_none());
+    }
+
+    #[test]
+    fn cleanup_closes_stdin_and_reaps_child() {
+        let child = Command::new("sh")
+            .args(["-c", "read line"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("helper child");
+        assert!(child.stdin.is_some());
+        let child = Arc::new(Mutex::new(child));
+        let retained = Arc::clone(&child);
+        let expected_shutdown = Arc::new(AtomicBool::new(false));
+        let expected = Arc::clone(&expected_shutdown);
+
+        DesktopProcess {
+            child,
+            expected_shutdown,
+        }
+        .shutdown();
+
+        assert!(expected.load(Ordering::SeqCst));
+        assert!(retained
+            .lock()
+            .expect("child state")
+            .try_wait()
+            .expect("child status")
+            .is_some());
     }
 
     #[test]
