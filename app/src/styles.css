@@ -1913,3 +1913,16 @@ input:focus-visible {
     transition: none;
   }
 }
+/* Native bootstrap failures render before the shared workspace can mount. */
+.bootstrap-failure {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  gap: 1rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.bootstrap-failure > * {
+  margin: 0;
+}

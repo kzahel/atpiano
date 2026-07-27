@@ -34,6 +34,16 @@ Object.defineProperty(window, "localStorage", {
   },
 });
 
+let nextObjectUrl = 0;
+Object.defineProperty(URL, "createObjectURL", {
+  configurable: true,
+  value: vi.fn(() => `blob:atpiano-test-${nextObjectUrl += 1}`),
+});
+Object.defineProperty(URL, "revokeObjectURL", {
+  configurable: true,
+  value: vi.fn(),
+});
+
 vi.mock("opensheetmusicdisplay", () => ({
   OpenSheetMusicDisplay: class {
     readonly #container: HTMLElement;

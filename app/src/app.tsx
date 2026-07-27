@@ -330,7 +330,7 @@ export function App() {
       );
       return Promise.all(
         audioArtifacts.map(async (artifact, index) => {
-          const access = await runtime.getArtifactAccess(
+          const content = await runtime.readArtifact(
             artifact.workspace_id,
             artifact.session_id,
             artifact.artifact_id,
@@ -338,7 +338,11 @@ export function App() {
           );
           const source = {
             artifactId: artifact.artifact_id,
-            url: new URL(access.url, window.location.origin).href,
+            url: URL.createObjectURL(
+              new Blob([content.bytes], {
+                type: content.access.media_type,
+              }),
+            ),
             startSample: startSamples[index]!,
             endSample: artifact.source_horizon_sample,
           };
@@ -351,6 +355,14 @@ export function App() {
       selectedSession.data?.status !== "active",
     staleTime: Infinity,
   });
+  useEffect(() => {
+    const sources = audioPlayback.data;
+    return () => {
+      sources?.forEach((source) => {
+        if (source.url.startsWith("blob:")) URL.revokeObjectURL(source.url);
+      });
+    };
+  }, [audioPlayback.data]);
   const scoreXml = useQuery({
     queryKey: ["artifact-content", scoreArtifact?.artifact_id],
     queryFn: ({ signal }) =>
@@ -372,25 +384,19 @@ export function App() {
       scoreAlignmentArtifact?.artifact_id,
     ],
     queryFn: async ({ signal }) => {
-      const access = await runtime.getArtifactAccess(
+      const content = await runtime.readArtifact(
         scoreAlignmentArtifact!.workspace_id,
         scoreAlignmentArtifact!.session_id,
         scoreAlignmentArtifact!.artifact_id,
         { requestId: requestId("score-alignment"), signal },
       );
-      const response = await fetch(
-        new URL(access.url, window.location.origin),
-        { signal },
-      );
-      if (!response.ok) {
-        throw new Error(
-          `Score alignment download failed: HTTP ${response.status}`,
-        );
-      }
-      return parseScoreAlignment(await response.json(), {
+      return parseScoreAlignment(
+        JSON.parse(new TextDecoder().decode(content.bytes)),
+        {
         sessionId: scoreAlignmentArtifact!.session_id,
         musicXmlSha256: scoreArtifact!.sha256,
-      });
+        },
+      );
     },
     enabled:
       scoreArtifact !== undefined &&
@@ -429,25 +435,19 @@ export function App() {
       scoreReaderRoute?.alignmentArtifactId,
     ],
     queryFn: async ({ signal }) => {
-      const access = await runtime.getArtifactAccess(
+      const content = await runtime.readArtifact(
         workspace!.workspace_id,
         selectedSessionId!,
         scoreReaderRoute!.alignmentArtifactId!,
         { requestId: requestId("reader-score-alignment"), signal },
       );
-      const response = await fetch(
-        new URL(access.url, window.location.origin),
-        { signal },
-      );
-      if (!response.ok) {
-        throw new Error(
-          `Score alignment download failed: HTTP ${response.status}`,
-        );
-      }
-      return parseScoreAlignment(await response.json(), {
+      return parseScoreAlignment(
+        JSON.parse(new TextDecoder().decode(content.bytes)),
+        {
         sessionId: selectedSessionId!,
         musicXmlSha256: scoreReaderRoute!.sha256,
-      });
+        },
+      );
     },
     enabled:
       workspace !== undefined &&
@@ -796,16 +796,20 @@ export function App() {
 
   const downloadArtifact = useCallback(async (artifact: Artifact) => {
     try {
-      const access = await runtime.getArtifactAccess(
+      const content = await runtime.readArtifact(
         artifact.workspace_id,
         artifact.session_id,
         artifact.artifact_id,
         { requestId: requestId("artifact-access") },
       );
       const link = document.createElement("a");
-      link.href = access.url;
-      link.download = access.download_name;
+      const url = URL.createObjectURL(
+        new Blob([content.bytes], { type: content.access.media_type }),
+      );
+      link.href = url;
+      link.download = content.access.download_name;
       link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     }
@@ -814,16 +818,20 @@ export function App() {
   const downloadPinnedScore = useCallback(async () => {
     if (!workspace || !selectedSessionId || !scoreReaderRoute) return;
     try {
-      const access = await runtime.getArtifactAccess(
+      const content = await runtime.readArtifact(
         workspace.workspace_id,
         selectedSessionId,
         scoreReaderRoute.artifactId,
         { requestId: requestId("reader-score-download") },
       );
       const link = document.createElement("a");
-      link.href = new URL(access.url, window.location.origin).href;
-      link.download = access.download_name;
+      const url = URL.createObjectURL(
+        new Blob([content.bytes], { type: content.access.media_type }),
+      );
+      link.href = url;
+      link.download = content.access.download_name;
       link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     }

@@ -15,7 +15,7 @@ export async function artifactText(
   expectedSha256: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  const access = await runtime.getArtifactAccess(
+  const content = await runtime.readArtifact(
     workspaceId,
     sessionId,
     artifactId,
@@ -24,21 +24,13 @@ export async function artifactText(
       ...(signal ? { signal } : {}),
     },
   );
-  const response = await fetch(
-    new URL(access.url, window.location.origin),
-    signal ? { signal } : undefined,
-  );
-  if (!response.ok) {
-    throw new Error(`Artifact download failed: HTTP ${response.status}`);
-  }
-  const content = await response.arrayBuffer();
   const actualSha256 = hexadecimal(
-    await window.crypto.subtle.digest("SHA-256", content),
+    await window.crypto.subtle.digest("SHA-256", content.bytes),
   );
   if (actualSha256 !== expectedSha256) {
     throw new Error(
       `Pinned artifact checksum mismatch: expected ${expectedSha256}, received ${actualSha256}.`,
     );
   }
-  return new TextDecoder().decode(content);
+  return new TextDecoder().decode(content.bytes);
 }

@@ -4,6 +4,7 @@ import {
 } from "../http-client.js";
 import type {
   ArtifactAccess,
+  ArtifactContent,
   ArtifactPage,
   AtpianoRuntime,
   Capture,
@@ -147,23 +148,36 @@ export class LocalRuntime implements AtpianoRuntime {
   readonly #client: AtpianoHttpClient;
   readonly #fetch: typeof fetch;
   readonly #WebSocket: typeof WebSocket;
+  readonly #webSocketProtocol: string | undefined;
   #pendingSocket: PendingSocket | null = null;
 
   constructor({
     baseUrl = globalThis.location?.origin ?? "http://127.0.0.1",
     fetchImplementation = globalThis.fetch,
     WebSocketImplementation = globalThis.WebSocket,
+    bearerToken,
+    webSocketProtocol,
   }: {
     readonly baseUrl?: string;
     readonly fetchImplementation?: typeof fetch;
     readonly WebSocketImplementation?: typeof WebSocket;
+    readonly bearerToken?: string;
+    readonly webSocketProtocol?: string;
   } = {}) {
     this.#baseUrl = baseUrl.replace(/\/$/, "");
-    this.#fetch = fetchImplementation;
+    this.#fetch = bearerToken === undefined
+      ? fetchImplementation
+      : async (input, init) => {
+          const request = new Request(input, init);
+          const headers = new Headers(request.headers);
+          headers.set("Authorization", `Bearer ${bearerToken}`);
+          return fetchImplementation(new Request(request, { headers }));
+        };
     this.#WebSocket = WebSocketImplementation;
+    this.#webSocketProtocol = webSocketProtocol;
     this.#client = createAtpianoHttpClient({
       baseUrl: this.#baseUrl,
-      fetch: fetchImplementation,
+      fetch: this.#fetch,
     });
   }
 
@@ -259,7 +273,12 @@ export class LocalRuntime implements AtpianoRuntime {
     }
     const protocol = this.#baseUrl.startsWith("https:") ? "wss:" : "ws:";
     const host = new URL(this.#baseUrl).host;
-    const socket = new this.#WebSocket(`${protocol}//${host}/api/live`);
+    const socket = this.#webSocketProtocol === undefined
+      ? new this.#WebSocket(`${protocol}//${host}/api/live`)
+      : new this.#WebSocket(
+          `${protocol}//${host}/api/live`,
+          this.#webSocketProtocol,
+        );
     let resolveReady!: (capture: Capture) => void;
     let rejectReady!: (error: Error) => void;
     let resolveStopped!: () => void;
@@ -577,6 +596,31 @@ export class LocalRuntime implements AtpianoRuntime {
         },
       ),
     );
+  }
+
+  async readArtifact(
+    workspaceId: string,
+    sessionId: string,
+    artifactId: string,
+    request: RuntimeRequest,
+  ): Promise<ArtifactContent> {
+    const access = await this.getArtifactAccess(
+      workspaceId,
+      sessionId,
+      artifactId,
+      request,
+    );
+    const response = await this.#fetch(
+      new URL(access.url, this.#baseUrl),
+      abortOptions(request),
+    );
+    if (!response.ok) {
+      throw new Error(`Artifact download failed: HTTP ${response.status}`);
+    }
+    return {
+      access,
+      bytes: await response.arrayBuffer(),
+    };
   }
 
   async startScoreJob(

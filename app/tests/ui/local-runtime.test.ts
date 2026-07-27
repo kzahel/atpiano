@@ -46,6 +46,24 @@ const fakeFetch: typeof fetch = async (input, init) => {
   if (url.pathname === "/api/v1/workspaces/local/sessions/session-local") {
     return response(session);
   }
+  if (
+    url.pathname ===
+      "/api/v1/workspaces/local/sessions/session-local/artifacts/artifact-local/access"
+  ) {
+    return response({
+      schema_version: "atpiano.contract.v1",
+      workspace_id: "local",
+      session_id: "session-local",
+      artifact_id: "artifact-local",
+      media_type: "text/plain",
+      download_name: "artifact.txt",
+      url: "/api/artifacts/artifact.txt",
+      expires_at: null,
+    });
+  }
+  if (url.pathname === "/api/artifacts/artifact.txt") {
+    return new Response("artifact bytes");
+  }
   return response({ error: { message: `unexpected ${url.pathname}` } }, 404);
 };
 
@@ -60,7 +78,10 @@ class FakeWebSocket {
   bufferedAmount = 0;
   binaryType: BinaryType = "blob";
 
-  constructor(readonly url: string) {
+  constructor(
+    readonly url: string,
+    readonly protocols?: string | string[],
+  ) {
     FakeWebSocket.instances.push(this);
   }
 
@@ -191,5 +212,59 @@ describe("local runtime", () => {
     });
 
     expect((await stopping).session_id).toBe(session.session_id);
+  });
+
+  it("authenticates HTTP, WebSocket, and artifact bytes", async () => {
+    FakeWebSocket.instances = [];
+    const requests: Request[] = [];
+    const authenticatedFetch: typeof fetch = async (input, init) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      requests.push(request);
+      return fakeFetch(request);
+    };
+    const runtime = new LocalRuntime({
+      baseUrl: "http://127.0.0.1:49152",
+      fetchImplementation: authenticatedFetch,
+      WebSocketImplementation: FakeWebSocket as unknown as typeof WebSocket,
+      bearerToken: "ab".repeat(32),
+      webSocketProtocol: `atpiano.desktop.v1.${"ab".repeat(32)}`,
+    });
+
+    const content = await runtime.readArtifact(
+      "local",
+      "session-local",
+      "artifact-local",
+      { requestId: "artifact" },
+    );
+    expect(new TextDecoder().decode(content.bytes)).toBe("artifact bytes");
+    expect(
+      requests.every(
+        (request) =>
+          request.headers.get("Authorization") ===
+          `Bearer ${"ab".repeat(32)}`,
+      ),
+    ).toBe(true);
+
+    const starting = runtime.startCapture(
+      {
+        schema_version: "atpiano.contract.v1",
+        workspace_id: "local",
+        source: "microphone",
+        sample_rate_hz: 48_000,
+        request_id: "capture-auth",
+      },
+      { requestId: "capture-auth" },
+    );
+    expect(FakeWebSocket.instances[0]?.protocols).toBe(
+      `atpiano.desktop.v1.${"ab".repeat(32)}`,
+    );
+    FakeWebSocket.instances[0]?.emit("open");
+    FakeWebSocket.instances[0]?.message({
+      schema_version: "atpiano.corrected-stream.v1",
+      type: "ready",
+      session_id: session.session_id,
+      sample_rate_hz: 48_000,
+    });
+    expect((await starting).session_id).toBe(session.session_id);
   });
 });

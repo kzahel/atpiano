@@ -1,6 +1,7 @@
 import type {
   Artifact,
   ArtifactAccess,
+  ArtifactContent,
   ArtifactPage,
   AtpianoRuntime,
   Capture,
@@ -322,6 +323,30 @@ export class FixtureRuntime implements AtpianoRuntime {
       throw new Error("artifact does not exist");
     }
     return access;
+  }
+
+  async readArtifact(
+    workspaceId: string,
+    sessionId: string,
+    artifactId: string,
+    request: RuntimeRequest,
+  ): Promise<ArtifactContent> {
+    const access = await this.getArtifactAccess(
+      workspaceId,
+      sessionId,
+      artifactId,
+      request,
+    );
+    const response = await fetch(access.url, {
+      ...(request.signal === undefined ? {} : { signal: request.signal }),
+    });
+    if (!response.ok) {
+      throw new Error(`Artifact download failed: HTTP ${response.status}`);
+    }
+    return {
+      access,
+      bytes: await response.arrayBuffer(),
+    };
   }
 
   async startScoreJob(

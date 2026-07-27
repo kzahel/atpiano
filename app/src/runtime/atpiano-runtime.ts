@@ -59,6 +59,11 @@ export interface PcmBlock {
   readonly payload: ArrayBuffer;
 }
 
+export interface ArtifactContent {
+  readonly access: ArtifactAccess;
+  readonly bytes: ArrayBuffer;
+}
+
 /**
  * Platform-neutral atpiano boundary used by the shared frontend.
  *
@@ -105,6 +110,12 @@ export interface AtpianoRuntime {
     artifactId: string,
     request: RuntimeRequest,
   ): Promise<ArtifactAccess>;
+  readArtifact(
+    workspaceId: string,
+    sessionId: string,
+    artifactId: string,
+    request: RuntimeRequest,
+  ): Promise<ArtifactContent>;
   startScoreJob(
     input: ScoreJobStart,
     request: RuntimeRequest,

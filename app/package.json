@@ -6,12 +6,15 @@
     "build": "vite build",
     "contracts:check": "uv run atpiano generate-contracts --check",
     "dev": "vite",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build --target aarch64-apple-darwin --bundles app --no-sign",
     "test": "npm run test:node && vitest run",
     "test:node": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@tanstack/react-query": "5.101.4",
+    "@tauri-apps/api": "2.11.1",
     "openapi-fetch": "0.17.0",
     "opensheetmusicdisplay": "1.9.9",
     "react": "19.2.8",
@@ -19,6 +22,7 @@
     "zustand": "5.0.14"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "2.11.4",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
     "@types/node": "26.1.1",
