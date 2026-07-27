@@ -42,4 +42,4 @@ execution record; continuing status and direction belong in the relevant
 | [`029-durable-macos-share-service.md`](029-durable-macos-share-service.md) | Implemented | On-demand launchd supervision, persistent lifecycle logs, and explicit macOS-only service controls |
 | [`030-early-tauri-sidecar-boundary.md`](030-early-tauri-sidecar-boundary.md) | Implemented; at R5 hold | Self-contained macOS arm64 Tauri shell, authenticated Python sidecar, CPU model pack, bundle inventory, and R5 gate |
 | [`030-idle-model-worker-eviction.md`](030-idle-model-worker-eviction.md) | Implemented | Lazy model loading plus generation-safe worker eviction ten minutes after full capture settlement |
-| [`031-internal-desktop-score-runtime.md`](031-internal-desktop-score-runtime.md) | In progress | Opt-in internal-only macOS desktop score runtime under provisional checkpoint licensing; no distribution artifact |
+| [`031-internal-desktop-score-runtime.md`](031-internal-desktop-score-runtime.md) | Implemented; at R5 hold | Opt-in internal-only macOS desktop score runtime under provisional checkpoint licensing; no distribution artifact |

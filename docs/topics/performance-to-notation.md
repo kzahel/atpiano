@@ -68,6 +68,13 @@ continue to block public hosted operation, ordinary desktop archives, and
 model-pack distribution until rights are resolved or a licensed converter
 satisfies the same job and artifact contracts.
 
+That internal bundle is now implemented and has completed the real packaged
+42-second replay followed by CPU score generation. It produced a 12-measure,
+two-part MusicXML result and validated source alignment while keeping capture,
+playback, export, and the normal score-free desktop build independent. The
+result is ready for subjective notation review; it does not change the
+provisional license status or authorize distribution.
+
 The source performance remains authoritative. A score is one editable,
 versioned interpretation of it, not a replacement for the source note times.
 

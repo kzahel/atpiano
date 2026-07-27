@@ -4,8 +4,8 @@ Topic: multi-tenant-hybrid-service-architecture
 
 Status: **accepted target architecture as of 2026-07-26; Phases 1 through 4
 are complete and R2, R3, and R4 are accepted. Phase 5 reached R5 and now has
-one bounded internal-score revision in progress; R5 remains open.** Phase 4 is
-recorded under
+one implemented internal-score revision held for review; R5 remains open.**
+Phase 4 is recorded under
 [`017-python-application-core.md`](../tactical/017-python-application-core.md)
 and Phase 3 under
 [`016-shared-react-application.md`](../tactical/016-shared-react-application.md)
@@ -31,9 +31,10 @@ review packet is
 Phase 6 remains closed until explicit acceptance. Tactical 031 now owns a
 separate opt-in internal build of the unresolved score runtime after the user
 provisionally accepted the checkpoint as following the paper's CC BY 4.0
-terms for internal testing. The ordinary R5 and every public artifact remain
-score-free. Windows, Linux, final signing, updates, and microphone parity
-remain outside this bounded proof.
+terms for internal testing. That build has passed packaged replay-to-score and
+post-launch immutability audits. The ordinary R5 and every public artifact
+remain score-free. Windows, Linux, final signing, updates, and microphone
+parity remain outside this bounded proof.
 
 The local Python path now composes framework-independent application services
 for sessions, capture, score jobs, storage, artifacts, and recoverable
@@ -687,6 +688,14 @@ therefore stage an explicitly internal-only build, but neither the checkpoint
 nor implementation may enter a public archive, model pack, hosted offering,
 or release until their own rights are confirmed. A licensed replacement or
 reimplementation may satisfy the same score-worker contract.
+
+Tactical 031 has now proven that boundary in a separate macOS arm64
+application. The internal build validates pinned source and checkpoint
+hashes, advertises score capability only when its isolated runtime is valid,
+and completed a real packaged replay-to-score run without mutating the
+application tree. The normal staging and archive paths remain score-free and
+reject those assets. This is implementation evidence for the local process
+boundary, not resolution of the release gate or acceptance of R5.
 
 ## Observability And Operations
 

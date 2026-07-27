@@ -5,7 +5,7 @@ Master phase: 5. Early Tauri skeleton, R5 revision
 Topics: `multi-tenant-hybrid-service-architecture`,
 `performance-to-notation`
 
-Status: **in progress on 2026-07-27.**
+Status: **implemented and ready for R5 human review on 2026-07-27.**
 
 ## Entry Evidence
 
@@ -129,4 +129,67 @@ without changing source sessions or the existing private score runtime.
 
 ## Execution Record
 
-No implementation commits yet.
+Implementation commits:
+
+- `83d72f7` — open the internal-only policy and tactical;
+- `244d366` — negotiate score capability from the validated runtime;
+- `2ad8ed8` — stage, audit, and validate the opt-in score runtime;
+- `0cf5b27` — redirect native-launch library caches into app data; and
+- `02ea998` — apply the same cache policy to Python launch and validation
+  paths.
+
+The opt-in build command is:
+
+```text
+scripts/build-atpiano-desktop build-internal-score
+```
+
+It produced this ignored, unsigned review application and no ZIP, DMG, or
+other archive:
+
+```text
+results/desktop-internal-score/Atpiano-Internal-Score.app
+```
+
+The final application contains 32,704 files and 2,361,066,073 installed
+bytes. Its 1,316,271,921-byte score runtime contains standalone CPython
+3.11.14, 62 installed packages, pinned MIDI2ScoreTransformer source at
+`115432bda16ca16e0fec2e9465788f2ba369971f`, and the v0.0.1 checkpoint at
+SHA-256
+`7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d43cb2011245db638`.
+The runtime manifest says `internal_only=true`,
+`public_distribution=false`, and `license.status=provisional-unconfirmed`.
+
+The final packaged replay reached the exact 2,016,000-sample audio and commit
+horizons with 151 closed notes, retained one MP3 and zero WAV files, and then
+completed score generation in 7.61 seconds. The result contains a
+12-measure, two-part MusicXML 4.0 score with 152 pitched note elements and a
+valid v2 alignment mapping 131 of the 151 source notes. The MusicXML SHA-256
+for this session-addressed result is
+`21668c49f72563d21383cfbd42f3f0505934576ccbd18dc757b0c60e4731350f`.
+
+The complete bundle tree SHA-256 was
+`20b8ac3377008c54cb63fc3ec34463c564f7b927563e7792c5e13c130361d792`
+both before and after replay and score generation. A real Tauri launch then
+started the bundled sidecar with the bundled score root and passed the full
+post-launch audit. That launch exposed and led to fixing Numba's initially
+empty in-bundle cache directory; library caches now go to mutable app data.
+
+The ordinary `stage` command was run last. It restored the 1,035,523,314-byte
+score-free runtime, left no `score-runtime` directory, and advertises
+`score_available=false`. The existing score-free R5 archive remains the only
+review archive.
+
+Machine-readable ignored evidence:
+
+```text
+results/desktop-internal-score/stage-report.json
+results/desktop-internal-score/bundle-audit.json
+results/desktop-internal-score/packaged-score-report.json
+```
+
+Final automated gates passed with 177 Python tests and Ruff, 5 Node contract
+tests, 47 Vitest tests, frontend typecheck and production build, and 8 Rust
+tests plus formatting and Clippy with warnings denied. The internal
+application is ready for subjective score review. R5 remains open and Phase 6
+remains closed until explicit acceptance.

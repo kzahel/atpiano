@@ -50,6 +50,35 @@ This build is intentionally unsigned and unnotarized. macOS may require an
 explicit local-development override if the app is moved through a channel
 that adds quarantine metadata.
 
+## Internal Score Review Addendum
+
+The score-unavailable review result opened Tactical 031. A separate,
+internal-only application now exercises the existing score UI with the pinned
+MIDI2ScoreTransformer CPU checkpoint:
+
+```text
+results/desktop-internal-score/Atpiano-Internal-Score.app
+```
+
+Build and launch it from the repository root with:
+
+```text
+scripts/build-atpiano-desktop build-internal-score
+open results/desktop-internal-score/Atpiano-Internal-Score.app
+```
+
+This command intentionally creates no ZIP, DMG, installer, or updater
+payload. The app is ignored, unsigned, arm64-only, and restricted to the
+current private test. Its manifest records the paper and provisional
+checkpoint assumption as CC BY 4.0, the upstream source license as
+unconfirmed, and public distribution as false. The ordinary commands and R5
+archive continue to exclude and reject the score runtime.
+
+For this review, select or create a settled performance and choose **Render
+committed score**. The score should render in the existing workspace and open
+in the responsive reader. Capture, review, playback, and export should remain
+available if score generation fails.
+
 ## Suggested Review
 
 1. Launch the app. It should open the existing Atpiano performance workspace
@@ -62,7 +91,9 @@ that adds quarantine metadata.
    advance through preview and after-Stop correction and settle as a new
    completed local session.
 4. Quit and reopen the app. Completed sessions should still appear.
-5. Decide whether this feels like the accepted shared application and whether
+5. In the internal score build, render a settled score and inspect its
+   notation, synchronized score cursor, and source alignment.
+6. Decide whether this feels like the accepted shared application and whether
    the process, bundle, and capability direction are sound.
 
 The current local application-data workspace already contains two completed
@@ -118,6 +149,31 @@ results/desktop-phase5/bundle-audit.json
 results/desktop-phase5/r5-pruned-packaged-report.json
 results/desktop-phase5/r5-final-direct-report.json
 results/desktop-phase5/r5-pruned-replay-parity.json
+```
+
+The internal score build then passed a second real replay:
+
+- 2,016,000-sample audio and commit horizons;
+- 151 closed source notes;
+- one retained MP3 and zero WAV files;
+- 7.61 seconds for score generation;
+- 12 measures, two parts, and 152 pitched MusicXML note elements; and
+- a valid v2 alignment mapping 131 source notes.
+
+This session-addressed MusicXML result has SHA-256
+`21668c49f72563d21383cfbd42f3f0505934576ccbd18dc757b0c60e4731350f`.
+The entire 2.36 GB application tree retained SHA-256
+`20b8ac3377008c54cb63fc3ec34463c564f7b927563e7792c5e13c130361d792`
+across replay and score generation. A real Tauri launch also passed the
+post-launch bundle audit after library caches were redirected into mutable
+app data.
+
+Its ignored machine-readable evidence is:
+
+```text
+results/desktop-internal-score/stage-report.json
+results/desktop-internal-score/bundle-audit.json
+results/desktop-internal-score/packaged-score-report.json
 ```
 
 ## Failure And Recovery Evidence
@@ -236,9 +292,9 @@ removed and any survivor fails packaging.
   offline validation belong to Phase 6.
 - The current local filesystem catalog remains in use; the planned desktop
   SQLite catalog, repair, and model-pack acquisition UI belong to Phase 6.
-- The internal MIDI2ScoreTransformer and checkpoint are excluded because
-  distribution rights remain unresolved. Score-independent review remains
-  available.
+- The ordinary build excludes MIDI2ScoreTransformer and its checkpoint
+  because distribution rights remain unresolved. The separate internal app
+  is provisionally available only for this private review.
 - The bundled Homebrew FFmpeg build is GPL-3.0-or-later and its formula
   inventory is recorded. Public distribution requires a deliberate license-
   notice and source-compliance pass.
@@ -253,20 +309,22 @@ removed and any survivor fails packaging.
 
 ## Commit And Test Record
 
-The Phase 5 implementation series begins at `fc7cad6` and currently ends at
-`1350a54`. The bounded tactical contains the complete ordered commit list.
+The Phase 5 implementation series begins at `fc7cad6`; Tactical 030 records
+the original R5 series and Tactical 031 records the internal score revision.
 
 The final gate includes:
 
-- 173 Python tests and Ruff;
+- 177 Python tests and Ruff;
 - 5 Node contract tests and 47 Vitest tests;
 - frontend typecheck and production build;
-- 7 Rust lifecycle/security tests, formatting, and Clippy with warnings
+- 8 Rust lifecycle/security tests, formatting, and Clippy with warnings
   denied;
 - self-contained staging/import/sidecar smoke;
 - final bundle native, dependency, cache, component, and archive audit;
 - extracted-archive `env -i` launch and post-launch immutability check; and
-- direct-versus-packaged real golden replay parity.
+- direct-versus-packaged real golden replay parity; plus
+- internal packaged replay-to-score, MusicXML/alignment validation, and
+  whole-tree immutability.
 
 R5 is a human hold. Do not open the complete local-desktop Phase 6 until the
 user explicitly accepts this boundary and bundle direction.

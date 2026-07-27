@@ -74,6 +74,9 @@ the checkout or hosted login at runtime. Launch actions, replay and
 failure/recovery evidence, bundle inventory, privilege map, known exclusions,
 and the acceptance request are in
 [`docs/r5-desktop-boundary-review.md`](docs/r5-desktop-boundary-review.md).
+That packet also includes a separate, opt-in internal score build for the
+current review. It is not a distribution artifact and does not change the
+ordinary score-free R5 archive.
 This is not permission to begin the signed, microphone-complete Phase 6.
 
 ## Authoritative Performance Workspace (v3)
