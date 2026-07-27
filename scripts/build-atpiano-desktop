@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repository_root="$(cd "${script_directory}/.." && pwd)"
+runtime_root="${repository_root}/app/src-tauri/resources/desktop-runtime"
+report_root="${repository_root}/results/desktop-phase5"
+app_bundle="${repository_root}/app/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Atpiano.app"
+
+stage_runtime() {
+  mkdir -p "${report_root}"
+  (
+    cd "${repository_root}"
+    uv run python -m atpiano.desktop_packaging stage \
+      --output "${runtime_root}" \
+      --report "${report_root}/stage-report.json"
+  )
+}
+
+case "${1:-}" in
+  stage)
+    stage_runtime
+    ;;
+  dev)
+    stage_runtime
+    (
+      cd "${repository_root}/app"
+      ATPIANO_DESKTOP_RUNTIME_ROOT="${runtime_root}" npx tauri dev
+    )
+    ;;
+  build)
+    stage_runtime
+    (
+      cd "${repository_root}/app"
+      npx tauri build \
+        --target aarch64-apple-darwin \
+        --bundles app \
+        --no-sign
+    )
+    (
+      cd "${repository_root}"
+      uv run python -m atpiano.desktop_packaging audit \
+        --root "${app_bundle}" \
+        --report "${report_root}/bundle-audit.json"
+    )
+    printf '%s\n' "${app_bundle}"
+    ;;
+  audit)
+    (
+      cd "${repository_root}"
+      uv run python -m atpiano.desktop_packaging audit \
+        --root "${app_bundle}" \
+        --report "${report_root}/bundle-audit.json"
+    )
+    ;;
+  *)
+    printf 'usage: %s {stage|dev|build|audit}\n' "$0" >&2
+    exit 2
+    ;;
+esac

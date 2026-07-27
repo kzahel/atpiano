@@ -36,6 +36,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": {
+      "resources/": ""
+    },
     "category": "Music",
     "macOS": {
       "minimumSystemVersion": "13.0",

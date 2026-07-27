@@ -6,8 +6,9 @@
     "build": "vite build",
     "contracts:check": "uv run atpiano generate-contracts --check",
     "dev": "vite",
-    "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build --target aarch64-apple-darwin --bundles app --no-sign",
+    "desktop:dev": "../scripts/build-atpiano-desktop dev",
+    "desktop:stage": "../scripts/build-atpiano-desktop stage",
+    "desktop:build": "../scripts/build-atpiano-desktop build",
     "test": "npm run test:node && vitest run",
     "test:node": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit"
