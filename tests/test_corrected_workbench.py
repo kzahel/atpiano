@@ -376,9 +376,10 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
 def test_corrected_workbench_marks_interrupted_settlement_recoverable(
     tmp_path: Path,
 ) -> None:
+    session_id = "20260726T000000-abcdef123456"
     session = CorrectedSession(
-        tmp_path / "session",
-        session_id="20260726T000000-abcdef123456",
+        tmp_path / session_id,
+        session_id=session_id,
         sample_rate_hz=8_000,
         source="microphone",
         minimum_free_bytes=0,
@@ -430,7 +431,7 @@ def test_corrected_workbench_replaces_an_exited_model_before_next_session(
         isolate_models=False,
     )
     exited = _ExitedCommitModel()
-    server._commit_model = exited
+    server.application.capture._models.inject_commit_for_test(exited)
     try:
         replacement = server.get_commit_model()
     finally:

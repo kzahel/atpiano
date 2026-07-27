@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import re
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -42,6 +43,7 @@ from atpiano.corrected import (
 )
 from atpiano.corrected_export import (
     MAX_QUERY_LIMIT,
+    ensure_materialized_index,
     query_history_index,
     query_materialized_index,
 )
@@ -49,7 +51,7 @@ from atpiano.score_snapshot import (
     SCORE_SNAPSHOT_SCHEMA,
     score_snapshot_is_plausible,
 )
-from atpiano.util import read_json, sha256_file
+from atpiano.util import read_json, sha256_file, write_json
 
 LOCAL_WORKSPACE_ID = "local"
 SESSION_ID_PATTERN = re.compile(r"\d{8}T\d{6}-[0-9a-f]{12}")
@@ -99,6 +101,91 @@ class LocalSessionStore:
         if not manifest.is_file():
             raise LocalSessionNotFoundError("session does not exist")
         return candidate
+
+    def new_session_directory(self, session_id: str) -> Path:
+        session_id = self._validate_session_id(session_id)
+        candidate = (self.workspace_directory / session_id).resolve()
+        if candidate.parent != self.workspace_directory or candidate.exists():
+            raise LocalSessionConflictError(
+                "session directory already exists"
+            )
+        return candidate
+
+    def latest_session_record(
+        self,
+    ) -> tuple[Path, dict[str, Any]] | None:
+        manifests = sorted(
+            self.workspace_directory.glob("*/session.json"),
+            key=lambda path: path.stat().st_mtime_ns,
+        )
+        if not manifests:
+            return None
+        manifest_path = manifests[-1]
+        session_id = manifest_path.parent.name
+        if not SESSION_ID_PATTERN.fullmatch(session_id):
+            return None
+        try:
+            manifest = read_json(manifest_path)
+            if (
+                manifest.get("schema_version") != CORRECTED_SESSION_SCHEMA
+                or manifest.get("session_id") != session_id
+            ):
+                return None
+            ensure_materialized_index(
+                manifest_path.parent / "event-index.sqlite3"
+            )
+        except (
+            FileNotFoundError,
+            OSError,
+            sqlite3.Error,
+            TypeError,
+            ValueError,
+        ):
+            return None
+        return manifest_path.parent, manifest
+
+    def _document_path(
+        self,
+        session_id: str,
+        relative_path: str,
+    ) -> Path:
+        directory = self.resolve(session_id)
+        candidate = (directory / relative_path).resolve()
+        if directory != candidate and directory not in candidate.parents:
+            raise LocalSessionNotFoundError(
+                "session document does not exist"
+            )
+        return candidate
+
+    def read_document(
+        self,
+        session_id: str,
+        relative_path: str,
+    ) -> dict[str, Any]:
+        path = self._document_path(session_id, relative_path)
+        if not path.is_file():
+            raise LocalSessionNotFoundError(
+                "session document does not exist"
+            )
+        return read_json(path)
+
+    def write_document(
+        self,
+        session_id: str,
+        relative_path: str,
+        document: dict[str, Any],
+    ) -> None:
+        path = self._document_path(session_id, relative_path)
+        write_json(path, document)
+
+    def has_file(self, session_id: str, relative_path: str) -> bool:
+        try:
+            return self._document_path(
+                session_id,
+                relative_path,
+            ).is_file()
+        except LocalSessionNotFoundError:
+            return False
 
     def _manifests(self) -> list[tuple[datetime, str, Path, dict[str, Any]]]:
         rows: list[tuple[datetime, str, Path, dict[str, Any]]] = []

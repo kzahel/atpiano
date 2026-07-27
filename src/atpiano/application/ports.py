@@ -82,6 +82,27 @@ class SessionRepository(Protocol):
 
     def resolve(self, session_id: str) -> Path: ...
 
+    def new_session_directory(self, session_id: str) -> Path: ...
+
+    def latest_session_record(
+        self,
+    ) -> tuple[Path, dict[str, Any]] | None: ...
+
+    def read_document(
+        self,
+        session_id: str,
+        relative_path: str,
+    ) -> dict[str, Any]: ...
+
+    def write_document(
+        self,
+        session_id: str,
+        relative_path: str,
+        document: dict[str, Any],
+    ) -> None: ...
+
+    def has_file(self, session_id: str, relative_path: str) -> bool: ...
+
     def trash_session(
         self,
         session_id: str,

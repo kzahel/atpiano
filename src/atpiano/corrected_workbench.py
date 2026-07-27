@@ -23,6 +23,7 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 from pydantic import ValidationError
 
+from atpiano.adapters.local_models import LocalModelPool
 from atpiano.adapters.local_scores import LocalScoreExecutor
 from atpiano.adapters.local_sessions import (
     LOCAL_WORKSPACE_ID,
@@ -33,13 +34,12 @@ from atpiano.adapters.local_sessions import (
 from atpiano.application import (
     ApplicationNotFoundError,
     ApplicationServices,
+    CaptureApplicationService,
     ScoreApplicationService,
     SessionApplicationService,
 )
 from atpiano.backend_profile import (
     BackendSchedulerIdentity,
-    read_backend_profile,
-    select_profile_mode,
 )
 from atpiano.contracts.schemas import (
     CONTRACT_SCHEMA_VERSION,
@@ -62,31 +62,22 @@ from atpiano.corrected import (
     run_corrected_replay,
 )
 from atpiano.corrected_commit import (
-    DEFAULT_COMMIT_BUFFER_S,
-    DEFAULT_COMMIT_GUARD_S,
-    DEFAULT_COMMIT_HOP_S,
-    DEFAULT_COMMIT_MAX_HOP_S,
-    DEFAULT_COMMIT_MIN_CONTEXT_S,
     CommitModel,
-    CorrectedCommitLane,
 )
 from atpiano.corrected_export import (
     MAX_QUERY_LIMIT,
-    ensure_materialized_index,
     query_history_index,
     query_materialized_index,
     write_corrected_exports,
 )
 from atpiano.corrected_pipeline import CorrectedSessionPipeline
-from atpiano.corrected_preview import CorrectedPreviewLane
 from atpiano.live import LiveWindowModel, parse_pcm_block
-from atpiano.model_worker import CommitModelWorker, PreviewModelWorker
 from atpiano.score_snapshot import (
     ScoreRunner,
     ScoreVariantRunner,
     score_snapshot_is_plausible,
 )
-from atpiano.util import read_json, utc_now, write_json
+from atpiano.util import read_json
 from atpiano.websocket import encode_frame, encode_json, read_frame, websocket_accept
 
 CORRECTED_WORKBENCH_SCHEMA = "atpiano.corrected-workbench.v1"
@@ -220,30 +211,35 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             if backend_profile_path is not None
             else None
         )
-        self.state_lock = threading.Lock()
-        self.model_lock = threading.Lock()
-        self._preview_model: LiveWindowModel | None = None
-        self._commit_model: CommitModel | None = None
-        self._active_session: CorrectedSession | None = None
-        self._active_pipeline: CorrectedSessionPipeline | None = None
-        self._session_id: str | None = None
-        self._session_directory: Path | None = None
-        self._status = "idle"
-        self._error: str | None = None
-        self._received_blocks = 0
-        self._last_event_sequence = 0
-        self._load_latest_session()
+        model_pool = LocalModelPool(
+            preview_model_factory=preview_model_factory,
+            commit_model_factory=commit_model_factory,
+            isolate_models=isolate_models,
+            commit_threads=commit_threads,
+            correction_mode=correction_mode,
+            backend_profile_path=backend_profile_path,
+        )
         sessions = SessionApplicationService(
             self.session_store,
             workspace_id=LOCAL_WORKSPACE_ID,
+        )
+        capture = CaptureApplicationService(
+            self.session_store,
+            model_pool,
+            minimum_free_bytes=minimum_free_bytes,
+            free_bytes=lambda: shutil.disk_usage(
+                self.workspace_directory
+            ).free,
+            finalizer=self._finalize_microphone_session,
         )
         scores = ScoreApplicationService(
             self.session_store,
             score_executor,
             workspace_id=LOCAL_WORKSPACE_ID,
-            current_session_id=self.current_session_id,
+            current_session_id=capture.current_session_id,
         )
         self.application = ApplicationServices(
+            capture=capture,
             sessions=sessions,
             scores=scores,
         )
@@ -256,332 +252,69 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             return None
         return candidate if candidate.is_file() else None
 
-    def _load_latest_session(self) -> None:
-        manifests = sorted(
-            self.workspace_directory.glob("*/session.json"),
-            key=lambda path: path.stat().st_mtime_ns,
-        )
-        if not manifests:
-            return
-        latest_path = manifests[-1]
-        try:
-            latest = read_json(latest_path)
-        except (OSError, ValueError):
-            return
-        session_id = str(latest.get("session_id", ""))
-        if not SESSION_ID_PATTERN.fullmatch(session_id):
-            return
-        try:
-            ensure_materialized_index(latest_path.parent / "event-index.sqlite3")
-        except (FileNotFoundError, sqlite3.Error):
-            return
-        self._session_id = session_id
-        self._session_directory = latest_path.parent
-        persisted_status = str(latest.get("status", "failed"))
-        if persisted_status in {"active", "stopping"}:
-            interrupted_stage = (
-                "capture"
-                if persisted_status == "active"
-                else "settlement"
-            )
-            interruption = (
-                "The prior process ended before this session stopped."
-                if persisted_status == "active"
-                else (
-                    "The prior process ended during correction settlement. "
-                    "Accepted audio is preserved, but correction must be rerun."
-                )
-            )
-            processing = latest.get("processing")
-            if not isinstance(processing, dict):
-                processing = {}
-            stage_errors = processing.get("stage_errors")
-            if not isinstance(stage_errors, dict):
-                stage_errors = {}
-            processing["stage_errors"] = {
-                **stage_errors,
-                interrupted_stage: interruption,
-            }
-            latest.update(
-                {
-                    "status": "failed",
-                    "completed_at": utc_now(),
-                    "error": interruption,
-                    "processing": processing,
-                }
-            )
-            write_json(latest_path, latest)
-            self._status = "failed"
-            self._error = interruption
-        else:
-            self._status = persisted_status
-            self._error = latest.get("error")
-
     def get_preview_model(self) -> LiveWindowModel:
-        with self.model_lock:
-            if (
-                self._preview_model is not None
-                and self._model_has_exited(self._preview_model)
-            ):
-                close = getattr(self._preview_model, "close", None)
-                if close is not None:
-                    close()
-                self._preview_model = None
-            if self._preview_model is None:
-                self._preview_model = (
-                    PreviewModelWorker(self.preview_model_factory)
-                    if self.isolate_models
-                    else self.preview_model_factory()
-                )
-            return self._preview_model
+        return self.application.capture.preview_model()
 
     def get_commit_model(self) -> CommitModel:
-        with self.model_lock:
-            if (
-                self._commit_model is not None
-                and self._model_has_exited(self._commit_model)
-            ):
-                close = getattr(self._commit_model, "close", None)
-                if close is not None:
-                    close()
-                self._commit_model = None
-            if self._commit_model is None:
-                self._commit_model = (
-                    CommitModelWorker(
-                        self.commit_model_factory,
-                        thread_limit=self.commit_threads,
-                    )
-                    if self.isolate_models
-                    else self.commit_model_factory()
-                )
-            return self._commit_model
-
-    @staticmethod
-    def _model_has_exited(model: Any) -> bool:
-        status = getattr(model, "status", None)
-        if status is None:
-            return False
-        try:
-            document = status()
-        except RuntimeError:
-            return True
-        return isinstance(document, dict) and document.get("alive") is False
+        return self.application.capture.commit_model()
 
     def get_models(self) -> tuple[LiveWindowModel, CommitModel]:
-        return self.get_preview_model(), self.get_commit_model()
+        return self.application.capture.models()
 
     def model_worker_status(self) -> list[dict[str, Any]]:
-        with self.model_lock:
-            models = (self._preview_model, self._commit_model)
-        result: list[dict[str, Any]] = []
-        for model in models:
-            status = getattr(model, "status", None)
-            if status is not None:
-                result.append(status())
-        return result
+        return self.application.capture.worker_status()
 
     @staticmethod
     def correction_scheduler_identity() -> BackendSchedulerIdentity:
-        return BackendSchedulerIdentity(
-            buffer_s=DEFAULT_COMMIT_BUFFER_S,
-            base_hop_s=DEFAULT_COMMIT_HOP_S,
-            maximum_hop_s=DEFAULT_COMMIT_MAX_HOP_S,
-            guard_s=DEFAULT_COMMIT_GUARD_S,
-            minimum_context_s=DEFAULT_COMMIT_MIN_CONTEXT_S,
+        return (
+            CaptureApplicationService.correction_scheduler_identity()
         )
 
     def resolve_correction_mode(
         self,
         commit_model: CommitModel,
     ) -> tuple[str, str, str | None]:
-        if self.correction_mode != "auto":
-            return (
-                self.correction_mode,
-                "selected by explicit local configuration",
-                None,
-            )
-        if self.backend_profile_path is None:
-            return (
-                "after-stop",
-                "no backend profile is configured; using the conservative mode",
-                None,
-            )
-        try:
-            profile = read_backend_profile(self.backend_profile_path)
-        except (OSError, TypeError, ValueError, ValidationError) as error:
-            return (
-                "after-stop",
-                "backend profile is unavailable or invalid: "
-                f"{type(error).__name__}: {error}",
-                None,
-            )
-        selected, reason = select_profile_mode(
-            profile,
-            provenance=commit_model.provenance(),
-            thread_limit=self.commit_threads,
-            scheduler=self.correction_scheduler_identity(),
+        return self.application.capture.resolve_correction_mode(
+            commit_model
         )
-        return selected.value, reason, profile.profile_id
 
     def server_close(self) -> None:
-        with self.state_lock:
-            pipeline = self._active_pipeline
-        if pipeline is not None and not pipeline.wait(0):
-            pipeline.abort(RuntimeError("local server stopped during capture"))
-        with self.model_lock:
-            models = (self._preview_model, self._commit_model)
-            self._preview_model = None
-            self._commit_model = None
-        for model in models:
-            close = getattr(model, "close", None)
-            if close is not None:
-                close()
+        self.application.capture.close()
         super().server_close()
 
     def claim_session(self, *, source: str) -> tuple[str, Path]:
-        with self.state_lock:
-            if self._active_session is not None or self._status in {
-                "warming",
-                "active",
-                "stopping",
-            }:
-                raise RuntimeError("another corrected session is already active")
-            session_id = _new_session_id()
-            directory = self.workspace_directory / session_id
-            self._session_id = session_id
-            self._session_directory = directory
-            self._status = "warming"
-            self._error = None
-            self._received_blocks = 0
-            self._last_event_sequence = 0
-        return session_id, directory
+        return self.application.capture.claim_session(source=source)
 
     def set_active(
         self,
         session: CorrectedSession,
         pipeline: CorrectedSessionPipeline | None = None,
     ) -> None:
-        with self.state_lock:
-            if session.session_id != self._session_id:
-                raise RuntimeError("corrected session claim changed during startup")
-            self._active_session = session
-            self._active_pipeline = pipeline
-            self._status = "active"
+        self.application.capture.set_active(session, pipeline)
 
     def record_delivery(self, events: list[dict[str, Any]]) -> None:
-        with self.state_lock:
-            self._received_blocks += 1
-            if events:
-                self._last_event_sequence = max(
-                    self._last_event_sequence,
-                    max(int(event["sequence"]) for event in events),
-                )
+        self.application.capture.observe_delivery(events)
 
     def complete_session(self) -> None:
-        with self.state_lock:
-            self._active_session = None
-            self._active_pipeline = None
-            self._status = "complete"
-            self._error = None
+        self.application.capture.complete_session()
 
     def fail_session(self, error: Exception) -> None:
-        with self.state_lock:
-            self._active_session = None
-            self._active_pipeline = None
-            self._status = "failed"
-            self._error = f"{type(error).__name__}: {error}"
+        self.application.capture.fail_session(error)
 
     def begin_stop(self) -> None:
-        with self.state_lock:
-            self._status = "stopping"
+        self.application.capture.begin_stop()
 
     def current_directory(self) -> Path | None:
-        with self.state_lock:
-            return self._session_directory
+        return self.application.capture.current_directory()
 
     def active_session_id(self) -> str | None:
-        with self.state_lock:
-            if self._active_session is not None:
-                return self._active_session.session_id
-            if self._status in {"warming", "active", "stopping"}:
-                return self._session_id
-            return None
+        return self.application.capture.active_session_id()
 
     def current_session_id(self) -> str | None:
-        with self.state_lock:
-            return self._session_id
+        return self.application.capture.current_session_id()
 
     def public_state(self) -> dict[str, Any]:
-        with self.state_lock:
-            status = self._status
-            error = self._error
-            session_id = self._session_id
-            directory = self._session_directory
-            active = self._active_session
-            pipeline = self._active_pipeline
-            received_blocks = self._received_blocks
-            last_event_sequence = self._last_event_sequence
-        session: dict[str, Any] | None = None
-        horizons: dict[str, Any] | None = None
-        lanes: list[dict[str, Any]] = []
-        if active is not None:
-            horizons = active.horizons.document(sample_rate_hz=active.sample_rate_hz)
-            session = {
-                "session_id": active.session_id,
-                "status": status,
-                "source": active.source,
-                "realtime": active.realtime,
-                "sample_rate_hz": active.sample_rate_hz,
-                "source_frame_count": active.horizons.audio_head_sample,
-                "started_at": active.started_at,
-            }
-            lanes = [lane.status() for lane in active.lanes]
-            minimum_free_bytes = active.audio.minimum_free_bytes
-        elif directory is not None and (directory / "session.json").is_file():
-            try:
-                session = read_json(directory / "session.json")
-                horizon_path = directory / "horizons.json"
-                horizons = read_json(horizon_path) if horizon_path.is_file() else None
-                lanes = list(session.get("lanes", []))
-                minimum_free_bytes = int(session.get("retention", {}).get("minimum_free_bytes", 0))
-            except (OSError, TypeError, ValueError):
-                session = None
-                minimum_free_bytes = self.minimum_free_bytes
-        else:
-            minimum_free_bytes = self.minimum_free_bytes
-        usage = shutil.disk_usage(self.workspace_directory)
-        audio_frames = (
-            int(horizons["audio_head_sample"])
-            if horizons is not None
-            else int((session or {}).get("source_frame_count", 0))
-        )
-        sample_rate_hz = int((session or {}).get("sample_rate_hz", 0))
-        return {
-            "schema_version": CORRECTED_WORKBENCH_SCHEMA,
-            "status": status,
-            "error": error,
-            "session_id": session_id,
-            "session": session,
-            "horizons": horizons,
-            "lanes": lanes,
-            "storage": {
-                "audio_pcm_bytes": audio_frames * 2,
-                "free_bytes": usage.free,
-                "minimum_free_bytes": minimum_free_bytes,
-                "warning": usage.free < minimum_free_bytes * 5 // 4,
-            },
-            "transport": {
-                "received_blocks": received_blocks,
-                "last_event_sequence": last_event_sequence,
-                "recovery": "bounded indexed sequence query",
-            },
-            "pipeline": pipeline.status() if pipeline is not None else None,
-            "workers": self.model_worker_status(),
-            "duration_s": (audio_frames / sample_rate_hz if sample_rate_hz else 0.0),
-            "exports_ready": bool(
-                directory is not None and (directory / "exports" / "manifest.json").is_file()
-            ),
-        }
+        return self.application.capture.state()
 
     def _finalize_microphone_session(
         self,
@@ -591,27 +324,6 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             session.directory,
             allow_settling=True,
         )
-
-    def _microphone_session_settled(
-        self,
-        session: CorrectedSession,
-        manifest: dict[str, Any],
-    ) -> None:
-        del manifest
-        with self.state_lock:
-            active = self._active_session
-        if active is session:
-            self.complete_session()
-
-    def _microphone_session_failed(
-        self,
-        session: CorrectedSession,
-        error: Exception,
-    ) -> None:
-        with self.state_lock:
-            active = self._active_session
-        if active is session:
-            self.fail_session(error)
 
     def _runtime_state(self) -> dict[str, Any]:
         return self.application.scores.runtime_state()
@@ -643,31 +355,15 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         return self.application.scores.create_variant(request)
 
     def delete_api_session(self, session_id: str) -> dict[str, Any]:
-        with self.state_lock:
-            active_session_id = (
-                self._active_session.session_id
-                if self._active_session is not None
-                else self._session_id
-                if self._status in {"warming", "active", "stopping"}
-                else None
-            )
-            running_score_session_id = (
+        result = self.application.sessions.delete_session(
+            LOCAL_WORKSPACE_ID,
+            session_id,
+            active_session_id=self.active_session_id(),
+            running_score_session_id=(
                 self.application.scores.running_session_id()
-            )
-            result = self.application.sessions.delete_session(
-                LOCAL_WORKSPACE_ID,
-                session_id,
-                active_session_id=active_session_id,
-                running_score_session_id=running_score_session_id,
-            )
-            if self._session_id == session_id:
-                self._session_id = None
-                self._session_directory = None
-                self._status = "idle"
-                self._error = None
-                self._received_blocks = 0
-                self._last_event_sequence = 0
-                self._load_latest_session()
+            ),
+        )
+        self.application.capture.session_deleted(session_id)
         return result.model_dump(mode="json")
 
     def start_replay(self) -> None:
@@ -1484,7 +1180,6 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         if not self._upgrade_websocket():
             return
         session: CorrectedSession | None = None
-        pipeline: CorrectedSessionPipeline | None = None
         stopped = False
         try:
             while True:
@@ -1498,13 +1193,11 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     if session is None:
                         raise ValueError("microphone PCM arrived before Start")
                     block = parse_pcm_block(frame.payload)
-                    if pipeline is None:
-                        raise RuntimeError(
-                            "microphone capture pipeline is unavailable"
-                        )
-                    pipeline.accept_block(
+                    session = (
+                        self.server.application.capture.accept_block(
                         block,
                         received_ns=time.perf_counter_ns(),
+                    )
                     )
                     events: list[dict[str, Any]] = []
                     self.server.record_delivery(events)
@@ -1547,74 +1240,26 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     encoded_metadata = json.dumps(metadata, allow_nan=False).encode()
                     if len(encoded_metadata) > MAX_CLIENT_METADATA_BYTES:
                         raise ValueError("microphone client metadata is too large")
-                    session_id, directory = self.server.claim_session(source="microphone")
-                    preview_model = self.server.get_preview_model()
-                    correction_mode = self.server.correction_mode
-                    correction_reason = "commit correction is unavailable"
-                    correction_profile_id: str | None = None
-                    commit_model: CommitModel | None = None
-                    if correction_mode != "unavailable":
-                        try:
-                            commit_model = self.server.get_commit_model()
-                            (
-                                correction_mode,
-                                correction_reason,
-                                correction_profile_id,
-                            ) = self.server.resolve_correction_mode(
-                                commit_model
-                            )
-                        except RuntimeError as error:
-                            correction_mode = "unavailable"
-                            correction_reason = (
-                                "commit worker could not start: "
-                                f"{type(error).__name__}: {error}"
-                            )
-                    session = CorrectedSession(
-                        directory,
-                        session_id=session_id,
+                    started = (
+                        self.server.application.capture.start_microphone(
                         sample_rate_hz=sample_rate_hz,
-                        source="microphone",
-                        minimum_free_bytes=self.server.minimum_free_bytes,
-                        correction_mode=correction_mode,
-                        correction_reason=correction_reason,
-                        correction_profile_id=correction_profile_id,
+                        client_metadata=metadata,
                     )
-                    session.add_lane(CorrectedPreviewLane(session, model=preview_model))
-                    if commit_model is not None:
-                        session.add_lane(
-                            CorrectedCommitLane(session, model=commit_model)
-                        )
-                    pipeline = CorrectedSessionPipeline(
-                        session,
-                        finalizer=self.server._finalize_microphone_session,
-                        on_settled=self.server._microphone_session_settled,
-                        on_failed=self.server._microphone_session_failed,
-                        defer_until_stop=(
-                            frozenset({"commit"})
-                            if correction_mode == "after-stop"
-                            else frozenset()
-                        ),
                     )
-                    write_json(
-                        directory / "client.json",
-                        {
-                            "schema_version": "atpiano.corrected-client.v1",
-                            "received_at": utc_now(),
-                            "metadata": metadata,
-                        },
-                    )
-                    self.server.set_active(session, pipeline)
+                    session = started.session
                     self._send_websocket_json(
                         {
                             "schema_version": CORRECTED_STREAM_SCHEMA,
                             "type": "ready",
-                            "session_id": session_id,
+                            "session_id": session.session_id,
                             "sample_rate_hz": sample_rate_hz,
                             "lanes": [lane.status() for lane in session.lanes],
                             "correction": {
-                                "mode": correction_mode,
-                                "reason": correction_reason,
-                                "profile_id": correction_profile_id,
+                                "mode": started.correction_mode,
+                                "reason": started.correction_reason,
+                                "profile_id": (
+                                    started.correction_profile_id
+                                ),
                             },
                         }
                     )
@@ -1628,59 +1273,24 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                         or isinstance(frame_count, bool)
                         or not isinstance(block_count, int)
                         or isinstance(block_count, bool)
-                        or frame_count != session.horizons.audio_head_sample
-                        or block_count != session.next_sequence
                     ):
-                        raise ValueError("microphone Stop counts do not match accepted PCM")
+                        raise ValueError("microphone Stop counts are invalid")
                     transport = message.get("transport")
-                    if transport is not None:
-                        if not isinstance(transport, dict):
-                            raise ValueError(
-                                "microphone transport evidence must be an object"
-                            )
-                        expected_transport = {
-                            "sent_frame_count": frame_count,
-                            "sent_block_count": block_count,
-                        }
-                        if any(
-                            transport.get(name) != expected
-                            for name, expected in expected_transport.items()
-                        ):
-                            raise ValueError(
-                                "microphone transport evidence does not match Stop"
-                            )
-                        numeric_fields = (
-                            "acknowledged_frame_count",
-                            "acknowledged_block_count",
-                            "socket_buffered_bytes_at_stop",
-                            "socket_buffered_bytes_high_water",
+                    if transport is not None and not isinstance(
+                        transport,
+                        dict,
+                    ):
+                        raise ValueError(
+                            "microphone transport evidence must be an object"
                         )
-                        if any(
-                            not isinstance(transport.get(name), int)
-                            or isinstance(transport.get(name), bool)
-                            or int(transport[name]) < 0
-                            for name in numeric_fields
-                        ):
-                            raise ValueError(
-                                "microphone transport evidence is invalid"
-                            )
-                        write_json(
-                            session.directory / "transport.json",
-                            {
-                                "schema_version": (
-                                    "atpiano.corrected-transport.v1"
-                                ),
-                                "recorded_at": utc_now(),
-                                **transport,
-                            },
+                    manifest = (
+                        self.server.application.capture.stop_microphone(
+                            frame_count=frame_count,
+                            block_count=block_count,
+                            transport=transport,
                         )
-                    self.server.begin_stop()
+                    )
                     stopped = True
-                    if pipeline is None:
-                        raise RuntimeError(
-                            "microphone capture pipeline is unavailable"
-                        )
-                    manifest = pipeline.begin_stop()
                     self._send_websocket_json(
                         {
                             "schema_version": CORRECTED_STREAM_SCHEMA,
@@ -1695,13 +1305,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                 else:
                     raise ValueError(f"unsupported microphone control type: {message_type}")
         except (ConnectionError, OSError, RuntimeError, ValueError) as error:
-            if pipeline is not None:
-                pipeline.abort(error)
-            elif session is not None and not session.closed:
-                session.abort(error)
-                self.server.fail_session(error)
-            else:
-                self.server.fail_session(error)
+            self.server.application.capture.abort_microphone(error)
             try:
                 self._send_websocket_json(
                     {
@@ -1716,11 +1320,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         finally:
             if session is not None and not stopped and not session.closed:
                 error = RuntimeError("microphone WebSocket closed before Stop")
-                if pipeline is not None:
-                    pipeline.abort(error)
-                else:
-                    session.abort(error)
-                    self.server.fail_session(error)
+                self.server.application.capture.abort_microphone(error)
 
 
 def create_corrected_workbench_server(

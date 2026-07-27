@@ -431,18 +431,21 @@ def test_api_delete_is_recoverable_and_structured(
 
 def test_api_delete_rejects_active_session(
     tmp_path: Path,
+    monkeypatch: Any,
 ) -> None:
     session_id = "20260726T100000-aaaaaaaaaaaa"
-    session = _session(tmp_path, session_id)
+    _session(tmp_path, session_id)
     server = create_corrected_workbench_server(
         tmp_path,
         port=0,
         minimum_free_bytes=0,
         commit_model_factory=lambda: None,
     )
-    server._session_id = session_id
-    server._session_directory = session.directory
-    server._status = "active"
+    monkeypatch.setattr(
+        server.application.capture,
+        "active_session_id",
+        lambda: session_id,
+    )
     thread, base_url = _serve(server)
     try:
         request = DeleteSessionRequest(
