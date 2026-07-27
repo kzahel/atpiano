@@ -19,6 +19,7 @@ interface DesktopRuntimeInfo {
   readonly executionBackend: string;
   readonly modelPackId: string;
   readonly modelPackSha256: string;
+  readonly scoreAvailable: boolean;
 }
 
 export interface DesktopRuntimeBootstrap {
@@ -50,6 +51,7 @@ function validateRuntimeInfo(value: DesktopRuntimeInfo): DesktopRuntimeInfo {
     !tokenPattern.test(value.bearerToken) ||
     value.webSocketProtocol !== `${desktopProtocol}.${value.bearerToken}` ||
     !tokenPattern.test(value.modelPackSha256) ||
+    typeof value.scoreAvailable !== "boolean" ||
     !value.sidecarVersion ||
     !value.modelPackId
   ) {

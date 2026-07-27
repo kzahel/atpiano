@@ -38,6 +38,7 @@ struct DesktopRuntimeInfo {
     execution_backend: String,
     model_pack_id: String,
     model_pack_sha256: String,
+    score_available: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -272,7 +273,6 @@ fn validate_handshake(handshake: &HandshakeRecord, ready: &ReadyRecord) -> Resul
         || handshake.model_pack.model_pack_id != MODEL_PACK_ID
         || handshake.model_pack_sha256 != ready.model_pack_sha256
         || handshake.storage_policy != "verified-mp3-default"
-        || handshake.score_available
     {
         return Err("desktop handshake is incompatible".to_string());
     }
@@ -355,6 +355,7 @@ fn start_sidecar(
         let python = runtime.join("bin/python3");
         let model_pack = runtime.join("model-pack/model-pack.json");
         let replay_manifest = runtime.join("fixture/input.json");
+        let score_runtime = runtime.join("score-runtime");
         require_file(&python, "Python runtime")?;
         require_file(&model_pack, "model pack")?;
         require_file(&replay_manifest, "replay fixture")?;
@@ -391,6 +392,8 @@ fn start_sidecar(
             .arg(DESKTOP_PROTOCOL)
             .arg("--expected-contract")
             .arg(CONTRACT_SCHEMA)
+            .arg("--score-runtime")
+            .arg(&score_runtime)
             .env("ATPIANO_DESKTOP_TOKEN", &credential)
             .env("ATPIANO_EXECUTION_BACKEND", "cpu")
             .env("CUDA_VISIBLE_DEVICES", "")
@@ -497,6 +500,7 @@ fn start_sidecar(
             execution_backend: ready.execution_backend,
             model_pack_id: ready.model_pack_id,
             model_pack_sha256: ready.model_pack_sha256,
+            score_available: handshake.score_available,
         };
         let expected_shutdown = Arc::new(AtomicBool::new(false));
         monitor_child(
@@ -591,6 +595,7 @@ mod tests {
             execution_backend: "cpu".to_string(),
             model_pack_id: MODEL_PACK_ID.to_string(),
             model_pack_sha256: "b".repeat(64),
+            score_available: false,
         }
     }
 

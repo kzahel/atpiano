@@ -96,7 +96,7 @@ class DesktopHandshake(BaseModel):
     model_pack: ModelPack
     model_pack_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     storage_policy: Literal["verified-mp3-default"] = "verified-mp3-default"
-    score_available: Literal[False] = False
+    score_available: bool = False
 
 
 def validate_desktop_token(raw_token: str) -> str:
@@ -165,7 +165,11 @@ def host_identity() -> tuple[str, str]:
     return "macos", "arm64"
 
 
-def create_handshake(pack: ModelPack) -> DesktopHandshake:
+def create_handshake(
+    pack: ModelPack,
+    *,
+    score_available: bool = False,
+) -> DesktopHandshake:
     platform_name, architecture = host_identity()
     return DesktopHandshake(
         sidecar_version=__version__,
@@ -175,6 +179,7 @@ def create_handshake(pack: ModelPack) -> DesktopHandshake:
         execution_backend="cpu",
         model_pack=pack,
         model_pack_sha256=model_pack_sha256(pack),
+        score_available=score_available,
     )
 
 

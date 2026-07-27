@@ -27,6 +27,11 @@ from atpiano.desktop import (
     validate_desktop_token,
 )
 from atpiano.fixture import generate_fixture
+from atpiano.score_snapshot import (
+    MIDI2SCORE_CHECKPOINT_SHA256,
+    MIDI2SCORE_COMMIT,
+    SCORE_RUNTIME_SCHEMA,
+)
 from atpiano.util import sha256_path, write_json
 
 DESKTOP_ORIGIN = "tauri://localhost"
@@ -93,6 +98,24 @@ def _request(
     headers: dict[str, str] | None = None,
 ) -> urllib.request.Request:
     return urllib.request.Request(url, method=method, headers=headers or {})
+
+
+def _write_score_runtime(root: Path) -> Path:
+    repository = root / "MIDI2ScoreTransformer"
+    repository.mkdir(parents=True)
+    (root / "MIDI2ScoreTF.ckpt").write_bytes(b"score")
+    python = root / ".venv" / "bin" / "python"
+    python.parent.mkdir(parents=True)
+    python.write_bytes(b"python")
+    write_json(
+        root / "runtime.json",
+        {
+            "schema_version": SCORE_RUNTIME_SCHEMA,
+            "repository": {"commit": MIDI2SCORE_COMMIT},
+            "checkpoint": {"sha256": MIDI2SCORE_CHECKPOINT_SHA256},
+        },
+    )
+    return root
 
 
 def _start_desktop_server(tmp_path: Path) -> tuple[Any, threading.Thread, str]:
@@ -169,6 +192,9 @@ def test_desktop_handshake_and_ready_are_versioned(tmp_path: Path) -> None:
     assert ready.protocol_version == DESKTOP_PROTOCOL_VERSION
     assert ready.model_pack_sha256 == handshake.model_pack_sha256
     assert ready.port == 49152
+
+    score_handshake = create_handshake(pack, score_available=True)
+    assert score_handshake.score_available is True
 
 
 @pytest.mark.skipif(not IS_MACOS_ARM64, reason="Phase 5 targets macOS arm64")
@@ -312,6 +338,7 @@ def test_sidecar_starts_authenticated_and_stops_on_parent_eof(
     fixture = tmp_path / "fixture"
     generate_fixture(fixture)
     model_pack = _write_model_pack(tmp_path / "pack")
+    score_runtime = _write_score_runtime(tmp_path / "score-runtime")
     environment = os.environ.copy()
     environment[DESKTOP_TOKEN_ENV] = DESKTOP_TOKEN
     process = subprocess.Popen(
@@ -329,6 +356,8 @@ def test_sidecar_starts_authenticated_and_stops_on_parent_eof(
             "atpiano-cpu-models-2026.07",
             "--minimum-free-gib",
             "0",
+            "--score-runtime",
+            str(score_runtime),
         ],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
@@ -363,6 +392,7 @@ def test_sidecar_starts_authenticated_and_stops_on_parent_eof(
         with urllib.request.urlopen(request, timeout=2) as response:
             handshake = json.load(response)
         assert handshake["model_pack"]["model_pack_id"] == ready["model_pack_id"]
+        assert handshake["score_available"] is True
 
         process.stdin.close()
         assert process.wait(timeout=10) == 0

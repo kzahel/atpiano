@@ -23,6 +23,7 @@ from atpiano.desktop import (
     load_model_pack,
     validate_desktop_token,
 )
+from atpiano.score_snapshot import inspect_score_runtime
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -47,6 +48,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=CONTRACT_SCHEMA_VERSION,
     )
     parser.add_argument("--expected-model-pack", required=True)
+    parser.add_argument(
+        "--score-runtime",
+        type=Path,
+        help="optional isolated MIDI2ScoreTransformer runtime",
+    )
     parser.add_argument(
         "--minimum-free-gib",
         type=float,
@@ -110,7 +116,16 @@ def run(arguments: Sequence[str] | None = None) -> int:
     if pack.model_pack_id != args.expected_model_pack:
         raise ValueError("desktop model pack is incompatible")
     apply_model_pack(pack, manifest_path)
-    handshake = create_handshake(pack)
+    score_runtime = (
+        args.score_runtime.resolve()
+        if args.score_runtime is not None
+        else args.workspace.resolve() / ".unavailable-score-runtime"
+    )
+    score_state = inspect_score_runtime(score_runtime)
+    handshake = create_handshake(
+        pack,
+        score_available=bool(score_state["available"]),
+    )
 
     server = create_corrected_workbench_server(
         args.workspace,
@@ -120,7 +135,7 @@ def run(arguments: Sequence[str] | None = None) -> int:
         minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
         replay_manifest=args.replay_manifest,
         replay_realtime=False,
-        score_runtime=args.workspace / ".unavailable-score-runtime",
+        score_runtime=score_runtime,
         application_mode="tauri-desktop-v1",
         desktop_origin=args.desktop_origin,
         desktop_token=token,
