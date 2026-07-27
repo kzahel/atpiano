@@ -376,6 +376,7 @@ fn start_sidecar(
         let mut command = Command::new(&python);
         command
             .arg("-I")
+            .arg("-B")
             .arg("-m")
             .arg("atpiano.desktop_sidecar")
             .arg("--workspace")

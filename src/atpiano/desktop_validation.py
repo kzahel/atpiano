@@ -184,6 +184,7 @@ def run_packaged_replay(
         [
             runtime / "bin" / "python3",
             "-I",
+            "-B",
             "-m",
             "atpiano.desktop_sidecar",
             "--workspace",
