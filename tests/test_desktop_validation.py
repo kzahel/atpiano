@@ -73,6 +73,18 @@ def test_replay_comparison_requires_product_parity() -> None:
         "models": {"commit_device": "cpu"},
         "artifacts": {"mp3_files": ["playback/session.mp3"]},
         "timing": {"total_s": 2.0},
+        "golden_reference": {
+            "note_count": 1,
+            "scores": {
+                "onset": {
+                    "50_ms": {"f1": 1.0},
+                    "25_ms": {"f1": 1.0},
+                },
+                "note_with_offset": {"f1": 1.0},
+                "frame": {"f1": 1.0},
+                "matched_velocity_mae": 0.0,
+            },
+        },
     }
     direct = deepcopy(packaged)
     direct["session_id"] = "direct"
@@ -82,5 +94,10 @@ def test_replay_comparison_requires_product_parity() -> None:
 
     assert comparison["status"] == "passed"
     direct["final_notes"][0]["pitch"] = 61
+    with pytest.raises(RuntimeError, match="products differ"):
+        compare_replays(packaged, direct)
+
+    direct = deepcopy(packaged)
+    direct["golden_reference"]["scores"]["frame"]["f1"] = 0.5
     with pytest.raises(RuntimeError, match="products differ"):
         compare_replays(packaged, direct)

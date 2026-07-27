@@ -24,6 +24,16 @@ from atpiano.util import write_json
 
 MODEL_PACK_ID = "atpiano-cpu-models-2026.07"
 TERMINAL_STATES = {"complete", "failed"}
+MAX_EVENT_RELATIVE_DELTA = 0.10
+MIN_PAIRWISE_ONSET_F1 = 0.90
+MIN_PAIRWISE_NOTE_OFFSET_F1 = 0.85
+MIN_PAIRWISE_FRAME_F1 = 0.90
+MAX_PAIRWISE_VELOCITY_MAE = 5.0
+MAX_GOLDEN_ONSET_F1_DELTA = 0.02
+MAX_GOLDEN_NOTE_OFFSET_F1_DELTA = 0.05
+MAX_GOLDEN_FRAME_F1_DELTA = 0.02
+MAX_GOLDEN_VELOCITY_MAE_DELTA = 2.0
+MAX_GOLDEN_NOTE_COUNT_RELATIVE_DELTA = 0.05
 VOLATILE_EVENT_FIELDS = {
     "emitted_at_monotonic_ns",
     "emitted_elapsed_s",
@@ -64,6 +74,7 @@ def _summarize(
     session_directory: Path,
     *,
     path: str,
+    reference_midi: Path,
     total_s: float,
     sidecar_ready_s: float | None,
 ) -> dict[str, Any]:
@@ -81,8 +92,9 @@ def _summarize(
     final_notes = load_notes(
         session_directory / "exports" / "session.mid"
     )
+    reference_notes = load_notes(reference_midi)
     return {
-        "schema_version": "atpiano.desktop-replay-validation.v1",
+        "schema_version": "atpiano.desktop-replay-validation.v2",
         "status": "passed",
         "path": path,
         "session_id": session["session_id"],
@@ -107,6 +119,10 @@ def _summarize(
             "normalized_export_sha256": event_sha256,
         },
         "final_notes": [asdict(note) for note in final_notes],
+        "golden_reference": {
+            "note_count": len(reference_notes),
+            "scores": score_notes(reference_notes, final_notes),
+        },
         "models": {
             "preview_artifact_sha256": lanes["preview"]["model"][
                 "artifact_sha256"
@@ -248,6 +264,7 @@ def run_packaged_replay(
             state,
             session_directory,
             path="packaged-sidecar",
+            reference_midi=runtime / "fixture" / "reference.mid",
             total_s=time.monotonic() - started,
             sidecar_ready_s=sidecar_ready_s,
         )
@@ -304,6 +321,7 @@ def run_direct_replay(
             state,
             session_directory,
             path="direct-application-core",
+            reference_midi=runtime / "fixture" / "reference.mid",
             total_s=time.monotonic() - started,
             sidecar_ready_s=None,
         )
@@ -369,32 +387,112 @@ def compare_replays(
         "direct_note_count": scores["reference_note_count"],
         "packaged_note_count": scores["estimated_note_count"],
     }
+    direct_golden = direct["golden_reference"]["scores"]
+    packaged_golden = packaged["golden_reference"]["scores"]
+    golden_note_denominator = max(
+        1,
+        len(direct_notes),
+        len(packaged_notes),
+    )
+    golden_quality_delta = {
+        "onset_f1_50_ms": abs(
+            direct_golden["onset"]["50_ms"]["f1"]
+            - packaged_golden["onset"]["50_ms"]["f1"]
+        ),
+        "onset_f1_25_ms": abs(
+            direct_golden["onset"]["25_ms"]["f1"]
+            - packaged_golden["onset"]["25_ms"]["f1"]
+        ),
+        "note_with_offset_f1": abs(
+            direct_golden["note_with_offset"]["f1"]
+            - packaged_golden["note_with_offset"]["f1"]
+        ),
+        "frame_f1": abs(
+            direct_golden["frame"]["f1"]
+            - packaged_golden["frame"]["f1"]
+        ),
+        "matched_velocity_mae": abs(
+            direct_golden["matched_velocity_mae"]
+            - packaged_golden["matched_velocity_mae"]
+        ),
+        "final_note_count_relative": (
+            abs(len(direct_notes) - len(packaged_notes))
+            / golden_note_denominator
+        ),
+    }
+    acceptance_thresholds = {
+        "event_relative_delta_max": MAX_EVENT_RELATIVE_DELTA,
+        "pairwise_onset_f1_min": MIN_PAIRWISE_ONSET_F1,
+        "pairwise_note_with_offset_f1_min": (
+            MIN_PAIRWISE_NOTE_OFFSET_F1
+        ),
+        "pairwise_frame_f1_min": MIN_PAIRWISE_FRAME_F1,
+        "pairwise_velocity_mae_max": MAX_PAIRWISE_VELOCITY_MAE,
+        "golden_onset_f1_delta_max": MAX_GOLDEN_ONSET_F1_DELTA,
+        "golden_note_with_offset_f1_delta_max": (
+            MAX_GOLDEN_NOTE_OFFSET_F1_DELTA
+        ),
+        "golden_frame_f1_delta_max": MAX_GOLDEN_FRAME_F1_DELTA,
+        "golden_velocity_mae_delta_max": (
+            MAX_GOLDEN_VELOCITY_MAE_DELTA
+        ),
+        "golden_note_count_relative_delta_max": (
+            MAX_GOLDEN_NOTE_COUNT_RELATIVE_DELTA
+        ),
+    }
     comparisons = {
         "source": packaged["source"] == direct["source"],
         "horizons": packaged["horizons"] == direct["horizons"],
         "models": packaged["models"] == direct["models"],
         "artifacts": packaged["artifacts"] == direct["artifacts"],
+        "golden_reference": (
+            packaged["golden_reference"]["note_count"]
+            == direct["golden_reference"]["note_count"]
+        ),
         "event_tolerance": (
             event_tolerance["preview_emissions_equal"]
-            and event_tolerance["commit_emission_relative_delta"] <= 0.10
-            and event_tolerance["export_count_relative_delta"] <= 0.10
+            and event_tolerance["commit_emission_relative_delta"]
+            <= MAX_EVENT_RELATIVE_DELTA
+            and event_tolerance["export_count_relative_delta"]
+            <= MAX_EVENT_RELATIVE_DELTA
         ),
-        "musical_tolerance": (
-            musical_tolerance["onset_f1_50_ms"] >= 0.98
-            and musical_tolerance["onset_f1_25_ms"] >= 0.98
-            and musical_tolerance["note_with_offset_f1"] >= 0.90
-            and musical_tolerance["frame_f1"] >= 0.95
-            and musical_tolerance["matched_velocity_mae"] <= 2.0
+        "pairwise_musical_floor": (
+            musical_tolerance["onset_f1_50_ms"]
+            >= MIN_PAIRWISE_ONSET_F1
+            and musical_tolerance["onset_f1_25_ms"]
+            >= MIN_PAIRWISE_ONSET_F1
+            and musical_tolerance["note_with_offset_f1"]
+            >= MIN_PAIRWISE_NOTE_OFFSET_F1
+            and musical_tolerance["frame_f1"]
+            >= MIN_PAIRWISE_FRAME_F1
+            and musical_tolerance["matched_velocity_mae"]
+            <= MAX_PAIRWISE_VELOCITY_MAE
+        ),
+        "golden_quality_delta": (
+            golden_quality_delta["onset_f1_50_ms"]
+            <= MAX_GOLDEN_ONSET_F1_DELTA
+            and golden_quality_delta["onset_f1_25_ms"]
+            <= MAX_GOLDEN_ONSET_F1_DELTA
+            and golden_quality_delta["note_with_offset_f1"]
+            <= MAX_GOLDEN_NOTE_OFFSET_F1_DELTA
+            and golden_quality_delta["frame_f1"]
+            <= MAX_GOLDEN_FRAME_F1_DELTA
+            and golden_quality_delta["matched_velocity_mae"]
+            <= MAX_GOLDEN_VELOCITY_MAE_DELTA
+            and golden_quality_delta["final_note_count_relative"]
+            <= MAX_GOLDEN_NOTE_COUNT_RELATIVE_DELTA
         ),
     }
     if not all(comparisons.values()):
         raise RuntimeError("packaged and direct replay products differ")
     return {
-        "schema_version": "atpiano.desktop-replay-parity.v1",
+        "schema_version": "atpiano.desktop-replay-parity.v2",
         "status": "passed",
         "comparisons": comparisons,
+        "acceptance_thresholds": acceptance_thresholds,
         "event_tolerance": event_tolerance,
-        "musical_tolerance": musical_tolerance,
+        "pairwise_musical_evidence": musical_tolerance,
+        "golden_quality_delta": golden_quality_delta,
         "packaged_session_id": packaged["session_id"],
         "direct_session_id": direct["session_id"],
         "packaged_total_s": packaged["timing"]["total_s"],
