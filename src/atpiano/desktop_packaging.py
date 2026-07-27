@@ -23,13 +23,25 @@ from typing import Any
 
 from atpiano.desktop import MODEL_PACK_SCHEMA, ModelPack
 from atpiano.musical_fixture import generate_musical_fixture
+from atpiano.score_snapshot import (
+    MIDI2SCORE_CHECKPOINT_SHA256,
+    MIDI2SCORE_CHECKPOINT_URL,
+    MIDI2SCORE_COMMIT,
+    MIDI2SCORE_REPOSITORY,
+    SCORE_RUNTIME_SCHEMA,
+    inspect_score_runtime,
+)
 from atpiano.util import sha256_file, sha256_path, utc_now, write_json
 
 PYTHON_KEY = "cpython-3.10.19-macos-aarch64-none"
 PYTHON_VERSION = "3.10.19"
+SCORE_PYTHON_KEY = "cpython-3.11.14-macos-aarch64-none"
+SCORE_PYTHON_VERSION = "3.11.14"
 MODEL_PACK_ID = "atpiano-cpu-models-2026.07"
 BUNDLE_MANIFEST_SCHEMA = "atpiano.desktop-bundle.v1"
 BUNDLE_AUDIT_SCHEMA = "atpiano.desktop-bundle-audit.v2"
+INTERNAL_SCORE_RUNTIME_NAME = "score-runtime"
+INTERNAL_SCORE_PAPER_URL = "https://zenodo.org/records/14877339"
 SYSTEM_LOAD_PREFIXES = ("/System/Library/", "/usr/lib/")
 FORBIDDEN_DISTRIBUTION_PREFIXES = (
     "cuda-",
@@ -46,14 +58,17 @@ FORBIDDEN_DEV_DISTRIBUTIONS = {
 }
 FORBIDDEN_TEST_NAMESPACES = {"test", "tests", "testing"}
 REQUIRED_RUNTIME_TEST_NAMESPACES = {("torch", "testing")}
+REQUIRED_SCORE_TEST_NAMESPACES = {
+    ("music21", "test"),
+    ("torch", "testing"),
+}
 FORBIDDEN_BASENAMES = {
     "MIDI2ScoreTF.ckpt",
     "midi2score-runtime",
+    INTERNAL_SCORE_RUNTIME_NAME,
 }
 MODEL_ASSET_PATHS = {
-    "basic_pitch": Path(
-        "basic_pitch/saved_models/icassp_2022/nmp.mlpackage"
-    ),
+    "basic_pitch": Path("basic_pitch/saved_models/icassp_2022/nmp.mlpackage"),
     "transkun_checkpoint": Path("transkun/pretrained/2.0.pt"),
     "transkun_config": Path("transkun/pretrained/2.0.conf"),
 }
@@ -108,11 +123,7 @@ def _repository_root() -> Path:
 
 def _expected_stage_root() -> Path:
     return (
-        _repository_root()
-        / "app"
-        / "src-tauri"
-        / "resources"
-        / "desktop-runtime"
+        _repository_root() / "app" / "src-tauri" / "resources" / "desktop-runtime"
     ).resolve()
 
 
@@ -121,13 +132,17 @@ def _require_macos_arm64() -> None:
         raise RuntimeError("desktop packaging requires macOS arm64")
 
 
-def _managed_python() -> tuple[Path, dict[str, Any]]:
+def _managed_python(
+    *,
+    key: str = PYTHON_KEY,
+    version: str = PYTHON_VERSION,
+) -> tuple[Path, dict[str, Any]]:
     result = _run(
         [
             "uv",
             "python",
             "list",
-            PYTHON_VERSION,
+            version,
             "--only-installed",
             "--managed-python",
             "--output-format",
@@ -137,44 +152,40 @@ def _managed_python() -> tuple[Path, dict[str, Any]]:
     )
     candidates = json.loads(result.stdout)
     selected = next(
-        (
-            candidate
-            for candidate in candidates
-            if candidate.get("key") == PYTHON_KEY
-        ),
+        (candidate for candidate in candidates if candidate.get("key") == key),
         None,
     )
     if not isinstance(selected, dict) or not selected.get("path"):
-        raise RuntimeError(
-            f"uv-managed {PYTHON_KEY} is not installed"
-        )
+        raise RuntimeError(f"uv-managed {key} is not installed")
     executable = Path(str(selected["path"])).resolve()
     runtime_root = executable.parent.parent
     build = (runtime_root / "BUILD").read_text(encoding="utf-8").strip()
     acquisition_url = (
         "https://github.com/astral-sh/python-build-standalone/"
         f"releases/download/{build}/"
-        f"cpython-{PYTHON_VERSION}%2B{build}-"
+        f"cpython-{version}%2B{build}-"
         "aarch64-apple-darwin-install_only_stripped.tar.gz"
     )
     return runtime_root, {
-        "key": PYTHON_KEY,
-        "version": PYTHON_VERSION,
+        "key": key,
+        "version": version,
         "build": build,
         "acquisition_url": acquisition_url,
         "source_tree_sha256": sha256_path(runtime_root),
     }
 
 
-def _site_packages(runtime_root: Path) -> Path:
-    return runtime_root / "lib" / "python3.10" / "site-packages"
+def _site_packages(
+    runtime_root: Path,
+    *,
+    python_version: str = "3.10",
+) -> Path:
+    return runtime_root / "lib" / f"python{python_version}" / "site-packages"
 
 
 def _stage_dependencies(runtime_root: Path, repository: Path) -> None:
     requirements = runtime_root / ".requirements.lock"
-    externally_managed = (
-        runtime_root / "lib" / "python3.10" / "EXTERNALLY-MANAGED"
-    )
+    externally_managed = runtime_root / "lib" / "python3.10" / "EXTERNALLY-MANAGED"
     if externally_managed.is_file():
         externally_managed.unlink()
     _run(
@@ -231,12 +242,8 @@ def _stage_dependencies(runtime_root: Path, repository: Path) -> None:
 def stage_model_pack(site_packages: Path, runtime_root: Path) -> ModelPack:
     pack_root = runtime_root / "model-pack"
     basic_pitch_source = site_packages / MODEL_ASSET_PATHS["basic_pitch"]
-    transkun_source = (
-        site_packages / MODEL_ASSET_PATHS["transkun_checkpoint"]
-    )
-    transkun_config_source = (
-        site_packages / MODEL_ASSET_PATHS["transkun_config"]
-    )
+    transkun_source = site_packages / MODEL_ASSET_PATHS["transkun_checkpoint"]
+    transkun_config_source = site_packages / MODEL_ASSET_PATHS["transkun_config"]
     for source in (
         basic_pitch_source,
         transkun_source,
@@ -341,14 +348,10 @@ def _copy_external_dependency(
     resolved = source.resolve()
     if name in copied:
         if sha256_file(copied[name]) != sha256_file(resolved):
-            raise RuntimeError(
-                f"media dependency basename collision: {name}"
-            )
+            raise RuntimeError(f"media dependency basename collision: {name}")
         return copied[name]
     shutil.copy2(resolved, destination)
-    destination.chmod(
-        destination.stat().st_mode | stat.S_IWUSR | stat.S_IXUSR
-    )
+    destination.chmod(destination.stat().st_mode | stat.S_IWUSR | stat.S_IXUSR)
     copied[name] = destination
     origins[name] = resolved
     return destination
@@ -370,9 +373,7 @@ def bundle_media_tools(runtime_root: Path) -> dict[str, Any]:
     for name, source in sources.items():
         destination = binaries / name
         shutil.copy2(source, destination)
-        destination.chmod(
-            destination.stat().st_mode | stat.S_IWUSR | stat.S_IXUSR
-        )
+        destination.chmod(destination.stat().st_mode | stat.S_IWUSR | stat.S_IXUSR)
         staged[name] = destination
 
     copied: dict[str, Path] = {}
@@ -387,16 +388,13 @@ def bundle_media_tools(runtime_root: Path) -> dict[str, Any]:
         visited.add(binary)
         replacements: list[tuple[str, Path]] = []
         for load_path in _otool_dependencies(binary):
-            if (
-                _is_system_load_path(load_path)
-                or load_path.startswith(("@loader_path/", "@rpath/"))
+            if _is_system_load_path(load_path) or load_path.startswith(
+                ("@loader_path/", "@rpath/")
             ):
                 continue
             source = Path(load_path)
             if not source.is_file():
-                raise RuntimeError(
-                    f"media dependency is unresolved: {load_path}"
-                )
+                raise RuntimeError(f"media dependency is unresolved: {load_path}")
             destination = _copy_external_dependency(
                 source,
                 libraries,
@@ -473,8 +471,7 @@ def bundle_media_tools(runtime_root: Path) -> dict[str, Any]:
                 "name": value["name"],
                 "license": value.get("license"),
                 "installed_versions": [
-                    item["version"]
-                    for item in value.get("installed", [])
+                    item["version"] for item in value.get("installed", [])
                 ],
             }
         )
@@ -525,26 +522,34 @@ def _prune_runtime(runtime_root: Path) -> None:
                 entry.unlink()
 
 
-def _prune_distribution_test_material(site_packages: Path) -> None:
+def _prune_distribution_test_material(
+    site_packages: Path,
+    *,
+    required_namespaces: set[tuple[str, ...]] | None = None,
+) -> None:
+    required = required_namespaces or REQUIRED_RUNTIME_TEST_NAMESPACES
     candidates = sorted(
         (
             path
             for path in site_packages.rglob("*")
-            if path.is_dir()
-            and path.name.lower() in FORBIDDEN_TEST_NAMESPACES
+            if path.is_dir() and path.name.lower() in FORBIDDEN_TEST_NAMESPACES
         ),
         key=lambda path: len(path.parts),
         reverse=True,
     )
     for candidate in candidates:
         relative = candidate.relative_to(site_packages)
-        if relative.parts in REQUIRED_RUNTIME_TEST_NAMESPACES:
+        if relative.parts in required:
             continue
         if candidate.is_dir():
             shutil.rmtree(candidate)
 
 
-def _package_inventory(runtime_root: Path) -> list[dict[str, Any]]:
+def _package_inventory(
+    runtime_root: Path,
+    *,
+    python: Path | None = None,
+) -> list[dict[str, Any]]:
     script = """
 import importlib.metadata as metadata
 import json
@@ -575,10 +580,212 @@ for distribution in metadata.distributions():
 print(json.dumps(sorted(items, key=lambda item: item["name"].lower())))
 """
     result = _run(
-        [runtime_root / "bin" / "python3", "-I", "-B", "-c", script],
+        [
+            python or runtime_root / "bin" / "python3",
+            "-I",
+            "-B",
+            "-c",
+            script,
+        ],
         capture_output=True,
     )
     return json.loads(result.stdout)
+
+
+def _direct_url_inventory(site_packages: Path) -> list[dict[str, Any]]:
+    sources = []
+    for path in sorted(site_packages.glob("*.dist-info/direct_url.json")):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        sources.append(
+            {
+                "distribution": path.parent.name.removesuffix(".dist-info"),
+                "source": document,
+            }
+        )
+    return sources
+
+
+def _remove_runtime_caches(root: Path) -> None:
+    for cache in sorted(
+        root.rglob("__pycache__"),
+        key=lambda path: len(path.parts),
+        reverse=True,
+    ):
+        if cache.is_dir():
+            shutil.rmtree(cache)
+    for bytecode in root.rglob("*.py[co]"):
+        bytecode.unlink()
+
+
+def _prune_internal_score_python(python_root: Path) -> None:
+    site_packages = _site_packages(
+        python_root,
+        python_version="3.11",
+    )
+    relative_directories = (
+        Path("include"),
+        Path("share/man"),
+        Path("lib/pkgconfig"),
+        Path("lib/python3.11/test"),
+        Path("lib/python3.11/idlelib"),
+        Path("lib/python3.11/tkinter"),
+        Path("lib/python3.11/turtledemo"),
+    )
+    for relative in relative_directories:
+        target = python_root / relative
+        if target.is_dir():
+            shutil.rmtree(target)
+    for relative in PRUNABLE_PACKAGE_DIRECTORIES:
+        target = site_packages / relative
+        if target.is_dir():
+            shutil.rmtree(target)
+    _prune_distribution_test_material(
+        site_packages,
+        required_namespaces=REQUIRED_SCORE_TEST_NAMESPACES,
+    )
+    for virtualenv_file in ("_virtualenv.pth", "_virtualenv.py"):
+        (site_packages / virtualenv_file).unlink(missing_ok=True)
+    for direct_url in site_packages.rglob("direct_url.json"):
+        direct_url.unlink()
+    _remove_runtime_caches(python_root)
+    keep = {"python", "python3", "python3.11"}
+    for entry in (python_root / "bin").iterdir():
+        if entry.name not in keep:
+            if entry.is_dir():
+                shutil.rmtree(entry)
+            else:
+                entry.unlink()
+
+
+def stage_internal_score_runtime(
+    runtime_root: Path,
+    source_runtime: Path,
+) -> dict[str, Any]:
+    source_runtime = source_runtime.resolve()
+    source_state = inspect_score_runtime(source_runtime)
+    if not source_state["available"]:
+        raise RuntimeError(
+            f"internal score runtime is unavailable: {source_state['error']}"
+        )
+    source_repository = source_runtime / "MIDI2ScoreTransformer"
+    source_checkpoint = source_runtime / "MIDI2ScoreTF.ckpt"
+    source_python_packages = (
+        source_runtime / ".venv" / "lib" / "python3.11" / "site-packages"
+    )
+    if not source_python_packages.is_dir():
+        raise RuntimeError("internal score runtime Python packages are missing")
+    repository_commit = _run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=source_repository,
+        capture_output=True,
+    ).stdout.strip()
+    if repository_commit != MIDI2SCORE_COMMIT:
+        raise RuntimeError("internal score repository differs from the pinned commit")
+    if sha256_file(source_checkpoint) != MIDI2SCORE_CHECKPOINT_SHA256:
+        raise RuntimeError("internal score checkpoint differs from the pinned hash")
+
+    score_root = runtime_root / INTERNAL_SCORE_RUNTIME_NAME
+    python_source, python_provenance = _managed_python(
+        key=SCORE_PYTHON_KEY,
+        version=SCORE_PYTHON_VERSION,
+    )
+    python_root = score_root / ".venv"
+    shutil.copytree(python_source, python_root, symlinks=True)
+    staged_site_packages = _site_packages(
+        python_root,
+        python_version="3.11",
+    )
+    if staged_site_packages.exists():
+        shutil.rmtree(staged_site_packages)
+    shutil.copytree(
+        source_python_packages,
+        staged_site_packages,
+        symlinks=True,
+    )
+    vcs_sources = _direct_url_inventory(staged_site_packages)
+    shutil.copytree(
+        source_repository,
+        score_root / "MIDI2ScoreTransformer",
+        ignore=shutil.ignore_patterns(
+            ".git",
+            "__pycache__",
+            "*.pyc",
+            "*.pyo",
+        ),
+    )
+    shutil.copy2(source_checkpoint, score_root / "MIDI2ScoreTF.ckpt")
+    _prune_internal_score_python(python_root)
+    relocated_native = relocate_runtime_native(
+        python_root,
+        python_source,
+    )
+    python = python_root / "bin" / "python"
+    packages = _package_inventory(python_root, python=python)
+    _audit_distributions(
+        score_root,
+        packages,
+        allow_internal_score_runtime=True,
+    )
+    for imports in (
+        "import torch, transformers, lightning, music21",
+        "import numba, pretty_midi, score_transformer",
+    ):
+        _run([python, "-I", "-B", "-c", imports])
+    python_version = _run(
+        [python, "--version"],
+        capture_output=True,
+    ).stdout.strip()
+    manifest = {
+        "schema_version": SCORE_RUNTIME_SCHEMA,
+        "created_at": utc_now(),
+        "internal_use_only": True,
+        "internal_only": True,
+        "public_distribution": False,
+        "license": {
+            "status": "provisional-unconfirmed",
+            "checkpoint_assumption": "CC-BY-4.0",
+            "paper_license": "CC-BY-4.0",
+            "paper_record": INTERNAL_SCORE_PAPER_URL,
+            "source_license": "unconfirmed",
+            "release_gate": (
+                "confirm source and checkpoint rights before distribution"
+            ),
+        },
+        "python": python_version,
+        "python_provenance": python_provenance,
+        "repository": {
+            "url": MIDI2SCORE_REPOSITORY,
+            "commit": repository_commit,
+            "tree_sha256": sha256_path(score_root / "MIDI2ScoreTransformer"),
+        },
+        "checkpoint": {
+            "url": MIDI2SCORE_CHECKPOINT_URL,
+            "sha256": sha256_file(score_root / "MIDI2ScoreTF.ckpt"),
+            "bytes": (score_root / "MIDI2ScoreTF.ckpt").stat().st_size,
+        },
+        "execution": {
+            "device": "cpu",
+            "beautifulsoup4": "4.13.4",
+            "transformers": "4.44.2",
+        },
+        "vcs_sources": vcs_sources,
+        "relocated_native_files": relocated_native,
+        "packages": packages,
+    }
+    write_json(score_root / "runtime.json", manifest)
+    if not inspect_score_runtime(score_root)["available"]:
+        raise RuntimeError("staged internal score runtime failed its manifest contract")
+    return {
+        "enabled": True,
+        "internal_only": True,
+        "public_distribution": False,
+        "relative_path": INTERNAL_SCORE_RUNTIME_NAME,
+        "manifest_sha256": sha256_file(score_root / "runtime.json"),
+        "checkpoint_sha256": MIDI2SCORE_CHECKPOINT_SHA256,
+        "repository_commit": MIDI2SCORE_COMMIT,
+        "installed_bytes": _path_size(score_root),
+        "package_count": len(packages),
+    }
 
 
 def _stage_fixture(runtime_root: Path) -> None:
@@ -597,11 +804,7 @@ def _path_size(path: Path) -> int:
 
 
 def inventory(root: Path) -> dict[str, Any]:
-    files = [
-        path
-        for path in root.rglob("*")
-        if path.is_file() or path.is_symlink()
-    ]
+    files = [path for path in root.rglob("*") if path.is_file() or path.is_symlink()]
     largest = sorted(
         (
             {
@@ -619,9 +822,7 @@ def inventory(root: Path) -> dict[str, Any]:
             {
                 "path": child.name,
                 "bytes": (
-                    _path_size(child)
-                    if child.is_dir()
-                    else child.lstat().st_size
+                    _path_size(child) if child.is_dir() else child.lstat().st_size
                 ),
             }
         )
@@ -647,10 +848,7 @@ def _native_candidates(root: Path) -> list[Path]:
         if (
             path.is_file()
             and not path.is_symlink()
-            and (
-                path.suffix in {".dylib", ".so"}
-                or os.access(path, os.X_OK)
-            )
+            and (path.suffix in {".dylib", ".so"} or os.access(path, os.X_OK))
             and _is_macho(path)
         ):
             candidates.append(path)
@@ -664,11 +862,7 @@ def _loader_path(binary: Path, target: Path) -> str:
 
 def _otool_id(path: Path) -> str | None:
     result = _run(["otool", "-D", path], capture_output=True)
-    lines = [
-        line.strip()
-        for line in result.stdout.splitlines()[1:]
-        if line.strip()
-    ]
+    lines = [line.strip() for line in result.stdout.splitlines()[1:] if line.strip()]
     return lines[0] if lines else None
 
 
@@ -682,9 +876,7 @@ def relocate_runtime_native(
             ["file", "-b", binary],
             capture_output=True,
         ).stdout
-        needs_thinning = (
-            "arm64" in description and "x86_64" in description
-        )
+        needs_thinning = "arm64" in description and "x86_64" in description
         if needs_thinning:
             original_mode = binary.stat().st_mode
             thinned = binary.with_name(f"{binary.name}.arm64")
@@ -709,17 +901,11 @@ def relocate_runtime_native(
             target = runtime_root / relative
             if not target.is_file():
                 raise RuntimeError(
-                    "copied Python dependency is missing: "
-                    f"{relative.as_posix()}"
+                    f"copied Python dependency is missing: {relative.as_posix()}"
                 )
-            changes.append(
-                (dependency, _loader_path(binary, target))
-            )
+            changes.append((dependency, _loader_path(binary, target)))
         install_id = _otool_id(binary)
-        needs_id = (
-            install_id is not None
-            and install_id.startswith(str(python_source))
-        )
+        needs_id = install_id is not None and install_id.startswith(str(python_source))
         for original, replacement in changes:
             _run(
                 [
@@ -758,9 +944,7 @@ def _audit_symlinks(root: Path) -> list[str]:
             continue
         target = path.resolve()
         if target != resolved_root and resolved_root not in target.parents:
-            raise RuntimeError(
-                f"bundle symlink escapes its root: {path}"
-            )
+            raise RuntimeError(f"bundle symlink escapes its root: {path}")
         links.append(path.relative_to(root).as_posix())
     return links
 
@@ -768,22 +952,107 @@ def _audit_symlinks(root: Path) -> list[str]:
 def _audit_distributions(
     root: Path,
     packages: list[dict[str, Any]],
+    *,
+    allow_internal_score_runtime: bool = False,
 ) -> None:
     for package in packages:
         normalized = str(package["name"]).lower().replace("_", "-")
         if normalized.startswith(FORBIDDEN_DISTRIBUTION_PREFIXES):
-            raise RuntimeError(
-                f"forbidden accelerator package: {package['name']}"
-            )
+            raise RuntimeError(f"forbidden accelerator package: {package['name']}")
         if normalized in FORBIDDEN_DEV_DISTRIBUTIONS:
-            raise RuntimeError(
-                f"forbidden development package: {package['name']}"
-            )
+            raise RuntimeError(f"forbidden development package: {package['name']}")
     for path in root.rglob("*"):
         if path.name in FORBIDDEN_BASENAMES:
-            raise RuntimeError(
-                f"forbidden score runtime asset: {path.name}"
-            )
+            if (
+                allow_internal_score_runtime
+                and INTERNAL_SCORE_RUNTIME_NAME in path.parts
+            ):
+                continue
+            raise RuntimeError(f"forbidden score runtime asset: {path.name}")
+
+
+def _internal_score_policy(
+    manifest: dict[str, Any],
+) -> dict[str, Any]:
+    raw = manifest.get("internal_score_runtime")
+    if not isinstance(raw, dict):
+        return {
+            "enabled": False,
+            "internal_only": False,
+            "public_distribution": False,
+        }
+    enabled = raw.get("enabled") is True
+    internal_only = raw.get("internal_only") is True
+    public_distribution = raw.get("public_distribution") is True
+    if enabled and (not internal_only or public_distribution):
+        raise RuntimeError("internal score runtime policy is unsafe for this build")
+    return {
+        **raw,
+        "enabled": enabled,
+        "internal_only": internal_only,
+        "public_distribution": public_distribution,
+    }
+
+
+def _audit_internal_score_runtime(
+    runtime_root: Path,
+) -> dict[str, Any]:
+    score_root = runtime_root / INTERNAL_SCORE_RUNTIME_NAME
+    state = inspect_score_runtime(score_root)
+    if not state["available"]:
+        raise RuntimeError(
+            f"internal score runtime failed validation: {state['error']}"
+        )
+    runtime_manifest = state["manifest"]
+    license_state = runtime_manifest.get("license", {})
+    if (
+        runtime_manifest.get("internal_only") is not True
+        or runtime_manifest.get("public_distribution") is not False
+        or not isinstance(license_state, dict)
+        or license_state.get("status") != "provisional-unconfirmed"
+        or license_state.get("checkpoint_assumption") != "CC-BY-4.0"
+        or license_state.get("source_license") != "unconfirmed"
+    ):
+        raise RuntimeError("internal score runtime lacks its provisional license gate")
+    checkpoint = score_root / "MIDI2ScoreTF.ckpt"
+    if sha256_file(checkpoint) != MIDI2SCORE_CHECKPOINT_SHA256:
+        raise RuntimeError("internal score runtime checkpoint hash mismatch")
+    repository = score_root / "MIDI2ScoreTransformer"
+    if sha256_path(repository) != runtime_manifest["repository"].get("tree_sha256"):
+        raise RuntimeError("internal score runtime source tree hash mismatch")
+    if (repository / ".git").exists():
+        raise RuntimeError("internal score runtime includes repository history")
+    python = score_root / ".venv" / "bin" / "python"
+    packages = _package_inventory(
+        score_root / ".venv",
+        python=python,
+    )
+    _audit_distributions(
+        score_root,
+        packages,
+        allow_internal_score_runtime=True,
+    )
+    return {
+        "status": "passed",
+        "relative_path": INTERNAL_SCORE_RUNTIME_NAME,
+        "manifest_sha256": sha256_file(score_root / "runtime.json"),
+        "checkpoint_sha256": MIDI2SCORE_CHECKPOINT_SHA256,
+        "repository_commit": MIDI2SCORE_COMMIT,
+        "package_count": len(packages),
+        "largest_packages": sorted(
+            (
+                {
+                    "name": package["name"],
+                    "version": package["version"],
+                    "installed_bytes": package["installed_bytes"],
+                }
+                for package in packages
+            ),
+            key=lambda item: item["installed_bytes"],
+            reverse=True,
+        )[:10],
+        "license": license_state,
+    }
 
 
 def _audit_native(root: Path) -> list[dict[str, Any]]:
@@ -794,9 +1063,7 @@ def _audit_native(root: Path) -> list[dict[str, Any]]:
             capture_output=True,
         ).stdout.strip()
         if "arm64" not in description or "x86_64" in description:
-            raise RuntimeError(
-                f"native file is not arm64-only: {path}"
-            )
+            raise RuntimeError(f"native file is not arm64-only: {path}")
         dependencies = _otool_dependencies(path)
         install_id = _otool_id(path)
         for dependency in dependencies:
@@ -809,9 +1076,7 @@ def _audit_native(root: Path) -> list[dict[str, Any]]:
             candidate = Path(dependency)
             if candidate == root.resolve() or root.resolve() in candidate.parents:
                 continue
-            raise RuntimeError(
-                f"native dependency escapes the bundle: {dependency}"
-            )
+            raise RuntimeError(f"native dependency escapes the bundle: {dependency}")
         native.append(
             {
                 "path": path.relative_to(root).as_posix(),
@@ -855,26 +1120,19 @@ def component_inventory(root: Path) -> dict[str, Any]:
             else:
                 category = "app_metadata"
         else:
-            category = _runtime_component_category(
-                runtime_relative.parts
-            )
+            category = _runtime_component_category(runtime_relative.parts)
             if category == "python_packages":
                 parts = runtime_relative.parts
                 lowered = {part.lower() for part in parts[3:]}
                 if lowered & FORBIDDEN_TEST_NAMESPACES:
                     package_parts = parts[3:]
-                    if (
-                        package_parts[:2]
-                        in REQUIRED_RUNTIME_TEST_NAMESPACES
-                    ):
+                    if package_parts[:2] in REQUIRED_RUNTIME_TEST_NAMESPACES:
                         runtime_required_testing.append(path)
                     else:
                         test_material.append(path)
         record(category, path)
 
-    installed_bytes = sum(
-        entry["bytes"] for entry in categories.values()
-    )
+    installed_bytes = sum(entry["bytes"] for entry in categories.values())
     native = _native_candidates(root)
     test_largest = sorted(
         (
@@ -899,21 +1157,14 @@ def component_inventory(root: Path) -> dict[str, Any]:
             "bytes": sum(path.lstat().st_size for path in test_material),
             "file_count": len(test_material),
             "largest_files": test_largest,
-            "policy": (
-                "test namespaces and development distributions excluded"
-            ),
+            "policy": ("test namespaces and development distributions excluded"),
         },
         "runtime_required_testing": {
-            "bytes": sum(
-                path.lstat().st_size
-                for path in runtime_required_testing
-            ),
+            "bytes": sum(path.lstat().st_size for path in runtime_required_testing),
             "file_count": len(runtime_required_testing),
             "namespaces": [
                 "/".join(namespace)
-                for namespace in sorted(
-                    REQUIRED_RUNTIME_TEST_NAMESPACES
-                )
+                for namespace in sorted(REQUIRED_RUNTIME_TEST_NAMESPACES)
             ],
             "policy": (
                 "retained only where the package imports its public "
@@ -925,6 +1176,8 @@ def component_inventory(root: Path) -> dict[str, Any]:
 
 
 def _runtime_component_category(parts: tuple[str, ...]) -> str:
+    if parts[:1] == (INTERNAL_SCORE_RUNTIME_NAME,):
+        return "internal_score_runtime"
     if parts[:1] == ("model-pack",):
         return "model_pack"
     if parts[:1] == ("fixture",):
@@ -935,10 +1188,10 @@ def _runtime_component_category(parts: tuple[str, ...]) -> str:
         "site-packages",
     ):
         return "python_packages"
-    if (
-        parts[:2] == ("lib", "media")
-        or parts in {("bin", "ffmpeg"), ("bin", "ffprobe")}
-    ):
+    if parts[:2] == ("lib", "media") or parts in {
+        ("bin", "ffmpeg"),
+        ("bin", "ffprobe"),
+    }:
         return "media_tools"
     return "python_runtime_and_manifest"
 
@@ -969,13 +1222,9 @@ def archive_component_inventory(archive: Path) -> dict[str, Any]:
                         "desktop-runtime",
                     )
                     if relative[:3] == runtime_prefix:
-                        category = _runtime_component_category(
-                            relative[3:]
-                        )
+                        category = _runtime_component_category(relative[3:])
                     elif relative[:2] == ("Contents", "MacOS"):
-                        category = (
-                            "rust_shell_and_embedded_frontend"
-                        )
+                        category = "rust_shell_and_embedded_frontend"
                     elif relative[:2] == ("Contents", "Resources"):
                         category = "app_resources"
                     else:
@@ -999,9 +1248,7 @@ def archive_component_inventory(archive: Path) -> dict[str, Any]:
         "entry_count": entry_count,
         "payload_compressed_bytes": payload_compressed_bytes,
         "payload_uncompressed_bytes": payload_uncompressed_bytes,
-        "container_overhead_bytes": (
-            archive_bytes - payload_compressed_bytes
-        ),
+        "container_overhead_bytes": (archive_bytes - payload_compressed_bytes),
         "categories": categories,
     }
 
@@ -1014,9 +1261,7 @@ def _audit_anonymous_caches(root: Path) -> list[str]:
         if path.is_dir() and path.name in forbidden
     ]
     if found:
-        raise RuntimeError(
-            f"anonymous cache directory is bundled: {found[0]}"
-        )
+        raise RuntimeError(f"anonymous cache directory is bundled: {found[0]}")
     return found
 
 
@@ -1034,8 +1279,21 @@ def audit_root(
     )
     if not (runtime_root / "bundle-manifest.json").is_file():
         raise RuntimeError("desktop runtime manifest is missing")
+    bundle_manifest = json.loads(
+        (runtime_root / "bundle-manifest.json").read_text(encoding="utf-8")
+    )
+    score_policy = _internal_score_policy(bundle_manifest)
+    if score_policy["enabled"] and archive is not None:
+        raise RuntimeError("internal score runtime cannot enter a review archive")
     packages = _package_inventory(runtime_root)
-    _audit_distributions(runtime_root, packages)
+    _audit_distributions(
+        runtime_root,
+        packages,
+        allow_internal_score_runtime=score_policy["enabled"],
+    )
+    internal_score_audit = (
+        _audit_internal_score_runtime(runtime_root) if score_policy["enabled"] else None
+    )
     symlinks = _audit_symlinks(root)
     anonymous_caches = _audit_anonymous_caches(root)
     native = _audit_native(root)
@@ -1071,6 +1329,11 @@ def audit_root(
         "forbidden_accelerator_packages": [],
         "forbidden_development_packages": [],
         "forbidden_score_runtime_assets": [],
+        "internal_score_runtime": internal_score_audit
+        or {
+            "status": "not-included",
+            "public_distribution": False,
+        },
         "anonymous_cache_directories": anonymous_caches,
         "status": "passed",
     }
@@ -1085,9 +1348,7 @@ def audit_root(
             "format": "zip",
             "compressed_bytes": compressed_bytes,
             "installed_bytes": components["installed_bytes"],
-            "compression_ratio": (
-                compressed_bytes / components["installed_bytes"]
-            ),
+            "compression_ratio": (compressed_bytes / components["installed_bytes"]),
             "components": compressed_components,
         }
     return result
@@ -1096,28 +1357,33 @@ def audit_root(
 def smoke_sidecar(
     runtime_root: Path,
     working_directory: Path,
+    *,
+    score_runtime: Path | None = None,
 ) -> dict[str, Any]:
     token = secrets.token_hex(32)
     environment = os.environ.copy()
     environment["ATPIANO_DESKTOP_TOKEN"] = token
+    command: list[str | Path] = [
+        runtime_root / "bin" / "python3",
+        "-I",
+        "-B",
+        "-m",
+        "atpiano.desktop_sidecar",
+        "--workspace",
+        working_directory / "workspace",
+        "--replay-manifest",
+        runtime_root / "fixture" / "input.json",
+        "--model-pack",
+        runtime_root / "model-pack" / "model-pack.json",
+        "--expected-model-pack",
+        MODEL_PACK_ID,
+        "--minimum-free-gib",
+        "0",
+    ]
+    if score_runtime is not None:
+        command.extend(["--score-runtime", score_runtime])
     process = subprocess.Popen(
-        [
-            runtime_root / "bin" / "python3",
-            "-I",
-            "-B",
-            "-m",
-            "atpiano.desktop_sidecar",
-            "--workspace",
-            working_directory / "workspace",
-            "--replay-manifest",
-            runtime_root / "fixture" / "input.json",
-            "--model-pack",
-            runtime_root / "model-pack" / "model-pack.json",
-            "--expected-model-pack",
-            MODEL_PACK_ID,
-            "--minimum-free-gib",
-            "0",
-        ],
+        [str(argument) for argument in command],
         cwd=working_directory,
         env=environment,
         stdin=subprocess.PIPE,
@@ -1133,9 +1399,7 @@ def smoke_sidecar(
         if not readable:
             process.terminate()
             process.wait(timeout=5)
-            raise RuntimeError(
-                "staged desktop sidecar did not become ready"
-            )
+            raise RuntimeError("staged desktop sidecar did not become ready")
         ready_line = process.stdout.readline()
         ready = json.loads(ready_line)
         base_url = f"http://127.0.0.1:{ready['port']}"
@@ -1150,9 +1414,7 @@ def smoke_sidecar(
                     "desktop sidecar returned an unexpected auth status"
                 ) from error
         else:
-            raise RuntimeError(
-                "desktop sidecar accepted an unauthenticated request"
-            )
+            raise RuntimeError("desktop sidecar accepted an unauthenticated request")
         request = urllib.request.Request(
             f"{base_url}/desktop/v1/handshake",
             headers={
@@ -1177,6 +1439,7 @@ def smoke_sidecar(
             "protocol_version": ready["protocol_version"],
             "contract_schema_version": ready["contract_schema_version"],
             "model_pack_id": ready["model_pack_id"],
+            "score_available": handshake["score_available"],
             "unauthenticated_status": 401,
             "parent_eof_shutdown": True,
         }
@@ -1186,14 +1449,18 @@ def smoke_sidecar(
             process.wait(timeout=5)
 
 
-def stage_runtime(output: Path, report: Path) -> dict[str, Any]:
+def stage_runtime(
+    output: Path,
+    report: Path,
+    *,
+    include_internal_score_runtime: bool = False,
+    score_runtime_source: Path | None = None,
+) -> dict[str, Any]:
     _require_macos_arm64()
     repository = _repository_root()
     output = output.resolve()
     if output != _expected_stage_root():
-        raise RuntimeError(
-            f"refusing unexpected desktop stage target: {output}"
-        )
+        raise RuntimeError(f"refusing unexpected desktop stage target: {output}")
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix=".desktop-runtime-stage-",
@@ -1211,8 +1478,24 @@ def stage_runtime(output: Path, report: Path) -> dict[str, Any]:
             staged,
             python_source,
         )
+        internal_score_runtime = (
+            stage_internal_score_runtime(
+                staged,
+                score_runtime_source or repository / "results" / "midi2score-runtime",
+            )
+            if include_internal_score_runtime
+            else {
+                "enabled": False,
+                "internal_only": False,
+                "public_distribution": False,
+            }
+        )
         packages = _package_inventory(staged)
-        _audit_distributions(staged, packages)
+        _audit_distributions(
+            staged,
+            packages,
+            allow_internal_score_runtime=(include_internal_score_runtime),
+        )
         _audit_symlinks(staged)
         _audit_native(staged)
         for imports in (
@@ -1232,6 +1515,11 @@ def stage_runtime(output: Path, report: Path) -> dict[str, Any]:
         sidecar_smoke = smoke_sidecar(
             staged,
             Path(temporary_directory),
+            score_runtime=(
+                staged / INTERNAL_SCORE_RUNTIME_NAME
+                if include_internal_score_runtime
+                else None
+            ),
         )
         manifest = {
             "schema_version": BUNDLE_MANIFEST_SCHEMA,
@@ -1248,6 +1536,7 @@ def stage_runtime(output: Path, report: Path) -> dict[str, Any]:
             "media": media,
             "sidecar_smoke": sidecar_smoke,
             "relocated_native_files": relocated_native,
+            "internal_score_runtime": internal_score_runtime,
             "packages": packages,
             "inventory_before_manifest": inventory(staged),
         }
@@ -1269,6 +1558,11 @@ def build_parser() -> argparse.ArgumentParser:
     stage = commands.add_parser("stage")
     stage.add_argument("--output", type=Path, required=True)
     stage.add_argument("--report", type=Path, required=True)
+    stage.add_argument(
+        "--include-internal-score-runtime",
+        action="store_true",
+    )
+    stage.add_argument("--score-runtime-source", type=Path)
     audit = commands.add_parser("audit")
     audit.add_argument("--root", type=Path, required=True)
     audit.add_argument("--report", type=Path, required=True)
@@ -1279,7 +1573,12 @@ def build_parser() -> argparse.ArgumentParser:
 def run(arguments: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(arguments)
     if args.command == "stage":
-        result = stage_runtime(args.output, args.report)
+        result = stage_runtime(
+            args.output,
+            args.report,
+            include_internal_score_runtime=(args.include_internal_score_runtime),
+            score_runtime_source=args.score_runtime_source,
+        )
     else:
         result = audit_root(args.root, args.archive)
         write_json(args.report, result)

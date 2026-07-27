@@ -19,8 +19,11 @@ from typing import Any
 from atpiano.corrected_workbench import create_corrected_workbench_server
 from atpiano.desktop import apply_model_pack, load_model_pack
 from atpiano.midi import MidiNote, load_notes
+from atpiano.notation import summarize_musicxml
 from atpiano.quality import score_notes
-from atpiano.util import write_json
+from atpiano.score_alignment import validate_score_alignment
+from atpiano.score_snapshot import score_snapshot_is_plausible
+from atpiano.util import read_json, sha256_file, write_json
 
 MODEL_PACK_ID = "atpiano-cpu-models-2026.07"
 TERMINAL_STATES = {"complete", "failed"}
@@ -86,12 +89,8 @@ def _summarize(
         for candidate in session_directory.rglob("*")
         if candidate.is_file()
     )
-    event_count, event_sha256 = normalized_event_digest(
-        session_directory
-    )
-    final_notes = load_notes(
-        session_directory / "exports" / "session.mid"
-    )
+    event_count, event_sha256 = normalized_event_digest(session_directory)
+    final_notes = load_notes(session_directory / "exports" / "session.mid")
     reference_notes = load_notes(reference_midi)
     return {
         "schema_version": "atpiano.desktop-replay-validation.v2",
@@ -101,9 +100,7 @@ def _summarize(
         "source": {
             "frame_count": session["source_frame_count"],
             "sample_rate_hz": session["sample_rate_hz"],
-            "duration_s": (
-                session["source_frame_count"] / session["sample_rate_hz"]
-            ),
+            "duration_s": (session["source_frame_count"] / session["sample_rate_hz"]),
         },
         "horizons": {
             "audio_head_sample": horizons["audio_head_sample"],
@@ -111,9 +108,7 @@ def _summarize(
             "commit_sample": horizons["commit_sample"],
         },
         "events": {
-            "preview_emissions": lanes["preview"][
-                "event_emission_count"
-            ],
+            "preview_emissions": lanes["preview"]["event_emission_count"],
             "commit_emissions": lanes["commit"]["events"]["emissions"],
             "normalized_export_count": event_count,
             "normalized_export_sha256": event_sha256,
@@ -124,15 +119,9 @@ def _summarize(
             "scores": score_notes(reference_notes, final_notes),
         },
         "models": {
-            "preview_artifact_sha256": lanes["preview"]["model"][
-                "artifact_sha256"
-            ],
-            "commit_checkpoint_sha256": lanes["commit"]["model"][
-                "checkpoint_sha256"
-            ],
-            "commit_config_sha256": lanes["commit"]["model"][
-                "config_sha256"
-            ],
+            "preview_artifact_sha256": lanes["preview"]["model"]["artifact_sha256"],
+            "commit_checkpoint_sha256": lanes["commit"]["model"]["checkpoint_sha256"],
+            "commit_config_sha256": lanes["commit"]["model"]["config_sha256"],
             "commit_device": lanes["commit"]["model"]["device"],
         },
         "timing": {
@@ -144,12 +133,8 @@ def _summarize(
         "artifacts": {
             "exports_ready": state["exports_ready"],
             "file_count": len(files),
-            "mp3_files": [
-                path for path in files if path.lower().endswith(".mp3")
-            ],
-            "wav_files": [
-                path for path in files if path.lower().endswith(".wav")
-            ],
+            "mp3_files": [path for path in files if path.lower().endswith(".mp3")],
+            "wav_files": [path for path in files if path.lower().endswith(".wav")],
         },
     }
 
@@ -172,17 +157,79 @@ def _require_complete(report: dict[str, Any]) -> None:
         raise RuntimeError("desktop golden replay acceptance failed")
 
 
+def _render_packaged_score(
+    base_url: str,
+    headers: dict[str, str],
+    session_directory: Path,
+) -> dict[str, Any]:
+    started = time.monotonic()
+    request = urllib.request.Request(
+        f"{base_url}/api/score",
+        data=b"{}",
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        state = json.load(response)
+    deadline = time.monotonic() + 5 * 60
+    while time.monotonic() < deadline:
+        request = urllib.request.Request(
+            f"{base_url}/api/score",
+            headers=headers,
+        )
+        with urllib.request.urlopen(request, timeout=10) as response:
+            state = json.load(response)
+        if state["status"] in TERMINAL_STATES:
+            break
+        time.sleep(0.25)
+    if state["status"] != "complete":
+        raise RuntimeError(f"packaged score failed: {state.get('error')}")
+    snapshot = read_json(session_directory / "score" / "current.json")
+    if not score_snapshot_is_plausible(snapshot):
+        raise RuntimeError("packaged score snapshot is implausible")
+    musicxml = session_directory / snapshot["musicxml"]["path"]
+    alignment = session_directory / snapshot["alignment"]["path"]
+    source_notes = session_directory / snapshot["source_notes"]["path"]
+    if (
+        sha256_file(musicxml) != snapshot["musicxml"]["sha256"]
+        or sha256_file(alignment) != snapshot["alignment"]["sha256"]
+        or sha256_file(source_notes) != snapshot["source_notes"]["sha256"]
+    ):
+        raise RuntimeError("packaged score artifact hash mismatch")
+    summary = summarize_musicxml(musicxml.read_bytes())
+    alignment_summary = validate_score_alignment(
+        read_json(alignment),
+        source_notes_path=source_notes,
+        musicxml_path=musicxml,
+    )
+    return {
+        "status": "passed",
+        "elapsed_s": time.monotonic() - started,
+        "commit_sample": snapshot["commit_sample"],
+        "input_note_count": snapshot["note_count"],
+        "musicxml": {
+            "path": snapshot["musicxml"]["path"],
+            "sha256": snapshot["musicxml"]["sha256"],
+            "bytes": musicxml.stat().st_size,
+            "summary": summary,
+        },
+        "alignment": {
+            "path": snapshot["alignment"]["path"],
+            "sha256": snapshot["alignment"]["sha256"],
+            "summary": alignment_summary,
+        },
+        "adapter": snapshot["adapter"],
+    }
+
+
 def run_packaged_replay(
     app_bundle: Path,
     workspace: Path,
+    *,
+    render_score: bool = False,
 ) -> dict[str, Any]:
     workspace = workspace.resolve()
-    runtime = (
-        app_bundle.resolve()
-        / "Contents"
-        / "Resources"
-        / "desktop-runtime"
-    )
+    runtime = app_bundle.resolve() / "Contents" / "Resources" / "desktop-runtime"
     token = secrets.token_hex(32)
     environment = {
         "HOME": str(Path.home()),
@@ -213,6 +260,8 @@ def run_packaged_replay(
             MODEL_PACK_ID,
             "--minimum-free-gib",
             "0",
+            "--score-runtime",
+            runtime / "score-runtime",
         ],
         cwd="/tmp",
         env=environment,
@@ -236,6 +285,17 @@ def run_packaged_replay(
             "Origin": "tauri://localhost",
             "Content-Type": "application/json",
         }
+        handshake_request = urllib.request.Request(
+            f"{base_url}/desktop/v1/handshake",
+            headers=headers,
+        )
+        with urllib.request.urlopen(
+            handshake_request,
+            timeout=10,
+        ) as response:
+            handshake = json.load(response)
+        if bool(handshake["score_available"]) != render_score:
+            raise RuntimeError("packaged score capability differs from validation mode")
         request = urllib.request.Request(
             f"{base_url}/api/replay",
             data=b"{}",
@@ -256,9 +316,7 @@ def run_packaged_replay(
                 break
             time.sleep(0.5)
         if state["status"] != "complete":
-            raise RuntimeError(
-                f"packaged replay failed: {state.get('error')}"
-            )
+            raise RuntimeError(f"packaged replay failed: {state.get('error')}")
         session_directory = workspace / state["session"]["session_id"]
         report = _summarize(
             state,
@@ -269,6 +327,15 @@ def run_packaged_replay(
             sidecar_ready_s=sidecar_ready_s,
         )
         _require_complete(report)
+        report["score"] = (
+            _render_packaged_score(
+                base_url,
+                headers,
+                session_directory,
+            )
+            if render_score
+            else {"status": "not-requested"}
+        )
         return report
     finally:
         if not process.stdin.closed:
@@ -335,12 +402,8 @@ def compare_replays(
     packaged: dict[str, Any],
     direct: dict[str, Any],
 ) -> dict[str, Any]:
-    direct_notes = [
-        MidiNote(**note) for note in direct["final_notes"]
-    ]
-    packaged_notes = [
-        MidiNote(**note) for note in packaged["final_notes"]
-    ]
+    direct_notes = [MidiNote(**note) for note in direct["final_notes"]]
+    packaged_notes = [MidiNote(**note) for note in packaged["final_notes"]]
     scores = score_notes(direct_notes, packaged_notes)
     direct_events = direct["events"]
     packaged_events = packaged["events"]
@@ -356,14 +419,10 @@ def compare_replays(
     )
     event_tolerance = {
         "preview_emissions_equal": (
-            direct_events["preview_emissions"]
-            == packaged_events["preview_emissions"]
+            direct_events["preview_emissions"] == packaged_events["preview_emissions"]
         ),
         "commit_emission_relative_delta": (
-            abs(
-                direct_events["commit_emissions"]
-                - packaged_events["commit_emissions"]
-            )
+            abs(direct_events["commit_emissions"] - packaged_events["commit_emissions"])
             / commit_denominator
         ),
         "export_count_relative_delta": (
@@ -407,38 +466,26 @@ def compare_replays(
             direct_golden["note_with_offset"]["f1"]
             - packaged_golden["note_with_offset"]["f1"]
         ),
-        "frame_f1": abs(
-            direct_golden["frame"]["f1"]
-            - packaged_golden["frame"]["f1"]
-        ),
+        "frame_f1": abs(direct_golden["frame"]["f1"] - packaged_golden["frame"]["f1"]),
         "matched_velocity_mae": abs(
             direct_golden["matched_velocity_mae"]
             - packaged_golden["matched_velocity_mae"]
         ),
         "final_note_count_relative": (
-            abs(len(direct_notes) - len(packaged_notes))
-            / golden_note_denominator
+            abs(len(direct_notes) - len(packaged_notes)) / golden_note_denominator
         ),
     }
     acceptance_thresholds = {
         "event_relative_delta_max": MAX_EVENT_RELATIVE_DELTA,
         "pairwise_onset_f1_min": MIN_PAIRWISE_ONSET_F1,
-        "pairwise_note_with_offset_f1_min": (
-            MIN_PAIRWISE_NOTE_OFFSET_F1
-        ),
+        "pairwise_note_with_offset_f1_min": (MIN_PAIRWISE_NOTE_OFFSET_F1),
         "pairwise_frame_f1_min": MIN_PAIRWISE_FRAME_F1,
         "pairwise_velocity_mae_max": MAX_PAIRWISE_VELOCITY_MAE,
         "golden_onset_f1_delta_max": MAX_GOLDEN_ONSET_F1_DELTA,
-        "golden_note_with_offset_f1_delta_max": (
-            MAX_GOLDEN_NOTE_OFFSET_F1_DELTA
-        ),
+        "golden_note_with_offset_f1_delta_max": (MAX_GOLDEN_NOTE_OFFSET_F1_DELTA),
         "golden_frame_f1_delta_max": MAX_GOLDEN_FRAME_F1_DELTA,
-        "golden_velocity_mae_delta_max": (
-            MAX_GOLDEN_VELOCITY_MAE_DELTA
-        ),
-        "golden_note_count_relative_delta_max": (
-            MAX_GOLDEN_NOTE_COUNT_RELATIVE_DELTA
-        ),
+        "golden_velocity_mae_delta_max": (MAX_GOLDEN_VELOCITY_MAE_DELTA),
+        "golden_note_count_relative_delta_max": (MAX_GOLDEN_NOTE_COUNT_RELATIVE_DELTA),
     }
     comparisons = {
         "source": packaged["source"] == direct["source"],
@@ -457,26 +504,18 @@ def compare_replays(
             <= MAX_EVENT_RELATIVE_DELTA
         ),
         "pairwise_musical_floor": (
-            musical_tolerance["onset_f1_50_ms"]
-            >= MIN_PAIRWISE_ONSET_F1
-            and musical_tolerance["onset_f1_25_ms"]
-            >= MIN_PAIRWISE_ONSET_F1
-            and musical_tolerance["note_with_offset_f1"]
-            >= MIN_PAIRWISE_NOTE_OFFSET_F1
-            and musical_tolerance["frame_f1"]
-            >= MIN_PAIRWISE_FRAME_F1
-            and musical_tolerance["matched_velocity_mae"]
-            <= MAX_PAIRWISE_VELOCITY_MAE
+            musical_tolerance["onset_f1_50_ms"] >= MIN_PAIRWISE_ONSET_F1
+            and musical_tolerance["onset_f1_25_ms"] >= MIN_PAIRWISE_ONSET_F1
+            and musical_tolerance["note_with_offset_f1"] >= MIN_PAIRWISE_NOTE_OFFSET_F1
+            and musical_tolerance["frame_f1"] >= MIN_PAIRWISE_FRAME_F1
+            and musical_tolerance["matched_velocity_mae"] <= MAX_PAIRWISE_VELOCITY_MAE
         ),
         "golden_quality_delta": (
-            golden_quality_delta["onset_f1_50_ms"]
-            <= MAX_GOLDEN_ONSET_F1_DELTA
-            and golden_quality_delta["onset_f1_25_ms"]
-            <= MAX_GOLDEN_ONSET_F1_DELTA
+            golden_quality_delta["onset_f1_50_ms"] <= MAX_GOLDEN_ONSET_F1_DELTA
+            and golden_quality_delta["onset_f1_25_ms"] <= MAX_GOLDEN_ONSET_F1_DELTA
             and golden_quality_delta["note_with_offset_f1"]
             <= MAX_GOLDEN_NOTE_OFFSET_F1_DELTA
-            and golden_quality_delta["frame_f1"]
-            <= MAX_GOLDEN_FRAME_F1_DELTA
+            and golden_quality_delta["frame_f1"] <= MAX_GOLDEN_FRAME_F1_DELTA
             and golden_quality_delta["matched_velocity_mae"]
             <= MAX_GOLDEN_VELOCITY_MAE_DELTA
             and golden_quality_delta["final_note_count_relative"]
@@ -501,14 +540,16 @@ def compare_replays(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="python -m atpiano.desktop_validation"
-    )
+    parser = argparse.ArgumentParser(prog="python -m atpiano.desktop_validation")
     commands = parser.add_subparsers(dest="command", required=True)
     packaged = commands.add_parser("packaged-replay")
     packaged.add_argument("--app", type=Path, required=True)
     packaged.add_argument("--workspace", type=Path, required=True)
     packaged.add_argument("--report", type=Path, required=True)
+    packaged_score = commands.add_parser("packaged-score")
+    packaged_score.add_argument("--app", type=Path, required=True)
+    packaged_score.add_argument("--workspace", type=Path, required=True)
+    packaged_score.add_argument("--report", type=Path, required=True)
     direct = commands.add_parser("direct-replay")
     direct.add_argument("--runtime-root", type=Path, required=True)
     direct.add_argument("--workspace", type=Path, required=True)
@@ -524,15 +565,17 @@ def run(arguments: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(arguments)
     if args.command == "packaged-replay":
         report = run_packaged_replay(args.app, args.workspace)
+    elif args.command == "packaged-score":
+        report = run_packaged_replay(
+            args.app,
+            args.workspace,
+            render_score=True,
+        )
     elif args.command == "direct-replay":
         report = run_direct_replay(args.runtime_root, args.workspace)
     else:
-        packaged = json.loads(
-            args.packaged_report.read_text(encoding="utf-8")
-        )
-        direct = json.loads(
-            args.direct_report.read_text(encoding="utf-8")
-        )
+        packaged = json.loads(args.packaged_report.read_text(encoding="utf-8"))
+        direct = json.loads(args.direct_report.read_text(encoding="utf-8"))
         report = compare_replays(packaged, direct)
     write_json(args.report, report)
     print(

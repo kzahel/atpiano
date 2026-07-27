@@ -5,17 +5,33 @@ script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repository_root="$(cd "${script_directory}/.." && pwd)"
 runtime_root="${repository_root}/app/src-tauri/resources/desktop-runtime"
 report_root="${repository_root}/results/desktop-phase5"
+internal_report_root="${repository_root}/results/desktop-internal-score"
 app_bundle="${repository_root}/app/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Atpiano.app"
+internal_app_bundle="${internal_report_root}/Atpiano-Internal-Score.app"
 tauri_target="${repository_root}/app/src-tauri/target"
 review_archive="${report_root}/Atpiano-R5-macos-arm64-unsigned.zip"
 
 stage_runtime() {
-  mkdir -p "${report_root}"
+  local mode="${1:-ordinary}"
+  local output_report="${report_root}/stage-report.json"
+  local extra_arguments=()
+  if [[ "${mode}" == "internal-score" ]]; then
+    mkdir -p "${internal_report_root}"
+    output_report="${internal_report_root}/stage-report.json"
+    extra_arguments=(
+      --include-internal-score-runtime
+      --score-runtime-source
+      "${repository_root}/results/midi2score-runtime"
+    )
+  else
+    mkdir -p "${report_root}"
+  fi
   (
     cd "${repository_root}"
     uv run python -m atpiano.desktop_packaging stage \
       --output "${runtime_root}" \
-      --report "${report_root}/stage-report.json"
+      --report "${output_report}" \
+      "${extra_arguments[@]}"
   )
 }
 
@@ -25,7 +41,8 @@ unlock_generated_outputs() {
     "${tauri_target}/debug/desktop-runtime" \
     "${tauri_target}/release/desktop-runtime" \
     "${tauri_target}/aarch64-apple-darwin/release/desktop-runtime" \
-    "${app_bundle}"
+    "${app_bundle}" \
+    "${internal_app_bundle}"
   do
     if [[ -d "${generated}" ]]; then
       chmod -R u+w "${generated}"
@@ -37,8 +54,19 @@ case "${1:-}" in
   stage)
     stage_runtime
     ;;
+  stage-internal-score)
+    stage_runtime internal-score
+    ;;
   dev)
     stage_runtime
+    unlock_generated_outputs
+    (
+      cd "${repository_root}/app"
+      ATPIANO_DESKTOP_RUNTIME_ROOT="${runtime_root}" npx tauri dev
+    )
+    ;;
+  dev-internal-score)
+    stage_runtime internal-score
     unlock_generated_outputs
     (
       cd "${repository_root}/app"
@@ -70,6 +98,29 @@ case "${1:-}" in
     )
     printf '%s\n' "${app_bundle}"
     ;;
+  build-internal-score)
+    stage_runtime internal-score
+    unlock_generated_outputs
+    (
+      cd "${repository_root}/app"
+      npx tauri build \
+        --target aarch64-apple-darwin \
+        --bundles app \
+        --no-sign
+    )
+    mkdir -p "${internal_report_root}"
+    rm -rf "${internal_app_bundle}"
+    ditto --norsrc --noextattr --noqtn --noacl \
+      "${app_bundle}" \
+      "${internal_app_bundle}"
+    (
+      cd "${repository_root}"
+      uv run python -m atpiano.desktop_packaging audit \
+        --root "${internal_app_bundle}" \
+        --report "${internal_report_root}/bundle-audit.json"
+    )
+    printf '%s\n' "${internal_app_bundle}"
+    ;;
   audit)
     (
       cd "${repository_root}"
@@ -78,8 +129,19 @@ case "${1:-}" in
         --report "${report_root}/bundle-audit.json"
     )
     ;;
+  audit-internal-score)
+    (
+      cd "${repository_root}"
+      uv run python -m atpiano.desktop_packaging audit \
+        --root "${internal_app_bundle}" \
+        --report "${internal_report_root}/bundle-audit.json"
+    )
+    ;;
   *)
-    printf 'usage: %s {stage|dev|build|audit}\n' "$0" >&2
+    printf '%s\n' \
+      "usage: $0 {stage|dev|build|audit|stage-internal-score|" \
+      "dev-internal-score|build-internal-score|" \
+      "audit-internal-score}" >&2
     exit 2
     ;;
 esac

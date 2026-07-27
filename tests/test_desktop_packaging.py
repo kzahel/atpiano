@@ -11,6 +11,7 @@ from atpiano.desktop_packaging import (
     _audit_anonymous_caches,
     _audit_distributions,
     _audit_symlinks,
+    _internal_score_policy,
     _prune_distribution_test_material,
     _stage_fixture,
     archive_component_inventory,
@@ -22,11 +23,7 @@ from atpiano.desktop_packaging import (
 
 def _fake_site_packages(root: Path) -> Path:
     basic_pitch = (
-        root
-        / "basic_pitch"
-        / "saved_models"
-        / "icassp_2022"
-        / "nmp.mlpackage"
+        root / "basic_pitch" / "saved_models" / "icassp_2022" / "nmp.mlpackage"
     )
     basic_pitch.mkdir(parents=True)
     (basic_pitch / "model.mlmodel").write_bytes(b"basic-pitch")
@@ -46,9 +43,7 @@ def test_model_pack_is_separated_and_verified(tmp_path: Path) -> None:
     assert pack.model_pack_id == "atpiano-cpu-models-2026.07"
     assert not (site_packages / "transkun" / "pretrained").exists()
     assert not (site_packages / "basic_pitch" / "saved_models").exists()
-    assert load_model_pack(
-        runtime / "model-pack" / "model-pack.json"
-    ) == pack
+    assert load_model_pack(runtime / "model-pack" / "model-pack.json") == pack
     summary = inventory(runtime)
     assert summary["file_count"] == 4
     assert summary["total_bytes"] > 0
@@ -84,21 +79,62 @@ def test_bundle_audit_rejects_accelerator_and_score_assets(
         )
 
 
+def test_internal_score_assets_require_explicit_policy(
+    tmp_path: Path,
+) -> None:
+    score_root = tmp_path / "score-runtime"
+    score_root.mkdir()
+    (score_root / "MIDI2ScoreTF.ckpt").write_bytes(b"score")
+
+    _audit_distributions(
+        tmp_path,
+        [{"name": "torch", "version": "2"}],
+        allow_internal_score_runtime=True,
+    )
+    outside = tmp_path / "MIDI2ScoreTF.ckpt"
+    outside.write_bytes(b"score")
+    with pytest.raises(RuntimeError, match="score runtime asset"):
+        _audit_distributions(
+            tmp_path,
+            [{"name": "torch", "version": "2"}],
+            allow_internal_score_runtime=True,
+        )
+
+
+def test_internal_score_policy_blocks_distribution() -> None:
+    policy = _internal_score_policy(
+        {
+            "internal_score_runtime": {
+                "enabled": True,
+                "internal_only": True,
+                "public_distribution": False,
+            }
+        }
+    )
+
+    assert policy["enabled"] is True
+    with pytest.raises(RuntimeError, match="policy is unsafe"):
+        _internal_score_policy(
+            {
+                "internal_score_runtime": {
+                    "enabled": True,
+                    "internal_only": True,
+                    "public_distribution": True,
+                }
+            }
+        )
+
+
 def test_model_pack_manifest_has_no_absolute_paths(tmp_path: Path) -> None:
     site_packages = _fake_site_packages(tmp_path / "site-packages")
     runtime = tmp_path / "runtime"
 
     stage_model_pack(site_packages, runtime)
     document = json.loads(
-        (runtime / "model-pack" / "model-pack.json").read_text(
-            encoding="utf-8"
-        )
+        (runtime / "model-pack" / "model-pack.json").read_text(encoding="utf-8")
     )
 
-    assert all(
-        not Path(asset["path"]).is_absolute()
-        for asset in document["assets"]
-    )
+    assert all(not Path(asset["path"]).is_absolute() for asset in document["assets"])
 
 
 def test_desktop_stages_the_golden_musical_fixture(
@@ -107,9 +143,7 @@ def test_desktop_stages_the_golden_musical_fixture(
     _stage_fixture(tmp_path)
 
     manifest = json.loads(
-        (tmp_path / "fixture" / "input.json").read_text(
-            encoding="utf-8"
-        )
+        (tmp_path / "fixture" / "input.json").read_text(encoding="utf-8")
     )
 
     assert manifest["input_id"] == "deterministic-musical-loop-v1"
@@ -127,6 +161,7 @@ def test_component_inventory_reconciles_staged_runtime(
         "lib/media/libcodec.dylib",
         "lib/python3.10/site-packages/example/module.py",
         "model-pack/model-pack.json",
+        "score-runtime/runtime.json",
     )
     for relative in paths:
         target = tmp_path / relative
@@ -138,6 +173,7 @@ def test_component_inventory_reconciles_staged_runtime(
     assert summary["installed_bytes"] == inventory(tmp_path)["total_bytes"]
     assert set(summary["categories"]) == {
         "golden_replay_fixture",
+        "internal_score_runtime",
         "media_tools",
         "model_pack",
         "python_packages",
@@ -158,9 +194,7 @@ def test_distribution_test_namespaces_are_pruned(
     keep = tmp_path / "example" / "module.py"
     remove = tmp_path / "example" / "tests" / "test_module.py"
     required = tmp_path / "torch" / "testing" / "_comparison.py"
-    required_internal = (
-        tmp_path / "torch" / "testing" / "_internal" / "test_case.py"
-    )
+    required_internal = tmp_path / "torch" / "testing" / "_internal" / "test_case.py"
     keep.parent.mkdir(parents=True)
     remove.parent.mkdir(parents=True)
     required.parent.mkdir(parents=True)
@@ -181,6 +215,29 @@ def test_distribution_test_namespaces_are_pruned(
     assert required_internal.is_file()
 
 
+def test_score_runtime_retains_music21_import_namespace(
+    tmp_path: Path,
+) -> None:
+    from atpiano.desktop_packaging import (
+        REQUIRED_SCORE_TEST_NAMESPACES,
+    )
+
+    music21_test = tmp_path / "music21" / "test" / "testRunner.py"
+    unrelated = tmp_path / "example" / "test" / "helper.py"
+    music21_test.parent.mkdir(parents=True)
+    unrelated.parent.mkdir(parents=True)
+    music21_test.write_text("value = 1\n", encoding="utf-8")
+    unrelated.write_text("value = 1\n", encoding="utf-8")
+
+    _prune_distribution_test_material(
+        tmp_path,
+        required_namespaces=REQUIRED_SCORE_TEST_NAMESPACES,
+    )
+
+    assert music21_test.is_file()
+    assert not unrelated.parent.exists()
+
+
 def test_archive_component_inventory_accounts_for_container(
     tmp_path: Path,
 ) -> None:
@@ -191,8 +248,7 @@ def test_archive_component_inventory_accounts_for_container(
             b"shell",
         )
         zipped.writestr(
-            "Atpiano.app/Contents/Resources/desktop-runtime/"
-            "model-pack/model-pack.json",
+            "Atpiano.app/Contents/Resources/desktop-runtime/model-pack/model-pack.json",
             b"model",
         )
         zipped.writestr(
@@ -204,12 +260,10 @@ def test_archive_component_inventory_accounts_for_container(
 
     assert summary["archive_bytes"] == archive.stat().st_size
     assert summary["container_overhead_bytes"] > 0
-    assert summary["categories"][
-        "rust_shell_and_embedded_frontend"
-    ]["uncompressed_bytes"] == len(b"shell")
-    assert summary["categories"]["model_pack"][
+    assert summary["categories"]["rust_shell_and_embedded_frontend"][
         "uncompressed_bytes"
-    ] == len(b"model")
-    assert summary["categories"]["archive_metadata"][
-        "uncompressed_bytes"
-    ] == len(b"metadata")
+    ] == len(b"shell")
+    assert summary["categories"]["model_pack"]["uncompressed_bytes"] == len(b"model")
+    assert summary["categories"]["archive_metadata"]["uncompressed_bytes"] == len(
+        b"metadata"
+    )
