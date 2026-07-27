@@ -15,9 +15,10 @@ import subprocess
 import tempfile
 import urllib.error
 import urllib.request
+import zipfile
 from collections import deque
 from collections.abc import Sequence
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from atpiano.desktop import MODEL_PACK_SCHEMA, ModelPack
@@ -28,7 +29,7 @@ PYTHON_KEY = "cpython-3.10.19-macos-aarch64-none"
 PYTHON_VERSION = "3.10.19"
 MODEL_PACK_ID = "atpiano-cpu-models-2026.07"
 BUNDLE_MANIFEST_SCHEMA = "atpiano.desktop-bundle.v1"
-BUNDLE_AUDIT_SCHEMA = "atpiano.desktop-bundle-audit.v1"
+BUNDLE_AUDIT_SCHEMA = "atpiano.desktop-bundle-audit.v2"
 SYSTEM_LOAD_PREFIXES = ("/System/Library/", "/usr/lib/")
 FORBIDDEN_DISTRIBUTION_PREFIXES = (
     "cuda-",
@@ -831,28 +832,14 @@ def component_inventory(root: Path) -> dict[str, Any]:
             else:
                 category = "app_metadata"
         else:
-            parts = runtime_relative.parts
-            if parts[:1] == ("model-pack",):
-                category = "model_pack"
-            elif parts[:1] == ("fixture",):
-                category = "golden_replay_fixture"
-            elif parts[:3] == (
-                "lib",
-                "python3.10",
-                "site-packages",
-            ):
-                category = "python_packages"
+            category = _runtime_component_category(
+                runtime_relative.parts
+            )
+            if category == "python_packages":
+                parts = runtime_relative.parts
                 lowered = {part.lower() for part in parts[3:]}
                 if lowered & {"test", "tests", "testing"}:
                     test_material.append(path)
-            elif (
-                parts[:2] == ("lib", "media")
-                or runtime_relative.as_posix()
-                in {"bin/ffmpeg", "bin/ffprobe"}
-            ):
-                category = "media_tools"
-            else:
-                category = "python_runtime_and_manifest"
         record(category, path)
 
     installed_bytes = sum(
@@ -887,6 +874,88 @@ def component_inventory(root: Path) -> dict[str, Any]:
                 "imports require them; development distributions excluded"
             ),
         },
+    }
+
+
+def _runtime_component_category(parts: tuple[str, ...]) -> str:
+    if parts[:1] == ("model-pack",):
+        return "model_pack"
+    if parts[:1] == ("fixture",):
+        return "golden_replay_fixture"
+    if parts[:3] == (
+        "lib",
+        "python3.10",
+        "site-packages",
+    ):
+        return "python_packages"
+    if (
+        parts[:2] == ("lib", "media")
+        or parts in {("bin", "ffmpeg"), ("bin", "ffprobe")}
+    ):
+        return "media_tools"
+    return "python_runtime_and_manifest"
+
+
+def archive_component_inventory(archive: Path) -> dict[str, Any]:
+    categories: dict[str, dict[str, int]] = {}
+    entry_count = 0
+    payload_compressed_bytes = 0
+    payload_uncompressed_bytes = 0
+    with zipfile.ZipFile(archive) as zipped:
+        for info in zipped.infolist():
+            entry_count += 1
+            if info.is_dir():
+                continue
+            parts = PurePosixPath(info.filename).parts
+            if not parts or parts[0] == "__MACOSX":
+                category = "archive_metadata"
+            else:
+                try:
+                    app_index = parts.index("Atpiano.app")
+                except ValueError:
+                    category = "archive_metadata"
+                else:
+                    relative = parts[app_index + 1 :]
+                    runtime_prefix = (
+                        "Contents",
+                        "Resources",
+                        "desktop-runtime",
+                    )
+                    if relative[:3] == runtime_prefix:
+                        category = _runtime_component_category(
+                            relative[3:]
+                        )
+                    elif relative[:2] == ("Contents", "MacOS"):
+                        category = (
+                            "rust_shell_and_embedded_frontend"
+                        )
+                    elif relative[:2] == ("Contents", "Resources"):
+                        category = "app_resources"
+                    else:
+                        category = "app_metadata"
+            entry = categories.setdefault(
+                category,
+                {
+                    "compressed_bytes": 0,
+                    "uncompressed_bytes": 0,
+                    "file_count": 0,
+                },
+            )
+            entry["compressed_bytes"] += info.compress_size
+            entry["uncompressed_bytes"] += info.file_size
+            entry["file_count"] += 1
+            payload_compressed_bytes += info.compress_size
+            payload_uncompressed_bytes += info.file_size
+    archive_bytes = archive.stat().st_size
+    return {
+        "archive_bytes": archive_bytes,
+        "entry_count": entry_count,
+        "payload_compressed_bytes": payload_compressed_bytes,
+        "payload_uncompressed_bytes": payload_uncompressed_bytes,
+        "container_overhead_bytes": (
+            archive_bytes - payload_compressed_bytes
+        ),
+        "categories": categories,
     }
 
 
@@ -961,6 +1030,7 @@ def audit_root(
         if not archive.is_file():
             raise RuntimeError("desktop review archive is missing")
         compressed_bytes = archive.stat().st_size
+        compressed_components = archive_component_inventory(archive)
         result["archive"] = {
             "path": str(archive),
             "format": "zip",
@@ -969,6 +1039,7 @@ def audit_root(
             "compression_ratio": (
                 compressed_bytes / components["installed_bytes"]
             ),
+            "components": compressed_components,
         }
     return result
 

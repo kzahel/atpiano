@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from atpiano.desktop_packaging import (
     _audit_distributions,
     _audit_symlinks,
     _stage_fixture,
+    archive_component_inventory,
     component_inventory,
     inventory,
     stage_model_pack,
@@ -147,3 +149,37 @@ def test_bundle_audit_rejects_anonymous_cache(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="anonymous cache"):
         _audit_anonymous_caches(tmp_path)
+
+
+def test_archive_component_inventory_accounts_for_container(
+    tmp_path: Path,
+) -> None:
+    archive = tmp_path / "Atpiano.zip"
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zipped:
+        zipped.writestr(
+            "Atpiano.app/Contents/MacOS/atpiano-desktop",
+            b"shell",
+        )
+        zipped.writestr(
+            "Atpiano.app/Contents/Resources/desktop-runtime/"
+            "model-pack/model-pack.json",
+            b"model",
+        )
+        zipped.writestr(
+            "__MACOSX/Atpiano.app/Contents/._Info.plist",
+            b"metadata",
+        )
+
+    summary = archive_component_inventory(archive)
+
+    assert summary["archive_bytes"] == archive.stat().st_size
+    assert summary["container_overhead_bytes"] > 0
+    assert summary["categories"][
+        "rust_shell_and_embedded_frontend"
+    ]["uncompressed_bytes"] == len(b"shell")
+    assert summary["categories"]["model_pack"][
+        "uncompressed_bytes"
+    ] == len(b"model")
+    assert summary["categories"]["archive_metadata"][
+        "uncompressed_bytes"
+    ] == len(b"metadata")

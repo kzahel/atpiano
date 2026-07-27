@@ -57,7 +57,7 @@ case "${1:-}" in
     )
     archive_staging="${review_archive}.tmp"
     rm -f "${archive_staging}"
-    ditto -c -k --sequesterRsrc --keepParent \
+    ditto -c -k --norsrc --noextattr --noqtn --noacl --keepParent \
       "${app_bundle}" \
       "${archive_staging}"
     mv -f "${archive_staging}" "${review_archive}"
