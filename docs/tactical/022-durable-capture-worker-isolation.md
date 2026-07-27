@@ -8,10 +8,10 @@ Topic: multi-tenant-hybrid-service-architecture
 
 Topic: long-session-storage-retention
 
-Status: **implemented and locally validated on 2026-07-26; mandatory x86_64
-Linux acceptance remains open.** This is the first Phase 4 implementation
-slice and must pass that host review before the remaining extraction in
-[`017-python-application-core.md`](017-python-application-core.md).
+Status: **implemented locally on 2026-07-26; the decisive x86_64 Linux profile,
+60-second browser, saturated-worker, Stop, reload, and settlement checks passed
+on 2026-07-27. A multi-hour real-model soak remains open.** This is the first
+Phase 4 implementation slice.
 
 ## Entry Evidence
 
@@ -275,7 +275,66 @@ Such an interruption now preserves and labels the recording but requires
 correction to be rerun. Browser reload while the server remains alive does
 continue to observe healthy settlement.
 
-Do not mark this tactical complete or resume Tactical 017 until the mandatory
-Linux checks above establish that the real browser head no longer develops
-decode-shaped ingest plateaus and that Basic Pitch remains responsive while
-the isolated Transkun worker is saturated.
+### Linux validation on 2026-07-27
+
+The locked corrected environment and frontend install succeeded. At revision
+`2d1e89a`, the migration report at
+`results/migration-regression/20260727T042657Z/report.json` passed 121 Python
+tests, retained JavaScript, generated contracts, TypeScript, Ruff, JavaScript
+syntax, and whitespace. It failed only three of 44 Vitest tests in the later
+score-job UI path because the expected **Refresh score** control was absent.
+The independent production build passed with the existing OSMD chunk warning.
+
+The Linux capability run retained
+`results/backend-profile/backend-profile.json`, profile ID
+`3616915c6b4dea54dcd617bd74e3b034634c8edcea505159ffcace550b3a18f9`.
+Its isolated two-thread CPU worker warmed in 12.967 seconds and completed ten
+decodes over 84 seconds of source. Decode wall time was 180.235 seconds total,
+18.024 seconds mean, and 19.491 seconds maximum. The 2.146 service ratio
+selected **after-Stop**. The measurement recorded 11 worker requests, a live
+worker process, the two-thread limit, and exact model, checkpoint, fixture, and
+scheduler identities. Linux scheduling was the ordinary `TS` class at nice
+zero and priority 19; no extra real-time or nice priority was configured.
+
+Headless Chrome then exercised the real React, `getUserMedia`, AudioWorklet,
+binary WebSocket, Basic Pitch, Transkun, Stop, HTTP read, reload, and export
+paths. Selected-profile session
+`20260727T043430-8b3224f1bc1f` accepted 2,913,280 frames in 1,423 blocks,
+60.693 seconds of source in 60.687 seconds of capture wall time. After initial
+model startup, the largest retained interval between advancing audio horizons
+was 0.296 seconds rather than the old 16–24 second decode plateaus. Ingest
+acceptance took 0.165 seconds total and 4.998 ms maximum.
+
+After-Stop mode correctly ran no Transkun decode during capture. Basic Pitch
+ran 236 bounded preview jobs, took 11.596 seconds total and 87.5 ms maximum,
+and ended 51,072 frames behind the audio head. Stop became durably
+`stopping` in 0.257 seconds. An immediate browser reload showed **Capture
+complete; correction is settling**. Seven later Transkun decodes took 132.431
+seconds total and 20.562 seconds maximum, caught up from durable audio older
+than the 40-second memory ring, and completed MIDI, history, and playback
+exports.
+
+Transport evidence recorded 1,423 sent blocks and 2,913,280 sent frames, equal
+to durable acceptance. The final block acknowledgement was still in flight at
+Stop, so the browser accurately retained 1,422 acknowledged blocks and
+2,912,256 acknowledged frames. The WebSocket buffered-byte high-water was
+4,144 and the value at Stop was zero. The two WAV segments contain exactly
+2,913,280 frames and both match their declared SHA-256 digests.
+
+A second explicit delayed-mode diagnostic exercised live contention. Session
+`20260727T044027-210f74fcc27b` accepted 2,208,256 frames, or 46.005 seconds, in
+46.001 seconds of capture wall time. Its first live Transkun decode took
+14.566 seconds. Every one-second observation during contention advanced
+`H_audio` by at least 36,864 frames, Basic Pitch remained 1.0 second behind,
+and the largest steady retained audio-horizon interval was 0.282 seconds. At
+30.210 seconds the session demoted one way from delayed to after-Stop because
+the decode exceeded the eight-second maximum hop. Stop acknowledged in 0.258
+seconds, reload reattached to settlement, and five decodes eventually covered
+all accepted frames. The session completed with the explicit demotion reason,
+bounded pending state, checksummed audio and exports, and no temporary files.
+
+This establishes the decisive Linux worker-isolation contract and completes
+Tactical 023's real-host acceptance. Tactical 022 remains open only for its
+separately required multi-hour real-model soak. A consentful physical
+microphone review and automatic continuation across a full server-process exit
+also remain outside this result.

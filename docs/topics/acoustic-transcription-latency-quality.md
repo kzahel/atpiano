@@ -398,6 +398,21 @@ musical and target-piano validations did not enter degraded mode: their decode
 maxima stayed near 3.3 seconds. A fake slow-adapter test forces the transition
 without making a real-time claim from throughput alone.
 
+### Linux backend capability result
+
+The versioned Linux two-thread CPU profile used two continuous repetitions of
+the fixed musical fixture, or 84 seconds of source. After a 16-second-source
+warm-up, ten Transkun decodes took 180.235 seconds total, 18.024 seconds mean,
+and 19.491 seconds maximum. Its 2.146 service ratio selects after-Stop rather
+than delayed or live correction.
+
+A separate forced delayed Chrome run supplied the real-load demotion evidence.
+Its first live decode took 14.566 seconds, exceeding the eight-second maximum
+hop. PCM ingest and the one-second Basic Pitch preview lag remained responsive,
+then correction demoted one way to after-Stop and completed from durable audio.
+This is backend capability and scheduling evidence, not a change to the model,
+decoder, window, reconciliation policy, or quality claims above.
+
 ## Accepted Pipeline Boundary
 
 ```text

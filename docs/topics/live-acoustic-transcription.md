@@ -18,7 +18,9 @@ is now the first Phase 4 implementation slice; Tactical
 [`023-backend-capability-degradation.md`](../tactical/023-backend-capability-degradation.md)
 then selects an honest live, delayed, or after-Stop correction mode from
 isolated measurements. Their host-independent implementation now passes
-locally; the real Linux browser acceptance remains open.
+locally. The 2026-07-27 Linux profile selects after-Stop, and real Chrome
+acceptance now preserves real-time ingest, prompt Stop, reload settlement, and
+Basic Pitch responsiveness under a separately saturated Transkun worker.
 
 ## Scope And Relationship
 
@@ -231,13 +233,18 @@ rather than an orphan that blocks future capture.
 
 Sessions record live, delayed, after-Stop, or unavailable correction behavior.
 Automatic selection requires an exact matching versioned backend profile and
-otherwise uses after-Stop. A real two-thread Apple Silicon profile selected
-delayed; no inference about Linux follows from that result. Runtime evidence
-only demotes: missing the base or maximum scheduler budget moves correction
-toward delayed or after-Stop, while worker failure moves it to unavailable
-without stopping PCM or preview. The next action is the fixed Linux Chrome
-and capability-profile packet, not broader feature or application-core
-refactoring.
+otherwise uses after-Stop. The measured two-thread Linux profile has a 2.146
+service ratio and selects after-Stop. Its real Chrome session accepted 60.693
+source seconds in 60.687 wall seconds, acknowledged Stop in 0.257 seconds, and
+reattached after reload while seven Transkun decodes settled in the background.
+
+A separate forced delayed-mode Chrome session saturated Transkun during live
+capture. Its first decode took 14.566 seconds, but the audio head continued at
+capture cadence and Basic Pitch remained one second behind. Runtime evidence
+then demoted the session one way to after-Stop with the explicit eight-second
+maximum-hop reason. The session stopped promptly, reattached, and completed
+all accepted audio and exports. A multi-hour real-model soak and physical
+browser-microphone review remain open.
 
 ## Desired Experience
 

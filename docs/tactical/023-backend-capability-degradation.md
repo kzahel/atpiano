@@ -8,9 +8,9 @@ Topic: live-acoustic-transcription
 
 Topic: linux-development-portability
 
-Status: **profile artifact, automatic selection, explicit modes, and local
-real-model validation implemented on 2026-07-26. Linux measurement, browser
-acceptance, and selected-mode confirmation remain open.**
+Status: **complete on 2026-07-27. Profile identity, automatic selection,
+explicit modes, Linux real-model measurement, browser acceptance, and one-way
+real-load demotion are validated.**
 
 ## Outcome
 
@@ -147,8 +147,25 @@ Commit worker failure becomes unavailable while PCM capture and preview
 continue. No automatic promotion occurs within the session, each reason is
 retained, and a dead warmed worker is replaced before the next session.
 
-The remaining Linux packet must generate its own profile under controlled
-load, retain thread and worker evidence, and run the real Chrome capture in
-the selected conservative mode. It must also demonstrate the one-way
-demotion under real contention and confirm that the UI and retained session
-show the resulting mode without interrupting PCM acceptance.
+The Linux packet completed on 2026-07-27. Profile
+`3616915c6b4dea54dcd617bd74e3b034634c8edcea505159ffcace550b3a18f9`
+used the fixed two-repeat, 84-second musical source, Transkun 2.0.1 on CPU,
+and two Torch threads. Ten measured decodes took 180.235 seconds total,
+18.024 seconds mean, and 19.491 seconds maximum. Its 2.146 service ratio
+selected **after-Stop**, with the reason that decode service cannot keep up
+with continuous source audio.
+
+The matching-profile Chrome session retained that profile ID and mode,
+accepted 60.693 source seconds in 60.687 wall seconds, ran no commit inference
+during capture, acknowledged Stop in 0.257 seconds, survived an immediate
+reload, and settled seven real decodes from durable audio. A separate explicit
+delayed-mode diagnostic saturated Transkun during capture. Its 14.566-second
+first decode did not interrupt PCM acceptance or the one-second Basic Pitch
+preview lag, and the session demoted one way to after-Stop with the exact
+eight-second maximum-hop reason. Stop acknowledged in 0.258 seconds and the
+session completed every accepted frame and export.
+
+These results satisfy the real-host selection, user-visible mode, safe
+demotion, and preserved-capture acceptance criteria. They do not promote this
+Linux backend to delayed or live correction; after-Stop remains the measured
+automatic choice.

@@ -50,11 +50,12 @@ there as well. Chrome's fake-microphone path exposed slow correction blocking
 capture and exceeding the old Stop timeout. Model work is now isolated from
 durable PCM ingest, Stop promptly enters background settlement, and correction
 defaults to a measured capability profile or conservative after-Stop mode.
-Those changes pass local fake-worker and real Transkun checks but still require
-the Linux browser rerun. A consentful human browser-microphone review and Linux
-latency parity have not been validated. The internal score runtime installs,
-but its current source-to-score alignment guard exposes an ordering defect on
-the Linux result.
+The Linux rerun now confirms continuous ingest, responsive Basic Pitch under a
+saturated isolated Transkun worker, sub-second Stop acknowledgement, reload
+reattachment, and complete checksummed settlement. This host's measured
+two-thread CPU profile selects after-Stop correction. A consentful human
+browser-microphone review, a multi-hour real-model soak, and Linux latency
+parity have not been validated.
 
 Current direction and research questions live in [`docs/topics/`](docs/topics/README.md).
 Acoustic-model benchmarking, live browser transcription, and downstream

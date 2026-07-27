@@ -15,8 +15,10 @@ started. The Linux browser evidence subsequently made
 and
 [`023-backend-capability-degradation.md`](023-backend-capability-degradation.md)
 prerequisite Phase 4 slices. Their host-independent work has landed; this
-tactical remains paused for their mandatory Linux evidence. R4 remains the
-combined parity and storage-behavior review before Phase 5.
+tactical remains paused while Tactical 022's multi-hour real-model soak stays
+open. The decisive Linux profile, Chrome, saturated-worker, Stop, reload, and
+settlement checks passed on 2026-07-27, and Tactical 023 is complete. R4
+remains the combined parity and storage-behavior review before Phase 5.
 
 ## Entry Evidence
 
@@ -41,8 +43,9 @@ combined parity and storage-behavior review before Phase 5.
 - The former WebSocket ingest path invoked preview and commit lanes
   synchronously. Slow Transkun inference on Linux blocked PCM acceptance and
   exposed Stop settlement as transport failure. Tactical 022 has corrected
-  that call path locally; its mandatory Linux rerun must pass before this
-  broader extraction preserves the new behavior.
+  that call path and passed the decisive Linux browser rerun. Its separate
+  multi-hour real-model soak remains before broader extraction preserves the
+  new behavior.
 
 ## User-Visible Outcome
 

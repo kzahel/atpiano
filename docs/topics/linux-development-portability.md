@@ -2,16 +2,14 @@
 
 Topic: linux-development-portability
 
-Status: **the ordinary locked environment, full unattended regression gate,
-production frontend build, native PortAudio capture, Basic Pitch TFLite
-inference, real Transkun CPU correction, and a complete shared-workbench
-replay pass on x86_64 Linux as of 2026-07-26. The isolated internal score
-runtime installs, but real score generation is blocked by a source-note/MIDI
-ordering mismatch owned by the active score-alignment tactical. A real Chrome
-fake-microphone run also exposes correction backlog and a client Stop timeout
-when CPU inference shares the local server process. The host-independent
-worker, Stop, and measured-degradation changes now pass on macOS, but their
-mandatory Linux rerun has not happened.**
+Status: **the locked corrected environment, production build, Basic Pitch
+TFLite preview, isolated two-thread Transkun correction, measured automatic
+after-Stop selection, continuous Chrome fake-microphone ingest, prompt Stop,
+reload reattachment, and complete background settlement pass on x86_64 Linux
+as of 2026-07-27. A forced delayed run also preserves preview and ingest under
+saturated Transkun and demotes one way to after-Stop. The current regression
+report has three separate score-job UI test failures; a multi-hour real-model
+soak and consentful physical browser-microphone review remain open.**
 
 ## Scope
 
@@ -120,6 +118,9 @@ host:
 | Linux shared-workbench replay | 42.0 s | 5 | 54.353 / 10.871 / 11.647 s |
 | Linux direct replay repeat | 42.0 s | 5 | 84.480 / 16.896 / 23.162 s |
 | Linux Chrome fake-microphone capture | 63.21 s | 7 | 148.846 / 21.264 / 23.654 s |
+| Linux isolated backend profile | 84.0 s | 10 | 180.235 / 18.024 / 19.491 s |
+| Linux isolated after-Stop browser | 60.69 s | 7 | 132.431 / 18.919 / 20.562 s |
+| Linux isolated forced-delayed browser | 46.01 s | 5 | 92.760 / 18.552 / 20.658 s |
 
 The Apple run remains below the four-second base hop and therefore performs
 eight decodes. Linux crosses that hop on its first decode, enters the declared
@@ -199,45 +200,64 @@ runtime too.
 
 Tactical
 [`022-durable-capture-worker-isolation.md`](../tactical/022-durable-capture-worker-isolation.md)
-now owns the local implementation and a mandatory rerun on this host.
+owns the local implementation; the isolated rerun below closes the original
+browser scheduling blocker.
 Tactical
 [`023-backend-capability-degradation.md`](../tactical/023-backend-capability-degradation.md)
-owns the measured product mode. Until isolated worker execution demonstrates
-otherwise, this host should run Basic Pitch provisionally during capture and
-defer Transkun until after Stop.
+owns the measured product mode. It confirms that this host should run Basic
+Pitch provisionally during capture and defer Transkun until after Stop.
 
-## Host-Independent Remediation Awaiting Linux
+## Isolated Worker Linux Rerun
 
-The local implementation now keeps model calls out of the microphone ingest
-path. PCM is validated and durably appended before acknowledgement; bounded
-preview and commit scheduler threads call separately spawned, warmed model
-processes. A commit worker is limited to an explicit Torch thread count.
-Commit work that falls behind reads source ranges from segmented audio rather
-than relying on the memory ring.
+The fixed profile command completed with the two-repeat, 84-second musical
+source, Transkun 2.0.1 on CPU, and two Torch threads. Ten measured decodes took
+180.235 seconds total, 18.024 seconds mean, and 19.491 seconds maximum. The
+2.146 service ratio selected **after-Stop**. Profile
+`3616915c6b4dea54dcd617bd74e3b034634c8edcea505159ffcace550b3a18f9`
+retains the exact fixture, host, model, checkpoint, scheduler, thread, and raw
+timing identity. The worker used ordinary Linux `TS` scheduling at nice zero
+and priority 19; no real-time or nice override was configured.
 
-Stop now persists capture-complete `stopping` state and responds before
-correction or exports finish. Browser reload observes that same settlement
-through ordinary session and horizon APIs. The session retains pipeline lag
-and timing summaries, while browser Stop records sent and acknowledged
-frames and WebSocket buffered-byte high-water separately. A full server exit
-during settlement produces an explicit failed-but-recording-preserved session
-on restart; automatic continuation across process exit is not yet claimed.
+The matching-profile Chrome run accepted 2,913,280 frames in 1,423 blocks:
+60.693 source seconds in 60.687 capture wall seconds. After model startup, the
+largest interval between advancing retained audio horizons was 0.296 seconds,
+compared with the pre-fix 16–24 second plateaus. Durable block acceptance took
+0.165 seconds total and 4.998 ms maximum. Basic Pitch completed 236 jobs with
+an 87.5 ms maximum and ended 1.064 seconds behind the audio head.
 
-Automatic correction selection is conservative. With no exact matching
-versioned profile, the runtime starts Transkun only after Stop. The new
-profiling command records fixture, host, model/checkpoint, scheduler, thread
-limit, and raw decode timing samples. A real Apple Silicon run exercised the
-command and selected delayed correction, but a profile is host-specific and
-does not alter the Linux direction. Runtime evidence can only demote within a
-session: live becomes delayed after missing the base hop, live or delayed
-becomes after-Stop after missing the maximum hop, and worker failure becomes
-unavailable while capture and preview continue.
+After-Stop mode correctly deferred all Transkun work during capture. Stop
+became durably `stopping` in 0.257 seconds and an immediate browser reload
+reattached to visible settlement. Seven Transkun decodes then took 132.431
+seconds and settled from durable audio older than the 40-second memory ring.
+The final session contains all 2,913,280 frames, complete MIDI/history/playback
+exports, and two WAV segments whose frame counts and SHA-256 digests match
+their index.
 
-These changes remove the known synchronous call path by inspection and pass
-blocked-lane, durable-catch-up, worker-exit, prompt-Stop, transport-evidence,
-and frontend tests. Only the real Linux Chrome rerun can establish that
-native dependencies start, OS scheduling preserves preview responsiveness,
-and the browser source head no longer develops decode-shaped plateaus.
+Transport evidence distinguishes browser and pipeline state. Sent counts were
+1,423 blocks and 2,913,280 frames, exactly equal to durable acceptance. The
+final acknowledgement was still in flight at Stop, so the browser accurately
+retained 1,422 acknowledged blocks and 2,912,256 acknowledged frames. Socket
+buffering peaked at 4,144 bytes and was zero at Stop.
+
+A separate forced delayed-mode run established the saturated-worker case. Its
+first live Transkun decode took 14.566 seconds. Every one-second observation
+during contention advanced the audio head by at least 36,864 frames, while
+Basic Pitch remained 1.0 second behind. The session demoted at 30.210 seconds
+to after-Stop with the explicit maximum-hop reason. Stop acknowledged in 0.258
+seconds, reload reattached, and the final five decodes covered all 2,208,256
+accepted frames. Both browser workspaces retained bounded pending state and no
+temporary files.
+
+The current-tree migration report passed 121 Python tests, retained
+JavaScript, generated contracts, TypeScript, Ruff, JavaScript syntax, and
+whitespace. Three of 44 Vitest tests in the later score-job UI path failed
+because **Refresh score** was absent. The production build passed with the
+known OSMD chunk warning. This separate frontend result does not invalidate
+the real worker/capture evidence.
+
+A full server exit during settlement still produces an explicit
+failed-but-recording-preserved session on restart; automatic continuation
+across process exit is not claimed.
 
 ## Small Portability Fix
 
@@ -308,15 +328,9 @@ produced.
 
 ## Remaining Validation
 
-- Run the fixed Chrome fake-microphone acceptance first, then a consentful
-  human browser-microphone audition against an actual piano.
+- Run a consentful human browser-microphone audition against an actual piano.
 - Measure capture-to-event latency by stage on Linux; the accelerated checks
   above intentionally publish no latency claim.
-- Generate a Linux backend profile with a controlled thread count and
-  competing load recorded; confirm that it selects after-Stop unless new
-  evidence supports a less conservative mode.
-- Compare browser sent/acknowledged and WebSocket high-water with ingest
-  append timing, worker utilization, and correction lag.
 - Decide whether interrupted settlement must resume automatically across a
   full server-process restart; it is currently preserved as an explicit
   recoverable stage failure.
