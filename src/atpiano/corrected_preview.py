@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import time
 from collections import deque
+from collections.abc import Callable
 from math import gcd
 from pathlib import Path
 from typing import Any
@@ -58,6 +59,8 @@ class CorrectedPreviewLane:
         internal_commit_horizon_s: float = DEFAULT_COMMIT_HORIZON_S,
         native_retention_windows: int = DEFAULT_NATIVE_RETENTION_WINDOWS,
         identity_retention_s: float = DEFAULT_IDENTITY_RETENTION_S,
+        debug_enabled: bool = True,
+        debug_pruner: Callable[[], Any] | None = None,
     ) -> None:
         if hop_s <= 0:
             raise ValueError("preview hop must be positive")
@@ -71,6 +74,8 @@ class CorrectedPreviewLane:
         self.hop_s = hop_s
         self.internal_commit_horizon_s = internal_commit_horizon_s
         self.native_retention_windows = native_retention_windows
+        self.debug_enabled = debug_enabled
+        self._debug_pruner = debug_pruner
         self.identity_retention_frames = round(
             identity_retention_s * session.sample_rate_hz
         )
@@ -92,7 +97,8 @@ class CorrectedPreviewLane:
             session.directory / "diagnostics" / "lane-a"
         )
         self.raw_directory = self.diagnostics_directory / "windows"
-        self.raw_directory.mkdir(parents=True, exist_ok=True)
+        if self.debug_enabled:
+            self.raw_directory.mkdir(parents=True, exist_ok=True)
         self.raw_index_path = self.diagnostics_directory / "windows.jsonl"
         self.timing_path = self.diagnostics_directory / "timing.jsonl"
         self.gate_path = self.diagnostics_directory / "gate.jsonl"
@@ -177,6 +183,8 @@ class CorrectedPreviewLane:
         source_start: int,
         source_end: int,
     ) -> None:
+        if not self.debug_enabled:
+            return
         path = self.raw_directory / f"{self._window_index:08d}.npz"
         np.savez_compressed(path, **output_raw)
         self._native_paths.append(path)
@@ -407,8 +415,11 @@ class CorrectedPreviewLane:
             self._next_window_start_s += self.hop_s
             processed += 1
         self._emission_count += len(events)
-        _append_jsonl(self.timing_path, timing_rows)
-        _append_jsonl(self.gate_path, gate_rows)
+        if self.debug_enabled:
+            _append_jsonl(self.timing_path, timing_rows)
+            _append_jsonl(self.gate_path, gate_rows)
+            if self._debug_pruner is not None:
+                self._debug_pruner()
         self._prune_identities(session)
         return LaneUpdate(
             events=tuple(events),
@@ -431,13 +442,20 @@ class CorrectedPreviewLane:
 
     def finalize(self, session: CorrectedSession) -> LaneUpdate:
         self._prune_identities(session)
-        write_json(self.diagnostics_directory / "preview.json", self.status())
+        if self.debug_enabled:
+            write_json(
+                self.diagnostics_directory / "preview.json",
+                self.status(),
+            )
+            if self._debug_pruner is not None:
+                self._debug_pruner()
         return LaneUpdate(provisional_sample=self._last_provisional_sample)
 
     def status(self) -> dict[str, Any]:
         return {
             "schema_version": PREVIEW_LANE_SCHEMA,
             "name": self.name,
+            "debug_enabled": self.debug_enabled,
             "model": self.model.provenance(),
             "window": {
                 "duration_s": self.window_duration_s,

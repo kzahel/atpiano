@@ -228,7 +228,10 @@ class LocalSessionStore:
 
     def _available_artifact_kinds(self, directory: Path) -> tuple[ArtifactKind, ...]:
         kinds: list[ArtifactKind] = []
-        if any((directory / "audio").glob("*.wav")):
+        if (
+            any((directory / "audio").glob("*.wav"))
+            or any((directory / "playback").glob("*.mp3"))
+        ):
             kinds.append(ArtifactKind.AUDIO)
         if (directory / "exports" / "session.jsonl").is_file():
             kinds.append(ArtifactKind.EVENT_HISTORY)

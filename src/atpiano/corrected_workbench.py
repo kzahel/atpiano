@@ -31,12 +31,15 @@ from atpiano.adapters.local_sessions import (
     LocalSessionNotFoundError,
     LocalSessionStore,
 )
+from atpiano.adapters.local_storage import LocalStorageAdapter
 from atpiano.application import (
     ApplicationNotFoundError,
     ApplicationServices,
     CaptureApplicationService,
+    DebugRetentionPolicy,
     ScoreApplicationService,
     SessionApplicationService,
+    StorageApplicationService,
 )
 from atpiano.backend_profile import (
     BackendSchedulerIdentity,
@@ -65,7 +68,6 @@ from atpiano.corrected_export import (
     MAX_QUERY_LIMIT,
     query_history_index,
     query_materialized_index,
-    write_corrected_exports,
 )
 from atpiano.corrected_pipeline import CorrectedSessionPipeline
 from atpiano.live import LiveWindowModel, parse_pcm_block
@@ -148,6 +150,10 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         correction_mode: str = "auto",
         backend_profile_path: Path | None = None,
         public_origin: str | None = None,
+        compact_recordings: bool = False,
+        debug_retention: bool = False,
+        debug_byte_cap: int = 64 * 1024**2,
+        debug_max_age_s: float = 72 * 60 * 60,
     ) -> None:
         if minimum_free_bytes < 0:
             raise ValueError("minimum free bytes cannot be negative")
@@ -185,6 +191,15 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self.workspace_directory = workspace_directory.resolve()
         self.workspace_directory.mkdir(parents=True, exist_ok=True)
         self.session_store = LocalSessionStore(self.workspace_directory)
+        storage = StorageApplicationService(
+            LocalStorageAdapter(self.workspace_directory),
+            compact_recordings=compact_recordings,
+            debug_policy=DebugRetentionPolicy(
+                enabled=debug_retention,
+                byte_cap=debug_byte_cap,
+                max_age_s=debug_max_age_s,
+            ),
+        )
         self.preview_model_factory = preview_model_factory
         self.commit_model_factory = commit_model_factory
         self.minimum_free_bytes = minimum_free_bytes
@@ -233,8 +248,9 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             free_bytes=lambda: shutil.disk_usage(
                 self.workspace_directory
             ).free,
-            finalizer=self._finalize_microphone_session,
+            finalizer=storage.finalize_session,
             replay_source=replay_source,
+            storage=storage,
         )
         scores = ScoreApplicationService(
             self.session_store,
@@ -246,6 +262,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             capture=capture,
             sessions=sessions,
             scores=scores,
+            storage=storage,
         )
         super().__init__((bind, port), CorrectedWorkbenchHandler)
 
@@ -319,15 +336,6 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
 
     def public_state(self) -> dict[str, Any]:
         return self.application.capture.state()
-
-    def _finalize_microphone_session(
-        self,
-        session: CorrectedSession,
-    ) -> None:
-        write_corrected_exports(
-            session.directory,
-            allow_settling=True,
-        )
 
     def _runtime_state(self) -> dict[str, Any]:
         return self.application.scores.runtime_state()
@@ -1311,6 +1319,10 @@ def create_corrected_workbench_server(
     web_root: Path = WEB_ROOT,
     application_mode: str = "corrected-workbench-v2",
     public_origin: str | None = None,
+    compact_recordings: bool = False,
+    debug_retention: bool = False,
+    debug_byte_cap: int = 64 * 1024**2,
+    debug_max_age_s: float = 72 * 60 * 60,
 ) -> CorrectedWorkbenchServer:
     factory = commit_model_factory or partial(
         _default_commit_model,
@@ -1338,6 +1350,10 @@ def create_corrected_workbench_server(
         web_root=web_root,
         application_mode=application_mode,
         public_origin=public_origin,
+        compact_recordings=compact_recordings,
+        debug_retention=debug_retention,
+        debug_byte_cap=debug_byte_cap,
+        debug_max_age_s=debug_max_age_s,
     )
 
 
@@ -1361,6 +1377,10 @@ def serve_corrected_workbench(
     application_mode: str = "corrected-workbench-v2",
     application_label: str = "Corrected-note workspace",
     public_origin: str | None = None,
+    compact_recordings: bool = False,
+    debug_retention: bool = False,
+    debug_byte_cap: int = 64 * 1024**2,
+    debug_max_age_s: float = 72 * 60 * 60,
 ) -> None:
     server = create_corrected_workbench_server(
         workspace_directory,
@@ -1379,6 +1399,10 @@ def serve_corrected_workbench(
         web_root=web_root,
         application_mode=application_mode,
         public_origin=public_origin,
+        compact_recordings=compact_recordings,
+        debug_retention=debug_retention,
+        debug_byte_cap=debug_byte_cap,
+        debug_max_age_s=debug_max_age_s,
     )
     actual_port = server.server_address[1]
     local_host = "127.0.0.1" if bind in {"", "0.0.0.0"} else bind
@@ -1414,6 +1438,10 @@ def serve_shared_application(
     replay_realtime: bool = True,
     score_runtime: Path = Path("results/midi2score-runtime"),
     public_origin: str | None = None,
+    compact_recordings: bool = False,
+    debug_retention: bool = False,
+    debug_byte_cap: int = 64 * 1024**2,
+    debug_max_age_s: float = 72 * 60 * 60,
 ) -> None:
     repository_root = Path(__file__).resolve().parents[2]
     app_root = repository_root / "app"
@@ -1441,4 +1469,8 @@ def serve_shared_application(
         application_mode="shared-react-v3",
         application_label="Atpiano performance workspace",
         public_origin=public_origin,
+        compact_recordings=compact_recordings,
+        debug_retention=debug_retention,
+        debug_byte_cap=debug_byte_cap,
+        debug_max_age_s=debug_max_age_s,
     )

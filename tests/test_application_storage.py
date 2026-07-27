@@ -221,3 +221,31 @@ def test_debug_retention_rotates_oldest_unpinned_and_exports_pin(
     )
     assert archive.is_file()
     service.pin_debug(second_id, pinned=False)
+
+
+def test_recovery_removes_known_partial_without_touching_old_sessions(
+    tmp_path: Path,
+) -> None:
+    phase4_id = "20260727T100004-eeeeeeeeeeee"
+    old_id = "20260727T100005-ffffffffffff"
+    phase4 = _complete_session(tmp_path, phase4_id, frame_count=8)
+    old = _complete_session(tmp_path, old_id, frame_count=8)
+    initial = StorageApplicationService(LocalStorageAdapter(tmp_path))
+    initial.initialize_session(phase4_id)
+    partial = phase4.directory / "playback" / ".session.mp3"
+    partial.parent.mkdir()
+    partial.write_bytes(b"partial")
+    old_wavs = list((old.directory / "audio").glob("*.wav"))
+
+    restarted = StorageApplicationService(LocalStorageAdapter(tmp_path))
+
+    assert not partial.exists()
+    assert restarted.recovery_decisions == (
+        {
+            "session_id": phase4_id,
+            "action": "removed-partial-recording",
+            "byte_count": 7,
+        },
+    )
+    assert not (old.directory / "application.json").exists()
+    assert list((old.directory / "audio").glob("*.wav")) == old_wavs

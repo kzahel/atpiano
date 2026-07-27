@@ -4,6 +4,7 @@ import json
 import struct
 import wave
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -322,3 +323,36 @@ def test_corrected_replay_repeats_one_continuous_sample_clock(tmp_path: Path) ->
         "input",
     ]
     assert read_json(session_directory / "horizons.json")["audio_head_sample"] == 31
+
+
+def test_capture_refuses_a_new_segment_below_free_space_reserve(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = CorrectedSession(
+        tmp_path / "low-disk",
+        session_id="low-disk",
+        sample_rate_hz=8_000,
+        source="microphone",
+        minimum_free_bytes=100,
+    )
+    monkeypatch.setattr(
+        "atpiano.corrected.shutil.disk_usage",
+        lambda _path: SimpleNamespace(free=99),
+    )
+
+    with pytest.raises(OSError, match="before disk exhaustion"):
+        session.accept_pcm(
+            PcmBlock(
+                sequence=0,
+                first_sample=0,
+                frame_count=8,
+                sample_rate_hz=8_000,
+                page_sent_ms=0.0,
+                worklet_time_s=0.0,
+                pcm_s16le=b"\0\0" * 8,
+            ),
+            received_ns=1,
+        )
+
+    assert not list((session.directory / "audio").glob("*.wav"))

@@ -98,6 +98,12 @@ class StorageApplicationService:
             lane.name: lane.status()
             for lane in session.lanes
         }
+        commit = lanes.get("commit")
+        raw_retirement_ready = (
+            commit is None
+            or int(commit.get("commit_sample", -1))
+            == session.horizons.audio_head_sample
+        )
         status = {
             "schema_version": "atpiano.pipeline-status.v1",
             "application": {
@@ -129,6 +135,17 @@ class StorageApplicationService:
             ],
             "gaps": [],
             "errors": [],
+            "retention": {
+                "raw_retirement_ready": raw_retirement_ready,
+                "raw_retirement_blocker": (
+                    None
+                    if raw_retirement_ready
+                    else (
+                        "commit lane did not advance through the accepted "
+                        "source range"
+                    )
+                ),
+            },
         }
         self._backend.finalize_session(
             session.session_id,
@@ -144,11 +161,15 @@ class StorageApplicationService:
         duration_s: float,
         minimum_free_bytes: int,
     ) -> dict[str, Any]:
-        return self._backend.accounting(
+        report = self._backend.accounting(
             session_id=session_id,
             duration_s=duration_s,
             minimum_free_bytes=minimum_free_bytes,
         )
+        return {
+            **report,
+            "recovery_decisions": list(self.recovery_decisions),
+        }
 
     def prune_debug(self) -> dict[str, Any]:
         if not self.debug_policy.enabled:

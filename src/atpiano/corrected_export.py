@@ -308,8 +308,15 @@ def write_corrected_exports(
         raise ValueError("corrected export requires a stopped session")
     if status == "stopping":
         horizons = read_json(session_directory / "horizons.json")
-        if int(horizons.get("commit_sample", -1)) != int(
-            session["source_frame_count"]
+        processing = session.get("processing")
+        correction_unavailable = (
+            isinstance(processing, dict)
+            and processing.get("correction_mode") == "unavailable"
+        )
+        if (
+            int(horizons.get("commit_sample", -1))
+            != int(session["source_frame_count"])
+            and not correction_unavailable
         ):
             raise ValueError(
                 "corrected export requires the stopping commit horizon "
@@ -414,6 +421,13 @@ def write_playback_audio(
             text=True,
         )
         os.replace(temporary_path, final_path)
+        with final_path.open("rb") as handle:
+            os.fsync(handle.fileno())
+        directory_fd = os.open(playback_directory, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
     except (OSError, subprocess.CalledProcessError):
         temporary_path.unlink(missing_ok=True)
         return None

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
@@ -232,6 +233,8 @@ class CorrectedCommitLane:
         guard_s: float = DEFAULT_COMMIT_GUARD_S,
         minimum_context_s: float = DEFAULT_COMMIT_MIN_CONTEXT_S,
         onset_match_s: float = DEFAULT_COMMIT_ONSET_MATCH_S,
+        debug_enabled: bool = True,
+        debug_pruner: Callable[[], Any] | None = None,
     ) -> None:
         if not 0 < guard_s < buffer_s:
             raise ValueError("commit guard must be positive and shorter than buffer")
@@ -252,6 +255,8 @@ class CorrectedCommitLane:
         self.session_id = session.session_id
         self.source_sample_rate_hz = session.sample_rate_hz
         self.model = model
+        self.debug_enabled = debug_enabled
+        self._debug_pruner = debug_pruner
         self.buffer_frames = round(buffer_s * session.sample_rate_hz)
         self.base_hop_frames = round(hop_s * session.sample_rate_hz)
         self.maximum_hop_frames = round(
@@ -284,7 +289,8 @@ class CorrectedCommitLane:
         self.diagnostics_directory = (
             session.directory / "diagnostics" / "lane-b"
         )
-        self.diagnostics_directory.mkdir(parents=True, exist_ok=True)
+        if self.debug_enabled:
+            self.diagnostics_directory.mkdir(parents=True, exist_ok=True)
         self.decode_path = self.diagnostics_directory / "decodes.jsonl"
 
     def _new_id(self, event: CommitModelEvent, decode_index: int) -> str:
@@ -680,10 +686,11 @@ class CorrectedCommitLane:
         self._max_pending_count = max(self._max_pending_count, len(self._pending))
         self._inference_s.append(output.inference_s)
         self._decode_wall_s.append(decode_wall_s)
-        _append_jsonl(
-            self.decode_path,
-            [
-                {
+        if self.debug_enabled:
+            _append_jsonl(
+                self.decode_path,
+                [
+                    {
                     "schema_version": "atpiano.corrected-commit-decode.v1",
                     "decode_index": self._decode_index,
                     "source_start_sample": source_start,
@@ -701,9 +708,11 @@ class CorrectedCommitLane:
                     "degraded_mode": self.hop_frames > self.base_hop_frames,
                     "final": final,
                     "emitted_monotonic_ns": emitted_ns,
-                }
-            ],
-        )
+                    }
+                ],
+            )
+            if self._debug_pruner is not None:
+                self._debug_pruner()
         self._decode_index += 1
         return LaneUpdate(
             events=tuple(records),
@@ -758,7 +767,13 @@ class CorrectedCommitLane:
             decode_head=session.horizons.audio_head_sample,
             final=True,
         )
-        write_json(self.diagnostics_directory / "commit.json", self.status())
+        if self.debug_enabled:
+            write_json(
+                self.diagnostics_directory / "commit.json",
+                self.status(),
+            )
+            if self._debug_pruner is not None:
+                self._debug_pruner()
         return update
 
     def status(self) -> dict[str, Any]:
@@ -766,6 +781,7 @@ class CorrectedCommitLane:
         return {
             "schema_version": COMMIT_LANE_SCHEMA,
             "name": self.name,
+            "debug_enabled": self.debug_enabled,
             "model": self.model.provenance(),
             "scheduler": {
                 "buffer_frames": self.buffer_frames,

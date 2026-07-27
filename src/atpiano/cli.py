@@ -8,6 +8,34 @@ from collections.abc import Sequence
 from pathlib import Path
 
 
+def _add_storage_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--compact-recordings",
+        action="store_true",
+        help=(
+            "retain verified 128 kbps MP3 and retire new-session WAV "
+            "source after settlement"
+        ),
+    )
+    parser.add_argument(
+        "--debug-retention",
+        action="store_true",
+        help="retain bounded local model diagnostics (default: off)",
+    )
+    parser.add_argument(
+        "--debug-byte-cap-mib",
+        type=float,
+        default=64.0,
+        help="workspace debug byte cap when enabled (default: 64 MiB)",
+    )
+    parser.add_argument(
+        "--debug-max-age-hours",
+        type=float,
+        default=72.0,
+        help="unpinned debug maximum age when enabled (default: 72 hours)",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="atpiano",
@@ -249,6 +277,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("results/midi2score-runtime"),
         help="isolated MIDI2ScoreTransformer runtime directory",
     )
+    _add_storage_arguments(corrected_workbench_parser)
     shared_app_parser = subparsers.add_parser(
         "workbench-v3",
         help="run the shared React performance workspace",
@@ -334,6 +363,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("results/midi2score-runtime"),
         help="isolated MIDI2ScoreTransformer runtime directory",
     )
+    _add_storage_arguments(shared_app_parser)
     score_setup_parser = subparsers.add_parser(
         "setup-midi2score",
         help="install the internal MIDI2ScoreTransformer runtime",
@@ -488,6 +518,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             replay_silence_s=args.silence_seconds,
             replay_realtime=not args.no_wait,
             score_runtime=args.score_runtime,
+            compact_recordings=args.compact_recordings,
+            debug_retention=args.debug_retention,
+            debug_byte_cap=round(
+                args.debug_byte_cap_mib * 1024**2
+            ),
+            debug_max_age_s=(
+                args.debug_max_age_hours * 60 * 60
+            ),
         )
         return 0
     if args.command == "workbench-v3":
@@ -509,6 +547,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             replay_realtime=not args.no_wait,
             score_runtime=args.score_runtime,
             public_origin=args.public_origin,
+            compact_recordings=args.compact_recordings,
+            debug_retention=args.debug_retention,
+            debug_byte_cap=round(
+                args.debug_byte_cap_mib * 1024**2
+            ),
+            debug_max_age_s=(
+                args.debug_max_age_hours * 60 * 60
+            ),
         )
         return 0
     if args.command == "setup-midi2score":

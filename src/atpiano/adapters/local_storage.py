@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
+import threading
 import time
 import wave
 from collections.abc import Callable
@@ -55,6 +57,7 @@ class LocalStorageAdapter:
         )
         self._run = process_runner
         self._now = now
+        self._debug_lock = threading.Lock()
 
     def _session_directory(self, session_id: str) -> Path:
         directory = (self.workspace_directory / session_id).resolve()
@@ -73,7 +76,7 @@ class LocalStorageAdapter:
         debug_policy: DebugRetentionPolicy,
     ) -> None:
         directory = self._session_directory(session_id)
-        write_json(
+        self._write_durable_json(
             directory / "application.json",
             {
                 "schema_version": PHASE4_SESSION_SCHEMA,
@@ -88,6 +91,26 @@ class LocalStorageAdapter:
                 },
             },
         )
+
+    @staticmethod
+    def _write_durable_json(
+        path: Path,
+        document: dict[str, Any],
+    ) -> None:
+        write_json(path, document)
+        with path.open("rb") as handle:
+            try:
+                os.fsync(handle.fileno())
+            except OSError:
+                return
+        try:
+            directory_fd = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        except OSError:
+            return
 
     @staticmethod
     def _source_segments(
@@ -270,6 +293,7 @@ class LocalStorageAdapter:
         playback: dict[str, Any] | None,
         frame_count: int,
         sample_rate_hz: int,
+        retirement_blocker: str | None,
     ) -> dict[str, Any]:
         try:
             segments = self._source_segments(
@@ -290,7 +314,10 @@ class LocalStorageAdapter:
                 error=f"{type(error).__name__}: {error}",
                 raw_state="retained",
             )
-            write_json(directory / "recording.json", document)
+            self._write_durable_json(
+                directory / "recording.json",
+                document,
+            )
             return document
 
         if not compact_recording:
@@ -306,7 +333,29 @@ class LocalStorageAdapter:
                 error=None,
                 raw_state="retained",
             )
-            write_json(directory / "recording.json", document)
+            self._write_durable_json(
+                directory / "recording.json",
+                document,
+            )
+            return document
+
+        if retirement_blocker is not None:
+            document = self._recording_document(
+                state="incomplete",
+                session_id=session_id,
+                frame_count=frame_count,
+                sample_rate_hz=sample_rate_hz,
+                segments=segments,
+                playback=playback,
+                verification=None,
+                compact_enabled=True,
+                error=retirement_blocker,
+                raw_state="retained",
+            )
+            self._write_durable_json(
+                directory / "recording.json",
+                document,
+            )
             return document
 
         try:
@@ -343,7 +392,10 @@ class LocalStorageAdapter:
                 error=f"{type(error).__name__}: {error}",
                 raw_state="retained",
             )
-            write_json(directory / "recording.json", document)
+            self._write_durable_json(
+                directory / "recording.json",
+                document,
+            )
             return document
 
         enriched_playback = {
@@ -370,7 +422,10 @@ class LocalStorageAdapter:
             error=None,
             raw_state="retirement-pending",
         )
-        write_json(directory / "recording.json", pending)
+        self._write_durable_json(
+            directory / "recording.json",
+            pending,
+        )
         remaining: list[str] = []
         retirement_error: str | None = None
         try:
@@ -399,7 +454,10 @@ class LocalStorageAdapter:
         )
         if remaining:
             document["raw_source"]["remaining_paths"] = remaining
-        write_json(directory / "recording.json", document)
+        self._write_durable_json(
+            directory / "recording.json",
+            document,
+        )
         return document
 
     def finalize_session(
@@ -431,6 +489,18 @@ class LocalStorageAdapter:
             ),
             frame_count=frame_count,
             sample_rate_hz=sample_rate_hz,
+            retirement_blocker=(
+                str(
+                    status.get("retention", {}).get(
+                        "raw_retirement_blocker"
+                    )
+                )
+                if not status.get("retention", {}).get(
+                    "raw_retirement_ready",
+                    False,
+                )
+                else None
+            ),
         )
         if recording.get("recording") is not None:
             exports["playback"] = recording["recording"]
@@ -452,9 +522,42 @@ class LocalStorageAdapter:
                 "truncated": removed_bytes > 0,
             }
 
+        stage_errors = session.get("processing", {}).get(
+            "stage_errors",
+            {},
+        )
+        lane_statuses = status.get("lanes", {})
+        pipeline = session.get("pipeline")
         final_status = {
             **status,
+            "recorded_at": utc_now(),
             "final_state": "complete",
+            "versions": {
+                "application": status.get("application"),
+                "models": {
+                    name: lane.get("model")
+                    for name, lane in (
+                        lane_statuses.items()
+                        if isinstance(lane_statuses, dict)
+                        else ()
+                    )
+                    if isinstance(lane, dict)
+                },
+                "decoders": {
+                    name: lane.get("schema_version")
+                    for name, lane in (
+                        lane_statuses.items()
+                        if isinstance(lane_statuses, dict)
+                        else ()
+                    )
+                    if isinstance(lane, dict)
+                },
+                "encoder": (
+                    recording["recording"].get("encoder")
+                    if isinstance(recording.get("recording"), dict)
+                    else None
+                ),
+            },
             "recording": {
                 "state": recording["state"],
                 "compact_enabled": compact_recording,
@@ -462,6 +565,49 @@ class LocalStorageAdapter:
                 "error": recording["error"],
             },
             "debug": debug,
+            "pipeline": pipeline,
+            "aggregates": {
+                "accepted_blocks": (
+                    int(pipeline.get("accepted_blocks", 0))
+                    if isinstance(pipeline, dict)
+                    else 0
+                ),
+                "accepted_frames": (
+                    int(pipeline.get("accepted_frames", 0))
+                    if isinstance(pipeline, dict)
+                    else frame_count
+                ),
+                "event_emissions": sum(
+                    int(
+                        lane.get(
+                            "event_emission_count",
+                            lane.get("events", {}).get(
+                                "emissions",
+                                0,
+                            ),
+                        )
+                    )
+                    for lane in (
+                        lane_statuses.values()
+                        if isinstance(lane_statuses, dict)
+                        else ()
+                    )
+                    if isinstance(lane, dict)
+                ),
+                "stage_error_count": (
+                    len(stage_errors)
+                    if isinstance(stage_errors, dict)
+                    else 0
+                ),
+            },
+            "errors": [
+                {"stage": str(stage), "error": str(error)}
+                for stage, error in (
+                    stage_errors.items()
+                    if isinstance(stage_errors, dict)
+                    else ()
+                )
+            ],
             "stages": [
                 *status.get("stages", []),
                 {
@@ -482,7 +628,10 @@ class LocalStorageAdapter:
         )
         if len(encoded) > PIPELINE_STATUS_MAX_BYTES:
             raise ValueError("compact pipeline status exceeds its size bound")
-        write_json(directory / "pipeline-status.json", final_status)
+        self._write_durable_json(
+            directory / "pipeline-status.json",
+            final_status,
+        )
         return final_status
 
     @staticmethod
@@ -515,6 +664,18 @@ class LocalStorageAdapter:
     ) -> dict[str, Any]:
         if byte_cap <= 0 or max_age_s <= 0:
             raise ValueError("debug retention limits must be positive")
+        with self._debug_lock:
+            return self._prune_debug_unlocked(
+                byte_cap=byte_cap,
+                max_age_s=max_age_s,
+            )
+
+    def _prune_debug_unlocked(
+        self,
+        *,
+        byte_cap: int,
+        max_age_s: float,
+    ) -> dict[str, Any]:
         cutoff = self._now() - max_age_s
         removed_bytes = 0
         removed_files = 0
@@ -654,7 +815,10 @@ class LocalStorageAdapter:
                 recording["raw_source"]["state"] = "retired"
                 recording["raw_source"].pop("remaining_paths", None)
                 recording["error"] = None
-                write_json(recording_path, recording)
+                self._write_durable_json(
+                    recording_path,
+                    recording,
+                )
                 decisions.append(
                     {
                         "session_id": directory.name,

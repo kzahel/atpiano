@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import socket
 import struct
 import threading
@@ -325,6 +326,12 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
             "--silence-seconds",
             "1.5",
             "--no-wait",
+            "--compact-recordings",
+            "--debug-retention",
+            "--debug-byte-cap-mib",
+            "2",
+            "--debug-max-age-hours",
+            "1.5",
         ]
     )
     v3 = parser.parse_args(
@@ -355,6 +362,10 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
     assert v2.repeat == 3
     assert v2.silence_seconds == 1.5
     assert v2.no_wait is True
+    assert v2.compact_recordings is True
+    assert v2.debug_retention is True
+    assert v2.debug_byte_cap_mib == 2
+    assert v2.debug_max_age_hours == 1.5
     assert v2.commit_threads == 2
     assert v2.correction_mode == "auto"
     assert v2.backend_profile == Path(
@@ -368,6 +379,8 @@ def test_corrected_workbench_cli_keeps_v1_command_separate() -> None:
     assert v3.commit_threads == 2
     assert v3.correction_mode == "auto"
     assert v3.public_origin == "https://atpiano.kzahel.com"
+    assert v3.compact_recordings is False
+    assert v3.debug_retention is False
     assert profile.repeat == 2
     assert profile.warmup_seconds == 16.0
     assert profile.commit_threads == 2
@@ -886,3 +899,113 @@ def test_server_driven_replay_uses_same_review_and_export_surface(
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+@pytest.mark.skipif(
+    shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
+    reason="compact recording validation requires FFmpeg and FFprobe",
+)
+def test_phase4_replay_retires_raw_only_after_compact_verification(
+    tmp_path: Path,
+) -> None:
+    fixture_directory = tmp_path / "fixture"
+    fixture = generate_fixture(fixture_directory)
+    server = create_corrected_workbench_server(
+        tmp_path / "workspace",
+        port=0,
+        preview_model_factory=_FakePreviewModel,
+        commit_model_factory=_FakeCommitModel,
+        minimum_free_bytes=0,
+        isolate_models=False,
+        correction_mode="delayed",
+        replay_manifest=fixture_directory / "input.json",
+        replay_realtime=False,
+        compact_recordings=True,
+    )
+    try:
+        server.start_replay()
+        for _ in range(200):
+            status = server.public_state()
+            if status["status"] in {"complete", "failed"}:
+                break
+            time.sleep(0.05)
+
+        assert status["status"] == "complete", status.get("error")
+        session_directory = server.current_directory()
+        assert session_directory is not None
+        recording = read_json(session_directory / "recording.json")
+        assert recording["state"] == "complete"
+        assert recording["source"]["frame_count"] == (
+            fixture["audio"]["frame_count"]
+        )
+        assert recording["verification"]["decoded_complete"] is True
+        assert (session_directory / "playback" / "session.mp3").is_file()
+        assert not list((session_directory / "audio").glob("*.wav"))
+        assert not (
+            session_directory / "audio" / "segments.jsonl"
+        ).exists()
+        assert not (session_directory / "diagnostics").exists()
+        assert (
+            status["storage"]["current_session"]["bytes"][
+                "temporary_raw"
+            ]
+            == 0
+        )
+        assert (
+            status["storage"]["current_session"]["bytes"]["recordings"]
+            > 0
+        )
+        assert (
+            "audio"
+            in {
+                kind.value
+                for kind in server.session_store.get_session(
+                    status["session_id"]
+                ).available_artifact_kinds
+            }
+        )
+    finally:
+        server.server_close()
+
+
+def test_replay_settles_with_raw_recording_when_correction_is_unavailable(
+    tmp_path: Path,
+) -> None:
+    fixture_directory = tmp_path / "fixture"
+    generate_fixture(fixture_directory)
+    server = create_corrected_workbench_server(
+        tmp_path / "workspace",
+        port=0,
+        preview_model_factory=_FakePreviewModel,
+        commit_model_factory=_FakeCommitModel,
+        minimum_free_bytes=0,
+        isolate_models=False,
+        correction_mode="unavailable",
+        replay_manifest=fixture_directory / "input.json",
+        replay_realtime=False,
+    )
+    try:
+        server.start_replay()
+        for _ in range(200):
+            status = server.public_state()
+            if status["status"] in {"complete", "failed"}:
+                break
+            time.sleep(0.05)
+
+        assert status["status"] == "complete", status.get("error")
+        assert status["session"]["processing"]["correction_mode"] == (
+            "unavailable"
+        )
+        session_directory = server.current_directory()
+        assert session_directory is not None
+        recording = read_json(session_directory / "recording.json")
+        assert recording["state"] == "raw-retained"
+        assert list((session_directory / "audio").glob("*.wav"))
+        assert (
+            read_json(session_directory / "pipeline-status.json")[
+                "versions"
+            ]["models"]["preview"]["name"]
+            == "fake-preview"
+        )
+    finally:
+        server.server_close()

@@ -674,11 +674,29 @@ class CorrectedSession:
             },
             "lanes": [lane.status() for lane in self.lanes],
             "artifacts": {
-                "audio_index": "audio/segments.jsonl",
+                **(
+                    {"audio_index": "audio/segments.jsonl"}
+                    if (
+                        self.directory / "audio" / "segments.jsonl"
+                    ).is_file()
+                    else {}
+                ),
+                **(
+                    {"recording": "recording.json"}
+                    if (self.directory / "recording.json").is_file()
+                    else {}
+                ),
                 "event_segments": "events/",
                 "event_index": "event-index.sqlite3",
                 "horizons": "horizons.jsonl",
                 "boundaries": "boundaries.jsonl",
+                **(
+                    {"pipeline_status": "pipeline-status.json"}
+                    if (
+                        self.directory / "pipeline-status.json"
+                    ).is_file()
+                    else {}
+                ),
             },
         }
         write_json(self.directory / "session.json", document)

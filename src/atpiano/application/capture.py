@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from atpiano.application.ports import SessionRepository
+from atpiano.application.storage import StorageApplicationService
 from atpiano.backend_profile import BackendSchedulerIdentity
 from atpiano.corrected import CorrectedSession
 from atpiano.corrected_commit import (
@@ -100,6 +101,7 @@ class CaptureApplicationService:
         free_bytes: FreeBytesProvider,
         finalizer: SessionFinalizer,
         replay_source: ReplaySource | None = None,
+        storage: StorageApplicationService | None = None,
     ) -> None:
         self._repository = repository
         self._models = model_pool
@@ -107,6 +109,7 @@ class CaptureApplicationService:
         self._free_bytes = free_bytes
         self._finalizer = finalizer
         self._replay_source = replay_source
+        self._storage = storage
         self._lock = threading.RLock()
         self._active_session: CorrectedSession | None = None
         self._active_pipeline: CorrectedSessionPipeline | None = None
@@ -332,12 +335,34 @@ class CaptureApplicationService:
             correction_reason=correction_reason,
             correction_profile_id=correction_profile_id,
         )
+        if self._storage is not None:
+            self._storage.initialize_session(session_id)
+        debug_enabled = (
+            self._storage.debug_enabled
+            if self._storage is not None
+            else True
+        )
+        debug_pruner = (
+            self._storage.prune_debug
+            if self._storage is not None
+            else None
+        )
         session.add_lane(
-            CorrectedPreviewLane(session, model=preview_model)
+            CorrectedPreviewLane(
+                session,
+                model=preview_model,
+                debug_enabled=debug_enabled,
+                debug_pruner=debug_pruner,
+            )
         )
         if commit_model is not None:
             session.add_lane(
-                CorrectedCommitLane(session, model=commit_model)
+                CorrectedCommitLane(
+                    session,
+                    model=commit_model,
+                    debug_enabled=debug_enabled,
+                    debug_pruner=debug_pruner,
+                )
             )
         pipeline = CorrectedSessionPipeline(
             session,
@@ -604,6 +629,26 @@ class CaptureApplicationService:
         )
         sample_rate_hz = int((session or {}).get("sample_rate_hz", 0))
         free_bytes = self._free_bytes()
+        duration_s = (
+            audio_frames / sample_rate_hz
+            if sample_rate_hz
+            else 0.0
+        )
+        storage = (
+            self._storage.accounting(
+                session_id=session_id,
+                duration_s=duration_s,
+                minimum_free_bytes=minimum_free_bytes,
+            )
+            if self._storage is not None
+            else {
+                "free_bytes": free_bytes,
+                "minimum_free_bytes": minimum_free_bytes,
+                "warning": (
+                    free_bytes < minimum_free_bytes * 5 // 4
+                ),
+            }
+        )
         return {
             "schema_version": CORRECTED_WORKBENCH_SCHEMA,
             "status": status,
@@ -614,11 +659,7 @@ class CaptureApplicationService:
             "lanes": lanes,
             "storage": {
                 "audio_pcm_bytes": audio_frames * 2,
-                "free_bytes": free_bytes,
-                "minimum_free_bytes": minimum_free_bytes,
-                "warning": (
-                    free_bytes < minimum_free_bytes * 5 // 4
-                ),
+                **storage,
             },
             "transport": {
                 "received_blocks": received_blocks,
@@ -629,11 +670,7 @@ class CaptureApplicationService:
                 pipeline.status() if pipeline is not None else None
             ),
             "workers": self.worker_status(),
-            "duration_s": (
-                audio_frames / sample_rate_hz
-                if sample_rate_hz
-                else 0.0
-            ),
+            "duration_s": duration_s,
             "exports_ready": bool(
                 session_id is not None
                 and self._repository.has_file(
