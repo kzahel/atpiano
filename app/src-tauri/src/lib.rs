@@ -146,15 +146,35 @@ fn token() -> Result<String, String> {
     Ok(encoded)
 }
 
+fn resource_dir_for_executable(executable: &Path) -> Option<PathBuf> {
+    let macos = executable.parent()?;
+    if macos.file_name()? != "MacOS" {
+        return None;
+    }
+    let contents = macos.parent()?;
+    if contents.file_name()? != "Contents" {
+        return None;
+    }
+    Some(contents.join("Resources"))
+}
+
 fn runtime_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     #[cfg(debug_assertions)]
     if let Some(override_path) = env::var_os("ATPIANO_DESKTOP_RUNTIME_ROOT") {
         return Ok(PathBuf::from(override_path));
     }
-    app.path()
-        .resource_dir()
-        .map(|directory| directory.join("desktop-runtime"))
-        .map_err(|error| format!("could not locate desktop resources: {error}"))
+    match app.path().resource_dir() {
+        Ok(directory) => Ok(directory.join("desktop-runtime")),
+        Err(error) => {
+            let fallback = env::current_exe()
+                .ok()
+                .and_then(|executable| resource_dir_for_executable(&executable))
+                .filter(|directory| directory.is_dir());
+            fallback
+                .map(|directory| directory.join("desktop-runtime"))
+                .ok_or_else(|| format!("could not locate desktop resources: {error}"))
+        }
+    }
 }
 
 fn require_file(path: &Path, label: &str) -> Result<(), String> {
@@ -571,6 +591,20 @@ mod tests {
             model_pack_id: MODEL_PACK_ID.to_string(),
             model_pack_sha256: "b".repeat(64),
         }
+    }
+
+    #[test]
+    fn derives_packaged_resources_from_executable() {
+        let executable = Path::new("/tmp/Atpiano.app/Contents/MacOS/atpiano-desktop");
+
+        assert_eq!(
+            resource_dir_for_executable(executable),
+            Some(PathBuf::from("/tmp/Atpiano.app/Contents/Resources"))
+        );
+        assert_eq!(
+            resource_dir_for_executable(Path::new("/tmp/atpiano-desktop")),
+            None
+        );
     }
 
     #[test]
