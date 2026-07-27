@@ -6,8 +6,10 @@ from typing import Any
 
 import numpy as np
 
+from atpiano.adapters.local_replay import LocalReplaySource
 from atpiano.adapters.local_sessions import LocalSessionStore
 from atpiano.application.capture import CaptureApplicationService
+from atpiano.fixture import generate_fixture
 from atpiano.live import LiveModelOutput, PcmBlock
 from atpiano.util import read_json
 
@@ -117,3 +119,51 @@ def test_capture_service_owns_start_pcm_stop_and_settlement_without_http(
 
     service.close()
     assert models.closed
+
+
+def test_capture_service_replay_uses_same_pipeline_without_http(
+    tmp_path: Path,
+) -> None:
+    fixture_directory = tmp_path / "fixture"
+    fixture = generate_fixture(fixture_directory)
+    models = _UnavailableModelPool()
+    finalized: list[str] = []
+    service = CaptureApplicationService(
+        LocalSessionStore(tmp_path / "workspace"),
+        models,
+        minimum_free_bytes=0,
+        free_bytes=lambda: 10_000,
+        finalizer=lambda session: finalized.append(
+            session.session_id
+        ),
+        replay_source=LocalReplaySource(
+            fixture_directory / "input.json",
+            repeat=2,
+            realtime=False,
+        ),
+    )
+
+    service.start_replay()
+    for _ in range(100):
+        state = service.state()
+        if state["status"] in {"complete", "failed"}:
+            break
+        time.sleep(0.05)
+
+    assert state["status"] == "complete", state["error"]
+    assert state["session"]["source"] == "replay"
+    assert state["session"]["source_frame_count"] == (
+        fixture["audio"]["frame_count"] * 2
+    )
+    assert finalized == [state["session_id"]]
+    session_directory = service.current_directory()
+    assert session_directory is not None
+    assert (
+        len(
+            (session_directory / "boundaries.jsonl")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        )
+        == 2
+    )
+    service.close()

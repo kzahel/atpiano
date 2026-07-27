@@ -8,7 +8,6 @@ import re
 import shutil
 import sqlite3
 import subprocess
-import threading
 import time
 import uuid
 import webbrowser
@@ -24,6 +23,7 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 from pydantic import ValidationError
 
 from atpiano.adapters.local_models import LocalModelPool
+from atpiano.adapters.local_replay import LocalReplaySource
 from atpiano.adapters.local_scores import LocalScoreExecutor
 from atpiano.adapters.local_sessions import (
     LOCAL_WORKSPACE_ID,
@@ -57,10 +57,7 @@ from atpiano.contracts.schemas import (
     ScoreVariantRequest,
     SourceKind,
 )
-from atpiano.corrected import (
-    CorrectedSession,
-    run_corrected_replay,
-)
+from atpiano.corrected import CorrectedSession
 from atpiano.corrected_commit import (
     CommitModel,
 )
@@ -191,10 +188,6 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         self.preview_model_factory = preview_model_factory
         self.commit_model_factory = commit_model_factory
         self.minimum_free_bytes = minimum_free_bytes
-        self.replay_manifest = replay_manifest.resolve() if replay_manifest else None
-        self.replay_repeat = replay_repeat
-        self.replay_silence_s = replay_silence_s
-        self.replay_realtime = replay_realtime
         score_executor = LocalScoreExecutor(
             score_runtime.resolve(),
             score_runner=score_runner,
@@ -219,6 +212,16 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             correction_mode=correction_mode,
             backend_profile_path=backend_profile_path,
         )
+        replay_source = (
+            LocalReplaySource(
+                replay_manifest,
+                repeat=replay_repeat,
+                silence_s=replay_silence_s,
+                realtime=replay_realtime,
+            )
+            if replay_manifest is not None
+            else None
+        )
         sessions = SessionApplicationService(
             self.session_store,
             workspace_id=LOCAL_WORKSPACE_ID,
@@ -231,6 +234,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
                 self.workspace_directory
             ).free,
             finalizer=self._finalize_microphone_session,
+            replay_source=replay_source,
         )
         scores = ScoreApplicationService(
             self.session_store,
@@ -367,38 +371,7 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
         return result.model_dump(mode="json")
 
     def start_replay(self) -> None:
-        if self.replay_manifest is None:
-            raise ValueError("no replay manifest was configured")
-        session_id, directory = self.claim_session(source="replay")
-        thread = threading.Thread(
-            target=self._run_replay,
-            args=(session_id, directory),
-            name=f"atpiano-replay-{session_id}",
-            daemon=True,
-        )
-        thread.start()
-
-    def _run_replay(self, session_id: str, directory: Path) -> None:
-        try:
-            preview_model, commit_model = self.get_models()
-            manifest = run_corrected_replay(
-                self.replay_manifest or Path(),
-                directory,
-                repeat=self.replay_repeat,
-                silence_s=self.replay_silence_s,
-                realtime=self.replay_realtime,
-                minimum_free_bytes=self.minimum_free_bytes,
-                preview_model=preview_model,
-                commit_model=commit_model,
-                session_callback=self.set_active,
-            )
-            if manifest["session_id"] != session_id:
-                raise RuntimeError("corrected replay returned a different session")
-            write_corrected_exports(directory)
-        except Exception as error:
-            self.fail_session(error)
-        else:
-            self.complete_session()
+        self.application.capture.start_replay()
 
 
 class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
@@ -790,17 +763,9 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     "mode": self.server.application_mode,
                     "stream_schema": CORRECTED_STREAM_SCHEMA,
                     "max_visible_range_s": MAX_VISIBLE_RANGE_S,
-                    "replay": {
-                        "configured": self.server.replay_manifest is not None,
-                        "manifest": (
-                            str(self.server.replay_manifest)
-                            if self.server.replay_manifest
-                            else None
-                        ),
-                        "repeat": self.server.replay_repeat,
-                        "silence_s": self.server.replay_silence_s,
-                        "realtime": self.server.replay_realtime,
-                    },
+                    "replay": (
+                        self.server.application.capture.replay_configuration()
+                    ),
                     "score": self.server._runtime_state(),
                 }
             )

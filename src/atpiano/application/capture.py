@@ -53,6 +53,21 @@ class CaptureModelPool(Protocol):
     def close(self) -> None: ...
 
 
+class ReplaySource(Protocol):
+    """Sample-indexed replay source consumed by capture coordination."""
+
+    sample_rate_hz: int
+
+    def stream(
+        self,
+        *,
+        accept: Callable[[PcmBlock, int], None],
+        boundary: Callable[..., None],
+    ) -> tuple[int, int]: ...
+
+    def configuration(self) -> dict[str, Any]: ...
+
+
 SessionFinalizer = Callable[[CorrectedSession], None]
 FreeBytesProvider = Callable[[], int]
 
@@ -84,12 +99,14 @@ class CaptureApplicationService:
         minimum_free_bytes: int,
         free_bytes: FreeBytesProvider,
         finalizer: SessionFinalizer,
+        replay_source: ReplaySource | None = None,
     ) -> None:
         self._repository = repository
         self._models = model_pool
         self.minimum_free_bytes = minimum_free_bytes
         self._free_bytes = free_bytes
         self._finalizer = finalizer
+        self._replay_source = replay_source
         self._lock = threading.RLock()
         self._active_session: CorrectedSession | None = None
         self._active_pipeline: CorrectedSessionPipeline | None = None
@@ -269,6 +286,23 @@ class CaptureApplicationService:
         client_metadata: dict[str, Any],
     ) -> CaptureStart:
         session_id, directory = self.claim_session(source="microphone")
+        return self._start_claimed_session(
+            session_id=session_id,
+            directory=directory,
+            source="microphone",
+            sample_rate_hz=sample_rate_hz,
+            client_metadata=client_metadata,
+        )
+
+    def _start_claimed_session(
+        self,
+        *,
+        session_id: str,
+        directory: Path,
+        source: str,
+        sample_rate_hz: int,
+        client_metadata: dict[str, Any] | None,
+    ) -> CaptureStart:
         preview_model = self.preview_model()
         correction_mode = self._models.correction_mode
         correction_reason = "commit correction is unavailable"
@@ -292,7 +326,7 @@ class CaptureApplicationService:
             directory,
             session_id=session_id,
             sample_rate_hz=sample_rate_hz,
-            source="microphone",
+            source=source,
             minimum_free_bytes=self.minimum_free_bytes,
             correction_mode=correction_mode,
             correction_reason=correction_reason,
@@ -316,15 +350,16 @@ class CaptureApplicationService:
                 else frozenset()
             ),
         )
-        self._repository.write_document(
-            session_id,
-            "client.json",
-            {
-                "schema_version": "atpiano.corrected-client.v1",
-                "received_at": utc_now(),
-                "metadata": client_metadata,
-            },
-        )
+        if client_metadata is not None:
+            self._repository.write_document(
+                session_id,
+                "client.json",
+                {
+                    "schema_version": "atpiano.corrected-client.v1",
+                    "received_at": utc_now(),
+                    "metadata": client_metadata,
+                },
+            )
         self.set_active(session, pipeline)
         return CaptureStart(
             session=session,
@@ -333,6 +368,63 @@ class CaptureApplicationService:
             correction_reason=correction_reason,
             correction_profile_id=correction_profile_id,
         )
+
+    def replay_configuration(self) -> dict[str, Any]:
+        if self._replay_source is None:
+            return {
+                "configured": False,
+                "manifest": None,
+                "repeat": 1,
+                "silence_s": 0.0,
+                "realtime": True,
+            }
+        return self._replay_source.configuration()
+
+    def start_replay(self) -> None:
+        source = self._replay_source
+        if source is None:
+            raise ValueError("no replay manifest was configured")
+        session_id, directory = self.claim_session(source="replay")
+        thread = threading.Thread(
+            target=self._run_replay,
+            args=(source, session_id, directory),
+            name=f"atpiano-replay-{session_id}",
+            daemon=True,
+        )
+        thread.start()
+
+    def _run_replay(
+        self,
+        source: ReplaySource,
+        session_id: str,
+        directory: Path,
+    ) -> None:
+        try:
+            started = self._start_claimed_session(
+                session_id=session_id,
+                directory=directory,
+                source="replay",
+                sample_rate_hz=source.sample_rate_hz,
+                client_metadata=None,
+            )
+            frame_count, block_count = source.stream(
+                accept=lambda block, received_ns: self.accept_block(
+                    block,
+                    received_ns=received_ns,
+                ),
+                boundary=started.session.record_boundary,
+            )
+            self.stop_microphone(
+                frame_count=frame_count,
+                block_count=block_count,
+                transport=None,
+            )
+            if not started.pipeline.wait(timeout=None):
+                raise RuntimeError(
+                    "replay settlement did not complete"
+                )
+        except Exception as error:
+            self.abort_microphone(error)
 
     def accept_block(
         self,
