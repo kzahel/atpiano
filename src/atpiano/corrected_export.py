@@ -7,7 +7,7 @@ import os
 import shutil
 import sqlite3
 import subprocess
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -292,6 +292,8 @@ def write_corrected_exports(
     session_directory: Path,
     *,
     allow_settling: bool = False,
+    playback_ffmpeg_executable: str | None = None,
+    process_runner: Callable[..., Any] | None = None,
 ) -> dict[str, Any]:
     """Write full JSONL history and latest committed MIDI from the event index."""
 
@@ -325,7 +327,11 @@ def write_corrected_exports(
         iter_latest_committed_index(database_path),
         sample_rate_hz=sample_rate_hz,
     )
-    playback = write_playback_audio(session_directory)
+    playback = write_playback_audio(
+        session_directory,
+        ffmpeg_executable=playback_ffmpeg_executable,
+        process_runner=process_runner,
+    )
     manifest = {
         "schema_version": CORRECTED_EXPORT_SCHEMA,
         "session_id": session["session_id"],
@@ -358,11 +364,13 @@ def write_playback_audio(
     session_directory: Path,
     *,
     ffmpeg_executable: str | None = None,
+    process_runner: Callable[..., Any] | None = None,
 ) -> dict[str, Any] | None:
     """Create one seekable MP3 derivative without replacing source WAVs."""
 
     session_directory = session_directory.resolve()
     ffmpeg = ffmpeg_executable or shutil.which("ffmpeg")
+    runner = process_runner or subprocess.run
     segments = sorted((session_directory / "audio").glob("*.wav"))
     if ffmpeg is None or not segments:
         return None
@@ -377,7 +385,7 @@ def write_playback_audio(
         encoding="utf-8",
     )
     try:
-        subprocess.run(
+        runner(
             [
                 ffmpeg,
                 "-hide_banner",
