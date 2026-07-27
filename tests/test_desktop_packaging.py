@@ -11,6 +11,7 @@ from atpiano.desktop_packaging import (
     _audit_anonymous_caches,
     _audit_distributions,
     _audit_symlinks,
+    _prune_distribution_test_material,
     _stage_fixture,
     archive_component_inventory,
     component_inventory,
@@ -149,6 +150,35 @@ def test_bundle_audit_rejects_anonymous_cache(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="anonymous cache"):
         _audit_anonymous_caches(tmp_path)
+
+
+def test_distribution_test_namespaces_are_pruned(
+    tmp_path: Path,
+) -> None:
+    keep = tmp_path / "example" / "module.py"
+    remove = tmp_path / "example" / "tests" / "test_module.py"
+    required = tmp_path / "torch" / "testing" / "_comparison.py"
+    required_internal = (
+        tmp_path / "torch" / "testing" / "_internal" / "test_case.py"
+    )
+    keep.parent.mkdir(parents=True)
+    remove.parent.mkdir(parents=True)
+    required.parent.mkdir(parents=True)
+    required_internal.parent.mkdir(parents=True)
+    keep.write_text("value = 1\n", encoding="utf-8")
+    remove.write_text("def test_value(): pass\n", encoding="utf-8")
+    required.write_text("value = 1\n", encoding="utf-8")
+    required_internal.write_text(
+        "def test_value(): pass\n",
+        encoding="utf-8",
+    )
+
+    _prune_distribution_test_material(tmp_path)
+
+    assert keep.is_file()
+    assert not remove.parent.exists()
+    assert required.is_file()
+    assert required_internal.is_file()
 
 
 def test_archive_component_inventory_accounts_for_container(

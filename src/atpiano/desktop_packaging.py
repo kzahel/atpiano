@@ -44,6 +44,8 @@ FORBIDDEN_DEV_DISTRIBUTIONS = {
     "pytest",
     "ruff",
 }
+FORBIDDEN_TEST_NAMESPACES = {"test", "tests", "testing"}
+REQUIRED_RUNTIME_TEST_NAMESPACES = {("torch", "testing")}
 FORBIDDEN_BASENAMES = {
     "MIDI2ScoreTF.ckpt",
     "midi2score-runtime",
@@ -502,6 +504,7 @@ def _prune_runtime(runtime_root: Path) -> None:
         target = site_packages / relative
         if target.is_dir():
             shutil.rmtree(target)
+    _prune_distribution_test_material(site_packages)
     for direct_url in site_packages.rglob("direct_url.json"):
         direct_url.unlink()
     for cache in sorted(
@@ -520,6 +523,25 @@ def _prune_runtime(runtime_root: Path) -> None:
                 shutil.rmtree(entry)
             else:
                 entry.unlink()
+
+
+def _prune_distribution_test_material(site_packages: Path) -> None:
+    candidates = sorted(
+        (
+            path
+            for path in site_packages.rglob("*")
+            if path.is_dir()
+            and path.name.lower() in FORBIDDEN_TEST_NAMESPACES
+        ),
+        key=lambda path: len(path.parts),
+        reverse=True,
+    )
+    for candidate in candidates:
+        relative = candidate.relative_to(site_packages)
+        if relative.parts in REQUIRED_RUNTIME_TEST_NAMESPACES:
+            continue
+        if candidate.is_dir():
+            shutil.rmtree(candidate)
 
 
 def _package_inventory(runtime_root: Path) -> list[dict[str, Any]]:
@@ -818,6 +840,7 @@ def component_inventory(root: Path) -> dict[str, Any]:
         entry["file_count"] += 1
 
     test_material = []
+    runtime_required_testing = []
     for path in root.rglob("*"):
         if not (path.is_file() or path.is_symlink()):
             continue
@@ -838,8 +861,15 @@ def component_inventory(root: Path) -> dict[str, Any]:
             if category == "python_packages":
                 parts = runtime_relative.parts
                 lowered = {part.lower() for part in parts[3:]}
-                if lowered & {"test", "tests", "testing"}:
-                    test_material.append(path)
+                if lowered & FORBIDDEN_TEST_NAMESPACES:
+                    package_parts = parts[3:]
+                    if (
+                        package_parts[:2]
+                        in REQUIRED_RUNTIME_TEST_NAMESPACES
+                    ):
+                        runtime_required_testing.append(path)
+                    else:
+                        test_material.append(path)
         record(category, path)
 
     installed_bytes = sum(
@@ -870,8 +900,25 @@ def component_inventory(root: Path) -> dict[str, Any]:
             "file_count": len(test_material),
             "largest_files": test_largest,
             "policy": (
-                "distribution-provided modules retained where runtime "
-                "imports require them; development distributions excluded"
+                "test namespaces and development distributions excluded"
+            ),
+        },
+        "runtime_required_testing": {
+            "bytes": sum(
+                path.lstat().st_size
+                for path in runtime_required_testing
+            ),
+            "file_count": len(runtime_required_testing),
+            "namespaces": [
+                "/".join(namespace)
+                for namespace in sorted(
+                    REQUIRED_RUNTIME_TEST_NAMESPACES
+                )
+            ],
+            "policy": (
+                "retained only where the package imports its public "
+                "or private testing namespace during ordinary runtime "
+                "startup"
             ),
         },
     }
@@ -996,6 +1043,8 @@ def audit_root(
     components = component_inventory(root)
     if components["installed_bytes"] != complete_inventory["total_bytes"]:
         raise RuntimeError("component inventory does not reconcile")
+    if components["distribution_test_material"]["file_count"]:
+        raise RuntimeError("distribution test material is bundled")
     largest_packages = sorted(
         (
             {
