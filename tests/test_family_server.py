@@ -14,6 +14,7 @@ from atpiano.contracts.schemas import MembershipRole
 from atpiano.corrected import CorrectedSession
 from atpiano.corrected_export import write_corrected_exports
 from atpiano.corrected_workbench import CorrectedWorkbenchRuntime
+from atpiano.family_check import check_family_workspace
 from atpiano.family_server import create_family_application
 from atpiano.live import PcmBlock
 from atpiano.persistence import initialize_catalog
@@ -105,6 +106,38 @@ def _login(
             "password": password,
         },
     )
+
+
+def test_local_operator_check_reads_protected_audio_and_revokes(
+    tmp_path: Path,
+) -> None:
+    _completed_session(tmp_path)
+    web_root = tmp_path / "operator-web"
+    web_root.mkdir()
+    (web_root / "index.html").write_text(
+        "<!doctype html><title>Atpiano operator check</title>",
+        encoding="utf-8",
+    )
+    _, engine = initialize_catalog(tmp_path)
+    identity = IdentityApplicationService(
+        SqlAlchemyIdentityRepository(engine),
+        Argon2PasswordHasher(),
+        workspace_id="local",
+    )
+    try:
+        identity.create_user("owner", "the owner family password")
+    finally:
+        engine.dispose()
+
+    report = check_family_workspace(
+        tmp_path,
+        session_id=SESSION_ID,
+        web_root=web_root,
+    )
+
+    assert report["operator"] == "owner"
+    assert report["audio"]["checked_range_bytes"] > 0
+    assert report["operator_session_revoked"] is True
 
 
 def test_static_login_is_public_but_data_and_websocket_are_not(

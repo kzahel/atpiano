@@ -24,6 +24,7 @@ MAXIMUM_PASSWORD_BYTES = 1024
 DEFAULT_IDLE_SESSION_LIFETIME = timedelta(days=7)
 DEFAULT_ABSOLUTE_SESSION_LIFETIME = timedelta(days=30)
 DEFAULT_SESSION_TOUCH_INTERVAL = timedelta(minutes=5)
+LOCAL_OPERATOR_SESSION_LIFETIME = timedelta(minutes=5)
 
 
 @dataclass(frozen=True)
@@ -315,19 +316,89 @@ class IdentityApplicationService:
                 password_hash=updated_hash,
                 now=now,
             )
+        return self._issue_web_session(
+            credentials.user.user_id,
+            now=now,
+            idle_expires_at=now + self._idle_session_lifetime,
+            absolute_expires_at=now + self._absolute_session_lifetime,
+        )
+
+    def issue_local_operator_session(
+        self,
+        username: str | None = None,
+    ) -> IssuedWebSession:
+        """Issue a bounded session to a caller with local catalog authority."""
+
+        normalized = (
+            normalize_username(username)
+            if username is not None
+            else None
+        )
+        candidates = tuple(
+            user
+            for user in self.list_users()
+            if (
+                not user.disabled
+                and any(
+                    membership.workspace_id == self.workspace_id
+                    for membership in user.memberships
+                )
+                and (
+                    normalized is not None
+                    or any(
+                        membership.workspace_id == self.workspace_id
+                        and membership.role is MembershipRole.OWNER
+                        for membership in user.memberships
+                    )
+                )
+            )
+        )
+        selected = next(
+            (
+                user
+                for user in candidates
+                if (
+                    normalized is None
+                    or normalize_username(user.username) == normalized
+                )
+            ),
+            None,
+        )
+        if selected is None:
+            raise ApplicationConflictError(
+                "no enabled local operator account is available"
+            )
         token = secrets.token_urlsafe(32)
-        idle_expires_at = now + self._idle_session_lifetime
-        absolute_expires_at = now + self._absolute_session_lifetime
+        now = self._now()
+        expires_at = now + LOCAL_OPERATOR_SESSION_LIFETIME
+        return self._issue_web_session(
+            selected.user_id,
+            now=now,
+            idle_expires_at=expires_at,
+            absolute_expires_at=expires_at,
+            token=token,
+        )
+
+    def _issue_web_session(
+        self,
+        user_id: str,
+        *,
+        now: datetime,
+        idle_expires_at: datetime,
+        absolute_expires_at: datetime,
+        token: str | None = None,
+    ) -> IssuedWebSession:
+        issued_token = token or secrets.token_urlsafe(32)
         principal = self._repository.create_web_session(
             web_session_id=f"web-session:{uuid.uuid4().hex}",
-            token_digest=_token_digest(token),
-            user_id=credentials.user.user_id,
+            token_digest=_token_digest(issued_token),
+            user_id=user_id,
             now=now,
             idle_expires_at=idle_expires_at,
             absolute_expires_at=absolute_expires_at,
         )
         return IssuedWebSession(
-            token=token,
+            token=issued_token,
             principal=principal,
             idle_expires_at=idle_expires_at,
             absolute_expires_at=absolute_expires_at,

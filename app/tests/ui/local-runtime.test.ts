@@ -110,6 +110,37 @@ class FakeWebSocket {
 }
 
 describe("local runtime", () => {
+  it("binds direct artifact fetches to the browser global", async () => {
+    const receivers: unknown[] = [];
+    const receiverSensitiveFetch = function (
+      this: unknown,
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) {
+      receivers.push(this);
+      if (this !== globalThis) {
+        throw new TypeError("Illegal invocation");
+      }
+      return fakeFetch(input, init);
+    } as typeof fetch;
+    const runtime = new LocalRuntime({
+      baseUrl: "http://127.0.0.1:8002",
+      fetchImplementation: receiverSensitiveFetch,
+      WebSocketImplementation: FakeWebSocket as unknown as typeof WebSocket,
+    });
+
+    const content = await runtime.readArtifact(
+      "local",
+      "session-local",
+      "artifact-local",
+      { requestId: "artifact-receiver" },
+    );
+
+    expect(new TextDecoder().decode(content.bytes)).toBe("artifact bytes");
+    expect(receivers.length).toBeGreaterThanOrEqual(2);
+    expect(receivers.every((receiver) => receiver === globalThis)).toBe(true);
+  });
+
   it("maps configured replay to an explicit active capture", async () => {
     const runtime = new LocalRuntime({
       baseUrl: "http://127.0.0.1:8002",

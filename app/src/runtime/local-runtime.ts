@@ -167,13 +167,14 @@ export class LocalRuntime implements AtpianoRuntime {
     readonly webSocketProtocol?: string;
   } = {}) {
     this.#baseUrl = baseUrl.replace(/\/$/, "");
+    const browserFetch = fetchImplementation.bind(globalThis);
     this.#fetch = bearerToken === undefined
-      ? fetchImplementation
+      ? browserFetch
       : async (input, init) => {
           const request = new Request(input, init);
           const headers = new Headers(request.headers);
           headers.set("Authorization", `Bearer ${bearerToken}`);
-          return fetchImplementation(new Request(request, { headers }));
+          return browserFetch(new Request(request, { headers }));
         };
     this.#WebSocket = WebSocketImplementation;
     this.#webSocketProtocol = webSocketProtocol;

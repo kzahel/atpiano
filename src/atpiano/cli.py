@@ -495,6 +495,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_storage_arguments(family_parser)
     _add_model_lifecycle_arguments(family_parser)
+    family_check_parser = subparsers.add_parser(
+        "family-check",
+        help="smoke-test protected family routes with a local operator session",
+    )
+    family_check_parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=Path("results/workbench-v3"),
+        help="session and identity directory (default: results/workbench-v3)",
+    )
+    family_check_parser.add_argument(
+        "--session",
+        required=True,
+        help="retained session whose protected audio should be checked",
+    )
+    family_check_parser.add_argument(
+        "--as-user",
+        help="enabled workspace member to use (default: first owner)",
+    )
+    family_check_parser.add_argument(
+        "--base-url",
+        help=(
+            "running HTTPS or loopback origin to check "
+            "(default: in-process adapter)"
+        ),
+    )
     score_setup_parser = subparsers.add_parser(
         "setup-midi2score",
         help="install the internal MIDI2ScoreTransformer runtime",
@@ -788,6 +814,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             ),
         )
         return 0
+    if args.command == "family-check":
+        from atpiano.family_check import run_family_check
+
+        return run_family_check(args)
     if args.command == "setup-midi2score":
         from atpiano.score_snapshot import setup_score_runtime
 

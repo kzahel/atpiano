@@ -145,6 +145,26 @@ def test_idle_and_absolute_session_expiry(tmp_path: Path) -> None:
         engine.dispose()
 
 
+def test_local_operator_session_is_bounded_and_revocable(
+    tmp_path: Path,
+) -> None:
+    clock = [datetime(2026, 7, 28, tzinfo=timezone.utc)]
+    service, engine = _service(tmp_path, now=clock)
+    try:
+        service.create_user("owner", "the only long owner password")
+        issued = service.issue_local_operator_session()
+
+        assert issued.principal.username == "owner"
+        assert issued.absolute_expires_at == clock[0] + timedelta(minutes=5)
+        assert service.authenticate(issued.token) == issued.principal
+
+        service.logout(issued.token)
+        with pytest.raises(AuthenticationError):
+            service.authenticate(issued.token)
+    finally:
+        engine.dispose()
+
+
 def test_username_and_password_policy(tmp_path: Path) -> None:
     service, engine = _service(tmp_path)
     try:
