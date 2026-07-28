@@ -73,6 +73,12 @@ post-fix sweep then exercised all nine current retained recordings in both
 browsers: all 18 combinations rendered inline notation, exposed a visible
 cursor at a mapped attack, and rendered their complete score-reader pages
 without an engraving, alignment, cursor, or reader error.
+Tactical 044 now owns turning that ad hoc evidence into an explicit slow
+headed-browser validator. It also owns one generated MIDI-tick corpus consumed
+by Python and TypeScript so producer and cursor ordering cannot drift
+independently again. This lane remains opt-in and read-only rather than making
+real retained recordings or downloaded browser engines part of the ordinary
+migration gate.
 This is not yet progressive engraving or a permanent consumer-stack
 selection. The leading score converter's GitHub source and checkpoint still
 have no explicit published license, although the paper is CC BY 4.0 and the

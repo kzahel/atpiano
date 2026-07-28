@@ -82,6 +82,14 @@ incident requiring failover. A reboot leaves the service stopped until an
 explicit `start`; it must not be silently converted into an always-on login
 service.
 
+An open tab may outlive a service restart and its production frontend rebuild.
+The retained-score review exposed that Vite removed an old lazy score-renderer
+chunk while FastAPI incorrectly returned the new `index.html` for its missing
+JavaScript URL. Tactical 045 owns a layered correction: exact asset 404s,
+explicit update-and-reload recovery, a small polled client build identity, and
+bounded retention of the newest three hashed-asset generations. Retention is
+a grace period, not an old-client API compatibility promise.
+
 ## Persistence Direction
 
 The current local filesystem session manifests and checksummed artifacts are
