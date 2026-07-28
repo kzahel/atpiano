@@ -57,4 +57,4 @@ execution record; continuing status and direction belong in the relevant
 | [`042-family-profile-schema-and-ui.md`](042-family-profile-schema-and-ui.md) | Complete; live | Seeded generic group/profile schema, creator-versus-performer attribution, and the profile-first Family UI |
 | [`043-browser-midi-float-parity.md`](043-browser-midi-float-parity.md) | Complete; live | Browser parity with the producer's floating-point MIDI tick conversion and Python rounding |
 | [`044-score-reliability-harness.md`](044-score-reliability-harness.md) | Planned | Slow headed Chromium/WebKit retained-score audit plus shared Python/TypeScript MIDI-tick conformance fixtures |
-| [`045-client-deployment-continuity.md`](045-client-deployment-continuity.md) | Implemented; live validation pending | Exact asset routing, update polling and recovery, and bounded recent hashed-asset retention |
+| [`045-client-deployment-continuity.md`](045-client-deployment-continuity.md) | Complete; live | Exact asset routing, update polling and recovery, and bounded recent hashed-asset retention |

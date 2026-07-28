@@ -85,10 +85,12 @@ service.
 An open tab may outlive a service restart and its production frontend rebuild.
 The retained-score review exposed that Vite removed an old lazy score-renderer
 chunk while FastAPI incorrectly returned the new `index.html` for its missing
-JavaScript URL. Tactical 045 owns a layered correction: exact asset 404s,
-explicit update-and-reload recovery, a small polled client build identity, and
-bounded retention of the newest three hashed-asset generations. Retention is
-a grace period, not an old-client API compatibility promise.
+JavaScript URL. Tactical 045 is implemented and live: missing assets return
+exact 404s, recognized chunk failures raise an explicit reload action, tabs
+poll a small uncached client build identity, and builds retain the newest
+three distinct hashed-asset generations. The live check also proved the
+pre-upgrade score-renderer chunk remained available through the restart.
+Retention is a grace period, not an old-client API compatibility promise.
 
 ## Persistence Direction
 

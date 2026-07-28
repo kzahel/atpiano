@@ -2,8 +2,7 @@
 
 Topic: home-hosted-family-sharing
 
-Status: **implemented and locally validated on 2026-07-28; live restart
-pending.**
+Status: **complete and live on 2026-07-28.**
 
 ## Goal
 
@@ -188,3 +187,17 @@ Local validation passed:
   and
 - direct inspection proving that ID appears in the current entry JavaScript
   and matches `client-version.json`.
+
+The already-active authenticated family service restarted onto the committed
+implementation. Through the real HTTPS origin:
+
+- `/` returned HTTP 200 HTML with `Cache-Control: no-store`;
+- `/client-version.json` returned HTTP 200, the embedded production build ID,
+  and `Cache-Control: no-store`;
+- the current entry JavaScript returned HTTP 200 with a one-year immutable
+  cache policy;
+- the pre-upgrade OpenSheetMusicDisplay chunk still returned HTTP 200 with the
+  same immutable policy;
+- a deliberately missing JavaScript chunk returned HTTP 404 JSON with
+  `X-Content-Type-Options: nosniff`; and
+- anonymous `/api/v1/capabilities` remained protected with HTTP 401.
