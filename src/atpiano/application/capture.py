@@ -505,6 +505,10 @@ class CaptureApplicationService:
             }
         return self._replay_source.configuration()
 
+    @property
+    def replay_available(self) -> bool:
+        return self._replay_source is not None
+
     def start_replay(self) -> None:
         source = self._replay_source
         if source is None:

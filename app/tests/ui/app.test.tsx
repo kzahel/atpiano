@@ -719,7 +719,7 @@ describe("shared application", () => {
       .toBeTruthy();
     expect(screen.getAllByRole("button", { name: /Morning progression/ })).toHaveLength(1);
 
-    await user.click(screen.getByRole("button", { name: /Replay musical fixture/ }));
+    await user.click(screen.getByRole("button", { name: /Run test recording/ }));
 
     expect(
       await screen.findByText("Listening with background correction"),

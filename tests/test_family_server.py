@@ -196,6 +196,7 @@ def test_owner_cookie_authenticates_api_artifacts_and_websocket(
         capabilities = client.get("/api/v1/capabilities")
         assert capabilities.status_code == 200
         assert capabilities.json()["score_available"] is False
+        assert capabilities.json()["capture_sources"] == ["microphone"]
         workspaces = client.get("/api/v1/workspaces")
         assert [item["workspace_id"] for item in workspaces.json()["items"]] == [
             "local"

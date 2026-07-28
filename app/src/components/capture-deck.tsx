@@ -35,14 +35,19 @@ export function CaptureDeck({
   );
   const recording = captureState.phase === "recording";
   const stopping = captureState.phase === "stopping";
+  const fixtureMode = capabilities?.runtime_mode === "fixture";
+  const fixtureReplayAvailable =
+    fixtureMode && capabilities.capture_sources.includes("replay");
   return (
     <section className="capture-deck" aria-labelledby="capture-title">
       <div>
         <p className="eyebrow">New performance</p>
         <h2 id="capture-title">What would you like to play?</h2>
         <p className="capture-copy">
-          Start with your piano, or replay the deterministic musical fixture.
-          Fast notes appear first; corrected notes settle behind them.
+          {fixtureReplayAvailable
+            ? "Start with your piano, or run the bundled deterministic test recording. "
+            : "Start a new performance using your piano. "}
+          Notes appear as you play; corrected notes settle behind them.
         </p>
       </div>
       <div className="capture-actions">
@@ -55,15 +60,17 @@ export function CaptureDeck({
           <span aria-hidden="true">●</span>
           Start microphone
         </button>
-        <button
-          className="button secondary"
-          type="button"
-          disabled={busy || !capabilities?.capture_sources.includes("replay")}
-          onClick={onReplay}
-        >
-          <span aria-hidden="true">▶</span>
-          Replay musical fixture
-        </button>
+        {fixtureReplayAvailable && (
+          <button
+            className="button secondary"
+            type="button"
+            disabled={busy}
+            onClick={onReplay}
+          >
+            <span aria-hidden="true">▶</span>
+            Run test recording
+          </button>
+        )}
         {(recording || stopping) && captureState.capture?.source === "microphone" && (
           <button
             className="button stop"

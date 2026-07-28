@@ -491,7 +491,11 @@ def create_family_application(
             runtime_mode=RuntimeMode.LOCAL,
             supported_schema_versions=(CONTRACT_SCHEMA_VERSION,),
             supported_pcm_protocol_versions=(PCM_PROTOCOL_VERSION,),
-            capture_sources=(SourceKind.MICROPHONE, SourceKind.REPLAY),
+            capture_sources=(
+                (SourceKind.MICROPHONE, SourceKind.REPLAY)
+                if runtime.application.capture.replay_available
+                else (SourceKind.MICROPHONE,)
+            ),
             score_available=score_available,
             recoverable_delete=True,
             max_pcm_block_frames=1_048_576,

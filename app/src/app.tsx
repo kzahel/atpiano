@@ -71,8 +71,8 @@ function EmptyWorkspace({ onNew }: { readonly onNew: () => void }) {
       <p className="eyebrow">Your piano, made visible</p>
       <h1>Begin a performance</h1>
       <p>
-        Record the room or replay the musical fixture. Atpiano keeps the
-        immediate recognition visible while corrected notes settle behind it.
+        Record your piano through the microphone. Atpiano keeps the immediate
+        recognition visible while corrected notes settle behind it.
       </p>
       <button className="button primary" type="button" onClick={onNew}>
         Create a new session

@@ -256,6 +256,7 @@ def test_api_routes_read_explicit_history_without_retargeting_current(
     assert capabilities["supported_schema_versions"] == [
         "atpiano.contract.v1"
     ]
+    assert capabilities["capture_sources"] == ["microphone"]
     assert catalog["items"][0]["session_id"] == newer_id
     assert catalog["next_cursor"] == newer_id
     assert older["session_id"] == older_id

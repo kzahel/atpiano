@@ -722,7 +722,11 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     runtime_mode=RuntimeMode.LOCAL,
                     supported_schema_versions=(CONTRACT_SCHEMA_VERSION,),
                     supported_pcm_protocol_versions=(PCM_PROTOCOL_VERSION,),
-                    capture_sources=(SourceKind.MICROPHONE, SourceKind.REPLAY),
+                    capture_sources=(
+                        (SourceKind.MICROPHONE, SourceKind.REPLAY)
+                        if self.server.application.capture.replay_available
+                        else (SourceKind.MICROPHONE,)
+                    ),
                     score_available=bool(
                         self.server._runtime_state().get("available")
                     ),
