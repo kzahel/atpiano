@@ -151,6 +151,15 @@ Password credentials were not exposed to or exercised by the automated
 operator during cutover; the owner retains the human login and artifact
 review checkpoint.
 
+The first Safari review exposed a client bootstrap defect: the authentication
+client stored `window.fetch` and invoked it with the client instance as its
+receiver, producing `TypeError: Illegal invocation` before the login view
+could render. Commit `1534b2c` binds the browser function to `globalThis` and
+adds a receiver-sensitive regression test. All 55 frontend tests, TypeScript,
+and the production build passed. The active authenticated service was
+restarted and the public origin served the corrected production asset while
+retaining the expected 200 app-shell and 401 anonymous API responses.
+
 ## Operating Contract
 
 The established commands remain:

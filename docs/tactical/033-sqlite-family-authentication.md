@@ -315,6 +315,8 @@ This section becomes the execution record as commits land. Record:
 - `ac51828` — harden sessions, login attempts, and persistent service mode.
 - `0dc3b70` — record the completed human review checkpoint.
 - `9647f1c` — disable the unresolved score runtime in public legacy mode.
+- `a539769` — record the authenticated live-service cutover.
+- `1534b2c` — bind browser fetch after the first Safari login review.
 
 ### Human review and live cutover
 
@@ -336,3 +338,11 @@ explicit rollback remains available with
 `ATPIANO_FAMILY_AUTH=false scripts/share-atpiano-service restart`, but it
 restores the unauthenticated legacy boundary and should only be used
 deliberately.
+
+The first post-cutover Safari load failed before rendering login because the
+authentication client invoked its stored browser `fetch` function with the
+client object as the receiver. The fix binds `fetch` to `globalThis` and
+covers the failure with a receiver-sensitive test. All 55 frontend tests,
+TypeScript, and the production build passed before the authenticated service
+was restarted. The public origin then served the corrected hashed asset and
+retained the expected 200 app-shell and 401 anonymous API responses.
