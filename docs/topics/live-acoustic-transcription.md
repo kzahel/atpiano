@@ -43,6 +43,15 @@ mono PCM16 blocks on the decoded source sample clock and then uses the same
 capture application and transcription lanes as microphone input;
 deterministic fixture replay remains an engineering-only source.
 
+The next live family microphone attempt exposed a deployment dependency gap
+under
+[`040-websocket-runtime-dependency.md`](../tactical/040-websocket-runtime-dependency.md).
+The request reached `/api/live`, but the locked environment contained Uvicorn
+without either supported WebSocket protocol implementation. Uvicorn rejected
+the upgrade before the authenticated application handler ran. The bounded fix
+owns dependency declaration and a protocol-selection regression; it does not
+change PCM, capture, or model semantics.
+
 ## Scope And Relationship
 
 This topic owns the live user path:
