@@ -131,15 +131,13 @@ def _default_commit_model(
     )
 
 
-class CorrectedWorkbenchServer(ThreadingHTTPServer):
-    daemon_threads = True
+class CorrectedWorkbenchRuntime:
+    """Transport-independent composition of the local application services."""
 
     def __init__(
         self,
         workspace_directory: Path,
         *,
-        bind: str = "127.0.0.1",
-        port: int,
         preview_model_factory: PreviewModelFactory = _default_preview_model,
         commit_model_factory: CommitModelFactory,
         minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
@@ -295,7 +293,6 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             scores=scores,
             storage=storage,
         )
-        super().__init__((bind, port), CorrectedWorkbenchHandler)
 
     def asset_path(self, request_path: str) -> Path | None:
         relative = "index.html" if request_path == "/" else request_path.lstrip("/")
@@ -330,9 +327,8 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
             commit_model
         )
 
-    def server_close(self) -> None:
+    def close(self) -> None:
         self.application.capture.close()
-        super().server_close()
 
     def claim_session(self, *, source: str) -> tuple[str, Path]:
         return self.application.capture.claim_session(source=source)
@@ -411,6 +407,90 @@ class CorrectedWorkbenchServer(ThreadingHTTPServer):
 
     def start_replay(self) -> None:
         self.application.capture.start_replay()
+
+
+class CorrectedWorkbenchServer(
+    CorrectedWorkbenchRuntime,
+    ThreadingHTTPServer,
+):
+    """Compatibility HTTP adapter around the shared runtime composition."""
+
+    daemon_threads = True
+
+    def __init__(
+        self,
+        workspace_directory: Path,
+        *,
+        bind: str = "127.0.0.1",
+        port: int,
+        preview_model_factory: PreviewModelFactory = _default_preview_model,
+        commit_model_factory: CommitModelFactory,
+        minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
+        model_idle_timeout_s: float = DEFAULT_MODEL_IDLE_TIMEOUT_S,
+        replay_manifest: Path | None = None,
+        replay_repeat: int = 1,
+        replay_silence_s: float = 0.0,
+        replay_realtime: bool = True,
+        score_runtime: Path = Path("results/midi2score-runtime"),
+        score_runner: ScoreRunner | None = None,
+        score_variant_runner: ScoreVariantRunner | None = None,
+        web_root: Path = WEB_ROOT,
+        application_mode: str = "corrected-workbench-v2",
+        isolate_models: bool = True,
+        commit_threads: int | None = 2,
+        correction_mode: str = "auto",
+        backend_profile_path: Path | None = None,
+        public_origin: str | None = None,
+        desktop_origin: str | None = None,
+        desktop_token: str | None = None,
+        desktop_handshake: DesktopHandshake | None = None,
+        compact_recordings: bool = True,
+        debug_retention: bool = False,
+        debug_byte_cap: int = 64 * 1024**2,
+        debug_max_age_s: float = 72 * 60 * 60,
+    ) -> None:
+        CorrectedWorkbenchRuntime.__init__(
+            self,
+            workspace_directory,
+            preview_model_factory=preview_model_factory,
+            commit_model_factory=commit_model_factory,
+            minimum_free_bytes=minimum_free_bytes,
+            model_idle_timeout_s=model_idle_timeout_s,
+            replay_manifest=replay_manifest,
+            replay_repeat=replay_repeat,
+            replay_silence_s=replay_silence_s,
+            replay_realtime=replay_realtime,
+            score_runtime=score_runtime,
+            score_runner=score_runner,
+            score_variant_runner=score_variant_runner,
+            web_root=web_root,
+            application_mode=application_mode,
+            isolate_models=isolate_models,
+            commit_threads=commit_threads,
+            correction_mode=correction_mode,
+            backend_profile_path=backend_profile_path,
+            public_origin=public_origin,
+            desktop_origin=desktop_origin,
+            desktop_token=desktop_token,
+            desktop_handshake=desktop_handshake,
+            compact_recordings=compact_recordings,
+            debug_retention=debug_retention,
+            debug_byte_cap=debug_byte_cap,
+            debug_max_age_s=debug_max_age_s,
+        )
+        try:
+            ThreadingHTTPServer.__init__(
+                self,
+                (bind, port),
+                CorrectedWorkbenchHandler,
+            )
+        except BaseException:
+            self.close()
+            raise
+
+    def server_close(self) -> None:
+        self.close()
+        ThreadingHTTPServer.server_close(self)
 
 
 class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
