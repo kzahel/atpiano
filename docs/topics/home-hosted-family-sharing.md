@@ -3,14 +3,12 @@
 Topic: home-hosted-family-sharing
 
 Status: **accepted near-term deployment direction as of 2026-07-28; basic
-family identity is implemented and held for human login/cutover review under
-Tactical 033.** The v3 application is shared on demand from the Mac through
-the home Pi and Caddy. SQLite users, memberships, and cookie sessions are
-implemented, but the live launchd service still uses the explicitly
-unauthenticated legacy composition until a real owner is created and the
-review accepts cutover. The managed PostgreSQL, object-storage, OIDC, broad
-tenancy, and sync program remains deferred with no active implementation
-schedule.
+family identity is implemented and live under Tactical 033.** The v3
+application is shared on demand from the Mac through the home Pi and Caddy.
+The live launchd service uses the authenticated FastAPI composition backed by
+SQLite users, memberships, and cookie sessions. The managed PostgreSQL,
+object-storage, OIDC, broad tenancy, and sync program remains deferred with no
+active implementation schedule.
 
 ## Scope And Relationship
 
@@ -102,15 +100,14 @@ and Caddy supplies HTTPS. They do not authenticate a person. Anyone who can
 reach an unauthenticated public hostname is not made trusted merely because
 the intended audience is family.
 
-Before the service is treated as private durable family storage or its URL is
-shared more broadly, accept and cut over the bounded SQLite account and
-cookie-session system in
-[`033-sqlite-family-authentication.md`](../tactical/033-sqlite-family-authentication.md).
-Validate ordinary HTTP, artifacts, and microphone WebSockets through it.
-This authorization does not include public signup, invitations, email,
-password reset, OIDC, or managed multi-tenant infrastructure.
+The bounded SQLite account and cookie-session system in
+[`033-sqlite-family-authentication.md`](../tactical/033-sqlite-family-authentication.md)
+is now the live service boundary. Ordinary HTTP, artifacts, and microphone
+WebSockets require an authenticated workspace member. This authorization does
+not include public signup, invitations, email, password reset, OIDC, or
+managed multi-tenant infrastructure.
 
-### Verified current exposure
+### Verified pre-cutover exposure
 
 On 2026-07-28, unauthenticated HTTPS requests to the live hostname returned:
 
@@ -126,7 +123,7 @@ release-boundary gap: the unresolved internal score runtime must not remain
 available through the public service merely because the local process can
 load it.
 
-Until then:
+Before the authenticated cutover:
 
 - treat the endpoint as a limited public trial;
 - keep the service off when it is not intentionally being shared;
@@ -134,10 +131,25 @@ Until then:
 - do not publicly expose the unresolved internal score runtime.
 
 The authenticated composition suppresses the public score capability, score
-mutations, and private score artifacts by default. While service cutover is
-held for review, the legacy public launcher also points at a deliberately
-absent score runtime. Neither public composition advertises or operates the
-unresolved internal score integration.
+mutations, and private score artifacts by default. The legacy public launcher
+also points at a deliberately absent score runtime if an operator explicitly
+rolls back. Neither public composition advertises or operates the unresolved
+internal score integration.
+
+### Authenticated cutover
+
+On 2026-07-28, after an enabled owner was created in the live workspace, the
+active launchd service was restarted with persistent family authentication
+enabled. Public verification returned:
+
+- HTTP 200 for the application shell, allowing the login UI to load;
+- HTTP 401 for `/api/v1/auth/session` without a session cookie; and
+- HTTP 401 for `/api/v1/capabilities` without a session cookie.
+
+The service remained active and reported `Family authentication: true`.
+Password credentials were not exposed to or exercised by the automated
+operator during cutover; the owner retains the human login and artifact
+review checkpoint.
 
 ## Operating Contract
 
@@ -167,8 +179,9 @@ eight-phase hosted migration:
 
 1. preserve and improve the working local application;
 2. reduce the desktop score/runtime footprint behind exact parity gates;
-3. review and cut over the implemented SQLite family identity catalog;
-4. enforce the implemented family access control before broader sharing; and
+3. monitor and refine the live SQLite family identity boundary;
+4. exercise authenticated history, artifacts, and microphone capture through
+   ordinary family use; and
 5. add backup, restore, or health checks only from an observed operational
    need.
 

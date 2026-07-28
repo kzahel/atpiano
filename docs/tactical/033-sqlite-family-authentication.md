@@ -2,11 +2,12 @@
 
 Topic: home-hosted-family-sharing
 
-Status: **implemented and held for human login/cutover review on
+Status: **implemented and cut over to the live family service on
 2026-07-28.** Alembic head `20260728_0001`, the typed identity service,
 administrator CLI, authenticated FastAPI adapter, minimal React login/logout
-boundary, and operational hardening are complete. The live launchd service
-has not been switched to authenticated mode.
+boundary, and operational hardening are complete. An enabled owner exists and
+the live launchd service now uses authenticated mode. Human browser login and
+artifact review remain the final acceptance check.
 
 ## Outcome
 
@@ -315,18 +316,23 @@ This section becomes the execution record as commits land. Record:
 - `0dc3b70` — record the completed human review checkpoint.
 - `9647f1c` — disable the unresolved score runtime in public legacy mode.
 
-### Human review hold
+### Human review and live cutover
 
-Do not invent or commit the real owner password. The reviewer should:
+On 2026-07-28 the reviewer created the real enabled owner interactively and
+authorized the live restart. The owner password was neither exposed to the
+operator nor committed. The service was restarted with:
 
-1. run
-   `uv run atpiano users --workspace results/workbench-v3 create USERNAME`;
-2. run the family server locally or explicitly authorize live cutover;
-3. sign in, review history and one artifact, confirm viewer mutation denial
-   if a viewer account is desired, and log out; and
-4. only after acceptance, run
-   `ATPIANO_FAMILY_AUTH=true scripts/share-atpiano-service restart`.
+`ATPIANO_FAMILY_AUTH=true scripts/share-atpiano-service restart`
 
-The authenticated service fails closed when no enabled owner exists. The
-legacy service remains live and unauthenticated at this checkpoint, so keep
-the existing limited-trial handling until cutover.
+It reported a ready listener and persistent
+`Family authentication: true`. Public checks returned HTTP 200 for the app
+shell and HTTP 401 for both `/api/v1/auth/session` and
+`/api/v1/capabilities` without credentials. The owner should now sign in
+through the ordinary browser, review history and one artifact, and log out.
+Viewer mutation denial can be reviewed later if a viewer account is desired.
+
+The authenticated service fails closed when no enabled owner exists. An
+explicit rollback remains available with
+`ATPIANO_FAMILY_AUTH=false scripts/share-atpiano-service restart`, but it
+restores the unauthenticated legacy boundary and should only be used
+deliberately.
