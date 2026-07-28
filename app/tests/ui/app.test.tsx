@@ -9,7 +9,20 @@ import { createFixtureRuntime } from "../../src/runtime/fixture-data.js";
 import { RuntimeProvider } from "../../src/runtime/runtime-context.js";
 import { useWorkspaceStore } from "../../src/state/workspace-store.js";
 
-function renderApp(runtime: AtpianoRuntime = createFixtureRuntime()) {
+function renderApp(
+  runtime: AtpianoRuntime = createFixtureRuntime(),
+  options: { readonly home?: boolean } = {},
+) {
+  if (
+    !options.home &&
+    new URL(window.location.href).searchParams.get("session") === null
+  ) {
+    window.history.replaceState(
+      null,
+      "",
+      "/?session=20260726T100000-abcdef123456",
+    );
+  }
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -28,6 +41,7 @@ describe("shared application", () => {
     window.localStorage.removeItem("atpiano.score-reader-density");
     useWorkspaceStore.setState({
       selectedSessionId: null,
+      libraryIntent: true,
       newIntent: false,
       showRoll: true,
       showKeyboard: true,
@@ -40,6 +54,53 @@ describe("shared application", () => {
         error: null,
       },
     });
+  });
+
+  it("uses the session library as the homepage", async () => {
+    renderApp(createFixtureRuntime(), { home: true });
+
+    expect(await screen.findByRole("heading", { name: "Sessions" }))
+      .toBeTruthy();
+    expect(screen.getByText("Your musical notebook")).toBeTruthy();
+    expect(
+      await screen.findAllByRole("button", { name: /Morning progression/ }),
+    ).toHaveLength(2);
+    expect(screen.queryByText("Schema v1")).toBeNull();
+    expect(screen.queryByText("Local engine")).toBeNull();
+    expect(screen.queryByText("On this device")).toBeNull();
+    expect(new URL(window.location.href).searchParams.get("session")).toBeNull();
+  });
+
+  it("returns to Sessions from the atpiano brand", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("heading", { name: "Morning progression" });
+
+    await user.click(
+      screen.getByRole("button", { name: "Atpiano Sessions home" }),
+    );
+
+    expect(await screen.findByRole("heading", { name: "Sessions" }))
+      .toBeTruthy();
+    expect(new URL(window.location.href).searchParams.get("session")).toBeNull();
+  });
+
+  it("renames a session inline and shows save completion", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("heading", { name: "Morning progression" });
+
+    await user.click(
+      screen.getByRole("button", { name: "Rename Morning progression" }),
+    );
+    const input = screen.getByRole("textbox", { name: "Session name" });
+    await user.clear(input);
+    await user.type(input, "Sunday invention{Enter}");
+
+    expect(
+      await screen.findByRole("heading", { name: "Sunday invention" }),
+    ).toBeTruthy();
+    expect(await screen.findByText("Saved ✓")).toBeTruthy();
   });
 
   it("shows performance history and independently toggles its views", async () => {
@@ -406,7 +467,9 @@ describe("shared application", () => {
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: /Nocturne sketch/ })).toBeNull();
     });
-    expect(screen.getByRole("button", { name: /Morning progression/ })).toBeTruthy();
+    expect(
+      screen.getAllByRole("button", { name: /Morning progression/ }),
+    ).toHaveLength(2);
   });
 
   it("isolates a failed score job from session review", async () => {

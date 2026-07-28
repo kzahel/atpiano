@@ -19,6 +19,7 @@ export interface CaptureState {
 
 interface WorkspaceState {
   selectedSessionId: string | null;
+  libraryIntent: boolean;
   newIntent: boolean;
   showRoll: boolean;
   showKeyboard: boolean;
@@ -27,6 +28,7 @@ interface WorkspaceState {
   inspectionSample: number | null;
   captureState: CaptureState;
   selectSession(sessionId: string): void;
+  showLibrary(): void;
   beginNew(): void;
   toggleView(view: "roll" | "keyboard" | "score"): void;
   setFollowHead(value: boolean): void;
@@ -53,6 +55,7 @@ function message(error: unknown): string {
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   selectedSessionId: null,
+  libraryIntent: true,
   newIntent: false,
   showRoll: true,
   showKeyboard: true,
@@ -63,12 +66,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   selectSession: (sessionId) =>
     set({
       selectedSessionId: sessionId,
+      libraryIntent: false,
+      newIntent: false,
+      inspectionSample: null,
+    }),
+  showLibrary: () =>
+    set({
+      selectedSessionId: null,
+      libraryIntent: true,
       newIntent: false,
       inspectionSample: null,
     }),
   beginNew: () =>
     set({
       selectedSessionId: null,
+      libraryIntent: false,
       newIntent: true,
       inspectionSample: null,
     }),
@@ -106,6 +118,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
               error: null,
             },
             selectedSessionId: capture.session_id,
+            libraryIntent: false,
             newIntent: false,
           }
         : {},

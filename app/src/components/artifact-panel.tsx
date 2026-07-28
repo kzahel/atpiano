@@ -29,11 +29,13 @@ export function ArtifactPanel({
   artifacts,
   baselineScoreArtifactId,
   selectedScoreArtifactId,
+  error,
   onDownload,
 }: {
   readonly artifacts: readonly Artifact[];
   readonly baselineScoreArtifactId: string | undefined;
   readonly selectedScoreArtifactId: string | undefined;
+  readonly error: string | null;
   readonly onDownload: (artifact: Artifact) => void;
 }) {
   return (
@@ -42,6 +44,7 @@ export function ArtifactPanel({
         <p className="eyebrow">Session evidence</p>
         <h3 id="artifacts-title">Exports</h3>
       </div>
+      {error && <p className="surface-feedback error" role="alert">{error}</p>}
       {artifacts.length ? (
         <div className="artifact-list">
           {artifacts.map((artifact) => (

@@ -21,6 +21,7 @@ describe("workspace state", () => {
   beforeEach(() => {
     useWorkspaceStore.setState({
       selectedSessionId: null,
+      libraryIntent: true,
       newIntent: false,
       showRoll: true,
       showKeyboard: true,
@@ -45,7 +46,17 @@ describe("workspace state", () => {
     useWorkspaceStore.getState().recordCapture("request-1", capture);
 
     expect(useWorkspaceStore.getState().newIntent).toBe(false);
+    expect(useWorkspaceStore.getState().libraryIntent).toBe(false);
     expect(useWorkspaceStore.getState().selectedSessionId).toBe("session-current");
+  });
+
+  it("returns selection and New intent to the Sessions library", () => {
+    useWorkspaceStore.getState().selectSession("session-history");
+    useWorkspaceStore.getState().showLibrary();
+
+    expect(useWorkspaceStore.getState().libraryIntent).toBe(true);
+    expect(useWorkspaceStore.getState().newIntent).toBe(false);
+    expect(useWorkspaceStore.getState().selectedSessionId).toBeNull();
   });
 
   it("rejects a late completion from an earlier capture intent", () => {

@@ -35,6 +35,7 @@ function Root({
   readonly viewer?: {
     readonly username: string;
     readonly displayName: string;
+    readonly canWrite: boolean;
     readonly logoutPending: boolean;
     readonly onLogout: () => void;
   };
@@ -104,6 +105,11 @@ function renderAuthenticated(
             viewer={{
               username: session.principal.username,
               displayName: session.principal.display_name,
+              canWrite: session.principal.memberships.some(
+                (membership) =>
+                  membership.workspace_id === "local" &&
+                  membership.role !== "viewer",
+              ),
               logoutPending,
               onLogout: logout,
             }}

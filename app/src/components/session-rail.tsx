@@ -1,25 +1,29 @@
 import { useEffect, useRef } from "react";
 
-import type { Session, Workspace } from "../runtime/atpiano-runtime.js";
+import type { Session } from "../runtime/atpiano-runtime.js";
 import { formatClock, formatSessionDate } from "../lib/format.js";
 
 export function SessionRail({
-  workspace,
   sessions,
   selectedSessionId,
   activeSessionId,
+  libraryIntent,
   newIntent,
+  canWrite,
   mobileOpen,
+  onHome,
   onNew,
   onSelect,
   onClose,
 }: {
-  readonly workspace: Workspace | undefined;
   readonly sessions: readonly Session[];
   readonly selectedSessionId: string | null;
   readonly activeSessionId: string | null;
+  readonly libraryIntent: boolean;
   readonly newIntent: boolean;
+  readonly canWrite: boolean;
   readonly mobileOpen: boolean;
+  readonly onHome: () => void;
   readonly onNew: () => void;
   readonly onSelect: (sessionId: string) => void;
   readonly onClose: () => void;
@@ -39,11 +43,15 @@ export function SessionRail({
       aria-label="Session history"
     >
       <div className="brand">
-        <span className="brand-mark" aria-hidden="true">A</span>
-        <div>
+        <button
+          className="brand-home"
+          type="button"
+          aria-label="Atpiano Sessions home"
+          onClick={onHome}
+        >
+          <span className="brand-mark" aria-hidden="true">A</span>
           <strong>atpiano</strong>
-          <small>{workspace?.name ?? "Connecting…"}</small>
-        </div>
+        </button>
         <button
           className="rail-close"
           ref={closeButton}
@@ -56,17 +64,28 @@ export function SessionRail({
       </div>
 
       <button
-        className={`new-session ${newIntent ? "selected" : ""}`}
+        className={`all-sessions ${libraryIntent ? "selected" : ""}`}
         type="button"
-        onClick={onNew}
+        aria-current={libraryIntent ? "page" : undefined}
+        onClick={onHome}
       >
-        <span aria-hidden="true">＋</span>
-        New session
+        <span aria-hidden="true">⌂</span>
+        All sessions
       </button>
+
+      {canWrite && (
+        <button
+          className={`new-session ${newIntent ? "selected" : ""}`}
+          type="button"
+          onClick={onNew}
+        >
+          <span aria-hidden="true">＋</span>
+          New session
+        </button>
+      )}
 
       <div className="history-heading">
         <span>Recent performances</span>
-        <span>{sessions.length}</span>
       </div>
       <nav className="session-list">
         {sessions.map((session) => {
@@ -97,10 +116,6 @@ export function SessionRail({
           );
         })}
       </nav>
-      <p className="rail-note">
-        Stored locally
-        <span>Audio never leaves this runtime.</span>
-      </p>
     </aside>
   );
 }

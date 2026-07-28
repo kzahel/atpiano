@@ -17,6 +17,8 @@ import { CaptureDeck } from "./components/capture-deck.js";
 import { PerformanceViews } from "./components/performance-views.js";
 import { ScoreReader } from "./components/score-reader.js";
 import { SessionRail } from "./components/session-rail.js";
+import { SessionTitleEditor } from "./components/session-title-editor.js";
+import { SessionsHome } from "./components/sessions-home.js";
 import { useMicrophone } from "./hooks/use-microphone.js";
 import { artifactText } from "./lib/artifact-content.js";
 import { eventWindow, liveFrameCount } from "./lib/event-window.js";
@@ -36,6 +38,7 @@ import type {
   Job,
   ScoreVariant,
   Session,
+  SessionPage,
 } from "./runtime/atpiano-runtime.js";
 import { useRuntime } from "./runtime/runtime-context.js";
 import { useWorkspaceStore } from "./state/workspace-store.js";
@@ -78,6 +81,7 @@ function EmptyWorkspace({ onNew }: { readonly onNew: () => void }) {
 export interface AppViewer {
   readonly username: string;
   readonly displayName: string;
+  readonly canWrite: boolean;
   readonly logoutPending: boolean;
   readonly onLogout: () => void;
 }
@@ -90,8 +94,10 @@ export function App({
   const runtime = useRuntime();
   const queryClient = useQueryClient();
   const selectedSessionId = useWorkspaceStore((state) => state.selectedSessionId);
+  const libraryIntent = useWorkspaceStore((state) => state.libraryIntent);
   const newIntent = useWorkspaceStore((state) => state.newIntent);
   const selectSession = useWorkspaceStore((state) => state.selectSession);
+  const showLibrary = useWorkspaceStore((state) => state.showLibrary);
   const beginNew = useWorkspaceStore((state) => state.beginNew);
   const captureState = useWorkspaceStore((state) => state.captureState);
   const beginCapture = useWorkspaceStore((state) => state.beginCapture);
@@ -109,7 +115,12 @@ export function App({
   );
   const [eventPage, setEventPage] = useState<EventPage | null>(null);
   const [scoreJob, setScoreJob] = useState<Job | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [eventError, setEventError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [sessionActionError, setSessionActionError] =
+    useState<string | null>(null);
+  const [scoreActionError, setScoreActionError] = useState<string | null>(null);
   const [routeReady, setRouteReady] = useState(false);
   const [scoreReaderRoute, setScoreReaderRoute] =
     useState<ScoreReaderRoute | null>(() =>
@@ -121,6 +132,13 @@ export function App({
     useState<string | null>(null);
   const [sessionNavOpen, setSessionNavOpen] = useState(false);
   const sessionNavTrigger = useRef<HTMLButtonElement>(null);
+  const canWrite = viewer?.canWrite ?? true;
+
+  useEffect(() => {
+    if (toast === null) return;
+    const timer = window.setTimeout(() => setToast(null), 3_200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   const closeSessionNav = useCallback(() => {
     setSessionNavOpen(false);
@@ -131,6 +149,11 @@ export function App({
     selectSession(sessionId);
     closeSessionNav();
   }, [closeSessionNav, selectSession]);
+
+  const showLibraryFromSessionNav = useCallback(() => {
+    showLibrary();
+    closeSessionNav();
+  }, [closeSessionNav, showLibrary]);
 
   const beginNewFromSessionNav = useCallback(() => {
     beginNew();
@@ -194,18 +217,20 @@ export function App({
   useEffect(() => {
     const requestedSession = sessionIdFromUrl(window.location.href);
     if (requestedSession) selectSession(requestedSession);
+    else showLibrary();
     setRouteReady(true);
-  }, [selectSession]);
+  }, [selectSession, showLibrary]);
 
   useEffect(() => {
     const restoreRoute = () => {
       const requestedSession = sessionIdFromUrl(window.location.href);
       if (requestedSession) selectSession(requestedSession);
+      else showLibrary();
       setScoreReaderRoute(scoreReaderRouteFromUrl(window.location.href));
     };
     window.addEventListener("popstate", restoreRoute);
     return () => window.removeEventListener("popstate", restoreRoute);
-  }, [selectSession]);
+  }, [selectSession, showLibrary]);
 
   useEffect(() => {
     if (!routeReady) return;
@@ -214,28 +239,10 @@ export function App({
       "",
       urlForSession(
         window.location.href,
-        newIntent ? null : selectedSessionId,
+        libraryIntent || newIntent ? null : selectedSessionId,
       ),
     );
-  }, [newIntent, routeReady, selectedSessionId]);
-
-  useEffect(() => {
-    if (
-      routeReady &&
-      !newIntent &&
-      selectedSessionId === null &&
-      sessionItems[0] !== undefined
-    ) {
-      selectSession(activeSession?.session_id ?? sessionItems[0].session_id);
-    }
-  }, [
-    activeSession?.session_id,
-    newIntent,
-    routeReady,
-    selectSession,
-    selectedSessionId,
-    sessionItems,
-  ]);
+  }, [libraryIntent, newIntent, routeReady, selectedSessionId]);
 
   const selectedSession = useQuery({
     queryKey: ["session", workspace?.workspace_id, selectedSessionId],
@@ -482,13 +489,15 @@ export function App({
     setScoreJob(result);
     if (result.status === "complete") {
       void queryClient.invalidateQueries({ queryKey: ["artifacts"] });
+      setScoreActionError(null);
       if (result.session_id === autoScoringSessionId) {
-        setNotice("Capture settled and the score snapshot is ready.");
         setAutoScoringSessionId(null);
       }
     }
     if (result.status === "failed") {
-      setNotice(result.error?.message ?? "Score generation failed.");
+      setScoreActionError(
+        result.error?.message ?? "Score generation failed.",
+      );
       if (result.session_id === autoScoringSessionId) {
         setAutoScoringSessionId(null);
       }
@@ -531,10 +540,16 @@ export function App({
     setAutoScoringSessionId((sessionId) =>
       sessionId === scoreJob.session_id ? null : sessionId,
     );
-    setNotice(message);
+    setScoreActionError(message);
   }, [scoreJob, scoreJobQuery.error]);
 
-  useEffect(() => setEventPage(null), [selectedSessionId]);
+  useEffect(() => {
+    setEventPage(null);
+    setEventError(null);
+    setExportError(null);
+    setSessionActionError(null);
+    setScoreActionError(null);
+  }, [selectedSessionId]);
 
   useEffect(() => {
     if (!workspace || !selectedSession.data) return;
@@ -557,10 +572,15 @@ export function App({
       },
       {
         next(page) {
-          if (page.session_id === target.session_id) setEventPage(page);
+          if (page.session_id === target.session_id) {
+            setEventPage(page);
+            setEventError(null);
+          }
         },
         error(error) {
-          setNotice(error instanceof Error ? error.message : String(error));
+          setEventError(
+            error instanceof Error ? error.message : String(error),
+          );
         },
       },
     );
@@ -643,13 +663,16 @@ export function App({
       );
     },
     onSuccess: async (result) => {
-      beginNew();
-      setNotice(`Session ${result.session_id} moved to recoverable trash.`);
+      showLibrary();
+      setSessionActionError(null);
+      setToast("Session moved to recoverable trash.");
       await invalidateWorkspace();
     },
     onError: (error) => {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      setNotice(error instanceof Error ? error.message : String(error));
+      setSessionActionError(
+        error instanceof Error ? error.message : String(error),
+      );
     },
   });
 
@@ -678,15 +701,17 @@ export function App({
         { requestId: requestId("score-variant-create") },
       );
     },
-    onSuccess: async (variant) => {
-      setNotice(`Selected ${variant.label}.`);
+    onSuccess: async () => {
+      setScoreActionError(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["artifacts"] }),
         queryClient.invalidateQueries({ queryKey: ["score-variants"] }),
       ]);
     },
     onError: (error) => {
-      setNotice(error instanceof Error ? error.message : String(error));
+      setScoreActionError(
+        error instanceof Error ? error.message : String(error),
+      );
     },
   });
 
@@ -737,6 +762,7 @@ export function App({
   const generateScore = useCallback(async () => {
     const target = selectedSession.data;
     if (!target || !horizon.data || !target.current_transcription_run_id) return;
+    setScoreActionError(null);
     setScoreJob({
       schema_version: "atpiano.contract.v1",
       workspace_id: target.workspace_id,
@@ -770,7 +796,9 @@ export function App({
       setAutoScoringSessionId((sessionId) =>
         sessionId === target.session_id ? null : sessionId,
       );
-      setNotice(error instanceof Error ? error.message : String(error));
+      setScoreActionError(
+        error instanceof Error ? error.message : String(error),
+      );
     }
   }, [horizon.data, queryClient, runtime, selectedSession.data]);
 
@@ -786,11 +814,9 @@ export function App({
     }
     setPendingAutoScoreSessionId(null);
     if (!capabilities.data?.score_available) {
-      setNotice("Capture settled. Score generation is not installed.");
       return;
     }
     setAutoScoringSessionId(target.session_id);
-    setNotice("Capture settled. Generating the score snapshot…");
     void generateScore();
   }, [
     capabilities.data?.score_available,
@@ -801,6 +827,7 @@ export function App({
   ]);
 
   const exportArtifact = useCallback(async (artifact: Artifact) => {
+    setExportError(null);
     try {
       const result = await runtime.exportArtifact(
         artifact.workspace_id,
@@ -809,12 +836,12 @@ export function App({
         { requestId: requestId("artifact-access") },
       );
       if (result.outcome === "saved" && result.fileName) {
-        setNotice(`Saved ${result.fileName}.`);
+        setToast(`Saved ${result.fileName}.`);
       } else if (result.outcome === "download-started" && result.fileName) {
-        setNotice(`Downloading ${result.fileName}…`);
+        setToast(`Downloading ${result.fileName}…`);
       }
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : String(error));
+      setExportError(error instanceof Error ? error.message : String(error));
     }
   }, [runtime]);
 
@@ -828,14 +855,50 @@ export function App({
         { requestId: requestId("reader-score-download") },
       );
       if (result.outcome === "saved" && result.fileName) {
-        setNotice(`Saved ${result.fileName}.`);
+        setToast(`Saved ${result.fileName}.`);
       } else if (result.outcome === "download-started" && result.fileName) {
-        setNotice(`Downloading ${result.fileName}…`);
+        setToast(`Downloading ${result.fileName}…`);
       }
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : String(error));
+      setToast(error instanceof Error ? error.message : String(error));
     }
   }, [runtime, scoreReaderRoute, selectedSessionId, workspace]);
+
+  const saveSelectedTitle = useCallback(async (displayName: string) => {
+    const target = selectedSession.data;
+    if (!target) throw new Error("No session is selected.");
+    const annotation = await runtime.updateSessionAnnotation(
+      {
+        schema_version: "atpiano.contract.v1",
+        workspace_id: target.workspace_id,
+        session_id: target.session_id,
+        display_name: displayName,
+        request_id: requestId("session-name"),
+      },
+      { requestId: requestId("session-name-save") },
+    );
+    queryClient.setQueryData<Session>(
+      ["session", target.workspace_id, target.session_id],
+      (current) =>
+        current
+          ? { ...current, display_name: annotation.display_name }
+          : current,
+    );
+    queryClient.setQueryData<SessionPage>(
+      ["sessions", target.workspace_id],
+      (current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.map((session) =>
+                session.session_id === target.session_id
+                  ? { ...session, display_name: annotation.display_name }
+                  : session
+              ),
+            }
+          : current,
+    );
+  }, [queryClient, runtime, selectedSession.data]);
 
   const currentScoreRoute = useMemo<ScoreReaderRoute | null>(
     () =>
@@ -891,12 +954,6 @@ export function App({
     ? { ...selected, source_frame_count: selectedFrames }
     : selected;
   const events = eventPage?.items ?? [];
-  const noteCount = events.filter(
-    (event) => event.kind === "note" && event.lifecycle !== "retracted",
-  ).length;
-  const committedCount = events.filter(
-    (event) => event.kind === "note" && event.lifecycle === "committed",
-  ).length;
   const selectedIsActive = selected?.session_id === activeSession?.session_id;
   const settleAudioHead = horizon.data?.audio_head_sample ?? selectedFrames;
   const settleCommit = horizon.data?.commit_sample ?? 0;
@@ -945,12 +1002,14 @@ export function App({
   return (
     <div className="app-shell">
       <SessionRail
-        workspace={workspace}
-        sessions={sessionItems}
+        sessions={sessionItems.slice(0, 6)}
         selectedSessionId={selectedSessionId}
         activeSessionId={activeSession?.session_id ?? null}
+        libraryIntent={libraryIntent}
         newIntent={newIntent}
+        canWrite={canWrite}
         mobileOpen={sessionNavOpen}
+        onHome={showLibraryFromSessionNav}
         onNew={beginNewFromSessionNav}
         onSelect={selectFromSessionNav}
         onClose={closeSessionNav}
@@ -982,12 +1041,6 @@ export function App({
               </span>
               Sessions
             </button>
-            <span className="runtime-badge">
-              <i aria-hidden="true" />
-              {capabilities.data?.runtime_mode === "fixture"
-                ? "Deterministic fixture"
-                : "Local engine"}
-            </span>
           </div>
           <div className="topbar-actions">
             {viewer !== undefined && (
@@ -1002,24 +1055,8 @@ export function App({
                 </button>
               </div>
             )}
-            <span>Schema v1</span>
-            <button
-              className="help-button"
-              type="button"
-              title="Atpiano keeps provisional and corrected notes visibly distinct."
-              aria-label="About this workspace"
-            >
-              ?
-            </button>
           </div>
         </header>
-
-        {notice && (
-          <div className="notice" role="status">
-            <span>{notice}</span>
-            <button type="button" onClick={() => setNotice(null)}>Dismiss</button>
-          </div>
-        )}
 
         {(workspaces.isError || sessions.isError) && (
           <section className="fatal-state" role="alert">
@@ -1029,11 +1066,21 @@ export function App({
           </section>
         )}
 
-        {!newIntent && !selected && !sessions.isLoading && (
+        {libraryIntent && !sessions.isLoading && !sessions.isError && (
+          <SessionsHome
+            sessions={sessionItems}
+            activeSessionId={activeSession?.session_id ?? null}
+            canWrite={canWrite}
+            onNew={beginNew}
+            onSelect={selectSession}
+          />
+        )}
+
+        {!libraryIntent && !newIntent && !selected && !sessions.isLoading && (
           <EmptyWorkspace onNew={beginNew} />
         )}
 
-        {newIntent && (
+        {newIntent && canWrite && (
           <CaptureDeck
             capabilities={capabilities.data}
             captureState={captureState}
@@ -1051,8 +1098,14 @@ export function App({
               <div className="session-title">
                 <p className="eyebrow">
                   {selectedIsActive ? "Active performance" : "Saved performance"}
+                  <span aria-hidden="true">·</span>
+                  <i className={`state-${selected.status}`}>{selected.status}</i>
                 </p>
-                <h1>{selected.display_name ?? "Untitled performance"}</h1>
+                <SessionTitleEditor
+                  session={selected}
+                  canEdit={canWrite}
+                  onSave={saveSelectedTitle}
+                />
                 <p>
                   {formatSessionDate(selected.started_at)}
                   <span>·</span>
@@ -1074,7 +1127,7 @@ export function App({
                       : "Stop & settle"}
                   </button>
                 )}
-                {!selectedIsActive && (
+                {!selectedIsActive && canWrite && (
                   <button
                     className="button danger-quiet"
                     type="button"
@@ -1084,11 +1137,19 @@ export function App({
                     Delete session
                   </button>
                 )}
-                <button className="button secondary" type="button" onClick={beginNew}>
-                  New session
-                </button>
+                {canWrite && (
+                  <button className="button secondary" type="button" onClick={beginNew}>
+                    New session
+                  </button>
+                )}
               </div>
             </section>
+
+            {sessionActionError && (
+              <p className="surface-feedback error session-action-error" role="alert">
+                {sessionActionError}
+              </p>
+            )}
 
             {activeSession && !selectedIsActive && (
               <button
@@ -1156,35 +1217,28 @@ export function App({
               </div>
             )}
 
-            <section className="metrics-row" aria-label="Session summary">
-              <article>
-                <span>Recognized notes</span>
-                <strong>{noteCount}</strong>
-                <small>{committedCount} corrected</small>
-              </article>
-              <article>
-                <span>Corrected through</span>
-                <strong>
-                  {horizon.data
-                    ? formatClock(horizon.data.commit_sample, selected.sample_rate_hz)
-                    : "—"}
-                </strong>
-                <small>
-                  {selected.correction_mode
-                    ? `${selected.correction_mode} correction`
-                    : "source sample horizon"}
-                </small>
-              </article>
-              <article>
-                <span>Session state</span>
-                <strong className={`state-${selected.status}`}>{selected.status}</strong>
-                <small>{selectedIsActive ? "writer attached" : "read-only history"}</small>
-              </article>
-              <article>
-                <span>Artifacts</span>
-                <strong>{artifacts.data?.items.length ?? 0}</strong>
-                <small>checksummed exports</small>
-              </article>
+            <section className="session-summary" aria-label="Session summary">
+              <span>
+                <strong>{selected.recognized_note_count}</strong> notes
+              </span>
+              <i aria-hidden="true">·</i>
+              <span>
+                <strong>{selected.corrected_note_count}</strong> corrected
+              </span>
+              {selected.status === "stopping" && (
+                <>
+                  <i aria-hidden="true">·</i>
+                  <span>
+                    corrected through{" "}
+                    <strong>
+                      {formatClock(
+                        horizon.data?.commit_sample ?? 0,
+                        selected.sample_rate_hz,
+                      )}
+                    </strong>
+                  </span>
+                </>
+              )}
             </section>
 
             <section className="performance-heading">
@@ -1198,6 +1252,21 @@ export function App({
                 <ViewSwitch checked={showScore} label="Score" onChange={() => toggleView("score")} />
               </div>
             </section>
+
+            {(eventError || scoreActionError) && (
+              <div className="performance-feedback">
+                {eventError && (
+                  <p className="surface-feedback error" role="alert">
+                    The performance events could not refresh. {eventError}
+                  </p>
+                )}
+                {scoreActionError && (
+                  <p className="surface-feedback error" role="alert">
+                    {scoreActionError}
+                  </p>
+                )}
+              </div>
+            )}
 
             <PerformanceViews
               session={displayedSession}
@@ -1240,14 +1309,22 @@ export function App({
                 selectedScoreVariant?.baseline_musicxml_artifact_id
               }
               selectedScoreArtifactId={scoreArtifact?.artifact_id}
+              error={
+                exportError ??
+                (artifacts.error instanceof Error
+                  ? artifacts.error.message
+                  : artifacts.error
+                    ? String(artifacts.error)
+                    : null)
+              }
               onDownload={(artifact) => void exportArtifact(artifact)}
             />
-            <footer className="session-footer">
-              <span>Session ID</span>
-              <code>{selected.session_id}</code>
-              <span>Source sample clock · {selected.sample_rate_hz.toLocaleString()} Hz</span>
-            </footer>
           </>
+        )}
+        {toast && (
+          <div className="toast" role="status" aria-live="polite">
+            {toast}
+          </div>
         )}
       </main>
     </div>

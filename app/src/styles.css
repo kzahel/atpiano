@@ -196,8 +196,19 @@ input:focus-visible {
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 8px;
   padding: 0 8px 25px;
+}
+
+.brand-home {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
 .brand-mark {
@@ -213,22 +224,12 @@ input:focus-visible {
   background: #10211c;
 }
 
-.brand strong,
-.brand small {
-  display: block;
-}
-
 .brand strong {
   letter-spacing: -0.04em;
   font-size: 18px;
 }
 
-.brand small {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 11px;
-}
-
+.all-sessions,
 .new-session {
   display: flex;
   align-items: center;
@@ -242,6 +243,20 @@ input:focus-visible {
   cursor: pointer;
   font-weight: 700;
   text-align: left;
+}
+
+.all-sessions {
+  margin-bottom: 7px;
+  border-color: transparent;
+  color: #a8bab3;
+  background: transparent;
+}
+
+.all-sessions:hover,
+.all-sessions.selected {
+  border-color: #2e493f;
+  color: #e1eee8;
+  background: #13241f;
 }
 
 .new-session:hover,
@@ -383,7 +398,7 @@ input:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 74px;
+  height: 62px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -391,23 +406,6 @@ input:focus-visible {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.runtime-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #a3b4ad;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.runtime-badge i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--mint);
-  box-shadow: 0 0 0 5px rgba(98, 214, 165, 0.1);
 }
 
 .topbar-actions {
@@ -420,17 +418,6 @@ input:focus-visible {
   text-transform: uppercase;
 }
 
-.help-button {
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  color: #94a79f;
-  background: transparent;
-  cursor: help;
-}
-
-.notice,
 .active-capture-banner {
   display: flex;
   align-items: center;
@@ -445,13 +432,6 @@ input:focus-visible {
   font-size: 12px;
 }
 
-.notice button {
-  border: 0;
-  color: var(--mint);
-  background: none;
-  cursor: pointer;
-}
-
 .eyebrow {
   margin: 0 0 8px;
   color: var(--mint);
@@ -464,13 +444,12 @@ input:focus-visible {
 
 .session-hero {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 30px;
-  padding: 52px 0 30px;
+  padding: 28px 0 17px;
 }
 
-.session-title h1,
 .empty-workspace h1,
 .fatal-state h1 {
   margin: 0;
@@ -479,6 +458,99 @@ input:focus-visible {
   font-weight: 500;
   letter-spacing: -0.055em;
   line-height: 1.06;
+}
+
+.session-title h1 {
+  margin: 0;
+  color: #f4f1e8;
+  font-size: clamp(25px, 3vw, 35px);
+  font-weight: 550;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+}
+
+.session-title .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.session-title .eyebrow i {
+  color: #82978e;
+  font-style: normal;
+}
+
+.session-title .eyebrow .state-active,
+.session-title .eyebrow .state-stopping {
+  color: var(--mint);
+}
+
+.session-title .eyebrow .state-failed {
+  color: var(--red);
+}
+
+.session-name {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 9px;
+}
+
+.session-name.editing {
+  flex-wrap: wrap;
+}
+
+.session-name label {
+  min-width: min(520px, 64vw);
+}
+
+.session-name input {
+  width: 100%;
+  padding: 6px 9px;
+  border: 1px solid #4a685d;
+  border-radius: 6px;
+  color: #f4f1e8;
+  background: #0c1915;
+  font-size: clamp(23px, 3vw, 34px);
+  font-weight: 550;
+  letter-spacing: -0.04em;
+}
+
+.rename-trigger {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  color: #7e968c;
+  background: transparent;
+  cursor: pointer;
+}
+
+.rename-trigger:hover {
+  border-color: #365247;
+  color: var(--mint);
+  background: #13251f;
+}
+
+.save-state {
+  color: #7f948b;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.save-state.saving {
+  color: var(--amber);
+}
+
+.save-state.saved {
+  color: var(--mint);
+}
+
+.save-state.error {
+  color: #ffaaa0;
 }
 
 .session-title > p:last-child {
@@ -652,56 +724,192 @@ input:focus-visible {
   animation: none;
 }
 
-.metrics-row {
+.session-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 11px 14px;
+  border: 1px solid #263a33;
+  border-radius: 7px;
+  color: #82978e;
+  background: #0d1916;
+  font-size: 11px;
+}
+
+.session-summary strong {
+  color: #e9f1ed;
+  font-family: "DM Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.session-summary > i {
+  color: #3f554c;
+  font-style: normal;
+}
+
+.sessions-home {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 48px 0 60px;
+}
+
+.sessions-home-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+  padding-bottom: 24px;
+}
+
+.sessions-home-heading h1 {
+  margin: 0;
+  font-size: clamp(34px, 5vw, 52px);
+  font-weight: 550;
+  letter-spacing: -0.055em;
+}
+
+.sessions-home-heading p:last-child {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.session-library-list {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.library-session {
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #0e1b18;
+  border-radius: 9px;
+  background: rgba(14, 27, 24, 0.84);
 }
 
-.metrics-row article {
-  min-width: 0;
-  padding: 17px 19px;
-  border-right: 1px solid var(--line);
+.library-session.active {
+  border-color: #35624f;
+  box-shadow: inset 3px 0 var(--mint);
 }
 
-.metrics-row article:last-child {
+.library-session-main {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(210px, 1.4fr) minmax(250px, 1fr) auto auto;
+  align-items: center;
+  gap: 20px;
+  padding: 17px 18px;
   border: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
 }
 
-.metrics-row span,
-.metrics-row small {
-  display: block;
-  color: #72857d;
-  font-size: 9px;
+.library-session-main:hover {
+  background: #13241f;
 }
 
-.metrics-row span {
-  font-family: "DM Mono", monospace;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.library-session-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
 }
 
-.metrics-row strong {
-  display: block;
-  margin: 7px 0 3px;
-  color: #edf3ef;
-  font-family: "DM Mono", monospace;
-  font-size: 20px;
-  font-weight: 500;
+.library-session-title strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.metrics-row .state-active,
-.metrics-row .state-stopping {
+.library-session-meta,
+.library-session-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #7c9087;
+  font-size: 10px;
+}
+
+.library-session-meta i,
+.library-session-summary i {
+  color: #40564d;
+  font-style: normal;
+}
+
+.library-session-open {
   color: var(--mint);
-  text-transform: capitalize;
+  font-size: 10px;
+  font-weight: 700;
 }
 
-.metrics-row .state-failed {
-  color: var(--red);
-  text-transform: capitalize;
+.sessions-empty {
+  display: grid;
+  min-height: 330px;
+  place-items: center;
+  align-content: center;
+  padding: 42px;
+  border: 1px dashed #31483f;
+  border-radius: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.sessions-empty > span {
+  color: var(--mint);
+  font-family: serif;
+  font-size: 32px;
+}
+
+.sessions-empty h2 {
+  margin: 12px 0 0;
+  color: var(--cream);
+}
+
+.sessions-empty p {
+  margin: 8px 0 22px;
+  font-size: 12px;
+}
+
+.surface-feedback {
+  margin: 8px 0;
+  color: #bdd3ca;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.surface-feedback.error {
+  padding: 9px 11px;
+  border: 1px solid #69443e;
+  border-radius: 6px;
+  color: #ffc1b9;
+  background: #2b1816;
+}
+
+.session-action-error {
+  margin-top: 0;
+}
+
+.performance-feedback {
+  margin-bottom: 10px;
+}
+
+.toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 50;
+  max-width: min(380px, calc(100vw - 30px));
+  padding: 11px 14px;
+  border: 1px solid #416355;
+  border-radius: 8px;
+  color: #dff5eb;
+  background: #173126;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32);
+  font-size: 12px;
 }
 
 .performance-heading {
@@ -1312,24 +1520,6 @@ input:focus-visible {
   font-size: 11px;
 }
 
-.session-footer {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 22px 2px 0;
-  color: #53675f;
-  font-family: "DM Mono", monospace;
-  font-size: 8px;
-}
-
-.session-footer code {
-  color: #80968d;
-}
-
-.session-footer span:last-child {
-  margin-left: auto;
-}
-
 .capture-deck {
   max-width: 820px;
   margin: 70px auto 0;
@@ -1459,20 +1649,21 @@ input:focus-visible {
     padding: 0 24px 42px;
   }
 
-  .metrics-row {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .metrics-row article:nth-child(2) {
-    border-right: 0;
-  }
-
-  .metrics-row article:nth-child(-n + 2) {
-    border-bottom: 1px solid var(--line);
-  }
-
   .artifact-panel {
     grid-template-columns: 1fr;
+  }
+
+  .library-session-main {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .library-session-summary {
+    grid-column: 1;
+  }
+
+  .library-session-open {
+    grid-column: 2;
+    grid-row: 1 / span 2;
   }
 }
 
@@ -1584,14 +1775,6 @@ input:focus-visible {
     height: 62px;
   }
 
-  .runtime-badge {
-    font-size: 0;
-  }
-
-  .runtime-badge i {
-    margin-left: 3px;
-  }
-
   .session-hero,
   .performance-heading {
     align-items: stretch;
@@ -1609,15 +1792,42 @@ input:focus-visible {
   }
 
   .session-hero {
-    padding-top: 35px;
+    padding-top: 24px;
   }
 
   .session-actions .button {
     flex: 1;
   }
 
-  .metrics-row {
-    grid-template-columns: 1fr 1fr;
+  .sessions-home {
+    padding-top: 28px;
+  }
+
+  .sessions-home-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sessions-home-heading .button {
+    align-self: flex-start;
+  }
+
+  .library-session-main {
+    grid-template-columns: 1fr;
+    gap: 7px;
+    padding: 17px 16px;
+  }
+
+  .library-session-meta,
+  .library-session-summary,
+  .library-session-open {
+    grid-column: 1;
+  }
+
+  .library-session-open {
+    grid-row: auto;
+    justify-self: start;
+    margin-top: 2px;
   }
 
   .view-heading {
@@ -1631,15 +1841,6 @@ input:focus-visible {
 
   .artifact-list {
     grid-template-columns: 1fr;
-  }
-
-  .session-footer {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .session-footer span:last-child {
-    margin: 0;
   }
 
   .capture-deck {
