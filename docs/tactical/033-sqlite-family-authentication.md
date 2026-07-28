@@ -2,7 +2,9 @@
 
 Topic: home-hosted-family-sharing
 
-Status: **authorized on 2026-07-28; implementation in progress.**
+Status: **authorized on 2026-07-28; implementation in progress.** Dependency
+and initial relational-schema checkpoints are complete through Alembic head
+`20260728_0001`.
 
 ## Outcome
 
@@ -199,3 +201,15 @@ This section becomes the execution record as commits land. Record:
 - frontend build and login screenshots or manual observations;
 - live-service status without switching it; and
 - the exact commit range presented for human review.
+
+### Relational foundation
+
+- `efdaaee` adds the FastAPI/Uvicorn, SQLAlchemy/Alembic, pwdlib/Argon2, and
+  HTTPX dependency ranges.
+- Alembic head `20260728_0001` creates users, workspaces, memberships, and
+  web sessions.
+- A fresh catalog uses SQLite WAL mode, foreign keys, a five-second busy
+  timeout, and the idempotently seeded `local` workspace.
+- Focused validation: `5 passed` for empty migration, repeated startup,
+  foreign-key/role constraints, normalized username uniqueness, and the
+  application dependency boundary.
