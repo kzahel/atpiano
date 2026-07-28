@@ -51,5 +51,5 @@ execution record; continuing status and direction belong in the relevant
 | [`037-detachable-score-playback.md`](037-detachable-score-playback.md) | Complete; live | Persistent selected-session playback, detachable panel-local score following, reader continuity, and current-attack note highlighting |
 | [`038-recording-import.md`](038-recording-import.md) | Complete; live | First-class WAV/MP3 recording import with bounded upload, provenance, shared transcription, and contextual progress/errors |
 | [`039-continuous-library-playback.md`](039-continuous-library-playback.md) | Complete; live | One route-independent playback transport, library seeking, first-note cueing, and clickable synchronized opening previews |
-| [`040-websocket-runtime-dependency.md`](040-websocket-runtime-dependency.md) | Diagnosed; implementing | Locked WebSocket protocol support for local, authenticated family, and packaged capture runtimes |
+| [`040-websocket-runtime-dependency.md`](040-websocket-runtime-dependency.md) | Complete; live | Locked WebSocket protocol support for local, authenticated family, and packaged capture runtimes |
 | [`040-score-producer-provenance.md`](040-score-producer-provenance.md) | Complete; live | Durable score-pipeline provenance, compatibility freshness, and actionable legacy-cursor feedback |

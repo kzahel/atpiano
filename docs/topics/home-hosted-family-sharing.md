@@ -63,11 +63,12 @@ The Pi terminates the public HTTPS connection and proxies the application,
 API, artifact, and microphone WebSocket traffic. It does not run inference,
 own session state, or store application artifacts. Those remain on the Mac.
 
-Tactical 040 owns a live packaging correction after Uvicorn reported no
+Tactical 040 completed a live packaging correction after Uvicorn reported no
 installed WebSocket protocol implementation and reduced `/api/live` upgrades
-to ordinary HTTP 404 responses. The WebSocket runtime belongs in the ordinary
-locked project environment because microphone capture is a core family
-capability, not an optional operator feature.
+to ordinary HTTP 404 responses. The WebSocket runtime now belongs to the
+ordinary locked project environment because microphone capture is a core
+family capability, not an optional operator feature. The public authenticated
+handshake is accepted while anonymous access remains rejected.
 
 The service is intentionally available only while the Mac is online and the
 repository-managed service has been started. A stopped or offline Mac makes
