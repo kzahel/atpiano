@@ -8,7 +8,11 @@ is complete and live under
 It provides application-owned human names, aggregate musical summaries, a
 dedicated Sessions homepage, compact selected-session identity, contextual
 feedback, and keyboard audition without changing session evidence or the
-selected-versus-active boundary. Phase 3 and R3 are complete under
+selected-versus-active boundary. The accepted next slice,
+[`037-detachable-score-playback.md`](../tactical/037-detachable-score-playback.md),
+moves selected-session playback behind a persistent app-level controller so
+workspace and score-reader controls share one lifecycle. Phase 3 and R3 are
+complete under
 [`016-shared-react-application.md`](../tactical/016-shared-react-application.md).
 The Phase 4 extraction is implemented locally under
 [`017-python-application-core.md`](../tactical/017-python-application-core.md)

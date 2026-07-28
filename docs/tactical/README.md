@@ -48,3 +48,4 @@ execution record; continuing status and direction belong in the relevant
 | [`034-authenticated-family-scores.md`](034-authenticated-family-scores.md) | Complete; live | Default score generation and rendering for the authenticated private family service |
 | [`035-browser-score-cursor-parity.md`](035-browser-score-cursor-parity.md) | Complete; live | Exact browser parity with producer MIDI rounding and score-cursor ordering |
 | [`036-musical-session-workspace-refresh.md`](036-musical-session-workspace-refresh.md) | Complete; live | Sessions homepage, compact performance identity, contextual feedback, editable naming, lazy preview/playback, and keyboard audition |
+| [`037-detachable-score-playback.md`](037-detachable-score-playback.md) | Accepted plan | Persistent selected-session playback, detachable panel-local score following, reader continuity, and current-attack note highlighting |

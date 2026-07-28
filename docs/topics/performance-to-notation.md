@@ -34,6 +34,10 @@ positions. The score producer uses Python's ties-to-even rounding when it
 orders transformer input, so the browser now reproduces that rounding with
 integer arithmetic before normalizing cursor rows back onto the authoritative
 source-sample clock.
+Tactical 037 is the accepted next browser interaction slice. It replaces
+OSMD's document-level cursor following with detachable, panel-local following,
+adds non-destructive current-attack notehead highlighting, and preserves
+manual page turning in the exact-score reader.
 This is not yet progressive engraving or a permanent consumer-stack
 selection. The leading score converter's GitHub source and checkpoint still
 have no explicit published license, although the paper is CC BY 4.0 and the
