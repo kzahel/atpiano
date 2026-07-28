@@ -160,6 +160,23 @@ and the production build passed. The active authenticated service was
 restarted and the public origin served the corrected production asset while
 retaining the expected 200 app-shell and 401 anonymous API responses.
 
+The subsequent retained-session review exposed the same receiver defect in
+`LocalRuntime`'s direct artifact download path. The session's compact MP3 was
+present, verified, and advertised through the protected access route, but
+Safari failed before requesting its content and the UI reduced that failure
+to `Recorded audio unavailable`. Commit `3ecc5e4` binds the shared runtime
+fetch path and adds receiver-sensitive artifact coverage.
+
+That commit also adds a passwordless local-operator check. A caller who
+already has filesystem authority over the SQLite catalog may issue a
+five-minute session for an enabled workspace member, exercise the protected
+application/session/artifact routes, and revoke the session without printing
+the token or learning a human password. The check can use an in-process
+FastAPI adapter or a running HTTPS origin. Against the reported retained
+session and the real public origin, it authenticated as the enabled owner,
+read a 1,024-byte range from the protected `audio/mpeg` artifact through
+Caddy and launchd, logged out, and verified revocation.
+
 ## Operating Contract
 
 The established commands remain:
@@ -171,6 +188,20 @@ scripts/share-atpiano-service logs
 scripts/share-atpiano-service restart
 scripts/share-atpiano-service stop
 ```
+
+An operator can check a specific retained session without a human password:
+
+```text
+uv run atpiano family-check \
+  --workspace results/workbench-v3 \
+  --session SESSION_ID \
+  --base-url https://atpiano.graehlarts.com
+```
+
+Omitting `--base-url` exercises an in-process authenticated adapter over the
+same real workspace. The operator session expires after five minutes and is
+always revoked by the command. This is local catalog authority, not a public
+or remotely selectable authentication bypass.
 
 The launchd service supervises unexpected process exits and retains bounded
 logs, but it does not provide machine failover or an uptime objective. After

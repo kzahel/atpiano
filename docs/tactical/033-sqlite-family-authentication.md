@@ -317,6 +317,7 @@ This section becomes the execution record as commits land. Record:
 - `9647f1c` — disable the unresolved score runtime in public legacy mode.
 - `a539769` — record the authenticated live-service cutover.
 - `1534b2c` — bind browser fetch after the first Safari login review.
+- `3ecc5e4` — add operator checks and fix authenticated audio playback.
 
 ### Human review and live cutover
 
@@ -346,3 +347,23 @@ covers the failure with a receiver-sensitive test. All 55 frontend tests,
 TypeScript, and the production build passed before the authenticated service
 was restarted. The public origin then served the corrected hashed asset and
 retained the expected 200 app-shell and 401 anonymous API responses.
+
+The next Safari review reached the reported retained session but showed
+`Recorded audio unavailable`. The compact MP3 and its catalog row were valid;
+logs showed successful artifact-access requests but no content request.
+`LocalRuntime.readArtifact` directly invoked a second stored browser `fetch`
+with the runtime instance as receiver. Binding the shared runtime fetch fixed
+audio, export, and other direct artifact bodies at the common boundary.
+
+The same slice adds `atpiano family-check`. It issues a five-minute operator
+session only to a caller with local SQLite catalog authority, exercises a
+specific retained session and protected audio range, prints no credential,
+logs out, and verifies revocation. It supports both an in-process adapter and
+an explicit running HTTPS origin; it does not add a public bypass. The exact
+reported session passed through `https://atpiano.graehlarts.com`: six
+artifacts were visible and a 1,024-byte range of the compact MP3 returned as
+`audio/mpeg`.
+
+Validation passed with 198 Python tests, 56 frontend tests, TypeScript, the
+production build, Ruff, and Git whitespace checks. The authenticated launchd
+service was restarted and served the corrected `index-C4pLTf1j.js` bundle.
