@@ -911,6 +911,46 @@ describe("shared application", () => {
     expect(document.querySelectorAll(".library-session-main")).toHaveLength(2);
   });
 
+  it("exposes delete when detail settles before the session catalog", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const fixture = createFixtureRuntime();
+    let listSessionsCalls = 0;
+    const runtime = new Proxy(fixture, {
+      get(target, property) {
+        if (property === "listSessions") {
+          return async (...args: Parameters<AtpianoRuntime["listSessions"]>) => {
+            const page = await target.listSessions(...args);
+            listSessionsCalls += 1;
+            if (listSessionsCalls > 1) return page;
+            return {
+              ...page,
+              items: page.items.map((session, index) =>
+                index === 0
+                  ? { ...session, status: "stopping" as const }
+                  : session,
+              ),
+            };
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) satisfies AtpianoRuntime;
+
+    renderApp(runtime);
+
+    expect(await screen.findByRole("heading", { name: "Morning progression" }))
+      .toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Delete session" }))
+      .toBeTruthy();
+    await waitFor(() => expect(listSessionsCalls).toBeGreaterThanOrEqual(2), {
+      timeout: 2_000,
+    });
+    await user.click(screen.getByRole("button", { name: "Delete session" }));
+    expect(await screen.findByText(/moved to recoverable trash/)).toBeTruthy();
+  });
+
   it("isolates a failed score job from session review", async () => {
     const user = userEvent.setup();
     const fixture = createFixtureRuntime();

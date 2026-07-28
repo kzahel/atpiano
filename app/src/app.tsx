@@ -226,7 +226,14 @@ export function App({
         limit: 100,
       }),
     enabled: workspace !== undefined,
-    refetchInterval: captureState.phase === "recording" ? 1_000 : false,
+    refetchInterval: (query) =>
+      captureState.phase === "recording" ||
+      query.state.data?.items.some(
+        (session) =>
+          session.status === "active" || session.status === "stopping",
+      )
+        ? 1_000
+        : false,
   });
   const sessionItems = sessions.data?.items ?? [];
   const activeSession = sessionItems.find(
@@ -276,8 +283,10 @@ export function App({
         signal,
       }),
     enabled: workspace !== undefined && selectedSessionId !== null,
-    refetchInterval:
-      captureState.phase === "recording" || selectedSessionIsActive
+    refetchInterval: (query) =>
+      captureState.phase === "recording" ||
+      query.state.data?.status === "active" ||
+      query.state.data?.status === "stopping"
         ? 750
         : false,
   });
@@ -1133,7 +1142,13 @@ export function App({
     ? { ...selected, source_frame_count: selectedFrames }
     : selected;
   const events = eventPage?.items ?? [];
-  const selectedIsActive = selected?.session_id === activeSession?.session_id;
+  const selectedIsActive =
+    selected !== undefined &&
+    (
+      selected.status === "active" ||
+      selected.status === "stopping" ||
+      selected.session_id === captureState.capture?.session_id
+    );
   const settleAudioHead = horizon.data?.audio_head_sample ?? selectedFrames;
   const settleCommit = horizon.data?.commit_sample ?? 0;
   const settlePercent = settleAudioHead > 0
