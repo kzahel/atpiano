@@ -493,6 +493,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("results/backend-profile/backend-profile.json"),
     )
+    family_parser.add_argument(
+        "--score-runtime",
+        type=Path,
+        default=Path("results/midi2score-runtime"),
+        help="isolated MIDI2ScoreTransformer runtime directory",
+    )
     _add_storage_arguments(family_parser)
     _add_model_lifecycle_arguments(family_parser)
     family_check_parser = subparsers.add_parser(
@@ -520,6 +526,17 @@ def build_parser() -> argparse.ArgumentParser:
             "running HTTPS or loopback origin to check "
             "(default: in-process adapter)"
         ),
+    )
+    family_check_parser.add_argument(
+        "--require-score",
+        action="store_true",
+        help="fail unless the session exposes a readable MusicXML score",
+    )
+    family_check_parser.add_argument(
+        "--score-runtime",
+        type=Path,
+        default=Path("results/midi2score-runtime"),
+        help="isolated MIDI2ScoreTransformer runtime directory",
     )
     score_setup_parser = subparsers.add_parser(
         "setup-midi2score",
@@ -798,6 +815,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             commit_threads=args.commit_threads,
             correction_mode=args.correction_mode,
             backend_profile_path=args.backend_profile,
+            score_runtime=args.score_runtime,
             minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
             model_idle_timeout_s=args.model_idle_timeout_seconds,
             replay_manifest=args.replay,

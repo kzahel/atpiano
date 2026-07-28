@@ -213,7 +213,7 @@ def create_family_application(
     *,
     public_origin: str,
     secure_cookie: bool = True,
-    public_score_available: bool = False,
+    public_score_available: bool | None = None,
 ) -> FastAPI:
     """Create one authenticated ASGI adapter over the shared local runtime."""
 
@@ -229,6 +229,14 @@ def create_family_application(
     ):
         raise ValueError("public origin is not a valid exact origin")
     identity.require_enabled_owner()
+    runtime_score_available = bool(
+        runtime.application.scores.runtime_state().get("available")
+    )
+    score_available = (
+        runtime_score_available
+        if public_score_available is None
+        else public_score_available and runtime_score_available
+    )
     login_limiter = LoginAttemptLimiter()
     cookie_name = (
         SECURE_SESSION_COOKIE if secure_cookie else LOCAL_SESSION_COOKIE
@@ -386,7 +394,7 @@ def create_family_application(
         return principal
 
     def public_session(value: Any) -> Any:
-        if public_score_available:
+        if score_available:
             return value
         return value.model_copy(
             update={
@@ -399,14 +407,14 @@ def create_family_application(
         )
 
     def require_public_score() -> None:
-        if not public_score_available:
+        if not score_available:
             raise ApplicationNotFoundError(
                 "score runtime is not available"
             )
 
     def require_public_artifact(artifact: Any) -> None:
         if (
-            not public_score_available
+            not score_available
             and artifact.kind in PRIVATE_SCORE_ARTIFACT_KINDS
         ):
             raise ApplicationNotFoundError(
@@ -483,7 +491,7 @@ def create_family_application(
             supported_schema_versions=(CONTRACT_SCHEMA_VERSION,),
             supported_pcm_protocol_versions=(PCM_PROTOCOL_VERSION,),
             capture_sources=(SourceKind.MICROPHONE, SourceKind.REPLAY),
-            score_available=public_score_available,
+            score_available=score_available,
             recoverable_delete=True,
             max_pcm_block_frames=1_048_576,
             max_event_range_samples=round(
@@ -603,7 +611,7 @@ def create_family_application(
             cursor=cursor,
             limit=limit,
         )
-        if public_score_available:
+        if score_available:
             return page.model_dump(mode="json")
         return ArtifactPage(
             workspace_id=page.workspace_id,
@@ -687,7 +695,7 @@ def create_family_application(
         session_id: str,
     ) -> dict[str, Any]:
         workspace_principal(request, workspace_id)
-        if not public_score_available:
+        if not score_available:
             return ScoreVariantPage(
                 workspace_id=workspace_id,
                 session_id=session_id,
@@ -1053,6 +1061,7 @@ def serve_family_application(
     commit_threads: int | None = 2,
     correction_mode: str = "auto",
     backend_profile_path: Path | None = None,
+    score_runtime: Path = Path("results/midi2score-runtime"),
     minimum_free_bytes: int,
     model_idle_timeout_s: float,
     replay_manifest: Path | None = None,
@@ -1083,6 +1092,7 @@ def serve_family_application(
         commit_threads=commit_threads,
         correction_mode=correction_mode,
         backend_profile_path=backend_profile_path,
+        score_runtime=score_runtime,
         minimum_free_bytes=minimum_free_bytes,
         model_idle_timeout_s=model_idle_timeout_s,
         replay_manifest=replay_manifest,
@@ -1110,7 +1120,6 @@ def serve_family_application(
             identity,
             public_origin=public_origin,
             secure_cookie=not insecure_local_cookie,
-            public_score_available=False,
         )
         print(f"Atpiano family workspace: {runtime.workspace_directory}")
         print(public_origin)

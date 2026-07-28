@@ -39,6 +39,7 @@ log_size="${ATPIANO_SERVICE_LOG_SIZE:-5M}"
 bind_address="${ATPIANO_BIND_ADDRESS:-192.168.1.104}"
 port="${ATPIANO_PORT:-8002}"
 public_origin="${ATPIANO_PUBLIC_ORIGIN:-https://atpiano.graehlarts.com}"
+score_runtime="${ATPIANO_SCORE_RUNTIME:-results/midi2score-runtime}"
 model_idle_timeout_seconds="${ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS:-600}"
 if [[ -n "${ATPIANO_FAMILY_AUTH+x}" ]]; then
   family_auth="${ATPIANO_FAMILY_AUTH}"
@@ -136,6 +137,8 @@ render_plist() {
     "${family_auth}" "${generated_plist}"
   /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_PUBLIC_ORIGIN -string \
     "${public_origin}" "${generated_plist}"
+  /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_SCORE_RUNTIME -string \
+    "${score_runtime}" "${generated_plist}"
   /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_SERVICE_LOG_COUNT -string \
     "${log_file_count}" "${generated_plist}"
   /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_SERVICE_LOG_SIZE -string \
@@ -187,6 +190,7 @@ print_status() {
   printf 'Listener: %s:%s (%s)\n' \
     "${bind_address}" "${port}" "$([[ -n "${listener}" ]] && printf 'ready' || printf 'not ready')"
   printf 'Public origin: %s\n' "${public_origin}"
+  printf 'Score runtime: %s\n' "${score_runtime}"
   printf 'Model idle timeout: %s seconds\n' "${model_idle_timeout_seconds}"
   printf 'Family authentication: %s\n' "${family_auth}"
   printf 'Logs: %s\n' "${log_directory}"
@@ -210,7 +214,7 @@ start_service() {
 
   render_plist
   record_lifecycle \
-    "event=start_requested label=${service_label} repository=${repository_directory} bind=${bind_address} port=${port} model_idle_timeout_seconds=${model_idle_timeout_seconds} family_auth=${family_auth}"
+    "event=start_requested label=${service_label} repository=${repository_directory} bind=${bind_address} port=${port} score_runtime=${score_runtime} model_idle_timeout_seconds=${model_idle_timeout_seconds} family_auth=${family_auth}"
   if ! /bin/launchctl bootstrap "${service_domain}" "${generated_plist}"; then
     record_lifecycle "event=start_failed label=${service_label}"
     printf 'error: launchd could not bootstrap %s; inspect %s.\n' \

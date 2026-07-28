@@ -57,6 +57,8 @@ def check_family_workspace(
     username: str | None = None,
     web_root: Path | None = None,
     base_url: str | None = None,
+    require_score: bool = False,
+    score_runtime: Path = Path("results/midi2score-runtime"),
 ) -> dict[str, Any]:
     """Exercise protected routes and audio bytes without knowing a password."""
 
@@ -79,7 +81,7 @@ def check_family_workspace(
                 workspace,
                 commit_model_factory=lambda: None,
                 minimum_free_bytes=0,
-                score_runtime=workspace / ".operator-score-runtime-unavailable",
+                score_runtime=score_runtime,
                 web_root=resolved_web_root,
                 application_mode="shared-react-family-operator-check",
             )
@@ -113,11 +115,13 @@ def check_family_workspace(
                 200,
                 "operator session",
             ).json()
-            _require_status(
+            capabilities = _require_status(
                 client.get("/api/v1/capabilities", headers=cookie),
                 200,
                 "capabilities",
-            )
+            ).json()
+            if require_score and not capabilities["score_available"]:
+                raise RuntimeError("score runtime is not available")
             _require_status(
                 client.get(session_root, headers=cookie),
                 200,
@@ -170,6 +174,80 @@ def check_family_workspace(
             if not content.content:
                 raise RuntimeError("audio content range was empty")
 
+            score_report = None
+            if capabilities["score_available"]:
+                variants = _require_status(
+                    client.get(
+                        f"{session_root}/score-variants",
+                        headers=cookie,
+                    ),
+                    200,
+                    "score variants",
+                ).json()["items"]
+                selected_variant = next(
+                    (
+                        variant
+                        for variant in variants
+                        if variant["selected"]
+                    ),
+                    None,
+                )
+                musicxml_artifacts = [
+                    artifact
+                    for artifact in artifacts
+                    if artifact["kind"] == "musicxml"
+                ]
+                score_artifact = next(
+                    (
+                        artifact
+                        for artifact in musicxml_artifacts
+                        if (
+                            selected_variant is not None
+                            and artifact["artifact_id"]
+                            == selected_variant["musicxml_artifact_id"]
+                        )
+                    ),
+                    musicxml_artifacts[0] if musicxml_artifacts else None,
+                )
+                if require_score and score_artifact is None:
+                    raise RuntimeError(
+                        f"session {session_id} has no rendered score artifact"
+                    )
+                if score_artifact is not None:
+                    encoded_score_artifact = quote(
+                        score_artifact["artifact_id"],
+                        safe="",
+                    )
+                    score_root = (
+                        f"{session_root}/artifacts/{encoded_score_artifact}"
+                    )
+                    score_access = _require_status(
+                        client.get(
+                            f"{score_root}/access",
+                            headers=cookie,
+                        ),
+                        200,
+                        "score access metadata",
+                    ).json()
+                    score_content = _require_status(
+                        client.get(
+                            f"{score_root}/content",
+                            headers=cookie,
+                        ),
+                        200,
+                        "score content",
+                    )
+                    if b"<score-partwise" not in score_content.content:
+                        raise RuntimeError(
+                            "rendered score is not MusicXML partwise content"
+                        )
+                    score_report = {
+                        "artifact_id": score_artifact["artifact_id"],
+                        "filename": score_artifact["filename"],
+                        "media_type": score_access["media_type"],
+                        "byte_count": len(score_content.content),
+                    }
+
             _require_status(
                 client.post(
                     "/api/v1/auth/logout",
@@ -194,6 +272,8 @@ def check_family_workspace(
             "operator": authenticated["principal"]["username"],
             "session_id": session_id,
             "artifact_count": len(artifacts),
+            "score_available": capabilities["score_available"],
+            "score": score_report,
             "audio": {
                 "artifact_id": audio["artifact_id"],
                 "filename": audio["filename"],
@@ -222,6 +302,8 @@ def run_family_check(args: object) -> int:
         session_id=str(getattr(args, "session")),
         username=getattr(args, "as_user"),
         base_url=getattr(args, "base_url"),
+        require_score=bool(getattr(args, "require_score")),
+        score_runtime=Path(getattr(args, "score_runtime")),
     )
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0

@@ -83,3 +83,7 @@ def test_launchd_template_is_on_demand_and_supervised() -> None:
         job["EnvironmentVariables"]["ATPIANO_FAMILY_AUTH"]
         == "__ATPIANO_FAMILY_AUTH__"
     )
+    assert (
+        job["EnvironmentVariables"]["ATPIANO_SCORE_RUNTIME"]
+        == "__ATPIANO_SCORE_RUNTIME__"
+    )

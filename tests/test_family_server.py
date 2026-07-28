@@ -50,6 +50,8 @@ def _completed_session(workspace: Path) -> None:
 
 def _environment(
     tmp_path: Path,
+    *,
+    score_runner: Any = None,
 ) -> tuple[
     TestClient,
     CorrectedWorkbenchRuntime,
@@ -68,6 +70,7 @@ def _environment(
         commit_model_factory=lambda: None,
         minimum_free_bytes=0,
         score_runtime=tmp_path / "score-runtime",
+        score_runner=score_runner,
         web_root=web_root,
         public_origin=PUBLIC_ORIGIN,
     )
@@ -133,10 +136,13 @@ def test_local_operator_check_reads_protected_audio_and_revokes(
         tmp_path,
         session_id=SESSION_ID,
         web_root=web_root,
+        score_runtime=tmp_path / "score-runtime",
     )
 
     assert report["operator"] == "owner"
     assert report["audio"]["checked_range_bytes"] > 0
+    assert report["score_available"] is False
+    assert report["score"] is None
     assert report["operator_session_revoked"] is True
 
 
@@ -223,6 +229,27 @@ def test_owner_cookie_authenticates_api_artifacts_and_websocket(
         )
         assert logout.status_code == 200
         assert client.get("/api/v1/auth/session").status_code == 401
+    finally:
+        runtime.close()
+        engine.dispose()
+
+
+def test_available_score_runtime_is_exposed_by_default(
+    tmp_path: Path,
+) -> None:
+    client, runtime, _identity, engine = _environment(
+        tmp_path,
+        score_runner=lambda *_args, **_kwargs: {},
+    )
+    try:
+        assert (
+            _login(client, "owner", "the owner family password").status_code
+            == 200
+        )
+        capabilities = client.get("/api/v1/capabilities")
+
+        assert capabilities.status_code == 200
+        assert capabilities.json()["score_available"] is True
     finally:
         runtime.close()
         engine.dispose()

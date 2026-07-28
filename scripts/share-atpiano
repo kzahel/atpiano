@@ -14,7 +14,7 @@ port="${ATPIANO_PORT:-8002}"
 public_origin="${ATPIANO_PUBLIC_ORIGIN:-https://atpiano.graehlarts.com}"
 model_idle_timeout_seconds="${ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS:-600}"
 family_auth="${ATPIANO_FAMILY_AUTH:-false}"
-public_score_runtime="${ATPIANO_PUBLIC_SCORE_RUNTIME:-results/public-score-disabled}"
+score_runtime="${ATPIANO_SCORE_RUNTIME:-${ATPIANO_PUBLIC_SCORE_RUNTIME:-results/midi2score-runtime}}"
 uv_path="${ATPIANO_UV:-$(command -v uv || true)}"
 
 if [[ -z "${uv_path}" || ! -x "${uv_path}" ]]; then
@@ -28,8 +28,11 @@ if [[ "${family_auth}" != "true" && "${family_auth}" != "false" ]]; then
 fi
 
 server_command="workbench-v3"
+selected_score_runtime="${score_runtime}"
 if [[ "${family_auth}" == "true" ]]; then
   server_command="family-server"
+else
+  selected_score_runtime="${ATPIANO_PUBLIC_SCORE_RUNTIME:-results/public-score-disabled}"
 fi
 
 server_arguments=(
@@ -37,11 +40,9 @@ server_arguments=(
   --port "${port}"
   --public-origin "${public_origin}"
   --model-idle-timeout-seconds "${model_idle_timeout_seconds}"
+  --score-runtime "${selected_score_runtime}"
   --no-open
 )
-if [[ "${family_auth}" == "false" ]]; then
-  server_arguments+=(--score-runtime "${public_score_runtime}")
-fi
 
 exec /usr/bin/caffeinate -im "${uv_path}" run atpiano "${server_command}" \
   "${server_arguments[@]}" \

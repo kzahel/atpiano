@@ -23,6 +23,8 @@
     <string>__ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS__</string>
     <key>ATPIANO_PUBLIC_ORIGIN</key>
     <string>__ATPIANO_PUBLIC_ORIGIN__</string>
+    <key>ATPIANO_SCORE_RUNTIME</key>
+    <string>__ATPIANO_SCORE_RUNTIME__</string>
     <key>ATPIANO_SERVICE_LOG_COUNT</key>
     <string>__ATPIANO_LOG_COUNT__</string>
     <key>ATPIANO_SERVICE_LOG_SIZE</key>
