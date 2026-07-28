@@ -25,6 +25,10 @@ renders successfully. Tactical 032 moves the original model MusicXML out of
 the engraving controls and labels it with the other session exports; web and
 desktop now dispatch the exact same artifact through browser download or
 native Save As behavior.
+Tactical 034 now enables the installed pinned runtime by default in the
+authenticated private Mac/Pi family service because the owner considers the
+application unusable without committed scores. This is accepted private use,
+not a model-pack or general hosted-service distribution decision.
 This is not yet progressive engraving or a permanent consumer-stack
 selection. The leading score converter's GitHub source and checkpoint still
 have no explicit published license, although the paper is CC BY 4.0 and the
@@ -70,10 +74,12 @@ treats notation conversion as a session-addressed, versioned job that can run
 in a hosted worker or local desktop sidecar. MIDI2ScoreTransformer remains
 permitted only for isolated internal use under the current acceptance.
 Tactical 031 may place it in a separately marked, opt-in internal desktop
-bundle for private testing. Its unconfirmed source and checkpoint notices
-continue to block public hosted operation, ordinary desktop archives, and
-model-pack distribution until rights are resolved or a licensed converter
-satisfies the same job and artifact contracts.
+bundle for private testing. Tactical 034 also permits it in the
+owner-authorized authenticated home service. Its unconfirmed source and
+checkpoint notices continue to block anonymous or general hosted operation,
+ordinary desktop archives, and model-pack distribution until rights are
+resolved or a licensed converter satisfies the same job and artifact
+contracts.
 
 That internal bundle is now implemented and has completed the real packaged
 42-second replay followed by CPU score generation. It produced a 12-measure,

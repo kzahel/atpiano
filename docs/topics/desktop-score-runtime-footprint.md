@@ -9,7 +9,10 @@ inference-minimal runtime. R5 was accepted on 2026-07-28, but no reduction
 tactical is open yet. The build remains internal-only under the provisional
 MIDI2ScoreTransformer licensing assumption. The broader packaged-desktop and
 managed-hosted programs are deferred; this optimization may proceed as an
-independent local tactical when authorized.
+independent local tactical when authorized. Tactical 034 now reuses the same
+ignored installed runtime for the authenticated private family service; that
+does not change the measured desktop bundle, distribution status, or
+reduction sequence.
 
 ## Scope And Relationship
 

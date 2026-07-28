@@ -6,9 +6,11 @@ Status: **accepted near-term deployment direction as of 2026-07-28; basic
 family identity is implemented and live under Tactical 033.** The v3
 application is shared on demand from the Mac through the home Pi and Caddy.
 The live launchd service uses the authenticated FastAPI composition backed by
-SQLite users, memberships, and cookie sessions. The managed PostgreSQL,
-object-storage, OIDC, broad tenancy, and sync program remains deferred with no
-active implementation schedule.
+SQLite users, memberships, and cookie sessions. Its configured local score
+runtime is enabled by default under Tactical 034 because committed scores are
+a core requirement of the private application. The managed PostgreSQL,
+object-storage, OIDC, broad tenancy, and sync program remains deferred with
+no active implementation schedule.
 
 ## Scope And Relationship
 
@@ -32,7 +34,8 @@ contract. [`long-session-storage-retention.md`](long-session-storage-retention.m
 owns recording and artifact disk growth.
 
 This is not a production multi-tenant service, a high-availability promise,
-or a public score-runtime distribution decision.
+or a public score-runtime distribution artifact. The installed internal score
+runtime is accepted for this authenticated private home deployment.
 
 ## Current Topology
 
@@ -130,11 +133,12 @@ Before the authenticated cutover:
 - avoid relying on it as the only copy of irreplaceable recordings; and
 - do not publicly expose the unresolved internal score runtime.
 
-The authenticated composition suppresses the public score capability, score
-mutations, and private score artifacts by default. The legacy public launcher
-also points at a deliberately absent score runtime if an operator explicitly
-rolls back. Neither public composition advertises or operates the unresolved
-internal score integration.
+The first authenticated review build also suppressed the score capability,
+mutations, and private score artifacts. That was a temporary release hold,
+not a satisfactory product default, and was superseded by the authenticated
+score decision below. The legacy public launcher still points at a
+deliberately absent score runtime if an operator explicitly rolls back to the
+unauthenticated composition.
 
 ### Authenticated cutover
 
@@ -177,6 +181,26 @@ session and the real public origin, it authenticated as the enabled owner,
 read a 1,024-byte range from the protected `audio/mpeg` artifact through
 Caddy and launchd, logged out, and verified revocation.
 
+### Authenticated score default
+
+On 2026-07-28 the owner explicitly rejected the score-suppressed family
+application as unusable. Tactical 034 makes the configured pinned score
+runtime available by default in authenticated family mode. Missing or invalid
+runtime assets still degrade cleanly to `score_available=false`; valid assets
+enable role-protected score jobs, variants, MusicXML, score-input MIDI, and
+alignment artifacts.
+
+The live launchd service restarted with
+`Score runtime: results/midi2score-runtime`. A bounded operator check through
+the real HTTPS origin reported `score_available=true` and read the selected
+701,346-byte partwise MusicXML for retained session
+`20260727T185541-a2298f1afaaf`. Anonymous capability requests remained
+unauthorized.
+
+This accepts private authenticated home use of the existing internal runtime.
+It does not authorize an ordinary desktop archive, public model download, or
+general hosted score service while the upstream license remains unresolved.
+
 ## Operating Contract
 
 The established commands remain:
@@ -195,7 +219,8 @@ An operator can check a specific retained session without a human password:
 uv run atpiano family-check \
   --workspace results/workbench-v3 \
   --session SESSION_ID \
-  --base-url https://atpiano.graehlarts.com
+  --base-url https://atpiano.graehlarts.com \
+  --require-score
 ```
 
 Omitting `--base-url` exercises an in-process authenticated adapter over the

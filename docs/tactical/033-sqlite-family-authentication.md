@@ -6,8 +6,10 @@ Status: **implemented and cut over to the live family service on
 2026-07-28.** Alembic head `20260728_0001`, the typed identity service,
 administrator CLI, authenticated FastAPI adapter, minimal React login/logout
 boundary, and operational hardening are complete. An enabled owner exists and
-the live launchd service now uses authenticated mode. Human browser login and
-artifact review remain the final acceptance check.
+the live launchd service now uses authenticated mode. Browser login, retained
+audio, and protected artifact review passed. The temporary score suppression
+in this review build was superseded by Tactical 034 after the owner required
+scores as a default authenticated capability.
 
 ## Outcome
 
@@ -318,6 +320,7 @@ This section becomes the execution record as commits land. Record:
 - `a539769` — record the authenticated live-service cutover.
 - `1534b2c` — bind browser fetch after the first Safari login review.
 - `3ecc5e4` — add operator checks and fix authenticated audio playback.
+- `14cceb0` — enable the installed score runtime in authenticated mode.
 
 ### Human review and live cutover
 

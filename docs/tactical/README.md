@@ -44,4 +44,5 @@ execution record; continuing status and direction belong in the relevant
 | [`030-idle-model-worker-eviction.md`](030-idle-model-worker-eviction.md) | Implemented | Lazy model loading plus generation-safe worker eviction ten minutes after full capture settlement |
 | [`031-internal-desktop-score-runtime.md`](031-internal-desktop-score-runtime.md) | Complete; R5 accepted | Opt-in internal-only macOS desktop score runtime under provisional checkpoint licensing; no distribution artifact |
 | [`032-cross-platform-artifact-export.md`](032-cross-platform-artifact-export.md) | Complete; R5 accepted | Shared browser downloads and bounded native desktop Save As export through the runtime boundary |
-| [`033-sqlite-family-authentication.md`](033-sqlite-family-authentication.md) | In progress | Typed SQLAlchemy/Alembic identity catalog, CLI-created family users, cookie sessions, authenticated FastAPI composition, and minimal React login |
+| [`033-sqlite-family-authentication.md`](033-sqlite-family-authentication.md) | Complete; live | Typed SQLAlchemy/Alembic identity catalog, CLI-created family users, cookie sessions, authenticated FastAPI composition, and minimal React login |
+| [`034-authenticated-family-scores.md`](034-authenticated-family-scores.md) | Complete; live | Default score generation and rendering for the authenticated private family service |
