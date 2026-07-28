@@ -16,6 +16,12 @@ store publishes observable playback state while the provider privately owns
 the media element and seek mechanics. Phase 3 and R3 are
 complete under
 [`016-shared-react-application.md`](../tactical/016-shared-react-application.md).
+The accepted
+[`039-continuous-library-playback.md`](../tactical/039-continuous-library-playback.md)
+extends that persistent transport through the Sessions library, adds
+full-duration inline seeking and first-note cueing, and makes the opening
+phrase a synchronized path into its session without weakening bounded lazy
+hydration.
 The Phase 4 extraction is implemented locally under
 [`017-python-application-core.md`](../tactical/017-python-application-core.md)
 and accepted at R4. Framework-independent services now own catalog and
@@ -188,12 +194,14 @@ The same refresh promotes the bounded history into a dedicated Sessions
 homepage. Its opening-phrase previews and playback hydrate lazily; listing
 history must not eagerly load every session's artifacts or events.
 
-Selected-session playback now has a separate global snapshot and persistent
-media provider. Entering the exact-score reader preserves the media element,
+Selected-session playback has a separate global snapshot and persistent media
+provider. Entering the exact-score reader preserves the media element,
 sample-clock position, status, and source identity; both layouts expose
-controls for that same transport. Session selection or source identity
-changes reset it, while the Sessions homepage keeps its bounded lazy
-row-local preview players outside this selected-session lifecycle.
+controls for that same transport. Tactical 039 replaces the library's
+row-local players with this same route-independent transport. Same-session
+navigation preserves playback, while an explicit different-session or
+capture choice remains a source change. Library previews and recording bytes
+remain bounded, lazy, and on demand.
 
 ### Delete
 
@@ -394,8 +402,8 @@ The implementation tactical must prove:
 Keep the live musical-notebook hierarchy and explicit selected-versus-active
 split stable. Human labels must remain application annotations; aggregate
 counts must remain rebuildable from the materialized event index; previews
-must remain bounded and source-sample-derived; and library playback must stay
-read-only and on demand.
+must remain bounded and source-sample-derived; and shared library playback
+must stay read-only, on demand, and independent from capture ownership.
 
 Same-session resumption, trash restoration, permanent purge, continuation
 relationships, and library pagination beyond the current bounded page remain
