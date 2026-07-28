@@ -2,6 +2,7 @@ import type {
   Artifact,
   ArtifactAccess,
   ArtifactContent,
+  ArtifactExportResult,
   ArtifactPage,
   AtpianoRuntime,
   Capture,
@@ -29,6 +30,7 @@ import type {
   Workspace,
   WorkspacePage,
 } from "./atpiano-runtime.js";
+import { startBrowserArtifactExport } from "../lib/artifact-export.js";
 
 export interface FixtureRuntimeData {
   readonly fixtureId: string;
@@ -347,6 +349,22 @@ export class FixtureRuntime implements AtpianoRuntime {
       access,
       bytes: await response.arrayBuffer(),
     };
+  }
+
+  async exportArtifact(
+    workspaceId: string,
+    sessionId: string,
+    artifactId: string,
+    request: RuntimeRequest,
+  ): Promise<ArtifactExportResult> {
+    return startBrowserArtifactExport(
+      await this.readArtifact(
+        workspaceId,
+        sessionId,
+        artifactId,
+        request,
+      ),
+    );
   }
 
   async startScoreJob(

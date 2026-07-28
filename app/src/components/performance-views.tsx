@@ -269,7 +269,6 @@ function ScorePreview({
   onSelectScoreVariant,
   onCreateAutomaticVariant,
   onCreateEnharmonicVariant,
-  onDownloadBaseline,
 }: {
   readonly session: Session;
   readonly scoreStatus: string | null;
@@ -289,7 +288,6 @@ function ScorePreview({
   readonly onSelectScoreVariant: (variant: ScoreVariant) => void;
   readonly onCreateAutomaticVariant: () => void;
   readonly onCreateEnharmonicVariant: () => void;
-  readonly onDownloadBaseline: (() => void) | undefined;
 }) {
   return (
     <section className="view-card score-card">
@@ -384,15 +382,6 @@ function ScorePreview({
                 Apply automatic clefs
               </button>
             )}
-          {onDownloadBaseline && (
-            <button
-              className="button small"
-              type="button"
-              onClick={onDownloadBaseline}
-            >
-              Download model baseline
-            </button>
-          )}
         </div>
       )}
       {selectedScoreVariant?.needs_review && (
@@ -462,7 +451,6 @@ export function PerformanceViews({
   onSelectScoreVariant,
   onCreateAutomaticVariant,
   onCreateEnharmonicVariant,
-  onDownloadBaseline,
 }: {
   readonly session: Session;
   readonly events: readonly EventRevision[];
@@ -490,7 +478,6 @@ export function PerformanceViews({
   readonly onSelectScoreVariant: (variant: ScoreVariant) => void;
   readonly onCreateAutomaticVariant: () => void;
   readonly onCreateEnharmonicVariant: () => void;
-  readonly onDownloadBaseline: (() => void) | undefined;
 }) {
   return (
     <div className="performance-views">
@@ -522,7 +509,6 @@ export function PerformanceViews({
           onSelectScoreVariant={onSelectScoreVariant}
           onCreateAutomaticVariant={onCreateAutomaticVariant}
           onCreateEnharmonicVariant={onCreateEnharmonicVariant}
-          onDownloadBaseline={onDownloadBaseline}
         />
       )}
       {showRoll && (

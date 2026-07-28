@@ -2,9 +2,11 @@ import {
   createAtpianoHttpClient,
   type AtpianoHttpClient,
 } from "../http-client.js";
+import { startBrowserArtifactExport } from "../lib/artifact-export.js";
 import type {
   ArtifactAccess,
   ArtifactContent,
+  ArtifactExportResult,
   ArtifactPage,
   AtpianoRuntime,
   Capture,
@@ -621,6 +623,22 @@ export class LocalRuntime implements AtpianoRuntime {
       access,
       bytes: await response.arrayBuffer(),
     };
+  }
+
+  async exportArtifact(
+    workspaceId: string,
+    sessionId: string,
+    artifactId: string,
+    request: RuntimeRequest,
+  ): Promise<ArtifactExportResult> {
+    return startBrowserArtifactExport(
+      await this.readArtifact(
+        workspaceId,
+        sessionId,
+        artifactId,
+        request,
+      ),
+    );
   }
 
   async startScoreJob(

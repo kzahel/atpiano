@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::{
     env,
+    ffi::OsStr,
     fmt::Write as _,
-    fs,
+    fs::{self, File, OpenOptions},
     io::{self, BufRead, BufReader, Read, Write},
     net::{SocketAddr, TcpStream},
     path::{Path, PathBuf},
@@ -15,6 +16,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::{Emitter, Manager};
+use tauri_plugin_dialog::DialogExt;
 
 const DESKTOP_PROTOCOL: &str = "atpiano.desktop.v1";
 const CONTRACT_SCHEMA: &str = "atpiano.contract.v1";
@@ -22,6 +24,8 @@ const MODEL_PACK_ID: &str = "atpiano-cpu-models-2026.07";
 const DESKTOP_ORIGIN: &str = "tauri://localhost";
 const MAX_READY_BYTES: usize = 64 * 1024;
 const MAX_HANDSHAKE_BYTES: u64 = 1024 * 1024;
+const MAX_ARTIFACT_HEADER_BYTES: usize = 64 * 1024;
+const MAX_ARTIFACT_URL_BYTES: usize = 4 * 1024;
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -39,6 +43,13 @@ struct DesktopRuntimeInfo {
     model_pack_id: String,
     model_pack_sha256: String,
     score_available: bool,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopArtifactExportResult {
+    saved: bool,
+    file_name: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -220,6 +231,215 @@ fn is_lower_hex_64(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn valid_encoded_path_segment(value: &str) -> bool {
+    if value.is_empty() {
+        return false;
+    }
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        let byte = bytes[index];
+        if byte == b'%' {
+            if index + 2 >= bytes.len()
+                || !bytes[index + 1].is_ascii_hexdigit()
+                || !bytes[index + 2].is_ascii_hexdigit()
+            {
+                return false;
+            }
+            let high = (bytes[index + 1] as char).to_digit(16).unwrap_or(16);
+            let low = (bytes[index + 2] as char).to_digit(16).unwrap_or(16);
+            let decoded_byte = (high * 16 + low) as u8;
+            if !(decoded_byte.is_ascii_alphanumeric()
+                || matches!(decoded_byte, b'-' | b'.' | b'_' | b'~' | b':'))
+            {
+                return false;
+            }
+            decoded.push(decoded_byte);
+            index += 3;
+            continue;
+        }
+        if !(byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~' | b':')) {
+            return false;
+        }
+        decoded.push(byte);
+        index += 1;
+    }
+    decoded != b"." && decoded != b".."
+}
+
+fn valid_artifact_url(value: &str) -> bool {
+    if value.len() > MAX_ARTIFACT_URL_BYTES || !value.is_ascii() {
+        return false;
+    }
+    let segments = value.split('/').collect::<Vec<_>>();
+    segments.len() == 10
+        && segments[0].is_empty()
+        && segments[1] == "api"
+        && segments[2] == "v1"
+        && segments[3] == "workspaces"
+        && valid_encoded_path_segment(segments[4])
+        && segments[5] == "sessions"
+        && valid_encoded_path_segment(segments[6])
+        && segments[7] == "artifacts"
+        && valid_encoded_path_segment(segments[8])
+        && segments[9] == "content"
+}
+
+fn valid_suggested_name(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 255
+        && value != "."
+        && value != ".."
+        && !value.contains('\0')
+        && Path::new(value)
+            .file_name()
+            .is_some_and(|name| name == OsStr::new(value))
+}
+
+fn runtime_port(info: &DesktopRuntimeInfo) -> Result<u16, String> {
+    info.base_url
+        .strip_prefix("http://127.0.0.1:")
+        .and_then(|value| value.parse::<u16>().ok())
+        .filter(|port| *port > 0)
+        .ok_or_else(|| "desktop artifact export has no valid loopback port".to_string())
+}
+
+fn read_artifact_header_line(
+    reader: &mut impl BufRead,
+    total: &mut usize,
+) -> Result<Vec<u8>, String> {
+    let remaining = MAX_ARTIFACT_HEADER_BYTES.saturating_sub(*total);
+    let mut line = Vec::new();
+    (&mut *reader)
+        .take((remaining + 1) as u64)
+        .read_until(b'\n', &mut line)
+        .map_err(|error| format!("artifact export response failed: {error}"))?;
+    *total += line.len();
+    if *total > MAX_ARTIFACT_HEADER_BYTES || !line.ends_with(b"\n") {
+        return Err("artifact export response headers exceeded their bound".to_string());
+    }
+    Ok(line)
+}
+
+fn read_artifact_response(reader: &mut impl BufRead) -> Result<u64, String> {
+    let mut total = 0;
+    let mut line = read_artifact_header_line(reader, &mut total)?;
+    let status = std::str::from_utf8(&line)
+        .map_err(|_| "artifact export response status is invalid".to_string())?;
+    if status.split_whitespace().nth(1) != Some("200") {
+        let code = status.split_whitespace().nth(1).unwrap_or("invalid");
+        return Err(format!("artifact export was rejected with HTTP {code}"));
+    }
+
+    let mut content_length = None;
+    loop {
+        line = read_artifact_header_line(reader, &mut total)?;
+        if line == b"\r\n" || line == b"\n" {
+            break;
+        }
+        let header = std::str::from_utf8(&line)
+            .map_err(|_| "artifact export response header is invalid".to_string())?;
+        let (name, value) = header
+            .trim_end_matches(['\r', '\n'])
+            .split_once(':')
+            .ok_or_else(|| "artifact export response header is malformed".to_string())?;
+        if name.eq_ignore_ascii_case("transfer-encoding") {
+            return Err("artifact export does not accept transfer encoding".to_string());
+        }
+        if name.eq_ignore_ascii_case("content-length") {
+            let parsed = value
+                .trim()
+                .parse::<u64>()
+                .map_err(|_| "artifact export content length is invalid".to_string())?;
+            if content_length.replace(parsed).is_some() {
+                return Err("artifact export content length is duplicated".to_string());
+            }
+        }
+    }
+    content_length.ok_or_else(|| "artifact export response has no content length".to_string())
+}
+
+fn temporary_export_file(destination: &Path) -> Result<(PathBuf, File), String> {
+    if !destination.is_absolute() || destination.file_name().is_none() {
+        return Err("artifact export destination is invalid".to_string());
+    }
+    let parent = destination
+        .parent()
+        .ok_or_else(|| "artifact export destination has no parent".to_string())?;
+    let file_name = destination
+        .file_name()
+        .and_then(OsStr::to_str)
+        .ok_or_else(|| "artifact export filename is invalid".to_string())?;
+    for _ in 0..8 {
+        let suffix = token()?;
+        let temporary = parent.join(format!(".{file_name}.atpiano-{}.part", &suffix[..16]));
+        match OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&temporary)
+        {
+            Ok(file) => return Ok((temporary, file)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => {
+                return Err(format!(
+                    "could not create the artifact export file: {error}"
+                ))
+            }
+        }
+    }
+    Err("could not reserve an artifact export file".to_string())
+}
+
+fn download_artifact(
+    port: u16,
+    credential: &str,
+    artifact_url: &str,
+    destination: &Path,
+) -> Result<(), String> {
+    if !valid_artifact_url(artifact_url) {
+        return Err("desktop artifact export target is invalid".to_string());
+    }
+    let address = SocketAddr::from(([127, 0, 0, 1], port));
+    let mut stream = TcpStream::connect_timeout(&address, Duration::from_secs(5))
+        .map_err(|error| format!("artifact export connection failed: {error}"))?;
+    stream
+        .set_read_timeout(Some(Duration::from_secs(60)))
+        .map_err(|error| format!("could not bound artifact export: {error}"))?;
+    stream
+        .set_write_timeout(Some(Duration::from_secs(5)))
+        .map_err(|error| format!("could not bound artifact export: {error}"))?;
+    write!(
+        stream,
+        "GET {artifact_url} HTTP/1.0\r\n\
+         Host: 127.0.0.1:{port}\r\n\
+         Origin: {DESKTOP_ORIGIN}\r\n\
+         Authorization: Bearer {credential}\r\n\
+         Connection: close\r\n\r\n"
+    )
+    .map_err(|error| format!("artifact export request failed: {error}"))?;
+
+    let mut reader = BufReader::new(stream);
+    let content_length = read_artifact_response(&mut reader)?;
+    let (temporary, mut output) = temporary_export_file(destination)?;
+    let result = (|| {
+        let copied = io::copy(&mut reader.take(content_length), &mut output)
+            .map_err(|error| format!("artifact export transfer failed: {error}"))?;
+        if copied != content_length {
+            return Err("artifact export ended before its declared length".to_string());
+        }
+        output
+            .sync_all()
+            .map_err(|error| format!("could not finish artifact export: {error}"))?;
+        fs::rename(&temporary, destination)
+            .map_err(|error| format!("could not publish artifact export: {error}"))
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
 }
 
 fn fetch_handshake(port: u16, credential: &str) -> Result<HandshakeRecord, String> {
@@ -553,9 +773,46 @@ fn desktop_runtime(state: tauri::State<'_, DesktopState>) -> Result<DesktopRunti
     current_runtime_info(&state.status)
 }
 
+#[tauri::command(async)]
+fn desktop_export_artifact(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, DesktopState>,
+    artifact_url: String,
+    suggested_name: String,
+) -> Result<DesktopArtifactExportResult, String> {
+    if !valid_artifact_url(&artifact_url) || !valid_suggested_name(&suggested_name) {
+        return Err("desktop artifact export request is invalid".to_string());
+    }
+    let info = current_runtime_info(&state.status)?;
+    let port = runtime_port(&info)?;
+    let destination = app
+        .dialog()
+        .file()
+        .set_title("Export Atpiano artifact")
+        .set_file_name(&suggested_name)
+        .blocking_save_file();
+    let Some(destination) = destination else {
+        return Ok(DesktopArtifactExportResult {
+            saved: false,
+            file_name: None,
+        });
+    };
+    let destination = destination
+        .into_path()
+        .map_err(|_| "artifact export destination is not a local file".to_string())?;
+    download_artifact(port, &info.bearer_token, &artifact_url, &destination)?;
+    Ok(DesktopArtifactExportResult {
+        saved: true,
+        file_name: destination
+            .file_name()
+            .map(|value| value.to_string_lossy().into_owned()),
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let application = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let status = Arc::new(RwLock::new(RuntimeStatus::Initializing));
             let result = start_sidecar(app.handle(), Arc::clone(&status));
@@ -579,7 +836,10 @@ pub fn run() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![desktop_runtime])
+        .invoke_handler(tauri::generate_handler![
+            desktop_runtime,
+            desktop_export_artifact
+        ])
         .build(tauri::generate_context!())
         .expect("error while building Atpiano");
 
@@ -596,6 +856,43 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::TcpListener;
+
+    fn artifact_server(
+        response: Vec<u8>,
+        expected_path: &'static str,
+        expected_credential: String,
+    ) -> (u16, thread::JoinHandle<()>) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("test listener");
+        let port = listener.local_addr().expect("listener address").port();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("artifact connection");
+            let mut request = Vec::new();
+            let mut byte = [0_u8; 1];
+            while !request.ends_with(b"\r\n\r\n") {
+                assert!(request.len() < MAX_ARTIFACT_HEADER_BYTES);
+                stream.read_exact(&mut byte).expect("artifact request");
+                request.push(byte[0]);
+            }
+            let request = String::from_utf8(request).expect("ASCII request");
+            assert!(request.starts_with(&format!("GET {expected_path} HTTP/1.0\r\n")));
+            assert!(request.contains(&format!(
+                "\r\nAuthorization: Bearer {expected_credential}\r\n"
+            )));
+            assert!(request.contains(&format!("\r\nOrigin: {DESKTOP_ORIGIN}\r\n")));
+            stream.write_all(&response).expect("artifact response");
+        });
+        (port, handle)
+    }
+
+    fn export_test_directory(label: &str) -> PathBuf {
+        let path = env::temp_dir().join(format!(
+            "atpiano-{label}-{}",
+            &token().expect("test token")[..16]
+        ));
+        fs::create_dir(&path).expect("test directory");
+        path
+    }
 
     fn runtime_info_fixture() -> DesktopRuntimeInfo {
         DesktopRuntimeInfo {
@@ -738,5 +1035,76 @@ mod tests {
         let credential = token().expect("token");
         assert_eq!(credential.len(), 64);
         assert!(is_lower_hex_64(&credential));
+    }
+
+    #[test]
+    fn accepts_only_encoded_local_artifact_content_paths() {
+        assert!(valid_artifact_url(
+            "/api/v1/workspaces/local/sessions/session-1/artifacts/artifact%3Aabc/content"
+        ));
+        for invalid in [
+            "https://example.com/file",
+            "/api/v1/workspaces/local/sessions/session-1/artifacts/a/access",
+            "/api/v1/workspaces/local/sessions/session-1/artifacts/a/content?x=1",
+            "/api/v1/workspaces/local/sessions/session-1/artifacts/a\r\nX-Evil: yes/content",
+            "/api/v1/workspaces/local/sessions/../artifacts/a/content",
+        ] {
+            assert!(!valid_artifact_url(invalid), "{invalid}");
+        }
+    }
+
+    #[test]
+    fn streams_authenticated_artifact_to_an_atomic_destination() {
+        let path = "/api/v1/workspaces/local/sessions/session-1/artifacts/artifact%3Aabc/content";
+        let credential = "c".repeat(64);
+        let body = b"exact artifact bytes";
+        let response = format!(
+            "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n",
+            body.len()
+        )
+        .into_bytes()
+        .into_iter()
+        .chain(body.iter().copied())
+        .collect();
+        let (port, server) = artifact_server(response, path, credential.clone());
+        let directory = export_test_directory("artifact-export");
+        let destination = directory.join("artifact.txt");
+        fs::write(&destination, b"old bytes").expect("old destination");
+
+        download_artifact(port, &credential, path, &destination).expect("artifact export");
+        server.join().expect("artifact server");
+
+        assert_eq!(fs::read(&destination).expect("saved artifact"), body);
+        assert_eq!(
+            fs::read_dir(&directory).expect("export directory").count(),
+            1
+        );
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[test]
+    fn truncated_artifact_keeps_the_existing_destination() {
+        let path = "/api/v1/workspaces/local/sessions/session-1/artifacts/artifact%3Aabc/content";
+        let credential = "d".repeat(64);
+        let response = b"HTTP/1.0 200 OK\r\nContent-Length: 20\r\n\r\nshort".to_vec();
+        let (port, server) = artifact_server(response, path, credential.clone());
+        let directory = export_test_directory("truncated-export");
+        let destination = directory.join("artifact.txt");
+        fs::write(&destination, b"old bytes").expect("old destination");
+
+        let error =
+            download_artifact(port, &credential, path, &destination).expect_err("truncated");
+        server.join().expect("artifact server");
+
+        assert!(error.contains("declared length"));
+        assert_eq!(
+            fs::read(&destination).expect("unchanged destination"),
+            b"old bytes"
+        );
+        assert_eq!(
+            fs::read_dir(&directory).expect("export directory").count(),
+            1
+        );
+        fs::remove_dir_all(directory).expect("remove test directory");
     }
 }

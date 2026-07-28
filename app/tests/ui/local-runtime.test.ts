@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Session } from "../../src/runtime/atpiano-runtime.js";
 import { LocalRuntime } from "../../src/runtime/local-runtime.js";
@@ -266,5 +266,37 @@ describe("local runtime", () => {
       sample_rate_hz: 48_000,
     });
     expect((await starting).session_id).toBe(session.session_id);
+  });
+
+  it("starts a browser artifact export with the supplied filename", async () => {
+    let clicked: HTMLAnchorElement | null = null;
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
+      function (this: HTMLAnchorElement) {
+        clicked = this;
+      },
+    );
+    vi.mocked(URL.createObjectURL).mockClear();
+    const runtime = new LocalRuntime({
+      baseUrl: "http://127.0.0.1:8002",
+      fetchImplementation: fakeFetch,
+      WebSocketImplementation: FakeWebSocket as unknown as typeof WebSocket,
+    });
+
+    const result = await runtime.exportArtifact(
+      "local",
+      "session-local",
+      "artifact-local",
+      { requestId: "artifact-export" },
+    );
+
+    expect(result).toEqual({
+      outcome: "download-started",
+      fileName: "artifact.txt",
+    });
+    expect(clicked).not.toBeNull();
+    expect(clicked!.download).toBe("artifact.txt");
+    expect(clicked!.href).toMatch(/^blob:atpiano-test-/);
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+    expect(document.querySelector(`a[href="${clicked!.href}"]`)).toBeNull();
   });
 });

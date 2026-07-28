@@ -295,11 +295,6 @@ export function App() {
     (artifact) =>
       artifact.artifact_id === selectedScoreVariant?.alignment_artifact_id,
   ) ?? fallbackScoreAlignmentArtifact;
-  const baselineScoreArtifact = artifacts.data?.items.find(
-    (artifact) =>
-      artifact.artifact_id ===
-        selectedScoreVariant?.baseline_musicxml_artifact_id,
-  );
   const audioArtifacts = useMemo(
     () => {
       const available = (artifacts.data?.items ?? []).filter(
@@ -794,44 +789,38 @@ export function App() {
     selectedSession.data,
   ]);
 
-  const downloadArtifact = useCallback(async (artifact: Artifact) => {
+  const exportArtifact = useCallback(async (artifact: Artifact) => {
     try {
-      const content = await runtime.readArtifact(
+      const result = await runtime.exportArtifact(
         artifact.workspace_id,
         artifact.session_id,
         artifact.artifact_id,
         { requestId: requestId("artifact-access") },
       );
-      const link = document.createElement("a");
-      const url = URL.createObjectURL(
-        new Blob([content.bytes], { type: content.access.media_type }),
-      );
-      link.href = url;
-      link.download = content.access.download_name;
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      if (result.outcome === "saved" && result.fileName) {
+        setNotice(`Saved ${result.fileName}.`);
+      } else if (result.outcome === "download-started" && result.fileName) {
+        setNotice(`Downloading ${result.fileName}…`);
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     }
   }, [runtime]);
 
-  const downloadPinnedScore = useCallback(async () => {
+  const exportPinnedScore = useCallback(async () => {
     if (!workspace || !selectedSessionId || !scoreReaderRoute) return;
     try {
-      const content = await runtime.readArtifact(
+      const result = await runtime.exportArtifact(
         workspace.workspace_id,
         selectedSessionId,
         scoreReaderRoute.artifactId,
         { requestId: requestId("reader-score-download") },
       );
-      const link = document.createElement("a");
-      const url = URL.createObjectURL(
-        new Blob([content.bytes], { type: content.access.media_type }),
-      );
-      link.href = url;
-      link.download = content.access.download_name;
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      if (result.outcome === "saved" && result.fileName) {
+        setNotice(`Saved ${result.fileName}.`);
+      } else if (result.outcome === "download-started" && result.fileName) {
+        setNotice(`Downloading ${result.fileName}…`);
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     }
@@ -937,7 +926,7 @@ export function App() {
         currentArtifactId={scoreArtifact?.artifact_id}
         onClose={closeScoreReader}
         onUseCurrent={useCurrentScore}
-        onDownload={() => void downloadPinnedScore()}
+        onDownload={() => void exportPinnedScore()}
       />
     );
   }
@@ -1220,16 +1209,15 @@ export function App() {
               onSelectScoreVariant={selectScoreVariant}
               onCreateAutomaticVariant={createAutomaticVariant}
               onCreateEnharmonicVariant={createEnharmonicVariant}
-              onDownloadBaseline={
-                baselineScoreArtifact
-                  ? () => void downloadArtifact(baselineScoreArtifact)
-                  : undefined
-              }
             />
 
             <ArtifactPanel
               artifacts={artifacts.data?.items ?? []}
-              onDownload={(artifact) => void downloadArtifact(artifact)}
+              baselineScoreArtifactId={
+                selectedScoreVariant?.baseline_musicxml_artifact_id
+              }
+              selectedScoreArtifactId={scoreArtifact?.artifact_id}
+              onDownload={(artifact) => void exportArtifact(artifact)}
             />
             <footer className="session-footer">
               <span>Session ID</span>

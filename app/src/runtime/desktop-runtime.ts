@@ -2,6 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import { LocalRuntime } from "./local-runtime.js";
+import type {
+  ArtifactExportResult,
+  RuntimeRequest,
+} from "./atpiano-runtime.js";
 
 const desktopProtocol = "atpiano.desktop.v1";
 const contractSchema = "atpiano.contract.v1";
@@ -23,8 +27,13 @@ interface DesktopRuntimeInfo {
 }
 
 export interface DesktopRuntimeBootstrap {
-  readonly runtime: LocalRuntime;
+  readonly runtime: DesktopRuntime;
   monitor(onFailure: (message: string) => void): Promise<UnlistenFn>;
+}
+
+interface DesktopArtifactExportResult {
+  readonly saved: boolean;
+  readonly fileName: string | null;
 }
 
 export function isTauriRuntime(): boolean {
@@ -60,12 +69,39 @@ function validateRuntimeInfo(value: DesktopRuntimeInfo): DesktopRuntimeInfo {
   return value;
 }
 
+export class DesktopRuntime extends LocalRuntime {
+  async exportArtifact(
+    workspaceId: string,
+    sessionId: string,
+    artifactId: string,
+    request: RuntimeRequest,
+  ): Promise<ArtifactExportResult> {
+    const access = await this.getArtifactAccess(
+      workspaceId,
+      sessionId,
+      artifactId,
+      request,
+    );
+    const result = await invoke<DesktopArtifactExportResult>(
+      "desktop_export_artifact",
+      {
+        artifactUrl: access.url,
+        suggestedName: access.download_name,
+      },
+    );
+    return {
+      outcome: result.saved ? "saved" : "cancelled",
+      fileName: result.fileName,
+    };
+  }
+}
+
 export async function createDesktopRuntime(): Promise<DesktopRuntimeBootstrap> {
   const info = validateRuntimeInfo(
     await invoke<DesktopRuntimeInfo>("desktop_runtime"),
   );
   return {
-    runtime: new LocalRuntime({
+    runtime: new DesktopRuntime({
       baseUrl: info.baseUrl,
       bearerToken: info.bearerToken,
       webSocketProtocol: info.webSocketProtocol,

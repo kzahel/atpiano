@@ -64,6 +64,11 @@ export interface ArtifactContent {
   readonly bytes: ArrayBuffer;
 }
 
+export interface ArtifactExportResult {
+  readonly outcome: "download-started" | "saved" | "cancelled";
+  readonly fileName: string | null;
+}
+
 /**
  * Platform-neutral atpiano boundary used by the shared frontend.
  *
@@ -116,6 +121,12 @@ export interface AtpianoRuntime {
     artifactId: string,
     request: RuntimeRequest,
   ): Promise<ArtifactContent>;
+  exportArtifact(
+    workspaceId: string,
+    sessionId: string,
+    artifactId: string,
+    request: RuntimeRequest,
+  ): Promise<ArtifactExportResult>;
   startScoreJob(
     input: ScoreJobStart,
     request: RuntimeRequest,

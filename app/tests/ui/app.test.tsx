@@ -63,6 +63,12 @@ describe("shared application", () => {
     ).toBeTruthy();
     expect(screen.getByLabelText("Engraving")).toBeTruthy();
     expect(
+      await screen.findByRole("button", { name: /Original model MusicXML/ }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Download model baseline" }),
+    ).toBeNull();
+    expect(
       (await screen.findByRole(
         "button",
         { name: "Play recorded audio" },
@@ -74,6 +80,41 @@ describe("shared application", () => {
     expect(screen.queryByRole("heading", { name: "Piano roll" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Detected keys" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Committed score" })).toBeTruthy();
+  });
+
+  it("exports the model baseline through the shared runtime operation", async () => {
+    const user = userEvent.setup();
+    const fixture = createFixtureRuntime();
+    const exported: string[] = [];
+    const runtime = new Proxy(fixture, {
+      get(target, property) {
+        if (property === "exportArtifact") {
+          return async (
+            _workspaceId: string,
+            _sessionId: string,
+            artifactId: string,
+          ) => {
+            exported.push(artifactId);
+            return {
+              outcome: "download-started" as const,
+              fileName: "score.musicxml",
+            };
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) satisfies AtpianoRuntime;
+    renderApp(runtime);
+
+    await user.click(
+      await screen.findByRole("button", { name: /Original model MusicXML/ }),
+    );
+
+    expect(exported).toEqual([
+      "artifact:20260726T100000-abcdef123456:musicxml",
+    ]);
+    expect(await screen.findByText("Downloading score.musicxml…")).toBeTruthy();
   });
 
   it("draws the shared inspection position on the piano roll", async () => {
@@ -386,7 +427,9 @@ describe("shared application", () => {
     expect(await screen.findByRole("heading", { name: "Morning progression" }))
       .toBeTruthy();
 
-    await user.click(screen.getByRole("button", { name: "Refresh score" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Refresh score" }),
+    );
 
     expect(await screen.findByText("Score runtime unavailable")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Morning progression" }))

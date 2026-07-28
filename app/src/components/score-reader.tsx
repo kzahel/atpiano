@@ -275,7 +275,7 @@ export function ScoreReader({
             <option value="compact">Compact</option>
           </select>
         </label>
-        <button type="button" onClick={onDownload}>Download</button>
+        <button type="button" onClick={onDownload}>Export</button>
         <button
           type="button"
           onClick={() => void toggleFullscreen()}
@@ -342,7 +342,7 @@ export function ScoreReader({
             </strong>
             <span>
               {xmlError
-                ? "Return to the workspace or download the MusicXML artifact."
+                ? "Return to the workspace or export the MusicXML artifact."
                 : "The exact MusicXML snapshot is being prepared for this screen."}
             </span>
           </div>
