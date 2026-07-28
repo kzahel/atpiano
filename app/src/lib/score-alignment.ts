@@ -71,13 +71,17 @@ function transformerMidiTick(
   sourceSample: number,
   sampleRateHz: number,
 ): bigint {
-  const numerator = BigInt(sourceSample) * 960n;
-  const denominator = BigInt(sampleRateHz);
-  const quotient = numerator / denominator;
-  const doubledRemainder = (numerator % denominator) * 2n;
-  if (doubledRemainder < denominator) return quotient;
-  if (doubledRemainder > denominator) return quotient + 1n;
-  return quotient % 2n === 0n ? quotient : quotient + 1n;
+  // Mirror mido.second2tick's floating-point operation order before applying
+  // Python's ties-to-even round. Algebraically equivalent rational arithmetic
+  // can choose a different tick when the intermediate float straddles 0.5.
+  const seconds = sourceSample / sampleRateHz;
+  const secondsPerTick = 500_000 * 1e-6 / 480;
+  const tick = seconds / secondsPerTick;
+  const lower = Math.floor(tick);
+  const fraction = tick - lower;
+  if (fraction < 0.5) return BigInt(lower);
+  if (fraction > 0.5) return BigInt(lower + 1);
+  return BigInt(lower % 2 === 0 ? lower : lower + 1);
 }
 
 type TransformerMidiOrder = readonly [

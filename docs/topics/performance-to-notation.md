@@ -53,6 +53,26 @@ Retained snapshots are classified from their own evidence rather than
 rewritten. The score card exposes current, older-compatible, incompatible,
 and untracked states; it now distinguishes legacy v1 cursor metadata from an
 ordinary artifact load failure and recommends a current re-score.
+The 2026-07-28 retained-score audit regenerated all nine complete, non-trashed
+recordings through the authenticated live service. Before refresh, three used
+incompatible v1 cursor alignment, four had valid v2 alignment without tracked
+producer provenance, and two were already current r2 snapshots. All nine
+published current r2 MusicXML and v2 alignment with matching hashes and passed
+structural validation. A Chromium and WebKit engraving sweep rendered every
+score, but session `20260726T191133-04261c1ba54b` still degraded its playback
+cursor. Its first rejected source-order pair exposes another cross-language
+MIDI rounding gap: Python rounds a floating-point conversion of source sample
+`1556525` at 48 kHz to tick `31131`, while the browser's exact rational
+ties-to-even conversion produces tick `31130`. Regeneration is deterministic
+and does not repair this mismatch. Tactical 043 now makes the browser mirror
+the producer's real `mido.second2tick` floating-point operation order before
+applying Python's ties-to-even rule. The retained 464-row target and the prior
+1,804-row half-tick regression both parse, and clean Chromium and WebKit live
+checks render the target and expose a visible cursor after seeking. A complete
+post-fix sweep then exercised all nine current retained recordings in both
+browsers: all 18 combinations rendered inline notation, exposed a visible
+cursor at a mapped attack, and rendered their complete score-reader pages
+without an engraving, alignment, cursor, or reader error.
 This is not yet progressive engraving or a permanent consumer-stack
 selection. The leading score converter's GitHub source and checkpoint still
 have no explicit published license, although the paper is CC BY 4.0 and the

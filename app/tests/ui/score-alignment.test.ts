@@ -161,6 +161,42 @@ describe("score playback alignment", () => {
     expect(scoreAttackAtSample(alignment, 3_063_125, 4_000_000)).toBe(67);
   });
 
+  it("matches the producer's floating-point half-tick conversion", () => {
+    const document = alignmentDocument();
+    document.rows = [
+      {
+        source_index: 0,
+        event_id: "later-low",
+        pitch: 65,
+        onset_sample: 1_556_530,
+        offset_sample: 1_559_535,
+        status: "mapped",
+        score_time_quarters: { numerator: 53, denominator: 1 },
+      },
+      {
+        source_index: 1,
+        event_id: "nominal-half-tick-high",
+        pitch: 77,
+        onset_sample: 1_556_525,
+        offset_sample: 1_596_339,
+        status: "unmatched",
+        score_time_quarters: null,
+      },
+    ];
+
+    const alignment = parseScoreAlignment(document, {
+      sessionId: "session-1",
+      musicXmlSha256: scoreHash,
+    });
+
+    expect(alignment.rows.map((row) => row.event_id)).toEqual([
+      "nominal-half-tick-high",
+      "later-low",
+    ]);
+    expect(scoreAttackAtSample(alignment, 1_556_529, 2_000_000)).toBeNull();
+    expect(scoreAttackAtSample(alignment, 1_556_530, 2_000_000)).toBe(53);
+  });
+
   it("rejects score reversals on the source sample clock", () => {
     const document = alignmentDocument();
     document.rows[3]!.score_time_quarters = {
