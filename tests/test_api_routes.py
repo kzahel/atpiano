@@ -6,8 +6,11 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import wave
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 from atpiano.contracts.schemas import (
     DeleteSessionRequest,
@@ -18,7 +21,7 @@ from atpiano.contracts.schemas import (
 from atpiano.corrected import CORRECTED_EVENT_SCHEMA, CorrectedSession
 from atpiano.corrected_export import write_corrected_exports
 from atpiano.corrected_workbench import create_corrected_workbench_server
-from atpiano.live import PcmBlock
+from atpiano.live import LiveModelOutput, PcmBlock
 from atpiano.util import sha256_file, write_json
 
 
@@ -73,6 +76,35 @@ def _session(
     session.finalize()
     write_corrected_exports(session.directory)
     return session
+
+
+class _PreviewModel:
+    sample_rate_hz = 8_000
+    window_samples = 100
+    fft_hop_samples = 1
+    overlapping_frames = 0
+    left_guard_samples = 0
+    right_guard_samples = 0
+
+    def predict(self, _audio: np.ndarray) -> LiveModelOutput:
+        return LiveModelOutput(
+            candidates=[],
+            raw={"onset": np.zeros((1, 88), dtype=np.float32)},
+            inference_s=0.0,
+            decode_s=0.0,
+        )
+
+    def provenance(self) -> dict[str, object]:
+        return {"name": "api-upload-preview"}
+
+
+def _wav_file(path: Path) -> bytes:
+    with wave.open(str(path), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(8_000)
+        output.writeframes(b"\0\0" * 800)
+    return path.read_bytes()
 
 
 def _score_runner(
@@ -256,13 +288,76 @@ def test_api_routes_read_explicit_history_without_retargeting_current(
     assert capabilities["supported_schema_versions"] == [
         "atpiano.contract.v1"
     ]
-    assert capabilities["capture_sources"] == ["microphone"]
+    assert capabilities["capture_sources"] == ["microphone", "upload"]
     assert catalog["items"][0]["session_id"] == newer_id
     assert catalog["next_cursor"] == newer_id
     assert older["session_id"] == older_id
     assert events["session_id"] == older_id
     assert events["items"][0]["event_id"] == "note-c4"
     assert legacy_current["session_id"] == newer_id
+
+
+def test_local_api_imports_wav_as_an_ordinary_named_session(
+    tmp_path: Path,
+) -> None:
+    server = create_corrected_workbench_server(
+        tmp_path,
+        port=0,
+        minimum_free_bytes=0,
+        preview_model_factory=_PreviewModel,
+        commit_model_factory=lambda: None,
+        correction_mode="unavailable",
+        isolate_models=False,
+        score_runtime=tmp_path / "runtime",
+    )
+    thread, base_url = _serve(server)
+    body = _wav_file(tmp_path / "Practice phrase.wav")
+    request = urllib.request.Request(
+        f"{base_url}/api/v1/workspaces/local/recording-imports",
+        data=body,
+        headers={
+            "Content-Type": "audio/wav",
+            "Origin": base_url,
+            "X-Atpiano-Filename": "Practice%20phrase.wav",
+            "X-Atpiano-Request-Id": "import-1",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            capture = json.load(response)
+            assert response.status == 202
+        deadline = time.monotonic() + 10
+        session: dict[str, Any] | None = None
+        while time.monotonic() < deadline:
+            session = _get(
+                f"{base_url}/api/v1/workspaces/local/sessions/"
+                f"{capture['session_id']}"
+            )
+            if session["status"] in {"complete", "failed"}:
+                break
+            time.sleep(0.02)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert capture["source"] == "upload"
+    assert capture["sample_rate_hz"] == 8_000
+    assert session is not None
+    assert session["status"] == "complete"
+    assert session["source_frame_count"] == 800
+    assert session["display_name"] == "Practice phrase"
+    upload = json.loads(
+        (
+            tmp_path / capture["session_id"] / "upload.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert upload["state"] == "accepted"
+    assert upload["original"]["filename"] == "Practice phrase.wav"
+    assert not any(
+        (tmp_path / ".recording-imports").glob("*.part")
+    )
 
 
 def test_api_score_job_and_artifacts_remain_targeted_to_history(

@@ -100,6 +100,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/recording-imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["importRecording"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/sessions": {
         parameters: {
             query?: never;
@@ -829,6 +845,25 @@ export interface components {
              */
             source_artifact_sha256: string[];
         };
+        /** RecordingImportStart */
+        RecordingImportStart: {
+            /** Byte Count */
+            byte_count: number;
+            /** Filename */
+            filename: string;
+            /** Media Type */
+            media_type: string;
+            /** Request Id */
+            request_id: string;
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+            /** Workspace Id */
+            workspace_id: string;
+        };
         /** ReplayStart */
         ReplayStart: {
             /** Fixture Id */
@@ -1459,6 +1494,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkspacePage"];
+                };
+            };
+            /** @description Structured API error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    importRecording: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Atpiano-Filename": string;
+                "X-Atpiano-Request-Id": string;
+            };
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+                "audio/mpeg": string;
+                "audio/wav": string;
+            };
+        };
+        responses: {
+            /** @description Capture */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Capture"];
                 };
             };
             /** @description Structured API error */

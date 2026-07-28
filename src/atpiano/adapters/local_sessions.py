@@ -311,6 +311,21 @@ class LocalSessionStore:
         started_at = _parse_time(manifest["started_at"], field="session.started_at")
         display_time = started_at.astimezone().strftime("%d %b %Y, %H:%M")
         automatic_display_name = f"{display_time}, {source.value}"
+        if source is SourceKind.UPLOAD:
+            try:
+                upload = read_json(directory / "upload.json")
+                original = upload.get("original")
+                filename = (
+                    original.get("filename")
+                    if isinstance(original, dict)
+                    else None
+                )
+                if isinstance(filename, str):
+                    upload_name = Path(filename).stem.strip()
+                    if upload_name:
+                        automatic_display_name = upload_name[:200]
+            except (OSError, ValueError):
+                pass
         display_name = automatic_display_name
         try:
             application = read_json(directory / "application.json")

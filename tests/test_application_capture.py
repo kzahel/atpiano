@@ -108,6 +108,59 @@ class _ManualTimerFactory:
         return timer
 
 
+class _UploadSource:
+    sample_rate_hz = 8_000
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    def stream(
+        self,
+        *,
+        accept: Callable[[PcmBlock, int], None],
+    ) -> tuple[int, int]:
+        accept(
+            PcmBlock(
+                sequence=0,
+                first_sample=0,
+                frame_count=80,
+                sample_rate_hz=self.sample_rate_hz,
+                page_sent_ms=10,
+                worklet_time_s=0.01,
+                pcm_s16le=b"\0\0" * 80,
+            ),
+            time.perf_counter_ns(),
+        )
+        return 80, 1
+
+    def provenance(
+        self,
+        *,
+        state: str,
+        decoded_frame_count: int = 0,
+        decoded_block_count: int = 0,
+        error: str | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "schema_version": "atpiano.recording-upload.v1",
+            "state": state,
+            "original": {
+                "filename": "Evening practice.wav",
+                "media_type": "audio/wav",
+                "byte_count": 204,
+                "sha256": "a" * 64,
+            },
+            "decode": {
+                "frame_count": decoded_frame_count,
+                "block_count": decoded_block_count,
+            },
+            "error": error,
+        }
+
+    def close(self) -> None:
+        self.closed = True
+
+
 def _stop_empty_capture(service: CaptureApplicationService) -> None:
     service.stop_microphone(
         frame_count=0,
@@ -235,6 +288,64 @@ def test_capture_service_replay_uses_same_pipeline_without_http(
         )
         == 2
     )
+    service.close()
+
+
+def test_capture_service_import_uses_upload_source_and_keeps_provenance(
+    tmp_path: Path,
+) -> None:
+    repository = LocalSessionStore(tmp_path)
+    source = _UploadSource()
+    finalized: list[str] = []
+    service = CaptureApplicationService(
+        repository,
+        _UnavailableModelPool(),
+        minimum_free_bytes=0,
+        free_bytes=lambda: 10_000,
+        finalizer=lambda session: finalized.append(session.session_id),
+        upload_enabled=True,
+    )
+
+    started = service.start_upload(source)
+    assert started.session.source == "upload"
+    assert service.wait_for_settlement(timeout=2)
+    for _ in range(100):
+        if service.state()["status"] == "complete":
+            break
+        time.sleep(0.01)
+
+    session_id = started.session.session_id
+    assert service.state()["status"] == "complete"
+    assert finalized == [session_id]
+    assert source.closed is True
+    assert read_json(tmp_path / session_id / "upload.json")["state"] == "accepted"
+    assert repository.get_session(session_id).display_name == "Evening practice"
+    service.close()
+
+
+def test_upload_cannot_displace_an_active_microphone_capture(
+    tmp_path: Path,
+) -> None:
+    service = CaptureApplicationService(
+        LocalSessionStore(tmp_path),
+        _UnavailableModelPool(),
+        minimum_free_bytes=0,
+        free_bytes=lambda: 10_000,
+        finalizer=lambda _session: None,
+        upload_enabled=True,
+    )
+    microphone = service.start_microphone(
+        sample_rate_hz=8_000,
+        client_metadata={},
+    )
+    source = _UploadSource()
+
+    with pytest.raises(RuntimeError, match="already active"):
+        service.start_upload(source)
+
+    assert source.closed is True
+    assert service.active_session_id() == microphone.session.session_id
+    service.abort_microphone(RuntimeError("test cleanup"))
     service.close()
 
 

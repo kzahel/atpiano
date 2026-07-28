@@ -135,6 +135,50 @@ def build_openapi_document() -> dict[str, Any]:
                 "responses": _response("SessionPage"),
             }
         },
+        "/api/v1/workspaces/{workspace_id}/recording-imports": {
+            "post": {
+                "operationId": "importRecording",
+                "parameters": [
+                    workspace_id,
+                    {
+                        "name": "X-Atpiano-Filename",
+                        "in": "header",
+                        "required": True,
+                        "schema": {"type": "string", "maxLength": 255},
+                    },
+                    {
+                        "name": "X-Atpiano-Request-Id",
+                        "in": "header",
+                        "required": True,
+                        "schema": {"type": "string", "maxLength": 128},
+                    },
+                ],
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "audio/wav": {
+                            "schema": {
+                                "type": "string",
+                                "format": "binary",
+                            }
+                        },
+                        "audio/mpeg": {
+                            "schema": {
+                                "type": "string",
+                                "format": "binary",
+                            }
+                        },
+                        "application/octet-stream": {
+                            "schema": {
+                                "type": "string",
+                                "format": "binary",
+                            }
+                        },
+                    },
+                },
+                "responses": _response("Capture", status="202"),
+            }
+        },
         "/api/v1/workspaces/{workspace_id}/sessions/{session_id}": {
             "get": {
                 "operationId": "getSession",

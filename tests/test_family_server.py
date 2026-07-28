@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import io
+import time
+import wave
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
@@ -16,11 +20,41 @@ from atpiano.corrected_export import write_corrected_exports
 from atpiano.corrected_workbench import CorrectedWorkbenchRuntime
 from atpiano.family_check import check_family_workspace
 from atpiano.family_server import create_family_application
-from atpiano.live import PcmBlock
+from atpiano.live import LiveModelOutput, PcmBlock
 from atpiano.persistence import initialize_catalog
 
 PUBLIC_ORIGIN = "https://family.test"
 SESSION_ID = "20260728T120000-aaaaaaaaaaaa"
+
+
+class _PreviewModel:
+    sample_rate_hz = 8_000
+    window_samples = 100
+    fft_hop_samples = 1
+    overlapping_frames = 0
+    left_guard_samples = 0
+    right_guard_samples = 0
+
+    def predict(self, _audio: np.ndarray) -> LiveModelOutput:
+        return LiveModelOutput(
+            candidates=[],
+            raw={"onset": np.zeros((1, 88), dtype=np.float32)},
+            inference_s=0.0,
+            decode_s=0.0,
+        )
+
+    def provenance(self) -> dict[str, object]:
+        return {"name": "family-upload-preview"}
+
+
+def _wav_bytes() -> bytes:
+    output = io.BytesIO()
+    with wave.open(output, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(8_000)
+        wav.writeframes(b"\0\0" * 800)
+    return output.getvalue()
 
 
 def _completed_session(workspace: Path) -> None:
@@ -67,7 +101,10 @@ def _environment(
     )
     runtime = CorrectedWorkbenchRuntime(
         tmp_path,
+        preview_model_factory=_PreviewModel,
         commit_model_factory=lambda: None,
+        correction_mode="unavailable",
+        isolate_models=False,
         minimum_free_bytes=0,
         score_runtime=tmp_path / "score-runtime",
         score_runner=score_runner,
@@ -196,7 +233,10 @@ def test_owner_cookie_authenticates_api_artifacts_and_websocket(
         capabilities = client.get("/api/v1/capabilities")
         assert capabilities.status_code == 200
         assert capabilities.json()["score_available"] is False
-        assert capabilities.json()["capture_sources"] == ["microphone"]
+        assert capabilities.json()["capture_sources"] == [
+            "microphone",
+            "upload",
+        ]
         workspaces = client.get("/api/v1/workspaces")
         assert [item["workspace_id"] for item in workspaces.json()["items"]] == [
             "local"
@@ -250,6 +290,78 @@ def test_owner_cookie_authenticates_api_artifacts_and_websocket(
     finally:
         runtime.close()
         engine.dispose()
+
+
+def test_family_recording_import_requires_writer_and_accepts_wav(
+    tmp_path: Path,
+) -> None:
+    client, runtime, _identity, engine = _environment(tmp_path)
+    body = _wav_bytes()
+    url = "/api/v1/workspaces/local/recording-imports"
+    headers = {
+        "Origin": PUBLIC_ORIGIN,
+        "Content-Type": "audio/wav",
+        "X-Atpiano-Filename": "Family%20practice.wav",
+        "X-Atpiano-Request-Id": "family-import-1",
+    }
+    try:
+        anonymous = client.post(url, headers=headers, content=body)
+        assert anonymous.status_code == 401
+        assert not any(
+            runtime.recording_uploads.spool_directory.glob("*.part")
+        )
+
+        assert (
+            _login(client, "viewer", "the viewer family password").status_code
+            == 200
+        )
+        viewer = client.post(url, headers=headers, content=body)
+        assert viewer.status_code == 403
+        assert not any(
+            runtime.recording_uploads.spool_directory.glob("*.part")
+        )
+    finally:
+        runtime.close()
+        engine.dispose()
+
+    owner_client, owner_runtime, _identity, owner_engine = _environment(
+        tmp_path / "owner"
+    )
+    try:
+        assert (
+            _login(
+                owner_client,
+                "owner",
+                "the owner family password",
+            ).status_code
+            == 200
+        )
+        imported = owner_client.post(url, headers=headers, content=body)
+        assert imported.status_code == 202, imported.text
+        capture = imported.json()
+        deadline = time.monotonic() + 10
+        session: dict[str, Any] | None = None
+        while time.monotonic() < deadline:
+            response = owner_client.get(
+                f"/api/v1/workspaces/local/sessions/"
+                f"{capture['session_id']}"
+            )
+            assert response.status_code == 200
+            session = response.json()
+            if session["status"] in {"complete", "failed"}:
+                break
+            time.sleep(0.02)
+
+        assert session is not None
+        assert session["status"] == "complete"
+        assert session["source"] == "upload"
+        assert session["display_name"] == "Family practice"
+        assert not any(
+            owner_runtime.recording_uploads.spool_directory.glob("*.part")
+        )
+    finally:
+        owner_runtime.close()
+        owner_engine.dispose()
 
 
 def test_available_score_runtime_is_exposed_by_default(

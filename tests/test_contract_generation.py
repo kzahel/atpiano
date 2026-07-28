@@ -44,6 +44,11 @@ def test_openapi_uses_explicit_targets_and_pydantic_components() -> None:
     ]["post"]["operationId"] == (
         "startScoreJob"
     )
+    import_operation = paths[
+        "/api/v1/workspaces/{workspace_id}/recording-imports"
+    ]["post"]
+    assert import_operation["operationId"] == "importRecording"
+    assert "audio/wav" in import_operation["requestBody"]["content"]
 
 
 def test_generation_check_detects_drift(tmp_path: Path) -> None:

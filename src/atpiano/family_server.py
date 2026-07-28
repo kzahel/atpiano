@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
+import re
 import sqlite3
 import subprocess
 import time
@@ -15,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Any
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 from fastapi import FastAPI, Request, Response, WebSocket
 from fastapi.exceptions import RequestValidationError
@@ -29,6 +31,7 @@ from atpiano.adapters.local_sessions import (
     LocalSessionConflictError,
     LocalSessionNotFoundError,
 )
+from atpiano.adapters.local_upload import MAX_RECORDING_UPLOAD_BYTES
 from atpiano.adapters.passwords import Argon2PasswordHasher
 from atpiano.adapters.sqlite_identity import SqlAlchemyIdentityRepository
 from atpiano.application.errors import (
@@ -50,12 +53,14 @@ from atpiano.contracts.schemas import (
     AtpianoError,
     AuthenticatedPrincipal,
     AuthSession,
+    Capture,
     DeleteSessionRequest,
     ErrorCode,
     ErrorResponse,
     LoginRequest,
     LogoutResult,
     Membership,
+    RecordingImportStart,
     RuntimeCapabilities,
     RuntimeMode,
     ScoreJobStart,
@@ -272,11 +277,19 @@ def create_family_application(
                 )
             content_length = request.headers.get("content-length")
             if content_length is not None:
+                body_limit = (
+                    MAX_RECORDING_UPLOAD_BYTES
+                    if re.fullmatch(
+                        r"/api/v1/workspaces/[^/]+/recording-imports",
+                        request.url.path,
+                    )
+                    else MAX_API_BODY_BYTES
+                )
                 try:
                     length = int(content_length)
                 except ValueError:
-                    length = MAX_API_BODY_BYTES + 1
-                if length < 0 or length > MAX_API_BODY_BYTES:
+                    length = body_limit + 1
+                if length < 0 or length > body_limit:
                     return _error_response(
                         "request body is too large",
                         status_code=413,
@@ -492,9 +505,19 @@ def create_family_application(
             supported_schema_versions=(CONTRACT_SCHEMA_VERSION,),
             supported_pcm_protocol_versions=(PCM_PROTOCOL_VERSION,),
             capture_sources=(
-                (SourceKind.MICROPHONE, SourceKind.REPLAY)
-                if runtime.application.capture.replay_available
-                else (SourceKind.MICROPHONE,)
+                (
+                    SourceKind.MICROPHONE,
+                    *(
+                        (SourceKind.UPLOAD,)
+                        if runtime.application.capture.upload_available
+                        else ()
+                    ),
+                    *(
+                        (SourceKind.REPLAY,)
+                        if runtime.application.capture.replay_available
+                        else ()
+                    ),
+                )
             ),
             score_available=score_available,
             recoverable_delete=True,
@@ -545,6 +568,87 @@ def create_family_application(
                 )
             }
         ).model_dump(mode="json")
+
+    @app.post(
+        "/api/v1/workspaces/{workspace_id}/recording-imports",
+        response_model=Capture,
+        status_code=202,
+    )
+    async def import_recording(
+        request: Request,
+        workspace_id: str,
+    ) -> Capture:
+        workspace_principal(request, workspace_id, write=True)
+        spool_path: Path | None = None
+        try:
+            content_length = int(
+                request.headers.get("content-length", "0")
+            )
+            filename = unquote(
+                request.headers.get("x-atpiano-filename", "")
+            )
+            request_id = request.headers.get(
+                "x-atpiano-request-id",
+                "",
+            )
+            media_type = request.headers.get(
+                "content-type",
+                "application/octet-stream",
+            )
+            normalized_filename, normalized_media_type = (
+                runtime.recording_uploads.validate_request(
+                    filename=filename,
+                    media_type=media_type,
+                    byte_count=content_length,
+                )
+            )
+            start = RecordingImportStart(
+                workspace_id=workspace_id,
+                filename=normalized_filename,
+                media_type=normalized_media_type,
+                byte_count=content_length,
+                request_id=request_id,
+            )
+            spool_path = runtime.recording_uploads.new_spool_path()
+            digest = hashlib.sha256()
+            received = 0
+            with spool_path.open("xb") as output:
+                spool_path.chmod(0o600)
+                async for chunk in request.stream():
+                    if not chunk:
+                        continue
+                    received += len(chunk)
+                    if received > start.byte_count:
+                        raise ValueError(
+                            "recording body exceeds Content-Length"
+                        )
+                    output.write(chunk)
+                    digest.update(chunk)
+                output.flush()
+                os.fsync(output.fileno())
+            if received != start.byte_count:
+                raise ValueError("recording body is truncated")
+            source = runtime.recording_uploads.prepare(
+                spool_path,
+                filename=start.filename,
+                media_type=start.media_type,
+                byte_count=received,
+                sha256=digest.hexdigest(),
+            )
+            try:
+                capture = runtime.start_recording_import(source)
+            except RuntimeError as error:
+                raise ApplicationConflictError(str(error)) from error
+            spool_path = None
+            return capture
+        except OSError as error:
+            raise ValueError(str(error)) from error
+        finally:
+            if spool_path is not None:
+                try:
+                    spool_path.unlink()
+                except FileNotFoundError:
+                    pass
 
     @app.get(
         "/api/v1/workspaces/{workspace_id}/sessions/{session_id}",

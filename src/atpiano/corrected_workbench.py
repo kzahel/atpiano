@@ -12,7 +12,7 @@ import subprocess
 import time
 import uuid
 import webbrowser
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from datetime import datetime, timezone
 from functools import partial
 from http import HTTPStatus
@@ -33,6 +33,11 @@ from atpiano.adapters.local_sessions import (
     LocalSessionStore,
 )
 from atpiano.adapters.local_storage import LocalStorageAdapter
+from atpiano.adapters.local_upload import (
+    MAX_RECORDING_UPLOAD_BYTES,
+    LocalRecordingUploadAdapter,
+    LocalUploadSource,
+)
 from atpiano.application import (
     DEFAULT_MODEL_IDLE_TIMEOUT_S,
     ApplicationNotFoundError,
@@ -51,10 +56,13 @@ from atpiano.contracts.schemas import (
     PCM_PROTOCOL_VERSION,
     ArtifactAccess,
     AtpianoError,
+    Capture,
+    CaptureStatus,
     DeleteSessionRequest,
     ErrorCode,
     ErrorResponse,
     Job,
+    RecordingImportStart,
     RuntimeCapabilities,
     RuntimeMode,
     ScoreJobStart,
@@ -216,8 +224,9 @@ class CorrectedWorkbenchRuntime:
         self.workspace_directory = workspace_directory.resolve()
         self.workspace_directory.mkdir(parents=True, exist_ok=True)
         self.session_store = LocalSessionStore(self.workspace_directory)
+        storage_adapter = LocalStorageAdapter(self.workspace_directory)
         storage = StorageApplicationService(
-            LocalStorageAdapter(self.workspace_directory),
+            storage_adapter,
             compact_recordings=compact_recordings,
             debug_policy=DebugRetentionPolicy(
                 enabled=debug_retention,
@@ -266,6 +275,12 @@ class CorrectedWorkbenchRuntime:
             if replay_manifest is not None
             else None
         )
+        self.recording_uploads = LocalRecordingUploadAdapter(
+            self.workspace_directory,
+            minimum_free_bytes=minimum_free_bytes,
+            ffmpeg_executable=storage_adapter.ffmpeg_executable,
+            ffprobe_executable=storage_adapter.ffprobe_executable,
+        )
         sessions = SessionApplicationService(
             self.session_store,
             workspace_id=LOCAL_WORKSPACE_ID,
@@ -279,6 +294,7 @@ class CorrectedWorkbenchRuntime:
             ).free,
             finalizer=storage.finalize_session,
             replay_source=replay_source,
+            upload_enabled=self.recording_uploads.available,
             storage=storage,
             model_idle_timeout_s=model_idle_timeout_s,
         )
@@ -408,6 +424,23 @@ class CorrectedWorkbenchRuntime:
 
     def start_replay(self) -> None:
         self.application.capture.start_replay()
+
+    def start_recording_import(
+        self,
+        source: LocalUploadSource,
+    ) -> Capture:
+        started = self.application.capture.start_upload(source)
+        session = started.session
+        return Capture(
+            workspace_id=LOCAL_WORKSPACE_ID,
+            session_id=session.session_id,
+            capture_id=f"capture:{session.session_id}",
+            status=CaptureStatus.RECORDING,
+            source=SourceKind.UPLOAD,
+            sample_rate_hz=session.sample_rate_hz,
+            accepted_through_sample=0,
+            started_at=session.started_at,
+        )
 
 
 class CorrectedWorkbenchServer(
@@ -723,9 +756,19 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     supported_schema_versions=(CONTRACT_SCHEMA_VERSION,),
                     supported_pcm_protocol_versions=(PCM_PROTOCOL_VERSION,),
                     capture_sources=(
-                        (SourceKind.MICROPHONE, SourceKind.REPLAY)
-                        if self.server.application.capture.replay_available
-                        else (SourceKind.MICROPHONE,)
+                        (
+                            SourceKind.MICROPHONE,
+                            *(
+                                (SourceKind.UPLOAD,)
+                                if self.server.application.capture.upload_available
+                                else ()
+                            ),
+                            *(
+                                (SourceKind.REPLAY,)
+                                if self.server.application.capture.replay_available
+                                else ()
+                            ),
+                        )
                     ),
                     score_available=bool(
                         self.server._runtime_state().get("available")
@@ -997,6 +1040,113 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     {"error": "corrected workbench actions require a trusted origin"},
                     HTTPStatus.FORBIDDEN,
                 )
+            return
+        import_match = re.fullmatch(
+            r"/api/v1/workspaces/([^/]+)/recording-imports",
+            request_path,
+        )
+        if import_match:
+            workspace_id = import_match.group(1)
+            spool_path: Path | None = None
+            content_length = 0
+            try:
+                content_length = int(
+                    self.headers.get("Content-Length", "0")
+                )
+                filename = unquote(
+                    self.headers.get("X-Atpiano-Filename", "")
+                )
+                request_id = self.headers.get(
+                    "X-Atpiano-Request-Id",
+                    "",
+                )
+                media_type = self.headers.get(
+                    "Content-Type",
+                    "application/octet-stream",
+                )
+                normalized_filename, normalized_media_type = (
+                    self.server.recording_uploads.validate_request(
+                        filename=filename,
+                        media_type=media_type,
+                        byte_count=content_length,
+                    )
+                )
+                start = RecordingImportStart(
+                    workspace_id=workspace_id,
+                    filename=normalized_filename,
+                    media_type=normalized_media_type,
+                    byte_count=content_length,
+                    request_id=request_id,
+                )
+                if start.workspace_id != LOCAL_WORKSPACE_ID:
+                    raise ValueError("recording import workspace is invalid")
+                spool_path = (
+                    self.server.recording_uploads.new_spool_path()
+                )
+
+                def chunks() -> Iterator[bytes]:
+                    remaining = start.byte_count
+                    while remaining:
+                        chunk = self.rfile.read(min(1024**2, remaining))
+                        if not chunk:
+                            break
+                        remaining -= len(chunk)
+                        yield chunk
+
+                byte_count, sha256 = (
+                    self.server.recording_uploads.write_spool(
+                        spool_path,
+                        chunks(),
+                        expected_bytes=start.byte_count,
+                    )
+                )
+                source = self.server.recording_uploads.prepare(
+                    spool_path,
+                    filename=start.filename,
+                    media_type=start.media_type,
+                    byte_count=byte_count,
+                    sha256=sha256,
+                )
+                capture = self.server.start_recording_import(source)
+                spool_path = None
+            except ValidationError as error:
+                self._send_api_error(
+                    str(error),
+                    code=ErrorCode.INVALID_REQUEST,
+                    status=HTTPStatus.BAD_REQUEST,
+                    workspace_id=workspace_id,
+                )
+                return
+            except (OSError, ValueError) as error:
+                self._send_api_error(
+                    str(error),
+                    code=ErrorCode.INVALID_REQUEST,
+                    status=(
+                        HTTPStatus.REQUEST_ENTITY_TOO_LARGE
+                        if content_length > MAX_RECORDING_UPLOAD_BYTES
+                        else HTTPStatus.BAD_REQUEST
+                    ),
+                    workspace_id=workspace_id,
+                )
+                return
+            except RuntimeError as error:
+                self._send_api_error(
+                    str(error),
+                    code=ErrorCode.CONFLICT,
+                    status=HTTPStatus.CONFLICT,
+                    workspace_id=workspace_id,
+                )
+                return
+            finally:
+                if spool_path is not None:
+                    try:
+                        spool_path.unlink()
+                    except FileNotFoundError:
+                        pass
+            self._send_json(
+                capture.model_dump(mode="json"),
+                HTTPStatus.ACCEPTED,
+            )
             return
         score_match = re.fullmatch(
             (
@@ -1302,7 +1452,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             )
             return
         method = self.headers.get("Access-Control-Request-Method", "")
-        if method not in {"GET", "HEAD", "POST", "DELETE"}:
+        if method not in {"GET", "HEAD", "POST", "PATCH", "DELETE"}:
             self._send_json(
                 {"error": "desktop preflight method is not allowed"},
                 HTTPStatus.FORBIDDEN,
@@ -1317,7 +1467,13 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             if value.strip()
         }
         if not requested_headers.issubset(
-            {"authorization", "content-type", "range"}
+            {
+                "authorization",
+                "content-type",
+                "range",
+                "x-atpiano-filename",
+                "x-atpiano-request-id",
+            }
         ):
             self._send_json(
                 {"error": "desktop preflight headers are not allowed"},
@@ -1332,7 +1488,10 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         )
         self.send_header(
             "Access-Control-Allow-Headers",
-            "Authorization, Content-Type, Range",
+            (
+                "Authorization, Content-Type, Range, "
+                "X-Atpiano-Filename, X-Atpiano-Request-Id"
+            ),
         )
         self.send_header("Access-Control-Max-Age", "600")
         self.end_headers()

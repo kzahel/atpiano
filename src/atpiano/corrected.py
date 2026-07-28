@@ -587,7 +587,7 @@ class CorrectedSession:
         correction_reason: str = "explicit local default",
         correction_profile_id: str | None = None,
     ) -> None:
-        if source not in {"replay", "microphone"}:
+        if source not in {"replay", "microphone", "upload"}:
             raise ValueError("corrected session source is invalid")
         if correction_mode not in {
             "live",

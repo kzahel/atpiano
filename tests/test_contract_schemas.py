@@ -16,6 +16,7 @@ from atpiano.contracts.schemas import (
     OffsetState,
     PcmEnvelope,
     Provenance,
+    RecordingImportStart,
     Session,
     SessionAnnotationPatch,
     SessionStatus,
@@ -138,6 +139,27 @@ def test_session_annotation_patch_normalizes_and_rejects_blank_names() -> None:
             session_id="session-1",
             display_name="   ",
             request_id="rename-2",
+        )
+
+
+def test_recording_import_contract_bounds_file_metadata() -> None:
+    request = RecordingImportStart(
+        workspace_id="local",
+        filename="Piano take.wav",
+        media_type="audio/wav",
+        byte_count=44,
+        request_id="import-1",
+    )
+
+    assert request.filename == "Piano take.wav"
+    assert request.byte_count == 44
+    with pytest.raises(ValidationError):
+        RecordingImportStart(
+            workspace_id="local",
+            filename="empty.wav",
+            media_type="audio/wav",
+            byte_count=0,
+            request_id="import-2",
         )
 
 

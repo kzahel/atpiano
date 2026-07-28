@@ -500,6 +500,17 @@ class ReplayStart(VersionedContractModel):
     request_id: OpaqueId
 
 
+class RecordingImportStart(VersionedContractModel):
+    workspace_id: OpaqueId
+    filename: Annotated[
+        str,
+        StringConstraints(min_length=1, max_length=255),
+    ]
+    media_type: MediaType
+    byte_count: Annotated[int, Field(ge=1, le=2_147_483_648)]
+    request_id: OpaqueId
+
+
 class ScoreJobStart(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
@@ -627,6 +638,7 @@ def contract_models() -> tuple[type[BaseModel], ...]:
         CaptureStart,
         CaptureStop,
         ReplayStart,
+        RecordingImportStart,
         ScoreJobStart,
         ScoreVariantRequest,
         SessionAnnotationPatch,

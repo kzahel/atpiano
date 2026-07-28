@@ -97,6 +97,29 @@ class ReplaySource(Protocol):
     def configuration(self) -> dict[str, Any]: ...
 
 
+class UploadSource(Protocol):
+    """Validated recording source consumed by capture coordination."""
+
+    sample_rate_hz: int
+
+    def stream(
+        self,
+        *,
+        accept: Callable[[PcmBlock, int], None],
+    ) -> tuple[int, int]: ...
+
+    def provenance(
+        self,
+        *,
+        state: str,
+        decoded_frame_count: int = 0,
+        decoded_block_count: int = 0,
+        error: str | None = None,
+    ) -> dict[str, Any]: ...
+
+    def close(self) -> None: ...
+
+
 SessionFinalizer = Callable[[CorrectedSession], None]
 FreeBytesProvider = Callable[[], int]
 
@@ -129,6 +152,7 @@ class CaptureApplicationService:
         free_bytes: FreeBytesProvider,
         finalizer: SessionFinalizer,
         replay_source: ReplaySource | None = None,
+        upload_enabled: bool = False,
         storage: StorageApplicationService | None = None,
         model_idle_timeout_s: float = DEFAULT_MODEL_IDLE_TIMEOUT_S,
         model_idle_timer_factory: ModelIdleTimerFactory = _daemon_timer,
@@ -141,6 +165,7 @@ class CaptureApplicationService:
         self._free_bytes = free_bytes
         self._finalizer = finalizer
         self._replay_source = replay_source
+        self._upload_enabled = upload_enabled
         self._storage = storage
         self._lock = threading.RLock()
         self._active_session: CorrectedSession | None = None
@@ -310,7 +335,7 @@ class CaptureApplicationService:
         )
 
     def claim_session(self, *, source: str) -> tuple[str, Path]:
-        if source not in {"microphone", "replay"}:
+        if source not in {"microphone", "replay", "upload"}:
             raise ValueError("capture source is invalid")
         with self._lock:
             if self._active_session is not None or self._status in {
@@ -509,6 +534,10 @@ class CaptureApplicationService:
     def replay_available(self) -> bool:
         return self._replay_source is not None
 
+    @property
+    def upload_available(self) -> bool:
+        return self._upload_enabled
+
     def start_replay(self) -> None:
         source = self._replay_source
         if source is None:
@@ -554,6 +583,93 @@ class CaptureApplicationService:
                 )
         except Exception as error:
             self.abort_microphone(error)
+
+    def start_upload(self, source: UploadSource) -> CaptureStart:
+        if not self._upload_enabled:
+            source.close()
+            raise RuntimeError("recording import is unavailable")
+        try:
+            session_id, directory = self.claim_session(source="upload")
+        except BaseException:
+            source.close()
+            raise
+        try:
+            started = self._start_claimed_session(
+                session_id=session_id,
+                directory=directory,
+                source="upload",
+                sample_rate_hz=source.sample_rate_hz,
+                client_metadata=None,
+            )
+            self._repository.write_document(
+                session_id,
+                "upload.json",
+                source.provenance(state="decoding"),
+            )
+        except BaseException as error:
+            source.close()
+            self.fail_session(
+                error if isinstance(error, Exception) else RuntimeError(str(error))
+            )
+            raise
+        thread = threading.Thread(
+            target=self._run_upload,
+            args=(source, started),
+            name=f"atpiano-upload-{session_id}",
+            daemon=True,
+        )
+        thread.start()
+        return started
+
+    def _run_upload(
+        self,
+        source: UploadSource,
+        started: CaptureStart,
+    ) -> None:
+        frame_count = 0
+        block_count = 0
+        try:
+            frame_count, block_count = source.stream(
+                accept=lambda block, received_ns: self.accept_block(
+                    block,
+                    received_ns=received_ns,
+                ),
+            )
+            self._repository.write_document(
+                started.session.session_id,
+                "upload.json",
+                source.provenance(
+                    state="accepted",
+                    decoded_frame_count=frame_count,
+                    decoded_block_count=block_count,
+                ),
+            )
+            self.stop_microphone(
+                frame_count=frame_count,
+                block_count=block_count,
+                transport=None,
+            )
+            if not started.pipeline.wait(timeout=None):
+                raise RuntimeError(
+                    "recording import settlement did not complete"
+                )
+        except Exception as error:
+            try:
+                self._repository.write_document(
+                    started.session.session_id,
+                    "upload.json",
+                    source.provenance(
+                        state="failed",
+                        decoded_frame_count=frame_count,
+                        decoded_block_count=block_count,
+                        error=f"{type(error).__name__}: {error}",
+                    ),
+                )
+            except (LookupError, OSError, TypeError, ValueError):
+                pass
+            self.abort_microphone(error)
+        finally:
+            source.close()
 
     def accept_block(
         self,
