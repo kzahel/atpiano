@@ -169,4 +169,75 @@ describe("recorded audio playback", () => {
       })
     );
   });
+
+  it("cues a fresh run but honors a manual seek to the beginning", () => {
+    render(
+      <PlaybackProvider
+        sessionId="session-1"
+        sources={[
+          {
+            artifactId: "audio-1",
+            url: "data:audio/wav;base64,UklGRg==",
+            startSample: 0,
+            endSample: 192_000,
+          },
+        ]}
+        totalSamples={192_000}
+        sampleRateHz={48_000}
+        cueSample={36_000}
+      >
+        <AudioPlayback unavailableReason="Unavailable" />
+      </PlaybackProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "Play recorded audio",
+    }));
+    expect(usePlaybackStore.getState().positionSample).toBe(36_000);
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "Pause recorded audio",
+    }));
+    fireEvent.change(screen.getByRole("slider"), {
+      target: { value: "0" },
+    });
+    fireEvent.click(screen.getByRole("button", {
+      name: "Play recorded audio",
+    }));
+    expect(usePlaybackStore.getState().positionSample).toBe(0);
+
+    fireEvent.ended(document.querySelector("audio")!);
+    fireEvent.click(screen.getByRole("button", {
+      name: "Play recorded audio",
+    }));
+    expect(usePlaybackStore.getState().positionSample).toBe(36_000);
+  });
+
+  it("does not publish playback position into another selected session", () => {
+    render(
+      <PlaybackProvider
+        sessionId="session-1"
+        selectedSessionId="session-2"
+        sources={[
+          {
+            artifactId: "audio-1",
+            url: "data:audio/wav;base64,UklGRg==",
+            startSample: 0,
+            endSample: 96_000,
+          },
+        ]}
+        totalSamples={96_000}
+        sampleRateHz={48_000}
+      >
+        <AudioPlayback unavailableReason="Unavailable" />
+      </PlaybackProvider>,
+    );
+
+    fireEvent.change(screen.getByRole("slider"), {
+      target: { value: "48_000" },
+    });
+
+    expect(usePlaybackStore.getState().positionSample).toBe(48_000);
+    expect(useWorkspaceStore.getState().inspectionSample).toBeNull();
+  });
 });

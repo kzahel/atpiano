@@ -24,6 +24,8 @@ interface PlaybackControls {
   readonly pause: () => void;
   readonly toggle: () => void;
   readonly seek: (sample: number) => void;
+  readonly playSession: (sessionId: string) => void;
+  readonly seekSession: (sessionId: string, sample: number) => void;
   readonly clearInspection: () => void;
 }
 
@@ -50,18 +52,38 @@ export function PlaybackProvider({
   sources,
   totalSamples,
   sampleRateHz,
+  cueSample = 0,
+  cueReady = true,
+  sourceError = null,
+  selectedSessionId = sessionId,
+  onSessionRequest = () => undefined,
   children,
 }: {
   readonly sessionId: string | null;
   readonly sources: readonly AudioPlaybackSource[];
   readonly totalSamples: number;
   readonly sampleRateHz: number;
+  readonly cueSample?: number;
+  readonly cueReady?: boolean;
+  readonly sourceError?: string | null;
+  readonly selectedSessionId?: string | null;
+  readonly onSessionRequest?: (sessionId: string) => void;
   readonly children: ReactNode;
 }) {
   const audio = useRef<HTMLAudioElement>(null);
   const desiredSample = useRef(0);
   const shouldPlay = useRef(false);
   const seeking = useRef(false);
+  const manualPositionChosen = useRef(false);
+  const pendingAction = useRef<
+    | { readonly kind: "play"; readonly sessionId: string }
+    | {
+        readonly kind: "seek";
+        readonly sessionId: string;
+        readonly sample: number;
+      }
+    | null
+  >(null);
   const seekRef = useRef<(sample: number) => void>(() => undefined);
   const [activeIndex, setActiveIndex] = useState(0);
   const playing = usePlaybackStore((state) => state.status === "playing");
@@ -70,8 +92,10 @@ export function PlaybackProvider({
 
   const publishPosition = useCallback((sample: number) => {
     usePlaybackStore.getState().setPosition(sample);
-    useWorkspaceStore.getState().setInspectionSample(sample);
-  }, []);
+    if (sessionId === selectedSessionId) {
+      useWorkspaceStore.getState().setInspectionSample(sample);
+    }
+  }, [selectedSessionId, sessionId]);
 
   const playElement = useCallback(() => {
     if (!audio.current) return;
@@ -83,8 +107,9 @@ export function PlaybackProvider({
     });
   }, []);
 
-  const seek = useCallback((rawSample: number) => {
+  const seekTo = useCallback((rawSample: number, manual: boolean) => {
     const sample = Math.max(0, Math.min(totalSamples, rawSample));
+    if (manual) manualPositionChosen.current = true;
     desiredSample.current = sample;
     publishPosition(sample);
     if (!sources.length) return;
@@ -109,6 +134,10 @@ export function PlaybackProvider({
     sources,
     totalSamples,
   ]);
+  const seek = useCallback(
+    (sample: number) => seekTo(sample, true),
+    [seekTo],
+  );
   seekRef.current = seek;
 
   const pause = useCallback(() => {
@@ -123,21 +152,88 @@ export function PlaybackProvider({
   const play = useCallback(() => {
     const state = usePlaybackStore.getState();
     if (!state.available || !sources.length) return;
+    if (!cueReady) {
+      if (sessionId) {
+        pendingAction.current = { kind: "play", sessionId };
+      }
+      return;
+    }
     state.clearError();
     shouldPlay.current = true;
     state.setStatus("playing");
-    if (state.positionSample >= totalSamples) {
+    const freshRun =
+      state.status === "idle" &&
+      state.positionSample === 0 &&
+      !manualPositionChosen.current;
+    const restarting =
+      state.status === "ended" || state.positionSample >= totalSamples;
+    if (restarting) {
       state.followScore();
-      seek(0);
+      manualPositionChosen.current = false;
+    }
+    if (freshRun || restarting) {
+      seekTo(cueSample, false);
       return;
     }
     if (audio.current?.readyState) playElement();
-  }, [playElement, seek, sources.length, totalSamples]);
+  }, [
+    cueReady,
+    cueSample,
+    playElement,
+    seekTo,
+    sessionId,
+    sources.length,
+    totalSamples,
+  ]);
 
   const toggle = useCallback(() => {
     if (shouldPlay.current) pause();
     else play();
   }, [pause, play]);
+
+  const playSession = useCallback((requestedSessionId: string) => {
+    if (
+      requestedSessionId !== sessionId ||
+      !sources.length ||
+      !cueReady
+    ) {
+      pendingAction.current = {
+        kind: "play",
+        sessionId: requestedSessionId,
+      };
+      if (requestedSessionId !== sessionId) {
+        onSessionRequest(requestedSessionId);
+      }
+      return;
+    }
+    pendingAction.current = null;
+    play();
+  }, [
+    cueReady,
+    onSessionRequest,
+    play,
+    sessionId,
+    sources.length,
+  ]);
+
+  const seekSession = useCallback((
+    requestedSessionId: string,
+    sample: number,
+  ) => {
+    if (requestedSessionId !== sessionId || !sources.length) {
+      pendingAction.current = {
+        kind: "seek",
+        sessionId: requestedSessionId,
+        sample,
+      };
+      if (requestedSessionId !== sessionId) {
+        onSessionRequest(requestedSessionId);
+      }
+      return;
+    }
+    pendingAction.current = null;
+    seek(sample);
+  }, [onSessionRequest, seek, sessionId, sources.length]);
 
   const clearInspection = useCallback(() => {
     seek(0);
@@ -147,6 +243,7 @@ export function PlaybackProvider({
   useEffect(() => {
     shouldPlay.current = false;
     seeking.current = false;
+    manualPositionChosen.current = false;
     if (audio.current && !audio.current.paused) audio.current.pause();
     setActiveIndex(0);
     desiredSample.current = 0;
@@ -159,11 +256,35 @@ export function PlaybackProvider({
     });
   }, [sampleRateHz, sessionId, sourceKey, sources.length, totalSamples]);
 
+  useEffect(() => {
+    if (!sourceError || !sessionId) return;
+    usePlaybackStore.getState().setError(sourceError);
+  }, [sessionId, sourceError]);
+
+  useEffect(() => {
+    const action = pendingAction.current;
+    if (
+      !action ||
+      action.sessionId !== sessionId ||
+      !sources.length ||
+      (action.kind === "play" && !cueReady)
+    ) {
+      return;
+    }
+    pendingAction.current = null;
+    if (action.kind === "seek") {
+      seek(action.sample);
+    } else {
+      play();
+    }
+  }, [cueReady, play, seek, sessionId, sources.length]);
+
   useEffect(
     () =>
       useWorkspaceStore.subscribe((state, previous) => {
         const sample = state.inspectionSample;
         if (
+          sessionId !== selectedSessionId ||
           sample === null ||
           sample === previous.inspectionSample ||
           Math.abs(
@@ -174,7 +295,7 @@ export function PlaybackProvider({
         }
         seekRef.current(sample);
       }),
-    [sampleRateHz],
+    [sampleRateHz, selectedSessionId, sessionId],
   );
 
   const updatePositionFromElement = useCallback(() => {
@@ -217,8 +338,24 @@ export function PlaybackProvider({
   );
 
   const controls = useMemo<PlaybackControls>(
-    () => ({ play, pause, toggle, seek, clearInspection }),
-    [clearInspection, pause, play, seek, toggle],
+    () => ({
+      play,
+      pause,
+      toggle,
+      seek,
+      playSession,
+      seekSession,
+      clearInspection,
+    }),
+    [
+      clearInspection,
+      pause,
+      play,
+      playSession,
+      seek,
+      seekSession,
+      toggle,
+    ],
   );
 
   return (

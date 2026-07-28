@@ -1,110 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
+import { usePlaybackControls } from "./playback-provider.js";
 import {
   formatClock,
   formatSessionDate,
   noteName,
-  requestId,
   sessionSourceLabel,
 } from "../lib/format.js";
+import { openingEventPage } from "../lib/opening-event-page.js";
 import type {
-  AtpianoRuntime,
-  EventPage,
   EventRevision,
   Session,
 } from "../runtime/atpiano-runtime.js";
 import { useRuntime } from "../runtime/runtime-context.js";
-
-type PlayerState = "idle" | "loading" | "ready" | "playing" | "error";
-
-function eventPageOnce(
-  runtime: AtpianoRuntime,
-  session: Session,
-  startSample: number,
-  endSample: number,
-  signal: AbortSignal,
-): Promise<EventPage> {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    let subscription: ReturnType<AtpianoRuntime["subscribeEvents"]> | null =
-      null;
-    const finish = (operation: () => void) => {
-      if (settled) return;
-      settled = true;
-      signal.removeEventListener("abort", abort);
-      subscription?.close();
-      operation();
-    };
-    const abort = () =>
-      finish(() =>
-        reject(new DOMException("Preview loading was cancelled.", "AbortError"))
-      );
-    signal.addEventListener("abort", abort, { once: true });
-    if (signal.aborted) {
-      abort();
-      return;
-    }
-    try {
-      subscription = runtime.subscribeEvents(
-        session.workspace_id,
-        session.session_id,
-        {
-          requestId: requestId("session-preview"),
-          signal,
-          startSample,
-          endSample,
-          limit: 256,
-        },
-        {
-          next: (page) => finish(() => resolve(page)),
-          error: (error) => finish(() => reject(error)),
-        },
-      );
-    } catch (error) {
-      finish(() => reject(error));
-    }
-  });
-}
-
-function hasVisibleNote(page: EventPage): boolean {
-  return page.items.some(
-    (event) =>
-      event.kind === "note" &&
-      event.pitch !== null &&
-      event.lifecycle !== "retracted",
-  );
-}
-
-function isPageLimitError(error: unknown): boolean {
-  return error instanceof Error &&
-    error.message.includes("materialized event range exceeds page limit");
-}
-
-async function openingEventPage(
-  runtime: AtpianoRuntime,
-  session: Session,
-  endSample: number,
-  signal: AbortSignal,
-): Promise<EventPage> {
-  const search = async (
-    start: number,
-    end: number,
-  ): Promise<EventPage> => {
-    try {
-      return await eventPageOnce(runtime, session, start, end, signal);
-    } catch (error) {
-      if (!isPageLimitError(error) || end - start <= 1) throw error;
-
-      const middle = start + Math.floor((end - start) / 2);
-      const left = await search(start, middle);
-      if (hasVisibleNote(left)) return left;
-      return search(middle, end);
-    }
-  };
-
-  return search(0, endSample);
-}
+import { usePlaybackStore } from "../state/playback-store.js";
 
 function useNearViewport(element: HTMLElement | null): boolean {
   const [nearViewport, setNearViewport] = useState(false);
@@ -134,9 +44,11 @@ function useNearViewport(element: HTMLElement | null): boolean {
 function OpeningPhrase({
   notes,
   sampleRateHz,
+  playbackSample,
 }: {
   readonly notes: readonly EventRevision[];
   readonly sampleRateHz: number;
+  readonly playbackSample: number | null;
 }) {
   const phrase = useMemo(() => {
     const pitched = notes
@@ -171,6 +83,12 @@ function OpeningPhrase({
 
   const pitchRange = Math.max(1, phrase.maxPitch - phrase.minPitch);
   const sampleRange = phrase.end - phrase.start;
+  const playhead =
+    playbackSample !== null &&
+    playbackSample >= phrase.start &&
+    playbackSample <= phrase.end
+      ? ((playbackSample - phrase.start) / sampleRange) * 100
+      : null;
   return (
     <div
       className="opening-preview"
@@ -197,6 +115,13 @@ function OpeningPhrase({
           />
         );
       })}
+      {playhead !== null && (
+        <span
+          className="opening-preview-playhead"
+          aria-hidden="true"
+          style={{ left: `${playhead}%` }}
+        />
+      )}
     </div>
   );
 }
@@ -205,28 +130,29 @@ function SessionLibraryRow({
   session,
   active,
   maxEventRangeSamples,
-  playingSessionId,
-  onPlaying,
-  onStopped,
   onSelect,
 }: {
   readonly session: Session;
   readonly active: boolean;
   readonly maxEventRangeSamples: number;
-  readonly playingSessionId: string | null;
-  readonly onPlaying: (sessionId: string) => void;
-  readonly onStopped: (sessionId: string) => void;
   readonly onSelect: (sessionId: string) => void;
 }) {
   const runtime = useRuntime();
+  const controls = usePlaybackControls();
   const [row, setRow] = useState<HTMLElement | null>(null);
   const nearViewport = useNearViewport(row);
-  const [playerState, setPlayerState] = useState<PlayerState>("idle");
-  const [playerError, setPlayerError] = useState<string | null>(null);
-  const [elapsed, setElapsed] = useState(0);
-  const audio = useRef<HTMLAudioElement | null>(null);
-  const audioUrl = useRef<string | null>(null);
-  const loadSequence = useRef(0);
+  const playbackSessionId = usePlaybackStore((state) => state.sessionId);
+  const playbackAvailable = usePlaybackStore((state) => state.available);
+  const playbackStatus = usePlaybackStore((state) => state.status);
+  const playbackSample = usePlaybackStore((state) => state.positionSample);
+  const playbackError = usePlaybackStore((state) => state.error);
+  const current = playbackSessionId === session.session_id;
+  const playing = current && playbackStatus === "playing";
+  const loading =
+    current &&
+    !playbackAvailable &&
+    playbackStatus !== "error" &&
+    !active;
 
   const preview = useQuery({
     queryKey: [
@@ -249,117 +175,12 @@ function SessionLibraryRow({
     staleTime: Infinity,
   });
 
-  useEffect(() => {
-    if (
-      playingSessionId !== session.session_id &&
-      playerState === "playing"
-    ) {
-      audio.current?.pause();
-      setPlayerState("ready");
-    }
-  }, [playerState, playingSessionId, session.session_id]);
-
-  useEffect(
-    () => () => {
-      loadSequence.current += 1;
-      audio.current?.pause();
-      if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
-    },
-    [],
-  );
-
-  const play = async (player: HTMLAudioElement) => {
-    try {
-      await player.play();
-      setPlayerState("playing");
-      setPlayerError(null);
-      onPlaying(session.session_id);
-    } catch (error) {
-      setPlayerState("ready");
-      setPlayerError(
-        error instanceof DOMException && error.name === "NotAllowedError"
-          ? "Recording loaded. Press play again to begin."
-          : error instanceof Error
-            ? error.message
-            : String(error),
-      );
-    }
-  };
-
-  const loadAndPlay = async () => {
-    const sequence = ++loadSequence.current;
-    setPlayerState("loading");
-    setPlayerError(null);
-    try {
-      const artifacts = await runtime.listArtifacts(
-        session.workspace_id,
-        session.session_id,
-        { requestId: requestId("library-audio"), limit: 100 },
-      );
-      const audioArtifacts = artifacts.items.filter(
-        (artifact) => artifact.kind === "audio",
-      );
-      const artifact =
-        audioArtifacts.find((item) => item.media_type === "audio/mpeg") ??
-        audioArtifacts[0];
-      if (!artifact) {
-        throw new Error("This session does not have a playable recording.");
-      }
-      const content = await runtime.readArtifact(
-        session.workspace_id,
-        session.session_id,
-        artifact.artifact_id,
-        { requestId: requestId("library-audio-read") },
-      );
-      if (sequence !== loadSequence.current) return;
-
-      const url = URL.createObjectURL(
-        new Blob([content.bytes], { type: content.access.media_type }),
-      );
-      const player = document.createElement("audio");
-      player.preload = "metadata";
-      player.src = url;
-      player.addEventListener("timeupdate", () =>
-        setElapsed(player.currentTime)
-      );
-      player.addEventListener("ended", () => {
-        setElapsed(0);
-        setPlayerState("ready");
-        onStopped(session.session_id);
-      });
-      player.addEventListener("error", () => {
-        setPlayerState("error");
-        setPlayerError("The recording could not be played.");
-        onStopped(session.session_id);
-      });
-      audio.current = player;
-      audioUrl.current = url;
-      setPlayerState("ready");
-      await play(player);
-    } catch (error) {
-      if (sequence !== loadSequence.current) return;
-      setPlayerState("error");
-      setPlayerError(error instanceof Error ? error.message : String(error));
-    }
-  };
-
   const togglePlayback = () => {
-    const player = audio.current;
-    if (playerState === "playing" && player) {
-      player.pause();
-      setPlayerState("ready");
-      onStopped(session.session_id);
-    } else if (player) {
-      void play(player);
-    } else {
-      void loadAndPlay();
-    }
+    if (playing) controls.pause();
+    else controls.playSession(session.session_id);
   };
 
-  const durationSeconds = session.source_frame_count / session.sample_rate_hz;
-  const progress = durationSeconds > 0
-    ? Math.min(100, (elapsed / durationSeconds) * 100)
-    : 0;
+  const elapsedSample = current ? playbackSample : 0;
   const previewError = preview.error instanceof Error
     ? preview.error.message
     : preview.error
@@ -396,62 +217,100 @@ function SessionLibraryRow({
       </button>
 
       <div className="library-session-preview">
-        {preview.isLoading && session.recognized_note_count > 0 ? (
-          <div className="opening-preview loading" aria-label="Loading opening phrase" />
-        ) : preview.data ? (
-          <OpeningPhrase
-            notes={preview.data.items}
-            sampleRateHz={session.sample_rate_hz}
-          />
-        ) : (
-          <div className="opening-preview empty">
-            {session.recognized_note_count > 0
-              ? "Opening preview unavailable"
-              : "No notes detected"}
-          </div>
-        )}
+        <button
+          className="opening-preview-link"
+          type="button"
+          aria-label={
+            `Open ${session.display_name ?? "session"} from its piano roll`
+          }
+          onClick={() => onSelect(session.session_id)}
+        >
+          {preview.isLoading && session.recognized_note_count > 0 ? (
+            <div
+              className="opening-preview loading"
+              aria-label="Loading opening phrase"
+            />
+          ) : preview.data ? (
+            <OpeningPhrase
+              notes={preview.data.items}
+              sampleRateHz={session.sample_rate_hz}
+              playbackSample={current ? playbackSample : null}
+            />
+          ) : (
+            <div className="opening-preview empty">
+              {session.recognized_note_count > 0
+                ? "Opening preview unavailable"
+                : "No notes detected"}
+            </div>
+          )}
+        </button>
 
         <div className="library-player">
           <button
             type="button"
-            disabled={active || playerState === "loading"}
+            disabled={active || loading}
             aria-label={
               active
                 ? `${session.display_name ?? "Session"} is still recording`
-                : playerState === "playing"
+                : playing
                   ? `Pause ${session.display_name ?? "session"} recording`
                   : `Play ${session.display_name ?? "session"} recording`
             }
             onClick={togglePlayback}
           >
             <span aria-hidden="true">
-              {playerState === "loading"
+              {loading
                 ? "…"
-                : playerState === "playing"
+                : playing
                   ? "Ⅱ"
                   : "▶"}
             </span>
           </button>
-          <span className="library-player-track" aria-hidden="true">
-            <i style={{ width: `${progress}%` }} />
-          </span>
+          <label className="library-player-track">
+            <span className="sr-only">
+              Seek {session.display_name ?? "session"} recording
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(1, session.source_frame_count)}
+              step={Math.max(
+                1,
+                Math.round(session.sample_rate_hz / 20),
+              )}
+              value={elapsedSample}
+              disabled={active || loading}
+              onChange={(event) =>
+                controls.seekSession(
+                  session.session_id,
+                  Number(event.currentTarget.value),
+                )}
+            />
+          </label>
           <output>
             {active
               ? "Recording"
-              : playerState === "loading"
+              : loading
                 ? "Loading…"
-                : formatClock(
-                    elapsed * session.sample_rate_hz,
-                    session.sample_rate_hz,
-                  )}
+                : (
+                  <>
+                    {formatClock(elapsedSample, session.sample_rate_hz)}
+                    <span aria-hidden="true"> / </span>
+                    <span className="sr-only"> of </span>
+                    {formatClock(
+                      session.source_frame_count,
+                      session.sample_rate_hz,
+                    )}
+                  </>
+                )}
           </output>
         </div>
 
-        {(previewError || playerError) && (
+        {(previewError || (current && playbackError)) && (
           <p className="library-session-error" role="alert">
             {previewError
               ? `Opening preview: ${previewError}`
-              : `Playback: ${playerError}`}
+              : `Playback: ${playbackError}`}
           </p>
         )}
       </div>
@@ -474,8 +333,6 @@ export function SessionsHome({
   readonly onNew: () => void;
   readonly onSelect: (sessionId: string) => void;
 }) {
-  const [playingSessionId, setPlayingSessionId] = useState<string | null>(null);
-
   return (
     <section className="sessions-home" aria-labelledby="sessions-title">
       <header className="sessions-home-heading">
@@ -499,12 +356,6 @@ export function SessionsHome({
               session={session}
               active={session.session_id === activeSessionId}
               maxEventRangeSamples={maxEventRangeSamples}
-              playingSessionId={playingSessionId}
-              onPlaying={setPlayingSessionId}
-              onStopped={(sessionId) =>
-                setPlayingSessionId((current) =>
-                  current === sessionId ? null : current
-                )}
               onSelect={onSelect}
             />
           ))}

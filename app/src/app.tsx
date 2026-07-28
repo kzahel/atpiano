@@ -31,6 +31,10 @@ import {
   requestId,
   sessionSourceLabel,
 } from "./lib/format.js";
+import {
+  firstVisibleNoteSample,
+  openingEventPage,
+} from "./lib/opening-event-page.js";
 import { parseScoreAlignment } from "./lib/score-alignment.js";
 import {
   scoreReaderRouteFromUrl,
@@ -133,6 +137,9 @@ export function App({
     useState<ScoreReaderRoute | null>(() =>
       scoreReaderRouteFromUrl(window.location.href)
     );
+  const [playbackSessionId, setPlaybackSessionId] = useState<string | null>(
+    () => sessionIdFromUrl(window.location.href),
+  );
   const [pendingAutoScoreSessionId, setPendingAutoScoreSessionId] =
     useState<string | null>(null);
   const [autoScoringSessionId, setAutoScoringSessionId] =
@@ -152,10 +159,20 @@ export function App({
     window.requestAnimationFrame(() => sessionNavTrigger.current?.focus());
   }, []);
 
-  const selectFromSessionNav = useCallback((sessionId: string) => {
+  const openSession = useCallback((sessionId: string) => {
+    setPlaybackSessionId(sessionId);
     selectSession(sessionId);
+  }, [selectSession]);
+
+  const beginNewSession = useCallback(() => {
+    setPlaybackSessionId(null);
+    beginNew();
+  }, [beginNew]);
+
+  const selectFromSessionNav = useCallback((sessionId: string) => {
+    openSession(sessionId);
     closeSessionNav();
-  }, [closeSessionNav, selectSession]);
+  }, [closeSessionNav, openSession]);
 
   const showLibraryFromSessionNav = useCallback(() => {
     showLibrary();
@@ -163,9 +180,9 @@ export function App({
   }, [closeSessionNav, showLibrary]);
 
   const beginNewFromSessionNav = useCallback(() => {
-    beginNew();
+    beginNewSession();
     closeSessionNav();
-  }, [beginNew, closeSessionNav]);
+  }, [beginNewSession, closeSessionNav]);
 
   useEffect(() => {
     if (!sessionNavOpen) return;
@@ -223,21 +240,21 @@ export function App({
 
   useEffect(() => {
     const requestedSession = sessionIdFromUrl(window.location.href);
-    if (requestedSession) selectSession(requestedSession);
+    if (requestedSession) openSession(requestedSession);
     else showLibrary();
     setRouteReady(true);
-  }, [selectSession, showLibrary]);
+  }, [openSession, showLibrary]);
 
   useEffect(() => {
     const restoreRoute = () => {
       const requestedSession = sessionIdFromUrl(window.location.href);
-      if (requestedSession) selectSession(requestedSession);
+      if (requestedSession) openSession(requestedSession);
       else showLibrary();
       setScoreReaderRoute(scoreReaderRouteFromUrl(window.location.href));
     };
     window.addEventListener("popstate", restoreRoute);
     return () => window.removeEventListener("popstate", restoreRoute);
-  }, [selectSession, showLibrary]);
+  }, [openSession, showLibrary]);
 
   useEffect(() => {
     if (!routeReady) return;
@@ -264,6 +281,13 @@ export function App({
         ? 750
         : false,
   });
+  const playbackSession = sessionItems.find(
+    (session) => session.session_id === playbackSessionId,
+  ) ?? (
+    selectedSession.data?.session_id === playbackSessionId
+      ? selectedSession.data
+      : undefined
+  );
   const horizon = useQuery({
     queryKey: ["horizon", workspace?.workspace_id, selectedSessionId],
     queryFn: ({ signal }) =>
@@ -320,9 +344,22 @@ export function App({
     (artifact) =>
       artifact.artifact_id === selectedScoreVariant?.alignment_artifact_id,
   ) ?? fallbackScoreAlignmentArtifact;
+  const playbackArtifacts = useQuery({
+    queryKey: ["artifacts", workspace?.workspace_id, playbackSessionId],
+    queryFn: ({ signal }) =>
+      runtime.listArtifacts(workspace!.workspace_id, playbackSessionId!, {
+        requestId: requestId("playback-artifacts"),
+        signal,
+        limit: 100,
+      }),
+    enabled:
+      workspace !== undefined &&
+      playbackSessionId !== null &&
+      playbackSession?.status !== "active",
+  });
   const audioArtifacts = useMemo(
     () => {
-      const available = (artifacts.data?.items ?? []).filter(
+      const available = (playbackArtifacts.data?.items ?? []).filter(
         (artifact) => artifact.kind === "audio",
       );
       const compressed = available.filter(
@@ -335,12 +372,12 @@ export function App({
             left.filename.localeCompare(right.filename),
         );
     },
-    [artifacts.data?.items],
+    [playbackArtifacts.data?.items],
   );
   const audioPlayback = useQuery({
     queryKey: [
       "audio-playback",
-      selectedSessionId,
+      playbackSessionId,
       ...audioArtifacts.map((artifact) => artifact.artifact_id),
     ],
     queryFn: async ({ signal }): Promise<AudioPlaybackSource[]> => {
@@ -351,8 +388,8 @@ export function App({
       return Promise.all(
         audioArtifacts.map(async (artifact, index) => {
           const content = await runtime.readArtifact(
-            artifact.workspace_id,
-            artifact.session_id,
+            playbackSession!.workspace_id,
+            playbackSession!.session_id,
             artifact.artifact_id,
             { requestId: requestId("audio-access"), signal },
           );
@@ -372,8 +409,9 @@ export function App({
     },
     enabled:
       audioArtifacts.length > 0 &&
-      selectedSession.data?.status !== "active",
+      playbackSession?.status !== "active",
     staleTime: Infinity,
+    gcTime: 0,
   });
   useEffect(() => {
     const sources = audioPlayback.data;
@@ -383,6 +421,56 @@ export function App({
       });
     };
   }, [audioPlayback.data]);
+  const playbackOpening = useQuery({
+    queryKey: [
+      "session-opening-preview",
+      playbackSession?.workspace_id,
+      playbackSession?.session_id,
+      playbackSession?.source_frame_count,
+    ],
+    queryFn: ({ signal }) =>
+      openingEventPage(
+        runtime,
+        playbackSession!,
+        Math.max(
+          1,
+          Math.min(
+            playbackSession!.source_frame_count,
+            capabilities.data?.max_event_range_samples ?? 5_760_000,
+          ),
+        ),
+        signal,
+      ),
+    enabled:
+      playbackSession !== undefined &&
+      playbackSession.status !== "active" &&
+      playbackSession.recognized_note_count > 0,
+    staleTime: Infinity,
+  });
+  const playbackFirstNoteSample = firstVisibleNoteSample(
+    playbackOpening.data?.items ?? [],
+  );
+  const playbackCueSample = playbackFirstNoteSample === null
+    ? 0
+    : Math.max(
+        0,
+        playbackFirstNoteSample -
+          Math.round((playbackSession?.sample_rate_hz ?? 48_000) * 0.75),
+      );
+  const playbackCueReady =
+    playbackSession?.recognized_note_count === 0 ||
+    playbackOpening.isFetched;
+  const playbackSourceFailure =
+    playbackArtifacts.error ?? audioPlayback.error;
+  const playbackSourceError = playbackSourceFailure instanceof Error
+    ? playbackSourceFailure.message
+    : playbackSourceFailure
+      ? String(playbackSourceFailure)
+      : playbackSession?.status !== "active" &&
+          playbackArtifacts.isFetched &&
+          audioArtifacts.length === 0
+        ? "This session does not have a playable recording."
+        : null;
   const scoreXml = useQuery({
     queryKey: ["artifact-content", scoreArtifact?.artifact_id],
     queryFn: ({ signal }) =>
@@ -617,6 +705,11 @@ export function App({
     onStopped: (session) => setPendingAutoScoreSessionId(session.session_id),
   });
 
+  useEffect(() => {
+    const sessionId = captureState.capture?.session_id;
+    if (sessionId) setPlaybackSessionId(sessionId);
+  }, [captureState.capture?.session_id]);
+
   const importRecording = useCallback(async (file: File) => {
     if (!workspace) return;
     const operationId = requestId("recording-import");
@@ -645,6 +738,7 @@ export function App({
         { requestId: operationId },
       );
       recordCapture(operationId, capture);
+      setPlaybackSessionId(capture.session_id);
       await invalidateWorkspace();
     } catch (error) {
       failCapture(operationId, error);
@@ -677,7 +771,7 @@ export function App({
         { requestId: operationId },
       );
       recordCapture(operationId, capture);
-      selectSession(capture.session_id);
+      openSession(capture.session_id);
       await invalidateWorkspace();
     } catch (error) {
       failCapture(operationId, error);
@@ -689,7 +783,7 @@ export function App({
     invalidateWorkspace,
     recordCapture,
     runtime,
-    selectSession,
+    openSession,
     warmCapture,
     workspace,
   ]);
@@ -744,8 +838,11 @@ export function App({
         { requestId: requestId("delete-session") },
       );
     },
-    onSuccess: async (result) => {
+    onSuccess: async (result, target) => {
       showLibrary();
+      setPlaybackSessionId((current) =>
+        current === target.session_id ? null : current
+      );
       setSessionActionError(null);
       setToast("Session moved to recoverable trash.");
       await invalidateWorkspace();
@@ -1052,10 +1149,15 @@ export function App({
     if (!selected) {
       return (
         <PlaybackProvider
-          sessionId={null}
-          sources={[]}
-          totalSamples={0}
-          sampleRateHz={48_000}
+          sessionId={playbackSession?.session_id ?? null}
+          sources={audioPlayback.data ?? []}
+          totalSamples={playbackSession?.source_frame_count ?? 0}
+          sampleRateHz={playbackSession?.sample_rate_hz ?? 48_000}
+          cueSample={playbackCueSample}
+          cueReady={playbackCueReady}
+          sourceError={playbackSourceError}
+          selectedSessionId={selectedSessionId}
+          onSessionRequest={setPlaybackSessionId}
         >
           <div className="score-reader reader-boot" role="status">
             <strong>Opening pinned score…</strong>
@@ -1073,10 +1175,15 @@ export function App({
     }
     return (
       <PlaybackProvider
-        sessionId={selected.session_id}
+        sessionId={playbackSession?.session_id ?? null}
         sources={audioPlayback.data ?? []}
-        totalSamples={selected.source_frame_count}
-        sampleRateHz={selected.sample_rate_hz}
+        totalSamples={playbackSession?.source_frame_count ?? 0}
+        sampleRateHz={playbackSession?.sample_rate_hz ?? 48_000}
+        cueSample={playbackCueSample}
+        cueReady={playbackCueReady}
+        sourceError={playbackSourceError}
+        selectedSessionId={selectedSessionId}
+        onSessionRequest={setPlaybackSessionId}
       >
         <ScoreReader
           route={scoreReaderRoute}
@@ -1096,10 +1203,15 @@ export function App({
 
   return (
     <PlaybackProvider
-      sessionId={selected?.session_id ?? null}
+      sessionId={playbackSession?.session_id ?? null}
       sources={audioPlayback.data ?? []}
-      totalSamples={selected?.source_frame_count ?? 0}
-      sampleRateHz={selected?.sample_rate_hz ?? 48_000}
+      totalSamples={playbackSession?.source_frame_count ?? 0}
+      sampleRateHz={playbackSession?.sample_rate_hz ?? 48_000}
+      cueSample={playbackCueSample}
+      cueReady={playbackCueReady}
+      sourceError={playbackSourceError}
+      selectedSessionId={selectedSessionId}
+      onSessionRequest={setPlaybackSessionId}
     >
       <div className="app-shell">
       <SessionRail
@@ -1175,13 +1287,13 @@ export function App({
             maxEventRangeSamples={
               capabilities.data?.max_event_range_samples ?? 5_760_000
             }
-            onNew={beginNew}
-            onSelect={selectSession}
+            onNew={beginNewSession}
+            onSelect={openSession}
           />
         )}
 
         {!libraryIntent && !newIntent && !selected && !sessions.isLoading && (
-          <EmptyWorkspace onNew={beginNew} />
+          <EmptyWorkspace onNew={beginNewSession} />
         )}
 
         {newIntent && canWrite && (
@@ -1243,7 +1355,11 @@ export function App({
                   </button>
                 )}
                 {canWrite && (
-                  <button className="button secondary" type="button" onClick={beginNew}>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={beginNewSession}
+                  >
                     New session
                   </button>
                 )}
@@ -1260,7 +1376,7 @@ export function App({
               <button
                 className="active-capture-banner"
                 type="button"
-                onClick={() => selectSession(activeSession.session_id)}
+                onClick={() => openSession(activeSession.session_id)}
               >
                 <span><i aria-hidden="true" /> Recording continues in another session</span>
                 <strong>Return to live performance →</strong>

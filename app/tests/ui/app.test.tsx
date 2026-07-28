@@ -191,7 +191,7 @@ describe("shared application", () => {
     const play = vi
       .spyOn(HTMLMediaElement.prototype, "play")
       .mockResolvedValue();
-    const pause = vi
+    vi
       .spyOn(HTMLMediaElement.prototype, "pause")
       .mockImplementation(() => undefined);
 
@@ -234,6 +234,10 @@ describe("shared application", () => {
         name: "Pause Morning progression recording",
       }),
     ).toBeTruthy();
+    const audio = document.querySelector(
+      ".persistent-playback-audio",
+    ) as HTMLAudioElement;
+    fireEvent.loadedMetadata(audio);
     expect(artifactSessions).toEqual([primarySessionId]);
     expect(readSessions).toEqual([primarySessionId]);
 
@@ -248,10 +252,88 @@ describe("shared application", () => {
         name: "Pause Nocturne sketch recording",
       }),
     ).toBeTruthy();
+    fireEvent.loadedMetadata(audio);
     expect(play).toHaveBeenCalledTimes(2);
     expect(artifactSessions).toEqual([primarySessionId, nocturneId]);
     expect(readSessions).toEqual([primarySessionId, nocturneId]);
-    expect(pause).toHaveBeenCalled();
+    expect(document.querySelectorAll(".persistent-playback-audio"))
+      .toHaveLength(1);
+  });
+
+  it("seeks inline and keeps playback while opening its piano roll", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    renderApp(createFixtureRuntime(), { home: true });
+
+    const play = await screen.findByRole("button", {
+      name: "Play Morning progression recording",
+    });
+    await user.click(play);
+    await screen.findByRole("button", {
+      name: "Pause Morning progression recording",
+    });
+
+    expect(usePlaybackStore.getState()).toMatchObject({
+      sessionId: "20260726T100000-abcdef123456",
+      status: "playing",
+      positionSample: 21_600,
+    });
+    const audio = document.querySelector(".persistent-playback-audio");
+    const slider = screen.getByRole("slider", {
+      name: "Seek Morning progression recording",
+    });
+    fireEvent.change(slider, { target: { value: String(48_000 * 2) } });
+
+    expect(usePlaybackStore.getState().positionSample).toBe(96_000);
+    expect(document.querySelector(".opening-preview-playhead")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", {
+      name: "Open Morning progression from its piano roll",
+    }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Morning progression" }),
+    ).toBeTruthy();
+    expect(document.querySelector(".persistent-playback-audio")).toBe(audio);
+    expect(usePlaybackStore.getState()).toMatchObject({
+      sessionId: "20260726T100000-abcdef123456",
+      status: "playing",
+      positionSample: 96_000,
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "Atpiano Sessions home" }),
+    );
+
+    expect(await screen.findByRole("heading", { name: "Sessions" }))
+      .toBeTruthy();
+    expect(document.querySelector(".persistent-playback-audio")).toBe(audio);
+    expect(screen.getByRole("button", {
+      name: "Pause Morning progression recording",
+    })).toBeTruthy();
+  });
+
+  it("prepares an inactive library seek without starting playback", async () => {
+    const play = vi
+      .spyOn(HTMLMediaElement.prototype, "play")
+      .mockResolvedValue();
+    renderApp(createFixtureRuntime(), { home: true });
+
+    fireEvent.change(
+      await screen.findByRole("slider", {
+        name: "Seek Morning progression recording",
+      }),
+      { target: { value: String(48_000 * 5) } },
+    );
+
+    await waitFor(() =>
+      expect(usePlaybackStore.getState()).toMatchObject({
+        sessionId: "20260726T100000-abcdef123456",
+        status: "idle",
+        positionSample: 240_000,
+      })
+    );
+    expect(play).not.toHaveBeenCalled();
   });
 
   it("subdivides dense opening ranges instead of exposing page limits", async () => {
