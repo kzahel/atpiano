@@ -27,6 +27,8 @@ same policy to WAV/MP3 import: request bodies are streamed through a bounded,
 known spool; byte-exact source provenance is retained in compact metadata; the
 spool is removed after durable decoded-PCM acceptance or recorded failure; and
 the ordinary verified compact recording remains the retained playback source.
+That implementation completed and passed public HTTPS validation on
+2026-07-28 with no remaining upload spool or synthetic verification session.
 
 ## Purpose
 

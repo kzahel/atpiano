@@ -6,10 +6,11 @@ Topic: live-acoustic-transcription
 
 Topic: long-session-storage-retention
 
-Status: **in progress on 2026-07-28.** The user requested a real recording
-import after an internal deterministic replay fixture leaked into the normal
-capture UI. Fixture controls remain test-only; import is a separate product
-source with its own transport, provenance, progress, and failure contract.
+Status: **complete and live on 2026-07-28.** The user requested a real
+recording import after an internal deterministic replay fixture leaked into
+the normal capture UI. Fixture controls remain test-only; import is a separate
+product source with its own transport, provenance, progress, and failure
+contract.
 
 ## Motivation
 
@@ -126,4 +127,50 @@ Implementation may proceed without an intermediate review. Pause only if:
 
 ## Execution Record
 
-Pending.
+### Landed slices
+
+- `177f0a9` recorded the accepted implementation boundary and continuing topic
+  direction.
+- `f3317b5` added the `upload` source contract, bounded known spools,
+  free-space protection, FFmpeg/FFprobe WAV and MP3 validation, source-rate
+  mono PCM16 decoding, compact provenance, ordinary capture orchestration,
+  filename-derived automatic naming, local/desktop HTTP, authenticated family
+  HTTP, and focused backend tests.
+- `b52434d` added the shared runtime operation, New-performance file chooser,
+  chosen-file and transfer feedback, imported-session selection and settlement
+  tracking, source labels, fixture-runtime behavior, and focused frontend
+  tests.
+
+The import limit is 2 GiB. WAV/MP3 bytes are streamed to a mode-0600 known
+spool and never buffered as one Python request body. The spool is removed
+after the normal transcription pipeline settles or records a failure. The
+decoded source sample rate and contiguous decoded frame count remain the
+musical timeline. `upload.json` retains original filename, declared media
+type, byte count, SHA-256, detected format/codec/sample rate/channel count,
+downmix policy, and decoded frame/block counts.
+
+### Validation and live evidence
+
+The complete migration regression passed at
+`results/migration-regression/20260728T114219Z/report.json`: 210 Python tests,
+82 frontend tests, six TypeScript Node tests, generated-contract drift,
+TypeScript, npm high-severity audit, Ruff, retained JavaScript syntax, and Git
+whitespace all passed. The production Vite build also passed with only the
+existing OpenSheetMusicDisplay chunk-size advisory.
+
+Focused real-adapter tests decode both stereo WAV and MP3 to contiguous mono
+PCM16 at the source rate. Application tests prove upload cannot displace an
+active microphone lease. Local and family integration tests prove ordinary
+completion and filename naming; family tests prove anonymous and viewer
+requests are rejected before a spool is retained.
+
+The already-active authenticated macOS share service was restarted. Its public
+homepage returned HTTP 200 with `index-zEF2WWwz.js`; anonymous capabilities
+remained protected with HTTP 401. A temporary authenticated operator observed
+exactly `microphone` and `upload` live capture sources. A 530 KiB,
+12.31-second WAV imported through the public HTTPS route as session
+`20260728T114446-d33e169a31bd`, preserved 271,436 source frames at 22,050 Hz,
+used `live-upload-check` as its automatic title, completed normal
+transcription/retention, and was then recoverably deleted. The exact synthetic
+trash directory was permanently removed after target validation, and the
+temporary operator session was logged out and verified revoked.

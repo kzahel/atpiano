@@ -3,7 +3,7 @@
 Topic: session-workspace-management
 
 Status: accepted foundation on 2026-07-26; the player-facing workspace refresh
-is complete and live under
+and first-class WAV/MP3 recording import are complete and live under
 [`036-musical-session-workspace-refresh.md`](../tactical/036-musical-session-workspace-refresh.md).
 It provides application-owned human names, aggregate musical summaries, a
 dedicated Sessions homepage, compact selected-session identity, contextual
@@ -178,7 +178,7 @@ the server, so reload and multiple tabs remain independent.
 The accepted 2026-07-28 refresh adds human naming as application-owned
 annotations rather than rewriting transcription evidence. Automatic
 date-and-source text remains the fallback for sessions without an annotation.
-The bounded recording-import slice is now active under
+The bounded recording-import slice completed under
 [`038-recording-import.md`](../tactical/038-recording-import.md): WAV and MP3
 become a first-class `upload` source with bounded transport, preserved
 provenance, and ordinary session behavior. It does not repurpose or expose the

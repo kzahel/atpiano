@@ -49,4 +49,4 @@ execution record; continuing status and direction belong in the relevant
 | [`035-browser-score-cursor-parity.md`](035-browser-score-cursor-parity.md) | Complete; live | Exact browser parity with producer MIDI rounding and score-cursor ordering |
 | [`036-musical-session-workspace-refresh.md`](036-musical-session-workspace-refresh.md) | Complete; live | Sessions homepage, compact performance identity, contextual feedback, editable naming, lazy preview/playback, and keyboard audition |
 | [`037-detachable-score-playback.md`](037-detachable-score-playback.md) | Complete; live | Persistent selected-session playback, detachable panel-local score following, reader continuity, and current-attack note highlighting |
-| [`038-recording-import.md`](038-recording-import.md) | In progress | First-class WAV/MP3 recording import with bounded upload, provenance, shared transcription, and contextual progress/errors |
+| [`038-recording-import.md`](038-recording-import.md) | Complete; live | First-class WAV/MP3 recording import with bounded upload, provenance, shared transcription, and contextual progress/errors |
