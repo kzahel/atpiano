@@ -66,6 +66,16 @@ async function seek(page, sample, timeout) {
     name: "Recorded audio position",
   });
   await scrubber.waitFor({ state: "visible", timeout });
+  await page.waitForFunction(
+    () => {
+      const input = document.querySelector(
+        ".playback-scrubber input[type=range]",
+      );
+      return input instanceof HTMLInputElement && !input.disabled;
+    },
+    undefined,
+    { timeout },
+  );
   await scrubber.evaluate((element, value) => {
     const setter = Object.getOwnPropertyDescriptor(
       HTMLInputElement.prototype,
