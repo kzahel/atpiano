@@ -16,7 +16,7 @@ store publishes observable playback state while the provider privately owns
 the media element and seek mechanics. Phase 3 and R3 are
 complete under
 [`016-shared-react-application.md`](../tactical/016-shared-react-application.md).
-The accepted
+The completed and live
 [`039-continuous-library-playback.md`](../tactical/039-continuous-library-playback.md)
 extends that persistent transport through the Sessions library, adds
 full-duration inline seeking and first-note cueing, and makes the opening
@@ -197,7 +197,7 @@ history must not eagerly load every session's artifacts or events.
 Selected-session playback has a separate global snapshot and persistent media
 provider. Entering the exact-score reader preserves the media element,
 sample-clock position, status, and source identity; both layouts expose
-controls for that same transport. Tactical 039 replaces the library's
+controls for that same transport. Tactical 039 replaced the library's
 row-local players with this same route-independent transport. Same-session
 navigation preserves playback, while an explicit different-session or
 capture choice remains a source change. Library previews and recording bytes

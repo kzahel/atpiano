@@ -4,9 +4,10 @@ Topic: session-workspace-management
 
 Topic: performance-to-notation
 
-Status: **accepted for implementation on 2026-07-28.** The user approved the
-complete interaction direction and authorized end-to-end implementation with
-commits after validated slices.
+Status: **complete and live on 2026-07-28.** The user approved the complete
+interaction direction and authorized end-to-end implementation with commits
+after validated slices. One persistent transport now spans the Sessions
+library, selected workspace, and exact-score reader.
 
 ## Motivation
 
@@ -156,4 +157,58 @@ Implementation may proceed without an intermediate review. Pause only if:
 
 ## Execution Record
 
-Pending implementation.
+### Landed slices
+
+- `4be3b4a` recorded the accepted interaction, source-time, hydration, and
+  navigation contract before implementation.
+- `3b325a5` moved library playback into the persistent provider, separated
+  playback identity from route selection, extracted the bounded opening-event
+  query, added full-duration row seeking and 750-millisecond first-note
+  cueing, made opening previews navigable, and drew their source-clock
+  playheads.
+
+The application now retains one playback target independently from the
+selected page. Sessions → workspace → score reader transitions reconcile the
+same provider and media element when the session identity is unchanged.
+Choosing another session or entering New changes the playback target
+explicitly. Returning to Sessions leaves it intact. Playback publishes
+workspace inspection only when the selected and playing session IDs match.
+
+Library Play and seek actions prepare the requested session through the
+shared source query. The prior row-created audio elements, private timers,
+blob URLs, and mutual-exclusion state were removed. Recording artifacts remain
+on-demand, and their blob URL query has zero unused-cache lifetime so retired
+sources are revoked without leaving an invalid cached URL. The existing
+recursively bounded opening query now supplies both the row preview and the
+first-note cue.
+
+A fresh run cues to the first non-retracted pitched onset minus 750
+milliseconds. A manual seek marks the position as listener-owned, including
+an explicit seek to sample zero. Pause/resume and same-session route changes
+therefore never jump. Playback after `ended` begins a new cued run, while a
+session with no visible note begins at zero.
+
+### Validation and live evidence
+
+Focused provider and application tests prove first-run and ended-run cueing,
+manual-zero precedence, mismatched-selection isolation, inactive paused seek
+preparation, full-duration library seeking, phrase-local playhead display,
+one media element across library/workspace navigation, and source replacement
+when another row plays.
+
+The complete frontend suite passed 86 tests across 17 files plus six
+TypeScript contract/runtime tests. TypeScript and the production Vite build
+passed; the build retained only the existing OpenSheetMusicDisplay chunk-size
+advisory.
+
+The complete migration regression passed at
+`results/migration-regression/20260728T120829Z/report.json`: 210 Python tests,
+86 frontend tests, six TypeScript contract/runtime tests, generated-contract
+drift, TypeScript, the high-severity npm audit, Ruff, retained JavaScript
+syntax, and Git whitespace all passed.
+
+The already-active authenticated macOS share service was restarted with the
+new bundle as PID 43890. The public homepage returned HTTP 200, and an
+anonymous capability request returned the expected protected HTTP 401. No
+retained session, capture evidence, score artifact, or account was mutated
+during live verification.

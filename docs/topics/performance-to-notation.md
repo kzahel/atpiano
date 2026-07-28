@@ -41,11 +41,11 @@ explicitly reattaches follow. Every notehead under the discrete OSMD cursor is
 highlighted non-destructively at the current mapped score attack. Playback
 continues through exact-score reader navigation while page turning remains
 manual.
-Tactical 039 extends the same source-clock playback lifecycle through the
-Sessions library. Its opening-phrase piano roll gains a phrase-local playhead
-and opens the exact session without interrupting same-session audio. The
-preview remains a bounded performance view rather than a meter or engraving
-claim.
+Tactical 039 is implemented and live. It extends the same source-clock
+playback lifecycle through the Sessions library. Its opening-phrase piano
+roll has a phrase-local playhead and opens the exact session without
+interrupting same-session audio. The preview remains a bounded performance
+view rather than a meter or engraving claim.
 This is not yet progressive engraving or a permanent consumer-stack
 selection. The leading score converter's GitHub source and checkpoint still
 have no explicit published license, although the paper is CC BY 4.0 and the
