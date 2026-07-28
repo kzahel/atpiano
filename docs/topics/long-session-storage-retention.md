@@ -21,6 +21,13 @@ passed it, while Tactical
 [`023-backend-capability-degradation.md`](../tactical/023-backend-capability-degradation.md)
 makes the resulting delayed-correction backlog explicit.
 
+Tactical
+[`038-recording-import.md`](../tactical/038-recording-import.md) applies the
+same policy to WAV/MP3 import: request bodies are streamed through a bounded,
+known spool; byte-exact source provenance is retained in compact metadata; the
+spool is removed after durable decoded-PCM acceptance or recorded failure; and
+the ordinary verified compact recording remains the retained playback source.
+
 ## Purpose
 
 This topic answers one practical question:

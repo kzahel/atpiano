@@ -36,6 +36,13 @@ diagnosis. A zero timeout retains the former keep-warm behavior. A
 same-duration Linux soak is retained only as the narrower host-specific gap
 documented in Tactical 022.
 
+On 2026-07-28, Tactical
+[`038-recording-import.md`](../tactical/038-recording-import.md) began the
+first product recording-import path. WAV and MP3 decoding must produce
+contiguous PCM blocks on the decoded source sample clock and then use the same
+capture application and transcription lanes as microphone input; deterministic
+fixture replay remains an engineering-only source.
+
 ## Scope And Relationship
 
 This topic owns the live user path:

@@ -178,6 +178,11 @@ the server, so reload and multiple tabs remain independent.
 The accepted 2026-07-28 refresh adds human naming as application-owned
 annotations rather than rewriting transcription evidence. Automatic
 date-and-source text remains the fallback for sessions without an annotation.
+The bounded recording-import slice is now active under
+[`038-recording-import.md`](../tactical/038-recording-import.md): WAV and MP3
+become a first-class `upload` source with bounded transport, preserved
+provenance, and ordinary session behavior. It does not repurpose or expose the
+deterministic replay fixture.
 
 The same refresh promotes the bounded history into a dedicated Sessions
 homepage. Its opening-phrase previews and playback hydrate lazily; listing
