@@ -241,3 +241,9 @@ can fail repeatedly while the opening preview still renders and no technical
 page-limit message reaches the UI. The current frontend suite passes 77 tests
 across 17 files, along with TypeScript, the production build, and Git
 whitespace.
+
+A read-only check against the nine retained non-empty sessions reproduced the
+same subdivision through the real SQLite adapter. The reported 1,804-note
+session resolved in three reads to a 222-item opening interval; every retained
+session resolved in at most four reads and the largest returned interval held
+239 items, below the 256-item boundary.
