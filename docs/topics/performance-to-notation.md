@@ -29,6 +29,11 @@ Tactical 034 now enables the installed pinned runtime by default in the
 authenticated private Mac/Pi family service because the owner considers the
 application unusable without committed scores. This is accepted private use,
 not a model-pack or general hosted-service distribution decision.
+Tactical 035 fixes browser cursor validation for exact half-MIDI-tick source
+positions. The score producer uses Python's ties-to-even rounding when it
+orders transformer input, so the browser now reproduces that rounding with
+integer arithmetic before normalizing cursor rows back onto the authoritative
+source-sample clock.
 This is not yet progressive engraving or a permanent consumer-stack
 selection. The leading score converter's GitHub source and checkpoint still
 have no explicit published license, although the paper is CC BY 4.0 and the

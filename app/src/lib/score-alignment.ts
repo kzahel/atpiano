@@ -67,6 +67,45 @@ export function scoreRationalValue(value: ScoreRational): number {
   return value.numerator / value.denominator;
 }
 
+function transformerMidiTick(
+  sourceSample: number,
+  sampleRateHz: number,
+): bigint {
+  const numerator = BigInt(sourceSample) * 960n;
+  const denominator = BigInt(sampleRateHz);
+  const quotient = numerator / denominator;
+  const doubledRemainder = (numerator % denominator) * 2n;
+  if (doubledRemainder < denominator) return quotient;
+  if (doubledRemainder > denominator) return quotient + 1n;
+  return quotient % 2n === 0n ? quotient : quotient + 1n;
+}
+
+type TransformerMidiOrder = readonly [
+  onsetTick: bigint,
+  pitch: number,
+  durationTicks: bigint,
+  onsetSample: number,
+  offsetSample: number,
+  eventId: string,
+];
+
+function compareTransformerMidiOrder(
+  left: TransformerMidiOrder,
+  right: TransformerMidiOrder,
+): number {
+  if (left[0] < right[0]) return -1;
+  if (left[0] > right[0]) return 1;
+  if (left[1] < right[1]) return -1;
+  if (left[1] > right[1]) return 1;
+  if (left[2] < right[2]) return -1;
+  if (left[2] > right[2]) return 1;
+  if (left[3] < right[3]) return -1;
+  if (left[3] > right[3]) return 1;
+  if (left[4] < right[4]) return -1;
+  if (left[4] > right[4]) return 1;
+  return left[5].localeCompare(right[5]);
+}
+
 export function parseScoreAlignment(
   value: unknown,
   expected: ExpectedScoreAlignment,
@@ -98,7 +137,7 @@ export function parseScoreAlignment(
   if (sampleRateHz === 0) {
     throw new Error("sample_rate_hz is invalid");
   }
-  let priorMidiOrder: readonly [number, number, number] | null = null;
+  let priorMidiOrder: TransformerMidiOrder | null = null;
   const rows = document.rows.map((value, index): ScoreAlignmentRow => {
     const item = record(value, `score alignment row ${index}`);
     const sourceIndex = integer(item.source_index, "source_index");
@@ -114,27 +153,19 @@ export function parseScoreAlignment(
     ) {
       throw new Error("Score alignment source order is invalid");
     }
-    const onsetTick = Math.round((onsetSample / sampleRateHz) * 960);
-    const offsetTick = Math.round((offsetSample / sampleRateHz) * 960);
+    const onsetTick = transformerMidiTick(onsetSample, sampleRateHz);
+    const offsetTick = transformerMidiTick(offsetSample, sampleRateHz);
     const midiOrder = [
       onsetTick,
       pitch,
       offsetTick - onsetTick,
+      onsetSample,
+      offsetSample,
+      item.event_id,
     ] as const;
     if (
       priorMidiOrder !== null &&
-      (
-        midiOrder[0] < priorMidiOrder[0] ||
-        (
-          midiOrder[0] === priorMidiOrder[0] &&
-          midiOrder[1] < priorMidiOrder[1]
-        ) ||
-        (
-          midiOrder[0] === priorMidiOrder[0] &&
-          midiOrder[1] === priorMidiOrder[1] &&
-          midiOrder[2] < priorMidiOrder[2]
-        )
-      )
+      compareTransformerMidiOrder(midiOrder, priorMidiOrder) < 0
     ) {
       throw new Error("Score alignment MIDI order is invalid");
     }

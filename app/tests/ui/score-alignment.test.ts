@@ -125,6 +125,42 @@ describe("score playback alignment", () => {
     expect(scoreAttackAtSample(alignment, 48_009, 144_000)).toBe(3);
   });
 
+  it("matches the transformer's half-even MIDI tick ordering", () => {
+    const document = alignmentDocument();
+    document.rows = [
+      {
+        source_index: 0,
+        event_id: "half-tick-later-low",
+        pitch: 66,
+        onset_sample: 3_063_125,
+        offset_sample: 3_071_815,
+        status: "mapped",
+        score_time_quarters: { numerator: 67, denominator: 1 },
+      },
+      {
+        source_index: 1,
+        event_id: "earlier-high",
+        pitch: 73,
+        onset_sample: 3_063_084,
+        offset_sample: 3_070_716,
+        status: "unmatched",
+        score_time_quarters: null,
+      },
+    ];
+
+    const alignment = parseScoreAlignment(document, {
+      sessionId: "session-1",
+      musicXmlSha256: scoreHash,
+    });
+
+    expect(alignment.rows.map((row) => row.event_id)).toEqual([
+      "earlier-high",
+      "half-tick-later-low",
+    ]);
+    expect(scoreAttackAtSample(alignment, 3_063_124, 4_000_000)).toBeNull();
+    expect(scoreAttackAtSample(alignment, 3_063_125, 4_000_000)).toBe(67);
+  });
+
   it("rejects score reversals on the source sample clock", () => {
     const document = alignmentDocument();
     document.rows[3]!.score_time_quarters = {
