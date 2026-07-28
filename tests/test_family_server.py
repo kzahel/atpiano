@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+import uvicorn
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
@@ -25,6 +26,21 @@ from atpiano.persistence import initialize_catalog
 
 PUBLIC_ORIGIN = "https://family.test"
 SESSION_ID = "20260728T120000-aaaaaaaaaaaa"
+
+
+async def _protocol_probe_application(
+    _scope: dict[str, Any],
+    _receive: Any,
+    _send: Any,
+) -> None:
+    return None
+
+
+def test_locked_runtime_exposes_uvicorn_websocket_protocol() -> None:
+    configuration = uvicorn.Config(_protocol_probe_application)
+    configuration.load()
+
+    assert configuration.ws_protocol_class is not None
 
 
 class _PreviewModel:
