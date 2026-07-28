@@ -2,11 +2,12 @@
 
 Topic: session-workspace-management
 
-Status: **implementing on 2026-07-28.** A newly recorded session can finish
-settling in the selected-session query while the session catalog remains
-cached as `stopping`. The workspace currently derives Delete visibility from
-that stale catalog entry, so the action does not appear until a full page
-reload refreshes the catalog.
+Status: **complete and live on 2026-07-28.** A newly recorded session could
+finish settling in the selected-session query while the session catalog
+remained cached as `stopping`. The workspace derived Delete visibility from
+that stale catalog entry, so the action did not appear until a full page
+reload refreshed the catalog. Detail and catalog lifecycle state now converge
+independently, and the selected detail controls immediate deletion safety.
 
 ## User-Visible Outcome
 
@@ -60,4 +61,30 @@ Topic: session-workspace-management
 
 ## Execution Record
 
-Pending.
+### Landed slices
+
+- `8985983` recorded the stale catalog/detail split, immediate-deletion
+  outcome, independent polling contract, and safety invariants.
+- `c31c26e` made both the selected detail and session catalog poll their own
+  `active` or `stopping` result until settlement. The selected workspace now
+  derives active/deletable state from current detail status plus browser
+  capture ownership rather than a stale matching catalog ID.
+
+The focused regression starts with a `complete` selected-session detail and a
+first catalog snapshot that still says `stopping`. It proves Delete appears,
+the catalog requests a settling follow-up, and the user can move the session
+to recoverable trash without reloading. The complete frontend suite passed 89
+Vitest tests and six TypeScript runtime/contract tests; TypeScript also passed
+independently.
+
+The production Vite build passed with only the existing
+OpenSheetMusicDisplay chunk-size advisory. The complete migration regression
+passed at
+`results/migration-regression/20260728T125317Z/report.json`: 218 Python tests,
+89 frontend tests, six TypeScript runtime/contract tests, generated-contract
+drift, TypeScript, the high-severity npm audit, Ruff, retained JavaScript
+syntax, and Git whitespace all passed.
+
+The already-active authenticated macOS service restarted as launchd PID
+48549. The public homepage returned HTTP 200, and anonymous capabilities
+remained protected with HTTP 401.

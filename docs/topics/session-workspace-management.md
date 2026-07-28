@@ -22,7 +22,7 @@ extends that persistent transport through the Sessions library, adds
 full-duration inline seeking and first-note cueing, and makes the opening
 phrase a synchronized path into its session without weakening bounded lazy
 hydration.
-The implementing
+The completed and live
 [`041-post-capture-delete-settlement.md`](../tactical/041-post-capture-delete-settlement.md)
 removes a stale post-Stop catalog/detail split so completed recordings become
 deletable without a page reload while active writers stay protected.
