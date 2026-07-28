@@ -479,6 +479,50 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="fail instead of writing when generated contracts have drifted",
     )
+    users_parser = subparsers.add_parser(
+        "users",
+        help="manage basic local family accounts",
+    )
+    users_parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=Path("results/workbench-v3"),
+        help="workspace owning the identity catalog",
+    )
+    user_commands = users_parser.add_subparsers(
+        dest="users_command",
+        required=True,
+    )
+    create_user_parser = user_commands.add_parser(
+        "create",
+        help="create a password account and local-workspace membership",
+    )
+    create_user_parser.add_argument("username")
+    create_user_parser.add_argument("--display-name")
+    create_user_parser.add_argument(
+        "--role",
+        choices=("owner", "editor", "viewer"),
+        default="owner",
+    )
+    set_password_parser = user_commands.add_parser(
+        "set-password",
+        help="replace a password and revoke existing browser sessions",
+    )
+    set_password_parser.add_argument("username")
+    disable_user_parser = user_commands.add_parser(
+        "disable",
+        help="disable an account and revoke existing browser sessions",
+    )
+    disable_user_parser.add_argument("username")
+    enable_user_parser = user_commands.add_parser(
+        "enable",
+        help="enable an existing account",
+    )
+    enable_user_parser.add_argument("username")
+    user_commands.add_parser(
+        "list",
+        help="list local-workspace accounts without password data",
+    )
     return parser
 
 
@@ -741,6 +785,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         for output in outputs:
             print(output)
         return 0
+    if args.command == "users":
+        from atpiano.identity_cli import run_users_command
+
+        return run_users_command(args)
     if not args.version:
         parser.print_help()
     return 0

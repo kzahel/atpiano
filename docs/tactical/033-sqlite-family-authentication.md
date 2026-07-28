@@ -4,7 +4,8 @@ Topic: home-hosted-family-sharing
 
 Status: **authorized on 2026-07-28; implementation in progress.** Dependency
 and initial relational-schema checkpoints are complete through Alembic head
-`20260728_0001`.
+`20260728_0001`. The typed identity service and administrator CLI are also
+complete; authenticated HTTP and React integration remain.
 
 ## Outcome
 
@@ -213,3 +214,17 @@ This section becomes the execution record as commits land. Record:
 - Focused validation: `5 passed` for empty migration, repeated startup,
   foreign-key/role constraints, normalized username uniqueness, and the
   application dependency boundary.
+
+### Identity service and CLI
+
+- The application layer owns typed users, principals, memberships, password
+  policy, permission checks, and opaque browser-session policy without
+  importing SQLAlchemy or FastAPI.
+- The SQLAlchemy adapter persists only Argon2 password hashes and SHA-256
+  digests of random browser-session tokens.
+- Password change, logout, and account disable revoke browser sessions.
+  The last enabled owner cannot be disabled.
+- `atpiano users --workspace <path>` provides interactive `create`,
+  `set-password`, `disable`, `enable`, and redacted `list` commands. No
+  plaintext password command-line argument exists.
+- Focused identity, CLI, migration, and dependency validation: `15 passed`.
