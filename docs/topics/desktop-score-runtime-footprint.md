@@ -5,9 +5,11 @@ Topic: desktop-score-runtime-footprint
 Status: **measured optimization opportunity as of 2026-07-27.** The current
 internal macOS arm64 score build is correct and reviewable, but deliberately
 packages the complete proven research environment rather than an
-inference-minimal runtime. No reduction tactical is open yet. The build
-remains internal-only under the provisional MIDI2ScoreTransformer licensing
-assumption, R5 remains open, and Phase 6 remains closed.
+inference-minimal runtime. R5 was accepted on 2026-07-28, but no reduction
+tactical is open yet. The build remains internal-only under the provisional
+MIDI2ScoreTransformer licensing assumption. The broader packaged-desktop and
+managed-hosted programs are deferred; this optimization may proceed as an
+independent local tactical when authorized.
 
 ## Scope And Relationship
 
@@ -31,7 +33,7 @@ distribution, and license gates. Tactical
 is the implemented baseline and execution record.
 
 This topic does not authorize public distribution, quantization, a model
-change, or Phase 6.
+change, or resumption of the deferred packaged-desktop program.
 
 ## Measured Baseline
 
@@ -287,4 +289,5 @@ When authorized, open one bounded tactical for the first two proof steps:
 derive an exact inference checkpoint, then run the unchanged score contract
 against the existing Python 3.10/Torch runtime. Stop at a measured
 human-review checkpoint before pruning general package payloads or changing
-the model.
+the model. This work is a local optimization and does not require or imply
+resuming the deferred managed hosted-service plan.

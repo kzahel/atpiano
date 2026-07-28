@@ -59,9 +59,10 @@ accepted refactor that separates the active capture session from each
 browser's selected session, then adds explicit New, history, and recoverable
 deletion without changing the capture sample-clock contract.
 [`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md)
-owns the accepted hosted and Tauri execution topology, multi-user workspace
-model, streaming process boundaries, persistence, and observability. Cloud
-transport may add authenticated routing and network delay, but it must
+retains the deferred hosted and Tauri execution topology, multi-user
+workspace model, streaming process boundaries, persistence, and
+observability. [`home-hosted-family-sharing.md`](home-hosted-family-sharing.md)
+owns the current single-host deployment. Any future cloud transport must
 preserve this topic's sample clock, event lifecycle, horizons, and separate
 latency stages.
 

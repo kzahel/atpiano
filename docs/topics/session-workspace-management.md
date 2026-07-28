@@ -41,12 +41,13 @@ The React runtime contract and accepted selected-versus-active behavior remain
 stable; R4 confirmed that parity on 2026-07-27.
 
 [`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md)
-owns the accepted hosted-plus-Tauri product architecture, including accounts,
+retains the deferred hosted-plus-Tauri architecture, including accounts,
 shared cloud workspaces, multiple concurrent capture sessions, local-only
-desktop workspaces, and later explicit sync. Here, **workspace** means the
-single local v2 process and its configured artifact root. Its one-capture
-limit is a local coordinator constraint, not a future cloud-workspace
-invariant.
+desktop workspaces, and later explicit sync.
+[`home-hosted-family-sharing.md`](home-hosted-family-sharing.md) owns the
+current single-host deployment. Here, **workspace** means the single local v2
+process and its configured artifact root. Its one-capture limit is a local
+coordinator constraint; no current multi-user concurrency claim is made.
 
 The v1 MVP and its workbench are outside this refactor. V2 may share utilities
 with v1 only when v1 behavior and artifacts remain unchanged.
@@ -363,7 +364,7 @@ shared React UI through bounded tacticals rather than landing the entire
 refactor at once. Treat same-session resumption, labeling, trash restoration,
 permanent purge, and a larger visual redesign as later tacticals unless
 implementation uncovers a blocking contract issue. Preserve the explicit IDs,
-immutable artifacts, and selected-versus-active split needed by the accepted
+immutable artifacts, and selected-versus-active split retained by the deferred
 [`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md),
 but do not pull accounts, cloud storage, or sync into the local session
 foundation.

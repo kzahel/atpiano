@@ -5,8 +5,8 @@ Master phase: 5. Early Tauri skeleton, R5 revision
 Topics: `multi-tenant-hybrid-service-architecture`,
 `performance-to-notation`
 
-Status: **implemented; score rendering was human-validated on 2026-07-28.
-R5 remains open for the broader desktop boundary.**
+Status: **implemented; score rendering was human-validated and R5 was
+accepted on 2026-07-28.**
 
 ## Entry Evidence
 
@@ -41,7 +41,7 @@ the default and remains independently reproducible.
   failure cannot stop capture, review, playback, or exports.
 - The existing desktop token, loopback-origin, thin-Rust, CPU-only, immutable
   bundle, and source-clock contracts remain unchanged.
-- R5 remains open. This revision does not authorize Phase 6.
+- This revision does not itself implement later signed distribution work.
 
 ## Exact Implementation Scope
 
@@ -195,5 +195,6 @@ tests, 47 Vitest tests, frontend typecheck and production build, and 8 Rust
 tests plus formatting and Clippy with warnings denied. The internal
 application reached subjective score review. On 2026-07-28 the user confirmed
 that score engraving works in the desktop app. That review exposed the
-separate artifact-export gap now owned by Tactical 032. R5 remains open and
-Phase 6 remains closed until explicit acceptance.
+separate artifact-export gap now owned by Tactical 032. After that revision,
+the user confirmed the export flow and accepted R5 on 2026-07-28. Later
+signed distribution work remains deferred.

@@ -5,7 +5,7 @@ Master phase: 5. Early Tauri skeleton, R5 revision
 Topics: `multi-tenant-hybrid-service-architecture`,
 `performance-to-notation`
 
-Status: **implemented and ready for R5 human export review on 2026-07-28.**
+Status: **implemented and human-accepted with R5 on 2026-07-28.**
 
 ## Entry Evidence
 
@@ -100,8 +100,9 @@ arbitrary bytes from the webview.
 ## Human Review Packet
 
 Provide the rebuilt internal app, the new privilege delta, automated evidence,
-and a short export checklist. Keep R5 open until the user explicitly accepts
-the whole desktop boundary.
+and a short export checklist. At implementation handoff, R5 remained open
+until the user explicitly accepted the whole desktop boundary; that
+acceptance was recorded on 2026-07-28.
 
 ## Rollback Or Disable Path
 
@@ -157,8 +158,7 @@ ordinary staging tree was restored last with 13,582 files,
 1,035,523,494 bytes, and no score runtime.
 
 Automated tests cover browser dispatch and native authenticated streaming.
-The remaining checkpoint is intentionally human: open the rebuilt internal
-app, select **Original model MusicXML** under **Exports**, choose a
-destination, and confirm the saved SHA-256 starts with the prefix shown by the
-panel. Repeat one audio or MIDI export and cancel one dialog. R5 and Phase 6
-remain closed pending the user's broader acceptance.
+On 2026-07-28 the user confirmed that the export flow is fine and accepted
+the broader R5 desktop boundary. This tactical and R5 are complete. The
+larger Phase 6 desktop-distribution program is deferred rather than opened
+automatically.

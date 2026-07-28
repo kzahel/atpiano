@@ -26,6 +26,10 @@ normally reuse the document slug in its `Topic:` trailers.
   measured internal desktop score footprint, duplicated dependency evidence,
   inference-only checkpoint opportunity, safe pruning order, and parity
   gates.
+- [`home-hosted-family-sharing.md`](home-hosted-family-sharing.md):
+  accepted near-term Mac-hosted family deployment through the home Pi/Caddy,
+  with on-demand availability, local persistence, proportionate access
+  boundaries, and explicit triggers for reconsidering cloud infrastructure.
 - [`live-acoustic-transcription.md`](live-acoustic-transcription.md):
   browser prototype whose strict-onset decoder, room gate, physical keyboard,
   grand-staff stream, confidence controls, and source-timing guides are
@@ -40,9 +44,9 @@ normally reuse the document slug in its `Topic:` trailers.
   and an interim MP3-retention path scheduled inside Phase 4 for measured R4
   review.
 - [`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md):
-  accepted target architecture for one shared React application, hosted
-  FastAPI service and Python workers, multi-user cloud workspaces, an offline
-  Tauri desktop runtime, and later explicit session-oriented sync.
+  deferred PostgreSQL, object-storage, managed-identity, worker, tenancy, and
+  sync architecture retained as a future option rather than the current
+  implementation sequence.
 - [`performance-to-notation.md`](performance-to-notation.md):
   evaluated downstream conversion prototype whose artifacts are inspectable
   but whose first target-piano score failed the readability goal.

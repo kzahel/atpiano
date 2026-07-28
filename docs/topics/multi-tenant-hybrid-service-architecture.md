@@ -2,10 +2,12 @@
 
 Topic: multi-tenant-hybrid-service-architecture
 
-Status: **accepted target architecture as of 2026-07-26; Phases 1 through 4
-are complete and R2, R3, and R4 are accepted. Phase 5 reached R5 and now has
-implemented internal-score and cross-platform-export revisions held for
-review; R5 remains open.**
+Status: **deferred future architecture as of 2026-07-28.** Phases 1 through 5
+are complete and R2 through R5 are accepted. The user does not currently plan
+to build the managed PostgreSQL, object-storage, identity, tenancy, or sync
+system. The near-term deployment is the working Mac-hosted local application
+shared on demand through the home Pi/Caddy; that current direction is owned by
+[`home-hosted-family-sharing.md`](home-hosted-family-sharing.md).
 Phase 4 is recorded under
 [`017-python-application-core.md`](../tactical/017-python-application-core.md)
 and Phase 3 under
@@ -29,7 +31,8 @@ development state cleared, preserves history, fails visibly on sidecar exit,
 and passes direct-versus-packaged reference-relative parity. The exact R5
 review packet is
 [`r5-desktop-boundary-review.md`](../r5-desktop-boundary-review.md).
-Phase 6 remains closed until explicit acceptance. Tactical 031 now owns a
+The user accepted R5 on 2026-07-28 after validating the revised artifact
+export flow. Tactical 031 owns a
 separate opt-in internal build of the unresolved score runtime after the user
 provisionally accepted the checkpoint as following the paper's CC BY 4.0
 terms for internal testing. That build has passed packaged replay-to-score and
@@ -54,24 +57,23 @@ one-hour/three-hour category evidence is reproducible. This is local
 modularity evidence, not evidence of hosted accounts, authorization,
 PostgreSQL, object storage, cloud durability, or multi-tenant isolation.
 
-The Pi's existing public Caddy service can proxy the real Mac-hosted React and
-Python/model application over the LAN for a short public trial. Its Mac
-upstream now runs as an on-demand, restart-supervised launchd job with
-retained lifecycle and process logs; it deliberately does not register as a
-reboot or login service.
+The Pi's existing public Caddy service proxies the real Mac-hosted React and
+Python/model application over the LAN for on-demand family sharing. Its Mac
+upstream runs as a restart-supervised launchd job with retained lifecycle and
+process logs; it deliberately does not register as a reboot or login service.
 Versioned Pydantic contracts, generated OpenAPI/TypeScript, the
 `AtpianoRuntime` boundary, an executable fixture provider, and explicit local
 compatibility paths exist. R2 feedback removed the generic `product`
 namespace and premature application ports while retaining the cross-client
 provider seam needed by web, future Android, and desktop clients. The shared
-React application is now reviewable against the retained local engine. The
-target remains a zero-install hosted service and auto-updating offline-capable
-Tauri desktop application over the same contracts.
+React application runs against the retained local engine. A zero-install
+managed hosted service and auto-updating offline-capable Tauri distribution
+remain future options, not the active product plan.
 
 ## Scope And Relationship
 
-This topic owns the durable system shape for turning the current local
-workbench into an extensible product:
+This topic retains the durable system shape designed for a possible future
+managed hybrid product:
 
 - the shared frontend and its hosted and desktop runtime adapters;
 - account, workspace, membership, session, job, and artifact boundaries;
@@ -113,12 +115,14 @@ process or release boundaries.
 an optional client-side executor investigation, not the product architecture
 or a constraint on model quality.
 
-This is a target architecture, not evidence that hosted, desktop, account,
-collaboration, sync, or multi-tenant behavior already works.
+This is a deferred target architecture, not evidence that hosted accounts,
+collaboration, sync, or multi-tenant behavior works and not an instruction to
+implement them.
 
-## Decision Summary
+## Deferred Decision Summary
 
-The accepted product has three workspace modes:
+If the managed hybrid product is revived, the proposed shape has three
+workspace modes:
 
 1. **Local-only workspace:** no account is required; capture, inference,
    metadata, recordings, and generated artifacts stay on the device.
@@ -129,16 +133,17 @@ The accepted product has three workspace modes:
    local copy and explicitly transfers mostly immutable sessions and
    artifacts to or from a cloud workspace.
 
-The hosted web application provides the lowest-friction trial and
+In that deferred design, the hosted web application provides the
+lowest-friction trial and
 collaboration path. The desktop application provides local/offline use,
 stronger privacy, direct access to local accelerators, and resilience to
 network quality. Neither is a compatibility shell around an unrelated
 product: both use the same frontend, domain vocabulary, event schemas, and
 artifact formats.
 
-The initial technology choices are:
+The provisional future technology choices are:
 
-| Concern | Accepted choice |
+| Concern | Proposed choice if resumed |
 | --- | --- |
 | Shared application | React, TypeScript, and Vite |
 | Remote/server state | TanStack Query |
@@ -157,7 +162,7 @@ The initial technology choices are:
 
 The exact React router, OIDC provider, cloud vendor, object-store vendor, job
 queue implementation, and first internal worker transport remain bounded
-implementation choices. They must preserve the contracts in this topic.
+implementation choices only if the hosted architecture is reopened.
 
 ## Architectural Overview
 
@@ -181,11 +186,12 @@ browser globals, Tauri commands, or cloud endpoints throughout components.
 The hosted adapter implements it with HTTPS and WebSockets. The desktop
 adapter implements it through the constrained Tauri shell and local sidecar.
 
-The cloud deployment begins as a **modular monolith**: one versioned
-application and repository with explicit internal modules and independently
-runnable process roles. It is not one operating-system process and it is not
-a pre-emptive fleet of microservices. API, real-time coordination, and model
-workers can scale separately without inventing unrelated service contracts.
+If resumed, the cloud deployment begins as a **modular monolith**: one
+versioned application and repository with explicit internal modules and
+independently runnable process roles. It is not one operating-system process
+and it is not a pre-emptive fleet of microservices. API, real-time
+coordination, and model workers can scale separately without inventing
+unrelated service contracts.
 
 ## Non-Negotiable Invariants
 
@@ -305,7 +311,10 @@ artifacts, cancellation, and errors will use explicit versioned types. UI
 components must not infer whether a result came from cloud PostgreSQL, local
 SQLite, a cloud worker, or a desktop sidecar.
 
-## Hosted Service Shape
+## Deferred Hosted Service Shape
+
+The remainder of this section is retained design guidance, not active
+implementation scope.
 
 ### Why the control plane stays in Python
 
@@ -402,7 +411,7 @@ Throughput or isolated inference time is not a real-time claim. The same
 stage vocabulary and source-onset identifiers must work in cloud and desktop
 diagnostics.
 
-## Accounts, Workspaces, And Concurrency
+## Deferred Accounts, Workspaces, And Concurrency
 
 ### Identity and authorization
 
@@ -634,7 +643,7 @@ offline status but cannot disable local work.
 Desktop diagnostic telemetry is opt-in and privacy-aware. Users can always
 produce an inspectable local diagnostic bundle without uploading audio.
 
-## Cloud, Local, And Sync Semantics
+## Deferred Cloud, Local, And Sync Semantics
 
 Cloud and local workspaces are explicit modes. The client must not make a
 local folder silently collaborative or upload audio merely because a user
@@ -706,7 +715,8 @@ hashes, advertises score capability only when its isolated runtime is valid,
 and completed a real packaged replay-to-score run without mutating the
 application tree. The normal staging and archive paths remain score-free and
 reject those assets. This is implementation evidence for the local process
-boundary, not resolution of the release gate or acceptance of R5.
+boundary, not resolution of the release gate. R5 was accepted independently
+after the later export revision.
 
 ## Observability And Operations
 
@@ -778,13 +788,13 @@ All queueing is bounded. Backpressure and degraded modes are visible rather
 than converted into ever-growing memory, stale live feedback, or falsely
 successful jobs.
 
-## Scalability And Deployment Evolution
+## Deferred Scalability And Deployment Evolution
 
-The first hosted vertical slice can run one API deployment, one real-time
-coordinator deployment, a small worker pool, managed PostgreSQL, and managed
-object storage. That is already horizontally extensible at the expensive
-boundaries without requiring microservices for catalog, membership, score,
-and artifact metadata.
+If revived, the first hosted vertical slice can run one API deployment, one
+real-time coordinator deployment, a small worker pool, managed PostgreSQL,
+and managed object storage. That is already horizontally extensible at the
+expensive boundaries without requiring microservices for catalog, membership,
+score, and artifact metadata.
 
 Scale by measured pressure:
 
@@ -806,7 +816,8 @@ work after database commit without making an ephemeral broker authoritative.
 
 The master sequence and human review gates are tracked in
 [`013-hybrid-product-migration-master.md`](../tactical/013-hybrid-product-migration-master.md).
-Land it through bounded, reversible child tacticals:
+Phases 1 through 5 landed through bounded, reversible child tacticals. The
+remaining entries are retained only as deferred scopes:
 
 1. **Freeze and characterize.** Turn v1, v2, the aligned fixture, retained
    recordings, microphone behavior, sessions, exports, and score snapshots
@@ -825,15 +836,19 @@ Land it through bounded, reversible child tacticals:
    authenticate a versioned Python sidecar, perform compatibility handshake,
    and run the golden replay. This early proof prevents later hosted
    assumptions from making the shared application browser-only.
-6. **Complete local desktop vertical slice.** Add durable SQLite/local
+6. **Deferred complete local desktop vertical slice.** Add durable SQLite/local
    artifacts, microphone and review parity, model packs, signed update
    infrastructure, diagnostics, and network-disabled validation.
-7. **Hosted service vertical slice.** Add managed identity, cloud workspaces,
+7. **Deferred hosted service vertical slice.** Add managed identity, cloud workspaces,
    memberships, PostgreSQL, object storage, worker boundaries, secure PCM
    ingest, collaboration, authorization, and observability.
-8. **Collaboration, distribution, and limited sync.** Harden both products and
+8. **Deferred collaboration, distribution, and limited sync.** Harden both products and
    add explicit idempotent immutable-session transfer before considering
    broader offline reconciliation.
+
+Completion of Phase 5 does not queue Phase 6 or Phase 7. Focused local work
+may proceed under its own topic without accepting the full scope of either
+phase.
 
 Phase 1 completed in
 [`014-freeze-migration-baseline.md`](../tactical/014-freeze-migration-baseline.md).
@@ -856,9 +871,10 @@ record. The structure, interaction, and pre-Tauri parity reviews are explicit
 holds rather than status updates. Do not combine cloud accounts, frontend
 migration, worker extraction, desktop packaging, and sync into one rewrite.
 
-## Validation Gates
+## Deferred Full-Architecture Validation Gates
 
-Before the architecture can be described as implemented, evidence must show:
+If the managed hybrid architecture is resumed, it cannot be described as
+implemented until evidence shows:
 
 - deterministic WAV replay produces equivalent normalized session products
   through the direct, hosted-worker, and desktop-sidecar paths within declared
@@ -892,6 +908,7 @@ Before the architecture can be described as implemented, evidence must show:
 
 These choices intentionally remain open until their implementation tactical:
 
+- whether a managed hosted service should be pursued at all;
 - React Router versus TanStack Router;
 - managed OIDC vendor and exact browser-session integration;
 - cloud, PostgreSQL, S3-compatible storage, and deployment vendors;
@@ -909,9 +926,10 @@ These choices intentionally remain open until their implementation tactical:
 - Windows and later Linux packaging details; and
 - the licensed score converter used in public distribution.
 
-Deferral does not reopen the accepted major boundaries. For example, choosing
-an OIDC vendor does not authorize building password authentication, and
-choosing a queue does not authorize sending raw PCM through it.
+If hosted work is reopened, selecting one deferred component does not reopen
+the safety boundaries. For example, choosing an OIDC vendor does not
+authorize building password authentication, and choosing a queue does not
+authorize sending raw PCM through it.
 
 ## Official References
 
@@ -929,17 +947,19 @@ choosing a queue does not authorize sending raw PCM through it.
 
 ## Recommended Direction
 
-Treat this topic as the architecture gate for productization and
-[`013-hybrid-product-migration-master.md`](../tactical/013-hybrid-product-migration-master.md)
-as its execution tracker. Freeze the current baseline, establish contracts,
-migrate the shared frontend, and extract the Python application core. After
-explicit parity review, prove the Tauri/sidecar boundary before building out
-the hosted service. Future tacticals should name the specific architecture
-phase they advance and update this topic when evidence changes a contract,
-gate, or recommended sequence.
+Use [`home-hosted-family-sharing.md`](home-hosted-family-sharing.md) as the
+current deployment direction. Continue local quality, storage, operational,
+and footprint work through focused tacticals. Do not open a PostgreSQL,
+managed-identity, object-storage, tenancy, or sync tactical merely because it
+appears next in the old sequence.
 
-Avoid creating parallel hosted and desktop products, putting model runtimes in
-the API process, adding a TypeScript control plane only for shared language,
-attempting general bidirectional sync, or distributing unresolved
-dependencies. Those choices would erase the boundaries that make the staged
-path testable.
+Reconsider this architecture only from a concrete need such as mutually
+untrusted users, simultaneous capture writers, availability while the Mac is
+offline, off-site durable storage, or measured single-host capacity limits.
+If that happens, begin with a new bounded architecture review and revalidate
+the old choices against the then-current application.
+
+The useful boundaries remain: avoid putting model runtimes in a stateless API
+process, adding a TypeScript control plane only for shared language,
+attempting general bidirectional sync, or publicly distributing unresolved
+dependencies.

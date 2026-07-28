@@ -5,10 +5,11 @@ Topic: browser-only-wasm-deployment
 Status: **deprioritized optional executor, not the product architecture.** The
 user clarified on 2026-07-25 that browser-only deployment was an appealing
 idea rather than a constraint, and that any execution backend including
-NVIDIA/CUDA is acceptable if it gives a clearly better result. On 2026-07-26,
-the project accepted a shared hosted-web plus offline Tauri architecture in
-[`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md).
-That architecture may later use a WASM lane, but it does not depend on one.
+NVIDIA/CUDA is acceptable if it gives a clearly better result. The later
+managed hosted-web architecture is now deferred; the current deployment is
+the host-executed Mac/Pi path in
+[`home-hosted-family-sharing.md`](home-hosted-family-sharing.md). Neither
+direction depends on a WASM lane.
 
 A local ONNX Runtime Web WASM execution smoke test succeeded. Browser replay,
 model-output parity, live microphone latency, storage behavior, and offline
@@ -38,9 +39,9 @@ client-side web application:
 This is a deployment and execution-boundary concern. It does not select a new
 acoustic model or change the transcription-quality standard.
 [`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md)
-owns the selected hosted and desktop product topology, tenancy, persistence,
-sync, and distribution path. This topic describes only an optional
-browser-local runtime that could plug into the shared application.
+retains the deferred hosted and desktop product topology, tenancy,
+persistence, sync, and distribution design. This topic describes only an
+optional browser-local runtime that could plug into the shared application.
 [`live-acoustic-transcription.md`](live-acoustic-transcription.md) continues to
 own the live event lifecycle, sample-clock timeline, windowing, gate,
 reconciliation, and latency evidence.
@@ -560,8 +561,11 @@ inference on rubato — none of which a browser runtime affects, and all of whic
 it constrains. The accepted transcription direction remains
 [`009-three-phase-unbounded-sessions.md`](../tactical/009-three-phase-unbounded-sessions.md),
 which is host-executed and free to select the best available model. The
-accepted product architecture is the hosted service plus local/offline Tauri
-runtime recorded in
+current deployment is the Mac-hosted runtime shared through the home Pi/Caddy,
+recorded in
+[`home-hosted-family-sharing.md`](home-hosted-family-sharing.md). The larger
+hosted service and local/offline Tauri distribution remain deferred options
+in
 [`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md).
 
 This topic becomes relevant again under one of two conditions:

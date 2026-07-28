@@ -1,7 +1,9 @@
 # R5 Desktop Boundary Review
 
-Status: **revised and ready for human export review on 2026-07-28; Phase 6
-remains closed.**
+Status: **accepted on 2026-07-28.** The user confirmed that the revised
+artifact-export flow is fine and that the working local application and
+desktop/process boundary are sufficient for the present direction. Phase 5
+is complete. Later signed desktop distribution work is deferred.
 
 This is the Phase 5 walking skeleton: one unsigned macOS arm64 application
 containing the shared React workspace, a thin Tauri 2 supervisor, a
@@ -357,5 +359,14 @@ The final gate includes:
 - a rebuilt internal app audit and authenticated, length-checked, atomic
   artifact-streaming tests.
 
-R5 is a human hold. Do not open the complete local-desktop Phase 6 until the
-user explicitly accepts this boundary and bundle direction.
+## Acceptance
+
+On 2026-07-28 the user confirmed that the revised export flow is fine and
+accepted the working local application and desktop/process boundary. R5 is
+closed and Phase 5 is complete.
+
+This acceptance does not claim that the known exclusions are implemented.
+The larger signed, installer-complete Phase 6 program and the managed hosted
+service remain deferred. Near-term sharing uses the on-demand Mac service
+behind the home Pi/Caddy as recorded in
+[`home-hosted-family-sharing.md`](topics/home-hosted-family-sharing.md).

@@ -24,3 +24,6 @@
 - `desktop-score-runtime-footprint` — measured desktop score dependency and
   checkpoint footprint, inference-minimal packaging, and parity-preserving
   reduction
+- `home-hosted-family-sharing` — on-demand Mac-hosted family access through
+  the home Pi/Caddy, local persistence, and proportionate operational and
+  security boundaries

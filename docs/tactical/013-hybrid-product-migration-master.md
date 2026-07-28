@@ -2,35 +2,38 @@
 
 Topic: multi-tenant-hybrid-service-architecture
 
-Status: accepted master plan on 2026-07-26; Phases 1 through 4 are complete
-and R2, R3, and R4 are accepted. On 2026-07-27 the user accepted application
-parity and selected verified MP3 retention with explicit WAV opt-in. Phase 5
-reached R5 under Tactical 030; the score-unavailable review result opened the
-bounded internal-only revision in Tactical 031. That revision is implemented,
-including a real packaged replay-to-score result, and the first hands-on test
-confirmed that its engraving works. The same review exposed inert
-browser-style downloads in the desktop webview. Tactical 032 now moves the
-model baseline into Exports and implements cross-platform artifact export
-through the runtime boundary. R5 remains open and Phase 6 remains closed.
-This document tracks the staged migration program and its human review gates.
-Each phase must create one or more smaller numbered tacticals before
-implementation.
+Status: Phases 1 through 5 are complete; R2, R3, R4, and R5 are accepted.
+On 2026-07-28 the user confirmed the revised export flow and accepted the
+working local desktop boundary. The user also deferred Phases 6 through 8:
+the signed desktop-distribution program, managed hosted service, and
+collaboration/sync program have no active implementation schedule. The
+near-term deployment is the on-demand Mac-hosted application behind the home
+Pi/Caddy, recorded in
+[`home-hosted-family-sharing.md`](../topics/home-hosted-family-sharing.md).
+This document retains the completed migration record and the deferred phases
+as possible future scopes, not as the current queue.
 
 ## Outcome
 
-Build the accepted hosted-plus-Tauri product architecture without turning the
-current v1 MVP or v2 corrected-note workbench into an in-place rewrite.
+The active outcome through Phase 5 was to establish the shared React
+application, framework-independent Python core, and working Tauri/local
+boundary without turning the v1 MVP or v2 corrected-note workbench into an
+in-place rewrite. That outcome is complete.
 
-The new product will methodically establish:
+The completed program established:
 
 - versioned domain and wire contracts;
 - a shared React/TypeScript/Vite application;
 - framework-independent Python application services;
-- hosted and desktop implementations of one runtime-provider boundary;
-- local-only, cloud, and later explicitly synced workspace modes;
-- multi-user cloud accounts and workspaces;
+- a platform-neutral runtime-provider boundary;
+- a local web runtime and self-contained Tauri proof;
 - isolated model and score workers; and
-- production-grade security, observability, artifacts, and recovery behavior.
+- durable local session, artifact, and recovery behavior.
+
+Managed cloud accounts, PostgreSQL, object storage, multi-tenant
+collaboration, sync, signed installers, and automatic updates remain possible
+future projects. They are not required to continue improving or sharing the
+current local application.
 
 The current applications are reference implementations and regression oracles.
 Their frontend and HTTP composition can be superseded, but their proven
@@ -72,13 +75,15 @@ result, and commit range.
 | 2. Contracts and structure | Complete (`e2c2b9d^..9f8dd16`) | [`015`](015-contracts-and-structure.md) | R2 accepted 2026-07-26 |
 | 3. Shared React application | Complete | [`016`](016-shared-react-application.md) | R3 accepted 2026-07-26 |
 | 4. Python application core | Complete | [`022`](022-durable-capture-worker-isolation.md), [`023`](023-backend-capability-degradation.md), then [`017`](017-python-application-core.md) | R4 accepted 2026-07-27 |
-| 5. Early Tauri skeleton | R5 internal-score and artifact-export revisions implemented; held for review | [`030`](030-early-tauri-sidecar-boundary.md), [`031`](031-internal-desktop-score-runtime.md), [`032`](032-cross-platform-artifact-export.md) | **R5 desktop-boundary review required** |
-| 6. Complete local desktop | Blocked by R5 acceptance | Not created | Required daily-use review |
-| 7. Hosted service | Blocked by Phase 6 | Not created | Required hosted and tenancy review |
-| 8. Collaboration, distribution, and limited sync | Blocked by Phase 7 | Not created | Separate release and sync reviews |
+| 5. Early Tauri skeleton | Complete | [`030`](030-early-tauri-sidecar-boundary.md), [`031`](031-internal-desktop-score-runtime.md), [`032`](032-cross-platform-artifact-export.md) | R5 accepted 2026-07-28 |
+| 6. Complete packaged local desktop | Deferred; no active tactical | Not created | Review only if resumed |
+| 7. Managed hosted service | Deferred; no active tactical | Not created | Review only if resumed |
+| 8. Collaboration, distribution, and limited sync | Deferred; no active tactical | Not created | Review only if resumed |
 
-“Blocked” here describes planned sequencing, not a technical failure. The
-master tracker itself does not authorize work past a required human gate.
+“Deferred” is a product-priority decision, not a technical failure and not an
+instruction to resume the next numbered phase. Small local, home-sharing,
+storage, quality, and footprint tacticals may proceed independently under
+their focused topic docs.
 
 ## Migration Strategy
 
@@ -537,8 +542,8 @@ fallback, extracted-archive validation, real replay parity, failure/recovery
 demonstrations, privilege map, reconciled bundle inventory, known gaps, code
 map, tests, and commit series are in
 [`r5-desktop-boundary-review.md`](../r5-desktop-boundary-review.md).
-Implementation presence does not accept R5. Do not create the Phase 6
-tactical until the user explicitly accepts this review.
+At that hold, implementation presence alone did not accept R5 and Phase 6
+could not open without explicit review.
 
 The first hands-on R5 pass found the Tauri application functional but exposed
 the deliberate missing-score capability. The user authorized
@@ -546,7 +551,8 @@ the deliberate missing-score capability. The user authorized
 as an R5 revision for internal testing under a provisional assumption that
 the checkpoint follows the paper's CC BY 4.0 terms. The upstream repository
 and checkpoint still lack their own explicit notices, so ordinary and public
-artifacts remain score-free. This revision does not accept R5 or open Phase 6.
+artifacts remain score-free. This revision did not by itself accept R5 or open
+Phase 6.
 
 The user then confirmed that score engraving works in the internal desktop
 app and found that **Download model baseline** produced no visible file.
@@ -554,16 +560,26 @@ app and found that **Download model baseline** produced no visible file.
 moves the immutable baseline into the shared Exports panel and implements one
 runtime export operation with ordinary browser downloads and a bounded native
 desktop Save As path. This second review revision is implemented and rebuilt
-for human export validation. It does not accept R5 or open Phase 6.
+for human export validation.
+
+On 2026-07-28 the user confirmed that the revised export flow is fine,
+described the local app as working, and accepted the present desktop
+boundary. R5 is closed and Phase 5 is complete. The acceptance does not start
+Phase 6 automatically; the user deferred the larger packaged-desktop program
+and selected home-hosted family sharing as the near-term deployment.
 
 ## Phase 6 — Complete The Local Desktop Vertical Slice
+
+Status: **deferred with no active tactical.** Local improvements may be
+opened independently without adopting this entire distribution scope.
 
 ### Purpose
 
 Make the desktop application useful as the first complete new-world local
-product.
+product if signed end-user distribution becomes a goal. This is no longer a
+prerequisite for ordinary local use or home-hosted sharing.
 
-### Work
+### Work If Resumed
 
 - Complete microphone capture, replay, Stop, history, deletion, remaining
   artifact polish, score jobs where licensed, and local settings.
@@ -575,21 +591,26 @@ product.
 - Validate network-disabled operation after installation and model acquisition.
 - Package macOS arm64 first; open separate platform tacticals later.
 
-### Exit evidence and review R6
+### Exit Evidence And Review R6 If Resumed
 
 The user can install or launch the desktop build, disconnect the network,
 record or replay, stop, review history, render available scores, export
-artifacts, restart, and recover prior sessions. R6 is a daily-use product
-review before hosted product complexity becomes the main focus.
+artifacts, restart, and recover prior sessions. R6 would review a supported
+packaged desktop product; it is not a gate in front of current local work.
 
 ## Phase 7 — Build The Hosted Service Vertical Slice
+
+Status: **deferred with no active tactical or target date.** Do not infer this
+phase from completion of local work. Reopen the architecture decision first
+if home hosting develops a concrete limitation.
 
 ### Purpose
 
 Implement the zero-install, collaborative service using the same frontend and
-domain products proven locally.
+domain products proven locally, only if managed multi-tenant hosting becomes
+a real requirement.
 
-### Work
+### Work If Resumed
 
 - Add managed OIDC integration, users, cloud workspaces, memberships, and
   roles.
@@ -602,7 +623,7 @@ domain products proven locally.
 - Deliver one browser microphone-to-cloud-session path.
 - Prove concurrent sessions in one workspace and one writer per session.
 
-### Exit evidence and review R7
+### Exit Evidence And Review R7 If Resumed
 
 R7 reviews a hosted account, workspace invitation or test membership, separate
 simultaneous sessions, historical review, artifacts, failures, authorization,
@@ -611,12 +632,15 @@ same direct and desktop fixture.
 
 ## Phase 8 — Collaboration, Distribution, And Limited Sync
 
+Status: **deferred with Phase 7.** No sync or cloud/local collaboration work
+is currently planned.
+
 ### Purpose
 
 Harden the two independently useful products, then add carefully bounded
-interoperation.
+interoperation if both products are ever independently useful.
 
-### Work
+### Work If Resumed
 
 - Complete hosted invitation, role-management, retention, quota, and
   operational controls.
@@ -663,7 +687,8 @@ links the child tactical and final commit range when complete.
 
 ## Cross-Phase Test Matrix
 
-The matrix grows with the program:
+The matrix records the completed local expectations and the evidence that the
+deferred phases would require if resumed:
 
 | Behavior | Existing v1/v2 | New local web | Tauri | Hosted |
 | --- | --- | --- | --- | --- |
@@ -705,8 +730,9 @@ evidence and tradeoff, not an undocumented exception.
 
 ## Immediate Next Action
 
-Do not scaffold the new product from this master document alone. When
-implementation is authorized, create the Phase 1 bounded tactical for baseline
-characterization. Its final handoff proposes the exact Phase 2 tactical and
-identifies any current behavior that needs a product decision before it is
-encoded as a durable contract.
+There is no automatic next numbered phase. Use
+[`home-hosted-family-sharing.md`](../topics/home-hosted-family-sharing.md) for
+near-term deployment and operational work, and the focused model, notation,
+storage, or footprint topic for local improvements. Do not scaffold Phase 6,
+7, or 8 from this master document unless the user explicitly reopens that
+product goal after reviewing the current need.

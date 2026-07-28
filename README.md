@@ -65,21 +65,22 @@ Current direction and research questions live in [`docs/topics/`](docs/topics/RE
 Acoustic-model benchmarking, live browser transcription, and downstream
 performance-to-notation conversion have separate owners there.
 
-## Desktop R5 Review
+## Desktop R5 Acceptance
 
-The early Tauri/process-boundary implementation has reached its explicit R5
-human hold. The unsigned macOS arm64 app bundles the shared React workspace,
-standalone Python 3.10, CPU model pack, and media tools; it does not require
-the checkout or hosted login at runtime. Launch actions, replay and
-failure/recovery evidence, bundle inventory, privilege map, known exclusions,
-and the acceptance request are in
+The early Tauri/process-boundary implementation passed its explicit R5 human
+review on 2026-07-28. The unsigned macOS arm64 app bundles the shared React
+workspace, standalone Python 3.10, CPU model pack, and media tools; it does
+not require the checkout or hosted login at runtime. Launch actions, replay
+and failure/recovery evidence, bundle inventory, privilege map, known
+exclusions, and the acceptance record are in
 [`docs/r5-desktop-boundary-review.md`](docs/r5-desktop-boundary-review.md).
 That packet also includes a separate, opt-in internal score build for the
-current review. It is not a distribution artifact and does not change the
+private review path. It is not a distribution artifact and does not change the
 ordinary score-free R5 archive. The reviewed score now keeps its original
 model MusicXML with the other session exports, and artifact export uses
 ordinary browser downloads on the web or a native Save As dialog on desktop.
-This is not permission to begin the signed, microphone-complete Phase 6.
+The larger signed, installer-complete desktop program is deferred rather than
+started automatically by this acceptance.
 
 ## Authoritative Performance Workspace (v3)
 
@@ -138,10 +139,13 @@ audit, Ruff, JavaScript syntax, and Git whitespace. The separate production
 build is included because it is a Phase 3 acceptance gate but is not currently
 part of `migration-regression`.
 
-## Temporary Public Trial
+## Home-Hosted Family Sharing
 
-The Pi's live Caddy service proxies `https://atpiano.graehlarts.com` over the
-LAN to this Mac. The public upstream is an on-demand macOS `launchd` service:
+The home Pi at `pi.graehlarts.com` runs Caddy and proxies
+`https://atpiano.graehlarts.com` over the LAN to this Mac. The application is
+the same local React/Python/model workspace, not a separate hosted,
+PostgreSQL-backed service. The upstream is an on-demand macOS `launchd`
+service:
 
 ```text
 scripts/share-atpiano-service start
@@ -175,6 +179,13 @@ WebSockets. Override `ATPIANO_BIND_ADDRESS`, `ATPIANO_PORT`,
 `ATPIANO_PUBLIC_ORIGIN`, `ATPIANO_UV`, or `ATPIANO_SERVICE_LOG_DIR` when
 registering the service to change its generated launch configuration.
 `ATPIANO_SERVICE_LOG_SIZE` and `ATPIANO_SERVICE_LOG_COUNT` adjust rotation.
+
+The current public-origin checks are not user authentication. Keep this a
+limited trusted trial until a proportionate Caddy or private-network access
+boundary is selected. The accepted near-term topology, local SQLite direction,
+operational limits, and conditions for reconsidering managed cloud
+infrastructure are recorded in
+[`docs/topics/home-hosted-family-sharing.md`](docs/topics/home-hosted-family-sharing.md).
 
 Machine-dependent microphone, real Transkun, internal score-runtime, and
 long-soak lanes remain explicit rather than being counted as unattended

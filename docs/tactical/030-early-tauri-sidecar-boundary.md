@@ -4,11 +4,11 @@ Master phase: 5. Early Tauri skeleton
 
 Topic: multi-tenant-hybrid-service-architecture
 
-Status: **implemented and held for R5 human review on 2026-07-27.** The
-review packet is
+Status: **implemented; R5 accepted on 2026-07-28.** The review and acceptance
+record is
 [`r5-desktop-boundary-review.md`](../r5-desktop-boundary-review.md).
-This tactical ends at R5. It does not open the complete local-desktop
-Phase 6.
+This tactical ends at R5. The larger local-desktop distribution program is
+deferred.
 
 ## Outcome
 
@@ -386,7 +386,7 @@ updates, public distribution compliance, microphone parity, settings,
 SQLite/re-indexing, model acquisition, network-disabled daily-use validation,
 the unresolved score runtime, and every platform except macOS arm64. The
 bundle is still large because the accepted CPU inference path includes Torch,
-llvmlite, SciPy, and the model assets. R5 must be explicitly accepted before
-Phase 6 opens.
+llvmlite, SciPy, and the model assets. The user accepted R5 on 2026-07-28;
+the excluded Phase 6 work remains deferred.
 
 No implementation commits yet.
