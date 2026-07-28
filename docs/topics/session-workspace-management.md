@@ -8,10 +8,12 @@ is complete and live under
 It provides application-owned human names, aggregate musical summaries, a
 dedicated Sessions homepage, compact selected-session identity, contextual
 feedback, and keyboard audition without changing session evidence or the
-selected-versus-active boundary. The accepted next slice,
-[`037-detachable-score-playback.md`](../tactical/037-detachable-score-playback.md),
+selected-versus-active boundary. The completed and live
+[`037-detachable-score-playback.md`](../tactical/037-detachable-score-playback.md)
 moves selected-session playback behind a persistent app-level controller so
-workspace and score-reader controls share one lifecycle. Phase 3 and R3 are
+workspace and score-reader controls share one lifecycle. Its focused Zustand
+store publishes observable playback state while the provider privately owns
+the media element and seek mechanics. Phase 3 and R3 are
 complete under
 [`016-shared-react-application.md`](../tactical/016-shared-react-application.md).
 The Phase 4 extraction is implemented locally under
@@ -176,6 +178,13 @@ date-and-source text remains the fallback for sessions without an annotation.
 The same refresh promotes the bounded history into a dedicated Sessions
 homepage. Its opening-phrase previews and playback hydrate lazily; listing
 history must not eagerly load every session's artifacts or events.
+
+Selected-session playback now has a separate global snapshot and persistent
+media provider. Entering the exact-score reader preserves the media element,
+sample-clock position, status, and source identity; both layouts expose
+controls for that same transport. Session selection or source identity
+changes reset it, while the Sessions homepage keeps its bounded lazy
+row-local preview players outside this selected-session lifecycle.
 
 ### Delete
 

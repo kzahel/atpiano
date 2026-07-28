@@ -4,9 +4,10 @@ Topic: performance-to-notation
 
 Topic: session-workspace-management
 
-Status: **accepted implementation plan.** The user accepted the complete
-interaction and architecture direction before implementation and authorized
-end-to-end work with commits after each validated slice.
+Status: **complete and live.** The user accepted the complete interaction and
+architecture direction before implementation. The persistent selected-session
+transport, detachable inline follow, reader continuity, and current-attack
+highlight are implemented and validated.
 
 ## Motivation
 
@@ -204,4 +205,51 @@ and exports intact.
 
 ## Execution Record
 
-Pending implementation and validation.
+Completed on 2026-07-28 in three bounded commits:
+
+- `f4ef780` records the accepted interaction, state, and reader boundary;
+- `a6a02d3` adds the focused Zustand snapshot, persistent media provider,
+  shared workspace transport, and reader Play/Pause control; and
+- `88a8f9c` replaces OSMD document following with panel-local movement,
+  detachment and reattachment, current-attack notehead highlighting, and
+  focused application tests.
+
+The provider remains mounted at the same React tree position when the
+workspace enters or leaves the reader. It owns one hidden audio element and
+keeps element state, seek locks, animation frames, and segment transitions
+imperative. The store publishes only the selected session/source identity,
+availability, lifecycle, sample-clock position, duration, sample rate, error,
+and follow attachment. Workspace inspection remains separately reusable for
+manual roll and keyboard inspection.
+
+OSMD now receives `followCursor: false` and a cursor option with
+`follow: false` in every layout. The application measures its cursor element
+against the inline score viewport, moves only the panel when the cursor exits
+the 22–78 percent comfort band, and suppresses its own scroll event from
+detaching follow. Wheel, touch, scrollbar, document-scroll, and scrolling-key
+intent detach while playback remains synchronized. The detached state
+survives pause, resume, and seek; **Follow playback** explicitly reattaches.
+
+At each mapped score attack, every notehead returned by
+`GNotesUnderCursor()` receives a transient SVG class. Moving forward,
+seeking backward, leaving snapshot coverage, rerendering, changing score, or
+unmounting removes the prior class. This is deliberately attack highlighting,
+not a pedal-aware sounding-note claim.
+
+Automated validation passed:
+
+- 5 Node contract/runtime checks and all 76 Vitest tests;
+- frontend TypeScript checking and the Vite production build;
+- Git whitespace validation; and
+- `uv run atpiano migration-regression`, with the passing report at
+  `results/migration-regression/20260728T110145Z/report.json`.
+
+The active macOS share service was restarted after the final code commit.
+Launchd reported PID 18799 and a ready listener at `192.168.1.104:8002`.
+Through `https://atpiano.graehlarts.com`, the homepage returned HTTP 200;
+anonymous capability and authentication-session requests returned the
+expected protected HTTP 401 responses.
+
+Physical piano-distance viewing, real trackpad/touch feel, and subjective
+highlight color on a representative retained score remain useful product
+review rather than an implementation gate.

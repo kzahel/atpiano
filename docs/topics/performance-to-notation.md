@@ -34,10 +34,13 @@ positions. The score producer uses Python's ties-to-even rounding when it
 orders transformer input, so the browser now reproduces that rounding with
 integer arithmetic before normalizing cursor rows back onto the authoritative
 source-sample clock.
-Tactical 037 is the accepted next browser interaction slice. It replaces
-OSMD's document-level cursor following with detachable, panel-local following,
-adds non-destructive current-attack notehead highlighting, and preserves
-manual page turning in the exact-score reader.
+Tactical 037 is implemented and live. It disables OSMD's document-level
+cursor following, keeps bounded automatic movement inside the inline score
+panel, and detaches immediately on deliberate scrolling. A floating action
+explicitly reattaches follow. Every notehead under the discrete OSMD cursor is
+highlighted non-destructively at the current mapped score attack. Playback
+continues through exact-score reader navigation while page turning remains
+manual.
 This is not yet progressive engraving or a permanent consumer-stack
 selection. The leading score converter's GitHub source and checkpoint still
 have no explicit published license, although the paper is CC BY 4.0 and the
@@ -310,6 +313,13 @@ clearance and effective page capacity while keeping the exact pinned XML and
 semantic reader position. The retained score visibly reflows across all three
 profiles at desktop and phone viewports without document-level horizontal
 overflow.
+
+[`037-detachable-score-playback.md`](../tactical/037-detachable-score-playback.md)
+adds one persistent selected-session transport around both workspace and
+reader layouts. The reader can pause and resume the same media element and
+continues to highlight the mapped current attack, but playback does not claim
+authority to turn pages. The inline preview alone may follow automatically,
+and that following is panel-local and user-detachable.
 
 ### Two-phase paid oracle
 
