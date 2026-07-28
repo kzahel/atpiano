@@ -4,10 +4,10 @@ Topic: session-workspace-management
 
 Topic: practice-companion-product-vision
 
-Status: **active on 2026-07-28.** The user accepted the complete direction
-before implementation and authorized end-to-end work with commits after each
-validated slice. Pause only if a material product or safety decision requires
-human review.
+Status: **complete and live on 2026-07-28.** The user accepted the complete
+direction before implementation and authorized end-to-end work with commits
+after each validated slice. No material product or safety decision required
+an intermediate human review.
 
 ## Motivation
 
@@ -175,3 +175,54 @@ Implementation may proceed without an intermediate review. Pause only if:
 - the opening preview would require unbounded list hydration; or
 - a required behavior cannot be shared across browser, authenticated family,
   and packaged desktop runtimes.
+
+## Execution Record
+
+### Landed slices
+
+- `6fcbd61` recorded this accepted tactical and continuing topic direction.
+- `6933a79` added annotation contracts, atomic application-document naming,
+  aggregate recognized/corrected counts, local and authenticated HTTP paths,
+  runtime providers, authorization, generated contracts, and tests.
+- `6257b04` made Sessions the root workspace, made the brand its return path,
+  compacted selected-session identity, added inline naming and permissions,
+  removed diagnostic chrome, and localized action feedback.
+- `f98f716` converted the 88-key display into an accessible pointer, touch,
+  and keyboard Web Audio instrument without adding a sample dependency.
+- `1f89ddd` added viewport-bounded opening-phrase previews, on-demand row
+  audio, one-player coordination, and operation-specific transport fallbacks.
+- `93dd549` serialized overlapping title autosaves so blur and continued
+  typing cannot lose the newest value.
+
+The implementation kept annotations in `application.json`; capture manifests,
+event history, audio, and generated artifacts remain unchanged. Preview time
+is derived from source samples. Preview subscriptions read at most 256 events
+inside the advertised maximum event range, and recording bytes are requested
+only after Play.
+
+### Validation and live evidence
+
+The complete migration regression passed at
+`results/migration-regression/20260728T103852Z/report.json`: 202 Python tests,
+67 frontend tests, five TypeScript Node tests, generated-contract drift,
+TypeScript, npm high-severity audit, Ruff, retained JavaScript syntax, and Git
+whitespace all passed. The production Vite build also passed; its only build
+notice is the existing large OpenSheetMusicDisplay chunk advisory.
+
+Focused frontend coverage proves root-library navigation, bounded recent
+history, lazy preview intersection, recording-on-Play, one-player
+coordination, inline save completion, overlapping autosave serialization,
+contextual errors, compact summaries, removed diagnostic chrome, and
+pointer/keyboard note audition.
+
+The already-active authenticated macOS share service was restarted after the
+final code change. The public homepage returned HTTP 200 and anonymous
+capability/authentication requests remained protected with HTTP 401. The
+bounded operator check against retained session
+`20260727T185541-a2298f1afaaf` read ten artifacts, a 1,024-byte MP3 range, and
+the selected MusicXML, then revoked its temporary operator session. No
+authenticated browser data was renamed during verification.
+
+No manual browser clicking or visual QA was performed in this execution; the
+interaction contracts are covered by the focused frontend tests and the live
+checks were deliberately read-only with respect to retained musical data.

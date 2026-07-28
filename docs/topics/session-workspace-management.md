@@ -2,10 +2,10 @@
 
 Topic: session-workspace-management
 
-Status: accepted foundation on 2026-07-26; a player-facing workspace refresh
-is active under
+Status: accepted foundation on 2026-07-26; the player-facing workspace refresh
+is complete and live under
 [`036-musical-session-workspace-refresh.md`](../tactical/036-musical-session-workspace-refresh.md).
-It adds application-owned human names, aggregate musical summaries, a
+It provides application-owned human names, aggregate musical summaries, a
 dedicated Sessions homepage, compact selected-session identity, contextual
 feedback, and keyboard audition without changing session evidence or the
 selected-versus-active boundary. Phase 3 and R3 are complete under
@@ -58,7 +58,7 @@ coordinator constraint; no current multi-user concurrency claim is made.
 The v1 MVP and its workbench are outside this refactor. V2 may share utilities
 with v1 only when v1 behavior and artifacts remain unchanged.
 
-## Current Behavior And Problem
+## Original Problem Record
 
 V2 already writes each microphone or replay run to a unique session
 directory. Old sessions survive and the server recovers the newest valid
@@ -159,10 +159,11 @@ newest-first history in an overlaid drawer, supports explicit close, backdrop
 close, and Escape, and closes after New or historical-session navigation.
 Collapsing the desktop rail must never remove session navigation.
 
-On startup, select the active session when one exists. Otherwise show the most
-recent historical session with an explicit historical label and a prominent
-New action. Selection belongs in the URL or client state, not in the server,
-so reload and multiple tabs behave predictably.
+The root URL now shows the newest-first Sessions library whether or not an
+active capture exists. Selecting a performance writes its ID to the URL; a
+deep link restores that selection, while returning through the atpiano brand
+clears it and restores the library. Selection belongs to browser state, not
+the server, so reload and multiple tabs remain independent.
 
 The accepted 2026-07-28 refresh adds human naming as application-owned
 annotations rather than rewriting transcription evidence. Automatic
@@ -184,8 +185,8 @@ directory to:
 
 The confirmation identifies the session by start time, source, duration, and
 ID. Active sessions and sessions with running score jobs reject deletion.
-After deleting the selected session, the client selects the next available
-history item or enters New state.
+After deleting the selected session, the client returns to the Sessions
+library and confirms the recoverable move with a transient toast.
 
 Restore and permanent purge are later actions. Keeping them separate prevents
 a simple UI mistake from destroying recordings, event history, or scores.
@@ -227,6 +228,7 @@ Phase 2 established the versioned ordinary HTTP shape:
 GET    /api/v1/workspaces
 GET    /api/v1/workspaces/{workspace-id}/sessions
 GET    /api/v1/workspaces/{workspace-id}/sessions/{session-id}
+PATCH  /api/v1/workspaces/{workspace-id}/sessions/{session-id}
 GET    /api/v1/workspaces/{workspace-id}/sessions/{session-id}/horizon
 GET    /api/v1/workspaces/{workspace-id}/sessions/{session-id}/events
 GET    /api/v1/workspaces/{workspace-id}/sessions/{session-id}/artifacts
@@ -367,14 +369,15 @@ The implementation tactical must prove:
 
 ## Recommended Direction
 
-Follow Phases 1–4 and their human gates in
-[`013-hybrid-product-migration-master.md`](../tactical/013-hybrid-product-migration-master.md).
-Establish characterization, contracts, the session backend boundary, and the
-shared React UI through bounded tacticals rather than landing the entire
-refactor at once. Treat same-session resumption, labeling, trash restoration,
-permanent purge, and a larger visual redesign as later tacticals unless
-implementation uncovers a blocking contract issue. Preserve the explicit IDs,
-immutable artifacts, and selected-versus-active split retained by the deferred
-[`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md),
-but do not pull accounts, cloud storage, or sync into the local session
-foundation.
+Keep the live musical-notebook hierarchy and explicit selected-versus-active
+split stable. Human labels must remain application annotations; aggregate
+counts must remain rebuildable from the materialized event index; previews
+must remain bounded and source-sample-derived; and library playback must stay
+read-only and on demand.
+
+Same-session resumption, trash restoration, permanent purge, continuation
+relationships, and library pagination beyond the current bounded page remain
+separate future tacticals. Preserve explicit IDs and immutable evidence from
+the deferred
+[`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md)
+without pulling cloud storage or sync into this local foundation.
