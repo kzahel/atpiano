@@ -1,7 +1,11 @@
 import { useEffect, useRef } from "react";
 
 import type { Session } from "../runtime/atpiano-runtime.js";
-import { formatClock, formatSessionDate } from "../lib/format.js";
+import {
+  formatClock,
+  formatSessionDate,
+  sessionSourceLabel,
+} from "../lib/format.js";
 
 export function SessionRail({
   sessions,
@@ -109,7 +113,7 @@ export function SessionRail({
                 {formatClock(session.source_frame_count, session.sample_rate_hz)}
               </span>
               <span className="session-source">
-                {session.source === "microphone" ? "Microphone" : "Fixture replay"}
+                {sessionSourceLabel(session.source)}
                 <i className={`status-pin ${session.status}`} aria-hidden="true" />
               </span>
             </button>

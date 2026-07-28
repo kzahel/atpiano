@@ -11,6 +11,7 @@ export type Capture = Schemas["Capture"];
 export type CaptureStart = Schemas["CaptureStart"];
 export type CaptureStop = Schemas["CaptureStop"];
 export type ReplayStart = Schemas["ReplayStart"];
+export type RecordingImportStart = Schemas["RecordingImportStart"];
 export type EventRevision = Schemas["EventRevision"];
 export type EventPage = Schemas["EventPage"];
 export type Horizon = Schemas["Horizon"];
@@ -104,6 +105,11 @@ export interface AtpianoRuntime {
   streamPcm(block: PcmBlock): void;
   stopCapture(input: CaptureStop, request: RuntimeRequest): Promise<Session>;
   startReplay(input: ReplayStart, request: RuntimeRequest): Promise<Capture>;
+  importRecording(
+    input: RecordingImportStart,
+    file: Blob,
+    request: RuntimeRequest,
+  ): Promise<Capture>;
   subscribeEvents(
     workspaceId: string,
     sessionId: string,

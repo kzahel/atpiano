@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { formatClock, formatSessionDate, noteName, requestId } from "../lib/format.js";
+import {
+  formatClock,
+  formatSessionDate,
+  noteName,
+  requestId,
+  sessionSourceLabel,
+} from "../lib/format.js";
 import type {
   AtpianoRuntime,
   EventPage,
@@ -377,7 +383,7 @@ function SessionLibraryRow({
         <span className="library-session-meta">
           {formatSessionDate(session.started_at)}
           <i aria-hidden="true">·</i>
-          {session.source === "microphone" ? "Microphone" : "Fixture replay"}
+          {sessionSourceLabel(session.source)}
           <i aria-hidden="true">·</i>
           {formatClock(session.source_frame_count, session.sample_rate_hz)}
         </span>

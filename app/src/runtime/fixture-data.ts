@@ -160,7 +160,7 @@ const capabilities: RuntimeCapabilities = {
   runtime_mode: "fixture",
   supported_schema_versions: [schemaVersion],
   supported_pcm_protocol_versions: ["atpiano.pcm.v1"],
-  capture_sources: ["microphone", "replay"],
+  capture_sources: ["microphone", "upload", "replay"],
   score_available: true,
   recoverable_delete: true,
   max_pcm_block_frames: 1_048_576,

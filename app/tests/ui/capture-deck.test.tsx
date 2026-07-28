@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { CaptureDeck } from "../../src/components/capture-deck.js";
@@ -26,7 +26,7 @@ const localCapabilities: RuntimeCapabilities = {
   runtime_mode: "local",
   supported_schema_versions: ["atpiano.contract.v1"],
   supported_pcm_protocol_versions: ["atpiano.pcm.v1"],
-  capture_sources: ["microphone", "replay"],
+  capture_sources: ["microphone", "upload", "replay"],
   score_available: true,
   recoverable_delete: true,
   max_pcm_block_frames: 1_048_576,
@@ -46,6 +46,7 @@ describe("capture deck", () => {
         }}
         activeSession={undefined}
         onMicrophone={vi.fn()}
+        onImport={vi.fn()}
         onReplay={vi.fn()}
         onStop={vi.fn()}
         onDismissError={vi.fn()}
@@ -57,7 +58,10 @@ describe("capture deck", () => {
     ).toBeNull();
     expect(screen.queryByText(/deterministic/)).toBeNull();
     expect(
-      screen.getByText(/Start a new performance using your piano/),
+      screen.getByRole("button", { name: "Import recording" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/import a WAV or MP3 recording/),
     ).toBeTruthy();
   });
 
@@ -73,6 +77,7 @@ describe("capture deck", () => {
         }}
         activeSession={undefined}
         onMicrophone={vi.fn()}
+        onImport={vi.fn()}
         onReplay={vi.fn()}
         onStop={vi.fn()}
         onDismissError={vi.fn()}
@@ -97,6 +102,7 @@ describe("capture deck", () => {
         }}
         activeSession={undefined}
         onMicrophone={vi.fn()}
+        onImport={vi.fn()}
         onReplay={vi.fn()}
         onStop={vi.fn()}
         onDismissError={vi.fn()}
@@ -108,5 +114,60 @@ describe("capture deck", () => {
         .disabled,
     ).toBe(true);
     expect(screen.getByText("Closing microphone capture…")).toBeTruthy();
+  });
+
+  it("passes the chosen recording file without exposing fixture language", () => {
+    const onImport = vi.fn();
+    const view = render(
+      <CaptureDeck
+        capabilities={localCapabilities}
+        captureState={{
+          phase: "idle",
+          operationId: null,
+          capture: null,
+          error: null,
+        }}
+        activeSession={undefined}
+        onMicrophone={vi.fn()}
+        onImport={onImport}
+        onReplay={vi.fn()}
+        onStop={vi.fn()}
+        onDismissError={vi.fn()}
+      />,
+    );
+    const file = new File(["audio"], "Nocturne.mp3", {
+      type: "audio/mpeg",
+    });
+
+    fireEvent.change(
+      screen.getByLabelText("Choose WAV or MP3 recording"),
+      { target: { files: [file] } },
+    );
+
+    expect(onImport).toHaveBeenCalledWith(file);
+    expect(screen.queryByText(/fixture replay/i)).toBeNull();
+    view.rerender(
+      <CaptureDeck
+        capabilities={localCapabilities}
+        captureState={{
+          phase: "requesting",
+          operationId: "import-1",
+          capture: null,
+          error: null,
+        }}
+        activeSession={undefined}
+        onMicrophone={vi.fn()}
+        onImport={onImport}
+        onReplay={vi.fn()}
+        onStop={vi.fn()}
+        onDismissError={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Uploading Nocturne.mp3…")).toBeTruthy();
+    expect(
+      screen.getByRole("progressbar", {
+        name: "Recording upload progress",
+      }),
+    ).toBeTruthy();
   });
 });

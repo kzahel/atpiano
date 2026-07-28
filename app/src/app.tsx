@@ -25,7 +25,12 @@ import { SessionsHome } from "./components/sessions-home.js";
 import { useMicrophone } from "./hooks/use-microphone.js";
 import { artifactText } from "./lib/artifact-content.js";
 import { eventWindow, liveFrameCount } from "./lib/event-window.js";
-import { formatClock, formatSessionDate, requestId } from "./lib/format.js";
+import {
+  formatClock,
+  formatSessionDate,
+  requestId,
+  sessionSourceLabel,
+} from "./lib/format.js";
 import { parseScoreAlignment } from "./lib/score-alignment.js";
 import {
   scoreReaderRouteFromUrl,
@@ -71,8 +76,9 @@ function EmptyWorkspace({ onNew }: { readonly onNew: () => void }) {
       <p className="eyebrow">Your piano, made visible</p>
       <h1>Begin a performance</h1>
       <p>
-        Record your piano through the microphone. Atpiano keeps the immediate
-        recognition visible while corrected notes settle behind it.
+        Record your piano through the microphone or import a WAV or MP3.
+        Atpiano keeps the immediate recognition visible while corrected notes
+        settle behind it.
       </p>
       <button className="button primary" type="button" onClick={onNew}>
         Create a new session
@@ -106,6 +112,8 @@ export function App({
   const beginCapture = useWorkspaceStore((state) => state.beginCapture);
   const warmCapture = useWorkspaceStore((state) => state.warmCapture);
   const recordCapture = useWorkspaceStore((state) => state.recordCapture);
+  const stopCapture = useWorkspaceStore((state) => state.stopCapture);
+  const completeCapture = useWorkspaceStore((state) => state.completeCapture);
   const failCapture = useWorkspaceStore((state) => state.failCapture);
   const resetCapture = useWorkspaceStore((state) => state.resetCapture);
   const showRoll = useWorkspaceStore((state) => state.showRoll);
@@ -609,6 +617,47 @@ export function App({
     onStopped: (session) => setPendingAutoScoreSessionId(session.session_id),
   });
 
+  const importRecording = useCallback(async (file: File) => {
+    if (!workspace) return;
+    const operationId = requestId("recording-import");
+    beginCapture(operationId);
+    try {
+      const suffix = file.name.toLowerCase().match(/\.(wav|mp3)$/)?.[1];
+      if (!suffix) {
+        throw new Error("Choose a WAV or MP3 recording.");
+      }
+      if (file.size === 0) {
+        throw new Error("The selected recording is empty.");
+      }
+      if (file.size > 2_147_483_648) {
+        throw new Error("The selected recording is larger than 2 GiB.");
+      }
+      const capture = await runtime.importRecording(
+        {
+          schema_version: "atpiano.contract.v1",
+          workspace_id: workspace.workspace_id,
+          filename: file.name,
+          media_type: suffix === "wav" ? "audio/wav" : "audio/mpeg",
+          byte_count: file.size,
+          request_id: operationId,
+        },
+        file,
+        { requestId: operationId },
+      );
+      recordCapture(operationId, capture);
+      await invalidateWorkspace();
+    } catch (error) {
+      failCapture(operationId, error);
+    }
+  }, [
+    beginCapture,
+    failCapture,
+    invalidateWorkspace,
+    recordCapture,
+    runtime,
+    workspace,
+  ]);
+
   const replay = useCallback(async () => {
     if (!workspace) return;
     const operationId = requestId("replay");
@@ -643,6 +692,40 @@ export function App({
     selectSession,
     warmCapture,
     workspace,
+  ]);
+
+  useEffect(() => {
+    const capture = captureState.capture;
+    const session = selectedSession.data;
+    if (
+      capture?.source !== "upload" ||
+      session?.session_id !== capture.session_id ||
+      captureState.operationId === null
+    ) {
+      return;
+    }
+    if (
+      session.status === "stopping" &&
+      captureState.phase !== "stopping"
+    ) {
+      stopCapture(captureState.operationId);
+    } else if (session.status === "complete") {
+      setPendingAutoScoreSessionId(session.session_id);
+      completeCapture(captureState.operationId);
+    } else if (session.status === "failed") {
+      setSessionActionError(
+        "The recording was uploaded, but processing did not complete. "
+        + "The failed session was preserved.",
+      );
+      completeCapture(captureState.operationId);
+    }
+  }, [
+    captureState.capture,
+    captureState.operationId,
+    captureState.phase,
+    completeCapture,
+    selectedSession.data,
+    stopCapture,
   ]);
 
   const deleteSession = useMutation({
@@ -1107,6 +1190,7 @@ export function App({
             captureState={captureState}
             activeSession={activeSession}
             onMicrophone={() => void microphone.start()}
+            onImport={(file) => void importRecording(file)}
             onReplay={() => void replay()}
             onStop={() => void microphone.stop()}
             onDismissError={resetCapture}
@@ -1130,7 +1214,7 @@ export function App({
                 <p>
                   {formatSessionDate(selected.started_at)}
                   <span>·</span>
-                  {selected.source === "microphone" ? "Microphone" : "Fixture replay"}
+                  {sessionSourceLabel(selected.source)}
                   <span>·</span>
                   {formatClock(selectedFrames, selected.sample_rate_hz)}
                 </p>
@@ -1188,21 +1272,27 @@ export function App({
                 <i aria-hidden="true" />
                 <strong>
                   {captureState.phase === "recording"
-                    ? selected.correction_mode === "after-stop"
-                      ? "Listening now; correction begins after Stop"
-                      : selected.correction_mode === "unavailable"
-                        ? "Listening with provisional recognition"
-                        : "Listening with background correction"
+                    ? captureState.capture?.source === "upload"
+                      ? "Processing imported recording"
+                      : selected.correction_mode === "after-stop"
+                        ? "Listening now; correction begins after Stop"
+                        : selected.correction_mode === "unavailable"
+                          ? "Listening with provisional recognition"
+                          : "Listening with background correction"
                     : captureState.phase === "stopping"
-                      ? "Closing microphone capture"
+                      ? captureState.capture?.source === "upload"
+                        ? "Recording imported; correction is settling"
+                        : "Closing microphone capture"
                       : captureState.phase === "failed"
                         ? "Capture needs attention"
                         : "Preparing the local engine"}
                 </strong>
                 <span>
                   {captureState.capture?.source === "replay"
-                    ? "Deterministic musical fixture"
-                    : "Physical microphone"}
+                    ? "Deterministic test recording"
+                    : captureState.capture?.source === "upload"
+                      ? "Imported WAV/MP3"
+                      : "Physical microphone"}
                 </span>
                 {captureState.phase === "stopping" && (
                   <div className="settle-progress">
@@ -1223,7 +1313,11 @@ export function App({
             {selected.status === "stopping" && captureState.phase === "idle" && (
               <div className="live-status-strip stopping" role="status">
                 <i aria-hidden="true" />
-                <strong>Capture complete; correction is settling</strong>
+                <strong>
+                  {selected.source === "upload"
+                    ? "Recording imported; correction is settling"
+                    : "Capture complete; correction is settling"}
+                </strong>
                 <span>
                   Corrected {formatClock(settleCommit, selected.sample_rate_hz)}
                   {" "}of {formatClock(settleAudioHead, selected.sample_rate_hz)}

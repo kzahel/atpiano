@@ -180,6 +180,33 @@ test("fixture runtime exercises replay, PCM, Stop, and explicit reads", async ()
   );
 });
 
+test("fixture runtime models recording import as upload, not replay", async () => {
+  const data = runtimeData();
+  const runtime = new FixtureRuntime(data);
+  const file = new Blob(["wav"]);
+  const capture = await runtime.importRecording(
+    {
+      schema_version: "atpiano.contract.v1",
+      workspace_id: data.workspace.workspace_id,
+      filename: "Player take.wav",
+      media_type: "audio/wav",
+      byte_count: file.size,
+      request_id: "request-import",
+    },
+    file,
+    { requestId: "request-import" },
+  );
+  const session = await runtime.getSession(
+    data.workspace.workspace_id,
+    capture.session_id,
+    { requestId: "request-import-session" },
+  );
+
+  assert.equal(capture.source, "upload");
+  assert.equal(session.source, "upload");
+  assert.equal(session.display_name, "Player take");
+});
+
 test("fixture subscription disposal suppresses late delivery", async () => {
   const data = runtimeData();
   const runtime = new FixtureRuntime(data);

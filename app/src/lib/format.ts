@@ -1,3 +1,5 @@
+import type { Session } from "../runtime/atpiano-runtime.js";
+
 export function formatClock(samples: number, sampleRate: number): string {
   const seconds = Math.max(0, samples / Math.max(1, sampleRate));
   const minutes = Math.floor(seconds / 60);
@@ -36,4 +38,10 @@ export function noteName(pitch: number): string {
 
 export function requestId(prefix: string): string {
   return `${prefix}:${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
+}
+
+export function sessionSourceLabel(source: Session["source"]): string {
+  if (source === "microphone") return "Microphone";
+  if (source === "upload") return "Imported recording";
+  return "Test recording";
 }

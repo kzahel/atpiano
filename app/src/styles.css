@@ -1778,6 +1778,24 @@ input:focus-visible {
   font-size: 9px;
 }
 
+.recording-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.capture-status progress {
+  display: block;
+  width: min(260px, 100%);
+  height: 4px;
+  margin-top: 7px;
+  border: 0;
+  accent-color: var(--mint);
+}
+
 .capture-status button {
   border: 0;
   color: var(--mint);

@@ -81,6 +81,35 @@ describe("shared application", () => {
     expect(new URL(window.location.href).searchParams.get("session")).toBeNull();
   });
 
+  it("imports a WAV as a product session without showing replay controls", async () => {
+    const user = userEvent.setup();
+    const fixture = createFixtureRuntime();
+    const importRecording = vi.spyOn(fixture, "importRecording");
+    renderApp(fixture, { home: true });
+    await user.click(
+      await screen.findByRole("button", { name: "New session" }),
+    );
+    const file = new File(["wav bytes"], "Sunday chords.wav", {
+      type: "audio/wav",
+    });
+
+    await user.upload(
+      screen.getByLabelText("Choose WAV or MP3 recording"),
+      file,
+    );
+
+    await waitFor(() => expect(importRecording).toHaveBeenCalledOnce());
+    expect(
+      screen.queryByRole("button", { name: "Replay musical fixture" }),
+    ).toBeNull();
+    expect(
+      screen.queryByText(/fixture replay/i),
+    ).toBeNull();
+    expect(
+      await screen.findByRole("heading", { name: "Sunday chords" }),
+    ).toBeTruthy();
+  });
+
   it("returns to Sessions from the atpiano brand", async () => {
     const user = userEvent.setup();
     renderApp();

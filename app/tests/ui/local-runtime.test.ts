@@ -37,6 +37,26 @@ const fakeFetch: typeof fetch = async (input, init) => {
   if (url.pathname === "/api/replay" && request.method === "POST") {
     return response({ session: { session_id: session.session_id } }, 202);
   }
+  if (
+    url.pathname === "/api/v1/workspaces/local/recording-imports" &&
+    request.method === "POST"
+  ) {
+    const bytes = await request.arrayBuffer();
+    return response({
+      schema_version: "atpiano.contract.v1",
+      workspace_id: "local",
+      session_id: session.session_id,
+      capture_id: `capture:${session.session_id}`,
+      status: "recording",
+      source: "upload",
+      sample_rate_hz: 48_000,
+      accepted_through_sample: 0,
+      started_at: session.started_at,
+      stopped_at: null,
+      error_id: null,
+      received_byte_count: bytes.byteLength,
+    }, 202);
+  }
   if (url.pathname === "/api/v1/workspaces/local/sessions") {
     return response({
       schema_version: "atpiano.contract.v1",
@@ -214,6 +234,43 @@ describe("local runtime", () => {
     expect(capture.session_id).toBe(session.session_id);
     expect(capture.capture_id).toBe(`capture:${session.session_id}`);
     expect(capture.source).toBe("replay");
+  });
+
+  it("uploads a recording with explicit filename and operation metadata", async () => {
+    const requests: Request[] = [];
+    const runtime = new LocalRuntime({
+      baseUrl: "http://127.0.0.1:8002",
+      fetchImplementation: async (input, init) => {
+        const request = input instanceof Request
+          ? input
+          : new Request(input, init);
+        requests.push(request.clone());
+        return fakeFetch(request);
+      },
+      WebSocketImplementation: FakeWebSocket as unknown as typeof WebSocket,
+    });
+    const file = new Blob(["recording bytes"], { type: "audio/mpeg" });
+
+    const capture = await runtime.importRecording(
+      {
+        schema_version: "atpiano.contract.v1",
+        workspace_id: "local",
+        filename: "Evening étude.mp3",
+        media_type: "audio/mpeg",
+        byte_count: file.size,
+        request_id: "recording-import-1",
+      },
+      file,
+      { requestId: "recording-import-1" },
+    );
+
+    const request = requests[0]!;
+    expect(capture.source).toBe("upload");
+    expect(request.headers.get("X-Atpiano-Filename"))
+      .toBe(encodeURIComponent("Evening étude.mp3"));
+    expect(request.headers.get("X-Atpiano-Request-Id"))
+      .toBe("recording-import-1");
+    expect(request.headers.get("Content-Type")).toBe("audio/mpeg");
   });
 
   it("owns WebSocket control and binary PCM framing", async () => {

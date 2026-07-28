@@ -18,6 +18,7 @@ import type {
   Job,
   PageRequest,
   PcmBlock,
+  RecordingImportStart,
   ReplayStart,
   RuntimeCapabilities,
   RuntimeRequest,
@@ -298,6 +299,35 @@ export class FixtureRuntime implements AtpianoRuntime {
       source_frame_count: this.#data.sessions[0]!.session.source_frame_count,
       completed_at: null,
       active_capture_id: this.#capture.capture_id,
+    };
+    return this.#capture;
+  }
+
+  async importRecording(
+    input: RecordingImportStart,
+    file: Blob,
+    request: RuntimeRequest,
+  ): Promise<Capture> {
+    assertRequest(request);
+    this.#assertWorkspace(input.workspace_id);
+    if (file.size !== input.byte_count || file.size === 0) {
+      throw new Error("fixture recording upload size is invalid");
+    }
+    const displayName = input.filename.replace(/\.(?:wav|mp3)$/i, "");
+    this.#capture = {
+      ...this.#data.capture,
+      source: "upload",
+      status: "complete",
+      accepted_through_sample: this.#session.source_frame_count,
+      stopped_at: this.#data.trashedAt,
+    };
+    this.#session = {
+      ...this.#session,
+      source: "upload",
+      status: "complete",
+      display_name: displayName,
+      completed_at: this.#data.trashedAt,
+      active_capture_id: null,
     };
     return this.#capture;
   }

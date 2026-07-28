@@ -22,6 +22,7 @@ import type {
   Job,
   PageRequest,
   PcmBlock,
+  RecordingImportStart,
   ReplayStart,
   RuntimeCapabilities,
   RuntimeRequest,
@@ -528,6 +529,43 @@ export class LocalRuntime implements AtpianoRuntime {
       throw new Error("The local replay did not create a session.");
     }
     return captureFromSession(session, "replay");
+  }
+
+  async importRecording(
+    input: RecordingImportStart,
+    file: Blob,
+    request: RuntimeRequest,
+  ): Promise<Capture> {
+    if (file.size !== input.byte_count) {
+      throw new Error("The selected recording size changed before upload.");
+    }
+    const response = await this.#fetch(
+      `${this.#baseUrl}/api/v1/workspaces/${encodeURIComponent(
+        input.workspace_id,
+      )}/recording-imports`,
+      {
+        ...abortOptions(request),
+        method: "POST",
+        headers: {
+          "Content-Type": input.media_type,
+          "X-Atpiano-Filename": encodeURIComponent(input.filename),
+          "X-Atpiano-Request-Id": input.request_id,
+        },
+        body: file,
+      },
+    );
+    if (!response.ok) {
+      let error: unknown;
+      try {
+        error = await response.json();
+      } catch {
+        error = undefined;
+      }
+      throw new Error(
+        errorMessage(error, "The recording could not be imported."),
+      );
+    }
+    return await response.json() as Capture;
   }
 
   subscribeEvents(
