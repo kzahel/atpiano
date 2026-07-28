@@ -15,6 +15,7 @@ type PlayerState = "idle" | "loading" | "ready" | "playing" | "error";
 function eventPageOnce(
   runtime: AtpianoRuntime,
   session: Session,
+  startSample: number,
   endSample: number,
   signal: AbortSignal,
 ): Promise<EventPage> {
@@ -45,7 +46,7 @@ function eventPageOnce(
         {
           requestId: requestId("session-preview"),
           signal,
-          startSample: 0,
+          startSample,
           endSample,
           limit: 256,
         },
@@ -58,6 +59,45 @@ function eventPageOnce(
       finish(() => reject(error));
     }
   });
+}
+
+function hasVisibleNote(page: EventPage): boolean {
+  return page.items.some(
+    (event) =>
+      event.kind === "note" &&
+      event.pitch !== null &&
+      event.lifecycle !== "retracted",
+  );
+}
+
+function isPageLimitError(error: unknown): boolean {
+  return error instanceof Error &&
+    error.message.includes("materialized event range exceeds page limit");
+}
+
+async function openingEventPage(
+  runtime: AtpianoRuntime,
+  session: Session,
+  endSample: number,
+  signal: AbortSignal,
+): Promise<EventPage> {
+  const search = async (
+    start: number,
+    end: number,
+  ): Promise<EventPage> => {
+    try {
+      return await eventPageOnce(runtime, session, start, end, signal);
+    } catch (error) {
+      if (!isPageLimitError(error) || end - start <= 1) throw error;
+
+      const middle = start + Math.floor((end - start) / 2);
+      const left = await search(start, middle);
+      if (hasVisibleNote(left)) return left;
+      return search(middle, end);
+    }
+  };
+
+  return search(0, endSample);
 }
 
 function useNearViewport(element: HTMLElement | null): boolean {
@@ -190,7 +230,7 @@ function SessionLibraryRow({
       session.source_frame_count,
     ],
     queryFn: ({ signal }) =>
-      eventPageOnce(
+      openingEventPage(
         runtime,
         session,
         Math.max(

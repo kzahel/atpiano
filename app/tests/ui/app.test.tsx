@@ -225,6 +225,59 @@ describe("shared application", () => {
     expect(pause).toHaveBeenCalled();
   });
 
+  it("subdivides dense opening ranges instead of exposing page limits", async () => {
+    const fixture = createFixtureRuntime();
+    const denseSessionId = "20260726T100000-abcdef123456";
+    const rejectedRanges: Array<[number, number]> = [];
+    const runtime = new Proxy(fixture, {
+      get(target, property) {
+        if (property === "subscribeEvents") {
+          return (
+            ...args: Parameters<AtpianoRuntime["subscribeEvents"]>
+          ) => {
+            const [, sessionId, range, subscriber] = args;
+            if (
+              sessionId === denseSessionId &&
+              range.endSample - range.startSample > 48_000 * 20
+            ) {
+              rejectedRanges.push([range.startSample, range.endSample]);
+              let closed = false;
+              queueMicrotask(() => {
+                if (!closed) {
+                  subscriber.error(
+                    new Error(
+                      "materialized event range exceeds page limit",
+                    ),
+                  );
+                }
+              });
+              return {
+                close() {
+                  closed = true;
+                },
+              };
+            }
+            return target.subscribeEvents(...args);
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) satisfies AtpianoRuntime;
+
+    renderApp(runtime, { home: true });
+
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("img", {
+          name: /Opening phrase with \d+ notes/,
+        }),
+      ).toHaveLength(3)
+    );
+    expect(rejectedRanges).toHaveLength(2);
+    expect(screen.queryByText(/exceeds page limit/)).toBeNull();
+  });
+
   it("renames a session inline and shows save completion", async () => {
     const user = userEvent.setup();
     renderApp();
