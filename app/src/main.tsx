@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App } from "./app.js";
 import { HttpAuthenticationClient } from "./auth/auth-client.js";
 import { AuthenticationBoundary } from "./auth/authentication-boundary.js";
+import { ClientUpdateNotice } from "./client-update.js";
 import { createFixtureRuntime } from "./runtime/fixture-data.js";
 import {
   createDesktopRuntime,
@@ -83,6 +84,7 @@ function render(
 ) {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
+      <ClientUpdateNotice />
       <Root runtime={runtime} desktop={desktop} />
     </StrictMode>,
   );
@@ -95,6 +97,7 @@ function renderAuthenticated(
 ) {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
+      <ClientUpdateNotice />
       <AuthenticationBoundary
         client={client}
         initialSession={initialSession}

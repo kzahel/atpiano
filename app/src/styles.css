@@ -42,6 +42,44 @@ button {
   color: inherit;
 }
 
+.client-update-notice {
+  position: fixed;
+  z-index: 1000;
+  top: 14px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: min(calc(100% - 28px), 620px);
+  padding: 11px 13px 11px 16px;
+  transform: translateX(-50%);
+  border: 1px solid #47715f;
+  border-radius: 10px;
+  color: #e8f8f0;
+  background: #173429;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.42);
+}
+
+.client-update-notice.urgent {
+  border-color: #a57945;
+  background: #3a2b19;
+}
+
+.client-update-notice span {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.client-update-notice button {
+  padding: 7px 11px;
+  border: 1px solid currentColor;
+  border-radius: 7px;
+  color: #10221b;
+  background: var(--mint);
+  cursor: pointer;
+  font-weight: 750;
+}
+
 button:focus-visible,
 input:focus-visible {
   outline: 2px solid var(--mint);

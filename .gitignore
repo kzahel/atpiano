@@ -8,6 +8,7 @@ build/
 dist/
 .attachments/
 node_modules/
+.atpiano-build-history.json
 
 # Benchmark inputs and generated artifacts stay outside Git.
 artifacts/

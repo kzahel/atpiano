@@ -1364,12 +1364,24 @@ def create_family_application(
         request_path = f"/{asset_path}"
         asset = runtime.asset_path(request_path)
         if asset is None:
+            if request_path.startswith("/assets/") or Path(request_path).suffix:
+                raise ApplicationNotFoundError(
+                    f"application asset does not exist: {request_path}"
+                )
             asset = runtime.asset_path("/")
         if asset is None:
             raise ApplicationNotFoundError(
                 "application asset does not exist"
             )
-        return FileResponse(asset)
+        cache_control = (
+            "public, max-age=31536000, immutable"
+            if request_path.startswith("/assets/")
+            else "no-store"
+        )
+        return FileResponse(
+            asset,
+            headers={"Cache-Control": cache_control},
+        )
 
     return app
 

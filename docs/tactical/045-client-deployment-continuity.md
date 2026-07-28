@@ -2,7 +2,8 @@
 
 Topic: home-hosted-family-sharing
 
-Status: **planned on 2026-07-28.**
+Status: **implemented and locally validated on 2026-07-28; live restart
+pending.**
 
 ## Goal
 
@@ -158,3 +159,32 @@ convergence path.
 - Build history and browser credentials remain outside Git and reports.
 - Frontend tests, TypeScript, Python server tests, the production build, and
   the migration regression gate remain green.
+
+## Implementation Evidence
+
+The Vite build now derives one deterministic client ID from its production
+inputs, emits the matching version document, and coalesces repeated builds of
+unchanged inputs instead of consuming retention generations. Its generated
+history remains ignored beside the application and atomically retains exact
+asset lists for three distinct client builds.
+
+The shared client mounts one update monitor across authenticated, bypass, and
+desktop bootstrap paths. It polls on startup, every 60 seconds, focus, and
+visibility restoration. Poll failures are silent and no state causes an
+automatic reload. A recognized OpenSheetMusicDisplay chunk acquisition
+failure raises the urgent reload notice; other engraving exceptions retain
+the existing notation diagnostic.
+
+Local validation passed:
+
+- 101 Vitest frontend tests;
+- nine TypeScript node tests, including generation pruning and unchanged-build
+  coalescing;
+- TypeScript checking;
+- 19 family-server and share-service Python tests;
+- Ruff over the changed Python paths;
+- Git whitespace;
+- two consecutive production builds with the same client ID and asset names;
+  and
+- direct inspection proving that ID appears in the current entry JavaScript
+  and matches `client-version.json`.

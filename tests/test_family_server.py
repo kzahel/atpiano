@@ -223,6 +223,70 @@ def test_static_login_is_public_but_data_and_websocket_are_not(
         engine.dispose()
 
 
+def test_static_assets_are_exact_and_have_deployment_cache_policy(
+    tmp_path: Path,
+) -> None:
+    client, runtime, _identity, engine = _environment(tmp_path)
+    assets = runtime.web_root / "assets"
+    assets.mkdir()
+    (assets / "index-current.js").write_text(
+        "globalThis.atpiano = true;\n",
+        encoding="utf-8",
+    )
+    (runtime.web_root / "capture-processor.js").write_text(
+        "registerProcessor('capture', class {});\n",
+        encoding="utf-8",
+    )
+    (runtime.web_root / "client-version.json").write_text(
+        (
+            '{"schema_version":"atpiano.client-version.v1",'
+            '"build_id":"current","built_at":"2026-07-28T17:00:00Z"}\n'
+        ),
+        encoding="utf-8",
+    )
+    try:
+        current = client.get("/assets/index-current.js")
+        assert current.status_code == 200
+        assert (
+            current.headers["cache-control"]
+            == "public, max-age=31536000, immutable"
+        )
+        assert current.headers["content-type"].startswith(
+            "text/javascript"
+        )
+
+        missing = client.get("/assets/index-old.js")
+        assert missing.status_code == 404
+        assert missing.headers["content-type"].startswith(
+            "application/json"
+        )
+        assert missing.headers["x-content-type-options"] == "nosniff"
+        assert "<!doctype html>" not in missing.text
+
+        version = client.get("/client-version.json")
+        assert version.status_code == 200
+        assert version.headers["cache-control"] == "no-store"
+        assert version.json()["build_id"] == "current"
+
+        stable = client.get("/capture-processor.js")
+        assert stable.status_code == 200
+        assert stable.headers["cache-control"] == "no-store"
+
+        missing_stable = client.get("/old-worker.js")
+        assert missing_stable.status_code == 404
+        assert missing_stable.headers["content-type"].startswith(
+            "application/json"
+        )
+
+        shell = client.get("/session/history")
+        assert shell.status_code == 200
+        assert shell.headers["cache-control"] == "no-store"
+        assert "Atpiano login" in shell.text
+    finally:
+        runtime.close()
+        engine.dispose()
+
+
 def test_owner_cookie_authenticates_api_artifacts_and_websocket(
     tmp_path: Path,
 ) -> None:

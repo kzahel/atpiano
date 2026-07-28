@@ -3,6 +3,7 @@ import type {
   OpenSheetMusicDisplay as OsmdRenderer,
 } from "opensheetmusicdisplay";
 
+import { reportClientAssetLoadError } from "../client-update.js";
 import {
   moveScoreCursor,
   scoreAttackAtSample,
@@ -274,8 +275,13 @@ export function MusicXmlScore({
         });
         setRenderVersion((value) => value + 1);
       })
-      .catch(() => {
-        if (!cancelled) setError("Notation rendering failed.");
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setError(
+          reportClientAssetLoadError(error)
+            ? "Atpiano was updated. Reload this page to render notation."
+            : "Notation rendering failed.",
+        );
       });
     return () => {
       cancelled = true;
