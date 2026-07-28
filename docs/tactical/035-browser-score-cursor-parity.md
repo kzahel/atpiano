@@ -2,7 +2,7 @@
 
 Topic: performance-to-notation
 
-Status: **implemented; live verification pending on 2026-07-28.**
+Status: **implemented and live on 2026-07-28.**
 
 ## Motivation
 
@@ -39,9 +39,22 @@ row rounded to `61,262`, so the browser alone saw a false reversal.
 
 - A focused browser regression uses the rejected live-session sample pair and
   proves it is accepted and normalized into exact source-sample order.
-- All seven focused score-alignment tests and TypeScript checking pass.
+- The full frontend suite passes with 57 Vitest tests and five TypeScript node
+  tests. TypeScript checking and the production Vite build also pass.
 - The complete selected retained artifact parses with 1,804 source rows and
   1,211 mapped cursor attacks.
+- The active authenticated family service restarted with the rebuilt client.
+  Its public homepage returns HTTP 200, anonymous capability access remains
+  HTTP 401, and the operator check reads the selected MusicXML and MP3 before
+  verifying session revocation.
+- A clean headless browser opened the exact reported public URL with a bounded
+  local-operator session. The selected score rendered without either cursor
+  advisory. Moving playback to mapped source sample `226,970` made OSMD cursor
+  element `cursorImg-0` visible. The operator session was then revoked.
+
+## Commit
+
+- `37aa248` — match browser score cursor MIDI rounding.
 
 ## Review Boundary
 
