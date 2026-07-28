@@ -27,6 +27,10 @@ from atpiano.contracts.schemas import (
     OffsetState,
     Provenance,
     ScoreClefPolicy,
+    ScoreFreshness,
+    ScoreFreshnessReason,
+    ScoreFreshnessStatus,
+    ScoreProducerProvenance,
     ScoreVariant,
     ScoreVariantPage,
     ScoreVariantRole,
@@ -50,7 +54,10 @@ from atpiano.corrected_export import (
     query_materialized_index,
     query_materialized_note_counts,
 )
+from atpiano.score_alignment import SCORE_ALIGNMENT_SCHEMA
 from atpiano.score_snapshot import (
+    SCORE_PIPELINE_REVISION,
+    SCORE_PRODUCER_SCHEMA,
     SCORE_SNAPSHOT_SCHEMA,
     score_snapshot_is_plausible,
 )
@@ -82,6 +89,107 @@ def _parse_time(value: object, *, field: str) -> datetime:
 
 def _legacy_run_id(session_id: str) -> str:
     return f"legacy-v2:{session_id}"
+
+
+def _score_snapshot_provenance(
+    pointer: dict[str, Any],
+) -> tuple[ScoreProducerProvenance | None, ScoreFreshness]:
+    alignment = pointer.get("alignment")
+    alignment_schema = (
+        alignment.get("schema_version")
+        if isinstance(alignment, dict)
+        else None
+    )
+    producer_value = pointer.get("producer")
+    producer: ScoreProducerProvenance | None = None
+
+    if alignment_schema != SCORE_ALIGNMENT_SCHEMA:
+        return None, ScoreFreshness(
+            schema_version="atpiano.score-freshness.v1",
+            status=ScoreFreshnessStatus.INCOMPATIBLE,
+            reason=ScoreFreshnessReason.ALIGNMENT_SCHEMA_UNSUPPORTED,
+            current_pipeline_revision=SCORE_PIPELINE_REVISION,
+            snapshot_pipeline_revision=(
+                producer_value.get("pipeline_revision")
+                if isinstance(producer_value, dict)
+                and isinstance(
+                    producer_value.get("pipeline_revision"),
+                    int,
+                )
+                and producer_value["pipeline_revision"] > 0
+                else None
+            ),
+            refresh_recommended=True,
+        )
+
+    if producer_value is None:
+        return None, ScoreFreshness(
+            schema_version="atpiano.score-freshness.v1",
+            status=ScoreFreshnessStatus.LEGACY_UNKNOWN,
+            reason=ScoreFreshnessReason.LEGACY_PROVENANCE_MISSING,
+            current_pipeline_revision=SCORE_PIPELINE_REVISION,
+            snapshot_pipeline_revision=None,
+            refresh_recommended=True,
+        )
+
+    if (
+        not isinstance(producer_value, dict)
+        or producer_value.get("schema_version") != SCORE_PRODUCER_SCHEMA
+    ):
+        return None, ScoreFreshness(
+            schema_version="atpiano.score-freshness.v1",
+            status=ScoreFreshnessStatus.INCOMPATIBLE,
+            reason=ScoreFreshnessReason.PRODUCER_SCHEMA_UNSUPPORTED,
+            current_pipeline_revision=SCORE_PIPELINE_REVISION,
+            snapshot_pipeline_revision=None,
+            refresh_recommended=True,
+        )
+    try:
+        producer = ScoreProducerProvenance.model_validate(producer_value)
+    except ValueError:
+        return None, ScoreFreshness(
+            schema_version="atpiano.score-freshness.v1",
+            status=ScoreFreshnessStatus.INCOMPATIBLE,
+            reason=ScoreFreshnessReason.PRODUCER_SCHEMA_UNSUPPORTED,
+            current_pipeline_revision=SCORE_PIPELINE_REVISION,
+            snapshot_pipeline_revision=None,
+            refresh_recommended=True,
+        )
+    if producer.alignment_schema != alignment_schema:
+        return producer, ScoreFreshness(
+            schema_version="atpiano.score-freshness.v1",
+            status=ScoreFreshnessStatus.INCOMPATIBLE,
+            reason=ScoreFreshnessReason.PRODUCER_SCHEMA_UNSUPPORTED,
+            current_pipeline_revision=SCORE_PIPELINE_REVISION,
+            snapshot_pipeline_revision=producer.pipeline_revision,
+            refresh_recommended=True,
+        )
+    if producer.pipeline_revision < SCORE_PIPELINE_REVISION:
+        return producer, ScoreFreshness(
+            schema_version="atpiano.score-freshness.v1",
+            status=ScoreFreshnessStatus.OLDER_COMPATIBLE,
+            reason=ScoreFreshnessReason.PIPELINE_OUTDATED,
+            current_pipeline_revision=SCORE_PIPELINE_REVISION,
+            snapshot_pipeline_revision=producer.pipeline_revision,
+            refresh_recommended=True,
+        )
+    if producer.pipeline_revision > SCORE_PIPELINE_REVISION:
+        return producer, ScoreFreshness(
+            schema_version="atpiano.score-freshness.v1",
+            status=ScoreFreshnessStatus.INCOMPATIBLE,
+            reason=ScoreFreshnessReason.PIPELINE_NEWER,
+            current_pipeline_revision=SCORE_PIPELINE_REVISION,
+            snapshot_pipeline_revision=producer.pipeline_revision,
+            refresh_recommended=False,
+        )
+    return producer, ScoreFreshness(
+        schema_version="atpiano.score-freshness.v1",
+        status=ScoreFreshnessStatus.CURRENT,
+        reason=ScoreFreshnessReason.CURRENT,
+        current_pipeline_revision=SCORE_PIPELINE_REVISION,
+        snapshot_pipeline_revision=producer.pipeline_revision,
+        refresh_recommended=False,
+    )
 
 
 class LocalSessionStore:
@@ -777,6 +885,7 @@ class LocalSessionStore:
         pointer = self.current_score_snapshot(session_id)
         if pointer is None:
             raise LocalSessionNotFoundError("score snapshot does not exist")
+        producer, freshness = _score_snapshot_provenance(pointer)
         directory = self.resolve(session_id)
         baseline = pointer.get("baseline")
         if isinstance(baseline, dict):
@@ -913,6 +1022,8 @@ class LocalSessionStore:
             workspace_id=LOCAL_WORKSPACE_ID,
             session_id=session_id,
             items=tuple(variants),
+            producer=producer,
+            freshness=freshness,
         )
 
     def current_score_snapshot(

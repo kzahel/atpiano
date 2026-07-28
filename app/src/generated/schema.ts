@@ -933,6 +933,35 @@ export interface components {
          * @enum {string}
          */
         ScoreClefPolicy: "preserve" | "automatic";
+        /** ScoreFreshness */
+        ScoreFreshness: {
+            /** Current Pipeline Revision */
+            current_pipeline_revision: number;
+            reason: components["schemas"]["ScoreFreshnessReason"];
+            /** Refresh Recommended */
+            refresh_recommended: boolean;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "atpiano.score-freshness.v1";
+            /**
+             * Snapshot Pipeline Revision
+             * @default null
+             */
+            snapshot_pipeline_revision: number | null;
+            status: components["schemas"]["ScoreFreshnessStatus"];
+        };
+        /**
+         * ScoreFreshnessReason
+         * @enum {string}
+         */
+        ScoreFreshnessReason: "current" | "pipeline-outdated" | "pipeline-newer" | "legacy-provenance-missing" | "alignment-schema-unsupported" | "producer-schema-unsupported";
+        /**
+         * ScoreFreshnessStatus
+         * @enum {string}
+         */
+        ScoreFreshnessStatus: "current" | "older-compatible" | "incompatible" | "legacy-unknown";
         /** ScoreJobStart */
         ScoreJobStart: {
             /** Commit Sample */
@@ -951,6 +980,51 @@ export interface components {
             transcription_run_id: string;
             /** Workspace Id */
             workspace_id: string;
+        };
+        /** ScoreProducerProvenance */
+        ScoreProducerProvenance: {
+            /** Adapter Schema */
+            adapter_schema: string;
+            /** Alignment Schema */
+            alignment_schema: string;
+            /**
+             * Application Dirty
+             * @default null
+             */
+            application_dirty: boolean | null;
+            /**
+             * Application Revision
+             * @default null
+             */
+            application_revision: string | null;
+            /** Application Version */
+            application_version: string;
+            /**
+             * Execution
+             * @enum {string}
+             */
+            execution: "pinned-runtime" | "injected-runner";
+            /**
+             * Model Checkpoint Sha256
+             * @default null
+             */
+            model_checkpoint_sha256: string | null;
+            /**
+             * Model Repository Commit
+             * @default null
+             */
+            model_repository_commit: string | null;
+            /** Pipeline Fingerprint */
+            pipeline_fingerprint: string;
+            /** Pipeline Revision */
+            pipeline_revision: number;
+            /** Postprocessor Version */
+            postprocessor_version: string;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "atpiano.score-producer.v1";
         };
         /** ScoreSnapshot */
         ScoreSnapshot: {
@@ -1042,8 +1116,12 @@ export interface components {
         };
         /** ScoreVariantPage */
         ScoreVariantPage: {
+            /** @default null */
+            freshness: components["schemas"]["ScoreFreshness"] | null;
             /** Items */
             items: components["schemas"]["ScoreVariant"][];
+            /** @default null */
+            producer: components["schemas"]["ScoreProducerProvenance"] | null;
             /**
              * Schema Version
              * @default atpiano.contract.v1

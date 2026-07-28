@@ -456,6 +456,8 @@ export class FixtureRuntime implements AtpianoRuntime {
       workspace_id: workspaceId,
       session_id: sessionId,
       items: [],
+      producer: null,
+      freshness: null,
     };
   }
 

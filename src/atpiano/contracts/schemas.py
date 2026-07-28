@@ -27,6 +27,10 @@ OpaqueId = Annotated[
     ),
 ]
 Sha256 = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+GitRevision = Annotated[
+    str,
+    StringConstraints(min_length=7, max_length=64, pattern=r"^[0-9a-f]+$"),
+]
 MediaType = Annotated[
     str,
     StringConstraints(
@@ -158,6 +162,22 @@ class ScoreVariantRole(str, Enum):
     BASELINE = "baseline"
     AUTOMATIC = "automatic"
     ENHARMONIC = "enharmonic"
+
+
+class ScoreFreshnessStatus(str, Enum):
+    CURRENT = "current"
+    OLDER_COMPATIBLE = "older-compatible"
+    INCOMPATIBLE = "incompatible"
+    LEGACY_UNKNOWN = "legacy-unknown"
+
+
+class ScoreFreshnessReason(str, Enum):
+    CURRENT = "current"
+    PIPELINE_OUTDATED = "pipeline-outdated"
+    PIPELINE_NEWER = "pipeline-newer"
+    LEGACY_PROVENANCE_MISSING = "legacy-provenance-missing"
+    ALIGNMENT_SCHEMA_UNSUPPORTED = "alignment-schema-unsupported"
+    PRODUCER_SCHEMA_UNSUPPORTED = "producer-schema-unsupported"
 
 
 class ErrorCode(str, Enum):
@@ -406,6 +426,42 @@ class ScoreVariant(VersionedContractModel):
     created_at: AwareDatetime
 
 
+class ScoreProducerProvenance(ContractModel):
+    schema_version: Literal["atpiano.score-producer.v1"]
+    pipeline_revision: Annotated[int, Field(ge=1)]
+    pipeline_fingerprint: Sha256
+    application_version: Annotated[
+        str,
+        StringConstraints(min_length=1, max_length=64),
+    ]
+    application_revision: GitRevision | None = None
+    application_dirty: bool | None = None
+    execution: Literal["pinned-runtime", "injected-runner"]
+    adapter_schema: Annotated[
+        str,
+        StringConstraints(min_length=1, max_length=128),
+    ]
+    alignment_schema: Annotated[
+        str,
+        StringConstraints(min_length=1, max_length=128),
+    ]
+    postprocessor_version: Annotated[
+        str,
+        StringConstraints(min_length=1, max_length=128),
+    ]
+    model_repository_commit: GitRevision | None = None
+    model_checkpoint_sha256: Sha256 | None = None
+
+
+class ScoreFreshness(ContractModel):
+    schema_version: Literal["atpiano.score-freshness.v1"]
+    status: ScoreFreshnessStatus
+    reason: ScoreFreshnessReason
+    current_pipeline_revision: Annotated[int, Field(ge=1)]
+    snapshot_pipeline_revision: Annotated[int, Field(ge=1)] | None = None
+    refresh_recommended: bool
+
+
 ErrorDetail = str | int | float | bool | None
 
 
@@ -605,6 +661,8 @@ class ScoreVariantPage(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
     items: tuple[ScoreVariant, ...]
+    producer: ScoreProducerProvenance | None = None
+    freshness: ScoreFreshness | None = None
 
 
 class ErrorResponse(VersionedContractModel):
@@ -631,6 +689,8 @@ def contract_models() -> tuple[type[BaseModel], ...]:
         Artifact,
         ScoreSnapshot,
         ScoreVariant,
+        ScoreProducerProvenance,
+        ScoreFreshness,
         AtpianoError,
         Job,
         RuntimeCapabilities,

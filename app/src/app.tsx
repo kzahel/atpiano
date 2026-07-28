@@ -1513,6 +1513,8 @@ export function App({
               scoreXmlError={scoreXml.error}
               scoreAlignment={scoreAlignment.data}
               scoreAlignmentError={scoreAlignment.error}
+              scoreFreshness={scoreVariants.data?.freshness ?? null}
+              scoreProducer={scoreVariants.data?.producer ?? null}
               scoreHorizonSample={scoreArtifact?.source_horizon_sample}
               scoreVariants={scoreVariants.data?.items ?? []}
               selectedScoreVariant={selectedScoreVariant}

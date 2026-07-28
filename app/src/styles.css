@@ -1685,6 +1685,10 @@ input:focus-visible {
   font-size: 8px;
 }
 
+.score-card > .score-provenance {
+  color: #8aa198;
+}
+
 .artifact-panel {
   display: grid;
   grid-template-columns: 180px 1fr;

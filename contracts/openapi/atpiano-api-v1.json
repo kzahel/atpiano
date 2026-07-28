@@ -1701,6 +1701,75 @@
         "title": "ScoreClefPolicy",
         "type": "string"
       },
+      "ScoreFreshness": {
+        "additionalProperties": false,
+        "properties": {
+          "current_pipeline_revision": {
+            "minimum": 1,
+            "title": "Current Pipeline Revision",
+            "type": "integer"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/ScoreFreshnessReason"
+          },
+          "refresh_recommended": {
+            "title": "Refresh Recommended",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": "atpiano.score-freshness.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "snapshot_pipeline_revision": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Snapshot Pipeline Revision"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ScoreFreshnessStatus"
+          }
+        },
+        "required": [
+          "schema_version",
+          "status",
+          "reason",
+          "current_pipeline_revision",
+          "refresh_recommended"
+        ],
+        "title": "ScoreFreshness",
+        "type": "object"
+      },
+      "ScoreFreshnessReason": {
+        "enum": [
+          "current",
+          "pipeline-outdated",
+          "pipeline-newer",
+          "legacy-provenance-missing",
+          "alignment-schema-unsupported",
+          "producer-schema-unsupported"
+        ],
+        "title": "ScoreFreshnessReason",
+        "type": "string"
+      },
+      "ScoreFreshnessStatus": {
+        "enum": [
+          "current",
+          "older-compatible",
+          "incompatible",
+          "legacy-unknown"
+        ],
+        "title": "ScoreFreshnessStatus",
+        "type": "string"
+      },
       "ScoreJobStart": {
         "additionalProperties": false,
         "properties": {
@@ -1752,6 +1821,125 @@
           "request_id"
         ],
         "title": "ScoreJobStart",
+        "type": "object"
+      },
+      "ScoreProducerProvenance": {
+        "additionalProperties": false,
+        "properties": {
+          "adapter_schema": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Adapter Schema",
+            "type": "string"
+          },
+          "alignment_schema": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Alignment Schema",
+            "type": "string"
+          },
+          "application_dirty": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Application Dirty"
+          },
+          "application_revision": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 7,
+                "pattern": "^[0-9a-f]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Application Revision"
+          },
+          "application_version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Application Version",
+            "type": "string"
+          },
+          "execution": {
+            "enum": [
+              "pinned-runtime",
+              "injected-runner"
+            ],
+            "title": "Execution",
+            "type": "string"
+          },
+          "model_checkpoint_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model Checkpoint Sha256"
+          },
+          "model_repository_commit": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 7,
+                "pattern": "^[0-9a-f]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model Repository Commit"
+          },
+          "pipeline_fingerprint": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Pipeline Fingerprint",
+            "type": "string"
+          },
+          "pipeline_revision": {
+            "minimum": 1,
+            "title": "Pipeline Revision",
+            "type": "integer"
+          },
+          "postprocessor_version": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Postprocessor Version",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "atpiano.score-producer.v1",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "pipeline_revision",
+          "pipeline_fingerprint",
+          "application_version",
+          "execution",
+          "adapter_schema",
+          "alignment_schema",
+          "postprocessor_version"
+        ],
+        "title": "ScoreProducerProvenance",
         "type": "object"
       },
       "ScoreSnapshot": {
@@ -2005,12 +2193,34 @@
       "ScoreVariantPage": {
         "additionalProperties": false,
         "properties": {
+          "freshness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScoreFreshness"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/ScoreVariant"
             },
             "title": "Items",
             "type": "array"
+          },
+          "producer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScoreProducerProvenance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "schema_version": {
             "const": "atpiano.contract.v1",

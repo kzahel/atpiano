@@ -325,7 +325,12 @@ export function ScoreReader({
         <p className="reader-advisory" role="status">
           {fullscreenError ??
             playbackError ??
-            "The score is readable, but its playback cursor is unavailable."}
+            (
+              alignmentError?.message ===
+                "Score alignment version is unsupported"
+                ? "This score uses legacy cursor metadata. Return to the workspace and refresh the score to generate the current playback mapping."
+                : "The score is readable, but its playback cursor is unavailable."
+            )}
         </p>
       )}
 

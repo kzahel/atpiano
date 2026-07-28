@@ -46,6 +46,13 @@ playback lifecycle through the Sessions library. Its opening-phrase piano
 roll has a phrase-local playhead and opens the exact session without
 interrupting same-session audio. The preview remains a bounded performance
 view rather than a meter or engraving claim.
+Tactical 040 is implemented and live. New score snapshots retain
+refresh-relevant pipeline revision r2, an exact Atpiano producer fingerprint
+and Git state, component revisions, and pinned model/checkpoint identity.
+Retained snapshots are classified from their own evidence rather than
+rewritten. The score card exposes current, older-compatible, incompatible,
+and untracked states; it now distinguishes legacy v1 cursor metadata from an
+ordinary artifact load failure and recommends a current re-score.
 This is not yet progressive engraving or a permanent consumer-stack
 selection. The leading score converter's GitHub source and checkpoint still
 have no explicit published license, although the paper is CC BY 4.0 and the

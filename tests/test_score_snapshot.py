@@ -8,13 +8,57 @@ from typing import Any
 import mido
 import pytest
 
+import atpiano.score_snapshot as score_snapshot
 from atpiano.corrected import CORRECTED_EVENT_SCHEMA, CorrectedSession
 from atpiano.score_snapshot import (
+    SCORE_ALIGNMENT_SCHEMA,
+    SCORE_PIPELINE_REVISION,
+    SCORE_POSTPROCESSOR_VERSION,
     generate_score_snapshot,
     generate_score_variant,
+    score_pipeline_fingerprint,
     score_snapshot_is_plausible,
 )
 from atpiano.util import sha256_file, write_json
+
+
+def test_score_producer_provenance_records_the_pinned_runtime(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        score_snapshot,
+        "inspect_score_runtime",
+        lambda _directory: {
+            "available": True,
+            "manifest": {
+                "repository": {"commit": "c" * 40},
+                "checkpoint": {"sha256": "d" * 64},
+            },
+        },
+    )
+    monkeypatch.setattr(
+        score_snapshot,
+        "git_revision",
+        lambda *, cwd: "e" * 40,
+    )
+    monkeypatch.setattr(
+        score_snapshot,
+        "git_worktree_dirty",
+        lambda *, cwd: True,
+    )
+
+    producer = score_snapshot.score_producer_provenance(
+        tmp_path,
+        adapter_schema="atpiano.midi2score-adapter.v1",
+        injected_runner=False,
+    )
+
+    assert producer["execution"] == "pinned-runtime"
+    assert producer["application_revision"] == "e" * 40
+    assert producer["application_dirty"] is True
+    assert producer["model_repository_commit"] == "c" * 40
+    assert producer["model_checkpoint_sha256"] == "d" * 64
 
 
 def _event(
@@ -222,6 +266,22 @@ def test_score_snapshot_selects_only_closed_committed_prefix(
         }
         assert manifest["baseline"]["role"] == "baseline"
         assert manifest["variants"][0]["role"] == "automatic"
+        producer = manifest["producer"]
+        assert producer == {
+            "schema_version": "atpiano.score-producer.v1",
+            "pipeline_revision": SCORE_PIPELINE_REVISION,
+            "pipeline_fingerprint": score_pipeline_fingerprint(),
+            "application_version": "0.1.0",
+            "application_revision": producer["application_revision"],
+            "application_dirty": producer["application_dirty"],
+            "execution": "injected-runner",
+            "adapter_schema": "test-score-runner.v1",
+            "alignment_schema": SCORE_ALIGNMENT_SCHEMA,
+            "postprocessor_version": SCORE_POSTPROCESSOR_VERSION,
+            "model_repository_commit": None,
+            "model_checkpoint_sha256": None,
+        }
+        assert len(producer["pipeline_fingerprint"]) == 64
         assert (
             manifest["selected_variant_id"]
             == manifest["variants"][0]["variant_id"]

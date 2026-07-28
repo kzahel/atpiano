@@ -13,6 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from atpiano import __version__
 from atpiano.corrected import CORRECTED_SESSION_SCHEMA
 from atpiano.corrected_export import iter_latest_committed_index, write_midi
 from atpiano.notation import summarize_musicxml
@@ -27,11 +28,20 @@ from atpiano.score_postprocess import (
     normalized_options,
     score_variant_id,
 )
-from atpiano.util import read_json, sha256_file, utc_now, write_json
+from atpiano.util import (
+    git_revision,
+    git_worktree_dirty,
+    read_json,
+    sha256_file,
+    utc_now,
+    write_json,
+)
 
 SCORE_SNAPSHOT_SCHEMA = "atpiano.committed-score-snapshot.v1"
 SCORE_VARIANT_SCHEMA = "atpiano.score-variant.v1"
 SCORE_RUNTIME_SCHEMA = "atpiano.midi2score-runtime.v2"
+SCORE_PRODUCER_SCHEMA = "atpiano.score-producer.v1"
+SCORE_PIPELINE_REVISION = 2
 MIDI2SCORE_REPOSITORY = "https://github.com/TimFelixBeyer/MIDI2ScoreTransformer.git"
 MIDI2SCORE_COMMIT = "115432bda16ca16e0fec2e9465788f2ba369971f"
 MIDI2SCORE_CHECKPOINT_URL = (
@@ -45,12 +55,76 @@ SCORE_TIMEOUT_S = 180
 SCORE_VARIANT_TIMEOUT_S = 30
 MAX_SCORE_NOTE_EXPANSION_RATIO = 4
 MAX_SCORE_NOTE_EXPANSION_ALLOWANCE = 16
+SCORE_PIPELINE_SOURCE_FILES = (
+    "corrected_export.py",
+    "midi2score_adapter.py",
+    "score_alignment.py",
+    "score_postprocess.py",
+    "score_snapshot.py",
+    "score_variant_adapter.py",
+)
 
 ScoreRunner = Callable[[Path, Path, Path, Path, Path], dict[str, Any]]
 ScoreVariantRunner = Callable[
     [Path, Path, Path, Path, str, int | None, Path],
     dict[str, Any],
 ]
+
+
+def score_pipeline_fingerprint() -> str:
+    """Hash the tracked source boundary that can change a score snapshot."""
+
+    source_root = Path(__file__).resolve().parent
+    digest = hashlib.sha256()
+    for name in SCORE_PIPELINE_SOURCE_FILES:
+        path = source_root / name
+        digest.update(name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(bytes.fromhex(sha256_file(path)))
+    return digest.hexdigest()
+
+
+def score_producer_provenance(
+    runtime_directory: Path,
+    *,
+    adapter_schema: str,
+    injected_runner: bool,
+) -> dict[str, Any]:
+    """Describe the exact Atpiano and model boundary that made a score."""
+
+    runtime_manifest: dict[str, Any] | None = None
+    if not injected_runner:
+        runtime = inspect_score_runtime(runtime_directory)
+        if not runtime["available"]:
+            raise RuntimeError(str(runtime["error"]))
+        runtime_manifest = runtime["manifest"]
+    repository_root = Path(__file__).resolve().parents[2]
+    repository = (
+        runtime_manifest.get("repository", {})
+        if runtime_manifest is not None
+        else {}
+    )
+    checkpoint = (
+        runtime_manifest.get("checkpoint", {})
+        if runtime_manifest is not None
+        else {}
+    )
+    return {
+        "schema_version": SCORE_PRODUCER_SCHEMA,
+        "pipeline_revision": SCORE_PIPELINE_REVISION,
+        "pipeline_fingerprint": score_pipeline_fingerprint(),
+        "application_version": __version__,
+        "application_revision": git_revision(cwd=repository_root),
+        "application_dirty": git_worktree_dirty(cwd=repository_root),
+        "execution": (
+            "injected-runner" if injected_runner else "pinned-runtime"
+        ),
+        "adapter_schema": adapter_schema,
+        "alignment_schema": SCORE_ALIGNMENT_SCHEMA,
+        "postprocessor_version": SCORE_POSTPROCESSOR_VERSION,
+        "model_repository_commit": repository.get("commit"),
+        "model_checkpoint_sha256": checkpoint.get("sha256"),
+    }
 
 
 def score_snapshot_is_plausible(manifest: dict[str, Any]) -> bool:
@@ -606,9 +680,15 @@ def generate_score_snapshot(
         postprocess=postprocess,
         created_at=created_at,
     )
+    producer = score_producer_provenance(
+        runtime_directory,
+        adapter_schema=str(adapter.get("schema_version", "unknown")),
+        injected_runner=runner is not None,
+    )
     write_json(variant_directory / "manifest.json", automatic)
     manifest = {
         "schema_version": SCORE_SNAPSHOT_SCHEMA,
+        "producer": producer,
         "session_id": session["session_id"],
         "generated_at": created_at,
         "commit_sample": commit_sample,

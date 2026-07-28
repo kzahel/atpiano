@@ -10,6 +10,8 @@ import { PianoKeyboard } from "./piano-keyboard.js";
 import type {
   EventRevision,
   Horizon,
+  ScoreFreshness,
+  ScoreProducerProvenance,
   ScoreVariant,
   Session,
 } from "../runtime/atpiano-runtime.js";
@@ -183,6 +185,8 @@ function ScorePreview({
   scoreXmlError,
   scoreAlignment,
   scoreAlignmentError,
+  scoreFreshness,
+  scoreProducer,
   scoreHorizonSample,
   scoreVariants,
   selectedScoreVariant,
@@ -202,6 +206,8 @@ function ScorePreview({
   readonly scoreXmlError: Error | null;
   readonly scoreAlignment: ScoreAlignment | undefined;
   readonly scoreAlignmentError: Error | null;
+  readonly scoreFreshness: ScoreFreshness | null;
+  readonly scoreProducer: ScoreProducerProvenance | null;
   readonly scoreHorizonSample: number | undefined;
   readonly scoreVariants: readonly ScoreVariant[];
   readonly selectedScoreVariant: ScoreVariant | undefined;
@@ -216,6 +222,35 @@ function ScorePreview({
   const playbackStatus = usePlaybackStore((state) => state.status);
   const scoreFollow = usePlaybackStore((state) => state.scoreFollow);
   const followScore = usePlaybackStore((state) => state.followScore);
+  const freshnessAdvisory = (() => {
+    if (!scoreFreshness || scoreFreshness.reason === "current") return null;
+    const snapshotRevision = scoreFreshness.snapshot_pipeline_revision;
+    switch (scoreFreshness.reason) {
+      case "alignment-schema-unsupported":
+        return "This score uses legacy cursor metadata. Refresh score to generate the current playback mapping.";
+      case "legacy-provenance-missing":
+        return "This score predates revision tracking. Refresh score to record its current producer provenance.";
+      case "pipeline-outdated":
+        return `This score was generated with pipeline r${snapshotRevision}; r${scoreFreshness.current_pipeline_revision} is current. Refresh score to apply the current score pipeline.`;
+      case "pipeline-newer":
+        return `This score was generated with newer pipeline r${snapshotRevision}; this application provides r${scoreFreshness.current_pipeline_revision}.`;
+      case "producer-schema-unsupported":
+        return "This score's producer revision is not supported. Refresh score to publish current provenance.";
+    }
+  })();
+  const revisionLabel = scoreProducer
+    ? `Score revision · r${scoreProducer.pipeline_revision} · ${scoreFreshness?.status ?? "unclassified"}`
+    : scoreFreshness
+      ? `Score revision · untracked · ${scoreFreshness.status}`
+      : null;
+  const revisionDetail = scoreProducer
+    ? [
+        `pipeline ${scoreProducer.pipeline_fingerprint}`,
+        scoreProducer.application_revision
+          ? `Atpiano ${scoreProducer.application_revision}${scoreProducer.application_dirty ? " (dirty)" : ""}`
+          : `Atpiano ${scoreProducer.application_version}`,
+      ].join(" · ")
+    : undefined;
   return (
     <section className="view-card score-card">
       <div className="view-heading">
@@ -317,6 +352,11 @@ function ScorePreview({
           merit engraving review.
         </p>
       )}
+      {freshnessAdvisory && (
+        <p className="score-render-warning" role="status">
+          {freshnessAdvisory}
+        </p>
+      )}
       {scoreXml ? (
         <div className="score-playback-frame">
           <MusicXmlScore
@@ -353,10 +393,16 @@ function ScorePreview({
           available.
         </p>
       )}
-      {scoreAlignmentError && (
+      {scoreAlignmentError &&
+        scoreFreshness?.reason !== "alignment-schema-unsupported" && (
         <p className="score-render-error" role="status">
           The score remains readable, but its playback cursor could not load.
         </p>
+      )}
+      {revisionLabel && (
+        <small className="score-provenance" title={revisionDetail}>
+          {revisionLabel}
+        </small>
       )}
       <small>
         Snapshot target · {session.display_name ?? session.session_id}
@@ -379,6 +425,8 @@ export function PerformanceViews({
   scoreXmlError,
   scoreAlignment,
   scoreAlignmentError,
+  scoreFreshness,
+  scoreProducer,
   scoreHorizonSample,
   scoreVariants,
   selectedScoreVariant,
@@ -403,6 +451,8 @@ export function PerformanceViews({
   readonly scoreXmlError: Error | null;
   readonly scoreAlignment: ScoreAlignment | undefined;
   readonly scoreAlignmentError: Error | null;
+  readonly scoreFreshness: ScoreFreshness | null;
+  readonly scoreProducer: ScoreProducerProvenance | null;
   readonly scoreHorizonSample: number | undefined;
   readonly scoreVariants: readonly ScoreVariant[];
   readonly selectedScoreVariant: ScoreVariant | undefined;
@@ -431,6 +481,8 @@ export function PerformanceViews({
           scoreXmlError={scoreXmlError}
           scoreAlignment={scoreAlignment}
           scoreAlignmentError={scoreAlignmentError}
+          scoreFreshness={scoreFreshness}
+          scoreProducer={scoreProducer}
           scoreHorizonSample={scoreHorizonSample}
           scoreVariants={scoreVariants}
           selectedScoreVariant={selectedScoreVariant}

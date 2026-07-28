@@ -72,16 +72,33 @@ def package_version(package: str) -> str | None:
         return None
 
 
-def git_revision() -> str | None:
+def git_revision(*, cwd: Path | None = None) -> str | None:
     try:
         return subprocess.run(
             ["git", "rev-parse", "HEAD"],
             check=True,
             capture_output=True,
             text=True,
+            cwd=cwd,
         ).stdout.strip()
     except (FileNotFoundError, subprocess.CalledProcessError):
         return None
+
+
+def git_worktree_dirty(*, cwd: Path | None = None) -> bool | None:
+    """Report tracked Git changes without treating untracked evidence as code."""
+
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            check=True,
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+    return bool(result.stdout.strip())
 
 
 def runtime_provenance() -> dict[str, Any]:

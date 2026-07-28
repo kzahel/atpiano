@@ -531,6 +531,30 @@ const scoreVariants: ScoreVariantPage = {
   schema_version: schemaVersion,
   workspace_id: workspaceId,
   session_id: primary.session_id,
+  producer: {
+    schema_version: "atpiano.score-producer.v1",
+    pipeline_revision: 2,
+    pipeline_fingerprint:
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    application_version: "0.1.0",
+    application_revision: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    application_dirty: false,
+    execution: "pinned-runtime",
+    adapter_schema: "atpiano.midi2score-adapter.v1",
+    alignment_schema: "atpiano.score-alignment.v2",
+    postprocessor_version: "deterministic-engraving-v1",
+    model_repository_commit: "cccccccccccccccccccccccccccccccccccccccc",
+    model_checkpoint_sha256:
+      "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  },
+  freshness: {
+    schema_version: "atpiano.score-freshness.v1",
+    status: "current",
+    reason: "current",
+    current_pipeline_revision: 2,
+    snapshot_pipeline_revision: 2,
+    refresh_recommended: false,
+  },
   items: [
     {
       schema_version: schemaVersion,

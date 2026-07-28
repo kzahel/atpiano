@@ -10,11 +10,102 @@ from atpiano.adapters.local_sessions import (
     LocalSessionConflictError,
     LocalSessionNotFoundError,
     LocalSessionStore,
+    _score_snapshot_provenance,
 )
 from atpiano.corrected import CORRECTED_EVENT_SCHEMA, CorrectedSession
 from atpiano.corrected_export import write_corrected_exports
 from atpiano.live import PcmBlock
 from atpiano.util import sha256_file, write_json
+
+
+def _producer(revision: int) -> dict[str, object]:
+    return {
+        "schema_version": "atpiano.score-producer.v1",
+        "pipeline_revision": revision,
+        "pipeline_fingerprint": "a" * 64,
+        "application_version": "0.1.0",
+        "application_revision": "b" * 40,
+        "application_dirty": False,
+        "execution": "pinned-runtime",
+        "adapter_schema": "atpiano.midi2score-adapter.v1",
+        "alignment_schema": "atpiano.score-alignment.v2",
+        "postprocessor_version": "deterministic-engraving-v1",
+        "model_repository_commit": "c" * 40,
+        "model_checkpoint_sha256": "d" * 64,
+    }
+
+
+@pytest.mark.parametrize(
+    ("alignment_schema", "producer", "status", "reason", "refresh"),
+    [
+        (
+            "atpiano.score-alignment.v2",
+            _producer(2),
+            "current",
+            "current",
+            False,
+        ),
+        (
+            "atpiano.score-alignment.v2",
+            _producer(1),
+            "older-compatible",
+            "pipeline-outdated",
+            True,
+        ),
+        (
+            "atpiano.score-alignment.v2",
+            _producer(3),
+            "incompatible",
+            "pipeline-newer",
+            False,
+        ),
+        (
+            "atpiano.score-alignment.v2",
+            None,
+            "legacy-unknown",
+            "legacy-provenance-missing",
+            True,
+        ),
+        (
+            "atpiano.score-alignment.v1",
+            None,
+            "incompatible",
+            "alignment-schema-unsupported",
+            True,
+        ),
+        (
+            "atpiano.score-alignment.v2",
+            {"schema_version": "atpiano.score-producer.v9"},
+            "incompatible",
+            "producer-schema-unsupported",
+            True,
+        ),
+    ],
+)
+def test_score_snapshot_provenance_classifies_retained_evidence(
+    alignment_schema: str,
+    producer: dict[str, object] | None,
+    status: str,
+    reason: str,
+    refresh: bool,
+) -> None:
+    pointer: dict[str, object] = {
+        "alignment": {"schema_version": alignment_schema},
+    }
+    if producer is not None:
+        pointer["producer"] = producer
+
+    parsed, freshness = _score_snapshot_provenance(pointer)
+
+    assert freshness.status.value == status
+    assert freshness.reason.value == reason
+    assert freshness.refresh_recommended is refresh
+    assert (parsed.pipeline_revision if parsed else None) == (
+        producer.get("pipeline_revision")
+        if producer is not None
+        and producer.get("schema_version") == "atpiano.score-producer.v1"
+        else None
+    )
 
 
 def _session(
