@@ -226,3 +226,18 @@ authenticated browser data was renamed during verification.
 No manual browser clicking or visual QA was performed in this execution; the
 interaction contracts are covered by the focused frontend tests and the live
 checks were deliberately read-only with respect to retained musical data.
+
+### Post-live dense-preview correction
+
+The first live Sessions review exposed the event repository's exact-range page
+guardrail on long and dense recordings: a broad opening-preview request could
+contain more than 256 materialized events and surfaced
+`materialized event range exceeds page limit` in several rows.
+
+`f05eed5` keeps that repository boundary intact and recursively subdivides only
+the preview's source-time range until it finds the earliest bounded interval
+with visible notes. A focused reproduction proves the initial broad ranges
+can fail repeatedly while the opening preview still renders and no technical
+page-limit message reaches the UI. The current frontend suite passes 77 tests
+across 17 files, along with TypeScript, the production build, and Git
+whitespace.
