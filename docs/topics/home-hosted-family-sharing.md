@@ -2,10 +2,12 @@
 
 Topic: home-hosted-family-sharing
 
-Status: **accepted near-term deployment direction as of 2026-07-28.** The v3
+Status: **accepted near-term deployment direction as of 2026-07-28; basic
+family identity implementation is authorized under Tactical 033.** The v3
 application is shared on demand from the Mac through the home Pi and Caddy.
-The managed PostgreSQL, object-storage, account, tenancy, and sync program is
-deferred with no active implementation schedule.
+SQLite users, memberships, and cookie sessions are now active implementation
+scope. The managed PostgreSQL, object-storage, OIDC, broad tenancy, and sync
+program remains deferred with no active implementation schedule.
 
 ## Scope And Relationship
 
@@ -14,7 +16,7 @@ This topic owns the current small sharing deployment intended for family use:
 - the Mac-hosted React, Python, model, session, and artifact runtime;
 - the home Pi/Caddy reverse-proxy boundary;
 - on-demand availability and its deliberately modest operational promise;
-- the single local workspace and future rebuildable SQLite catalog;
+- the single local workspace and its SQLite identity/catalog layer;
 - lightweight access, backup, and recovery requirements appropriate for
   family use; and
 - the evidence that would justify revisiting a managed hosted service.
@@ -50,7 +52,7 @@ v3 React + Python/model runtime
         |
         +---- current filesystem session manifests and artifacts
         |
-        `---- future rebuildable SQLite catalog, if implemented
+        `---- SQLite users, memberships, and browser sessions
 ```
 
 The Pi terminates the public HTTPS connection and proxies the application,
@@ -72,16 +74,17 @@ rebuildable range/history index over append-only JSONL evidence, so the
 bundled Python runtime already exercises SQLite. What R5 did not implement is
 a workspace-level SQLite catalog.
 
-If local catalog work becomes worthwhile, SQLite should be a transactional,
-rebuildable index on the Mac:
+Tactical 033 adds a transactional SQLite catalog on the Mac. Its identity and
+authorization rows are authoritative relational data; its references to
+capture sessions remain a rebuildable index over filesystem evidence:
 
 - session and artifact manifests remain sufficient to repair or re-index it;
 - recordings, MIDI, JSONL, MusicXML, and other large artifacts remain files;
 - paths remain validated and rooted below the configured workspace;
 - completed evidence remains immutable;
 - deletion remains recoverable before permanent purge; and
-- no PostgreSQL-compatible abstraction is required merely for a hypothetical
-  future migration.
+- SQLAlchemy isolates relational persistence cleanly without making a future
+  PostgreSQL deployment part of this tactical.
 
 This gives the family deployment useful restart and query behavior without
 introducing cloud accounts, object storage, distributed jobs, or database
@@ -95,10 +98,12 @@ reach an unauthenticated public hostname is not made trusted merely because
 the intended audience is family.
 
 Before the service is treated as private durable family storage or its URL is
-shared more broadly, add one proportionate access boundary at Caddy or a
-private network layer and validate ordinary HTTP, artifact downloads, and
-microphone WebSockets through it. Do not build an account, invitation, role,
-or tenancy system only to satisfy this small deployment.
+shared more broadly, complete the bounded SQLite account and cookie-session
+system in
+[`033-sqlite-family-authentication.md`](../tactical/033-sqlite-family-authentication.md).
+Validate ordinary HTTP, artifacts, and microphone WebSockets through it.
+This authorization does not include public signup, invitations, email,
+password reset, OIDC, or managed multi-tenant infrastructure.
 
 ### Verified current exposure
 
@@ -151,9 +156,8 @@ eight-phase hosted migration:
 
 1. preserve and improve the working local application;
 2. reduce the desktop score/runtime footprint behind exact parity gates;
-3. add a rebuildable SQLite catalog only when its durability or query value
-   justifies replacing filesystem scans;
-4. add proportionate family access control before broader sharing; and
+3. complete the SQLite family identity and session catalog;
+4. enforce proportionate family access control before broader sharing; and
 5. add backup, restore, or health checks only from an observed operational
    need.
 
