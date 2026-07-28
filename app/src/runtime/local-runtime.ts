@@ -69,7 +69,7 @@ function abortOptions(request: RuntimeRequest): { signal?: AbortSignal } {
   return request.signal === undefined ? {} : { signal: request.signal };
 }
 
-function errorMessage(error: unknown): string {
+function errorMessage(error: unknown, fallback: string): string {
   if (
     typeof error === "object" &&
     error !== null &&
@@ -91,12 +91,15 @@ function errorMessage(error: unknown): string {
   ) {
     return String(error.message);
   }
-  return "The local runtime request failed.";
+  return fallback;
 }
 
-function dataOrThrow<T>(result: { data?: T; error?: unknown }): T {
+function dataOrThrow<T>(
+  result: { data?: T; error?: unknown },
+  fallback: string,
+): T {
   if (result.data !== undefined) return result.data;
-  throw new Error(errorMessage(result.error));
+  throw new Error(errorMessage(result.error, fallback));
 }
 
 function captureFromSession(
@@ -189,6 +192,7 @@ export class LocalRuntime implements AtpianoRuntime {
   async getCapabilities(request: RuntimeRequest): Promise<RuntimeCapabilities> {
     return dataOrThrow(
       await this.#client.GET("/api/v1/capabilities", abortOptions(request)),
+      "Runtime capabilities could not be loaded.",
     );
   }
 
@@ -203,6 +207,7 @@ export class LocalRuntime implements AtpianoRuntime {
           },
         },
       }),
+      "Workspaces could not be loaded.",
     );
   }
 
@@ -221,6 +226,7 @@ export class LocalRuntime implements AtpianoRuntime {
           },
         },
       }),
+      "Sessions could not be loaded.",
     );
   }
 
@@ -242,6 +248,7 @@ export class LocalRuntime implements AtpianoRuntime {
           },
         },
       ),
+      "The selected session could not be loaded.",
     );
   }
 
@@ -263,6 +270,7 @@ export class LocalRuntime implements AtpianoRuntime {
           body: input,
         },
       ),
+      "The session name could not be saved.",
     );
   }
 
@@ -284,6 +292,7 @@ export class LocalRuntime implements AtpianoRuntime {
           },
         },
       ),
+      "Session progress could not be loaded.",
     );
   }
 
@@ -507,7 +516,7 @@ export class LocalRuntime implements AtpianoRuntime {
     });
     if (!response.ok) {
       const error = await response.json() as unknown;
-      throw new Error(errorMessage(error));
+      throw new Error(errorMessage(error, "The fixture replay could not start."));
     }
     const page = await this.listSessions(input.workspace_id, {
       requestId: request.requestId,
@@ -556,6 +565,7 @@ export class LocalRuntime implements AtpianoRuntime {
               },
             },
           ),
+          "The session notes could not be loaded.",
         );
         if (!closed && page.session_id === sessionId) subscriber.next(page);
       } catch (error) {
@@ -598,6 +608,7 @@ export class LocalRuntime implements AtpianoRuntime {
           },
         },
       ),
+      "Session exports could not be loaded.",
     );
   }
 
@@ -621,6 +632,7 @@ export class LocalRuntime implements AtpianoRuntime {
           },
         },
       ),
+      "The selected export could not be opened.",
     );
   }
 
@@ -683,6 +695,7 @@ export class LocalRuntime implements AtpianoRuntime {
           body: input,
         },
       ),
+      "Score generation could not start.",
     );
   }
 
@@ -704,6 +717,7 @@ export class LocalRuntime implements AtpianoRuntime {
           },
         },
       ),
+      "Score engraving choices could not be loaded.",
     );
   }
 
@@ -725,6 +739,7 @@ export class LocalRuntime implements AtpianoRuntime {
           body: input,
         },
       ),
+      "The score engraving choice could not be saved.",
     );
   }
 
@@ -734,6 +749,7 @@ export class LocalRuntime implements AtpianoRuntime {
         ...abortOptions(request),
         params: { path: { job_id: jobId } },
       }),
+      "Score generation progress could not be loaded.",
     );
   }
 
@@ -755,6 +771,7 @@ export class LocalRuntime implements AtpianoRuntime {
           body: input,
         },
       ),
+      "The session could not be moved to trash.",
     );
   }
 }

@@ -122,6 +122,22 @@ class FakeWebSocket {
 }
 
 describe("local runtime", () => {
+  it("keeps operation context when an error response has no message", async () => {
+    const runtime = new LocalRuntime({
+      baseUrl: "http://127.0.0.1:8002",
+      fetchImplementation: async () =>
+        Response.json({ unexpected: true }, { status: 500 }),
+      WebSocketImplementation: FakeWebSocket as unknown as typeof WebSocket,
+    });
+
+    await expect(
+      runtime.listSessions("local", {
+        requestId: "sessions-context",
+        limit: 10,
+      }),
+    ).rejects.toThrow("Sessions could not be loaded.");
+  });
+
   it("updates an explicitly targeted session annotation", async () => {
     const runtime = new LocalRuntime({
       baseUrl: "http://127.0.0.1:8002",

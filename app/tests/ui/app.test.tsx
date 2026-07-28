@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -62,9 +68,8 @@ describe("shared application", () => {
     expect(await screen.findByRole("heading", { name: "Sessions" }))
       .toBeTruthy();
     expect(screen.getByText("Your musical notebook")).toBeTruthy();
-    expect(
-      await screen.findAllByRole("button", { name: /Morning progression/ }),
-    ).toHaveLength(2);
+    await screen.findAllByText("Morning progression");
+    expect(document.querySelectorAll(".library-session-main")).toHaveLength(3);
     expect(screen.queryByText("Schema v1")).toBeNull();
     expect(screen.queryByText("Local engine")).toBeNull();
     expect(screen.queryByText("On this device")).toBeNull();
@@ -83,6 +88,136 @@ describe("shared application", () => {
     expect(await screen.findByRole("heading", { name: "Sessions" }))
       .toBeTruthy();
     expect(new URL(window.location.href).searchParams.get("session")).toBeNull();
+  });
+
+  it("loads only nearby previews and recordings only on play", async () => {
+    const user = userEvent.setup();
+    const fixture = createFixtureRuntime();
+    const intersectionCallbacks: IntersectionObserverCallback[] = [];
+    class TestIntersectionObserver {
+      constructor(callback: IntersectionObserverCallback) {
+        intersectionCallbacks.push(callback);
+      }
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+      takeRecords(): IntersectionObserverEntry[] {
+        return [];
+      }
+    }
+    vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
+    const previewSessions: string[] = [];
+    const artifactSessions: string[] = [];
+    const readSessions: string[] = [];
+    const primarySessionId = "20260726T100000-abcdef123456";
+    const runtime = new Proxy(fixture, {
+      get(target, property) {
+        if (property === "subscribeEvents") {
+          return (
+            ...args: Parameters<AtpianoRuntime["subscribeEvents"]>
+          ) => {
+            previewSessions.push(args[1]);
+            return target.subscribeEvents(...args);
+          };
+        }
+        if (property === "listArtifacts") {
+          return async (
+            workspaceId: string,
+            sessionId: string,
+            request: Parameters<AtpianoRuntime["listArtifacts"]>[2],
+          ) => {
+            artifactSessions.push(sessionId);
+            return target.listArtifacts(
+              workspaceId,
+              primarySessionId,
+              request,
+            );
+          };
+        }
+        if (property === "readArtifact") {
+          return async (
+            workspaceId: string,
+            sessionId: string,
+            _artifactId: string,
+            request: Parameters<AtpianoRuntime["readArtifact"]>[3],
+          ) => {
+            readSessions.push(sessionId);
+            return target.readArtifact(
+              workspaceId,
+              primarySessionId,
+              `artifact:${primarySessionId}:audio`,
+              request,
+            );
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) satisfies AtpianoRuntime;
+    const play = vi
+      .spyOn(HTMLMediaElement.prototype, "play")
+      .mockResolvedValue();
+    const pause = vi
+      .spyOn(HTMLMediaElement.prototype, "pause")
+      .mockImplementation(() => undefined);
+
+    renderApp(runtime, { home: true });
+
+    await waitFor(() => expect(intersectionCallbacks).toHaveLength(3));
+    expect(previewSessions).toEqual([]);
+    act(() => {
+      intersectionCallbacks[0]!([
+        { isIntersecting: true } as IntersectionObserverEntry,
+      ], {} as IntersectionObserver);
+    });
+    await waitFor(() => expect(previewSessions).toHaveLength(1));
+    act(() => {
+      intersectionCallbacks.slice(1).forEach((callback) =>
+        callback(
+          [{ isIntersecting: true } as IntersectionObserverEntry],
+          {} as IntersectionObserver,
+        )
+      );
+    });
+    await waitFor(() => expect(previewSessions).toHaveLength(3));
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("img", {
+          name: /Opening phrase with \d+ notes/,
+        }),
+      ).toHaveLength(3)
+    );
+    expect(artifactSessions).toEqual([]);
+    expect(readSessions).toEqual([]);
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Play Morning progression recording",
+      }),
+    );
+    expect(
+      await screen.findByRole("button", {
+        name: "Pause Morning progression recording",
+      }),
+    ).toBeTruthy();
+    expect(artifactSessions).toEqual([primarySessionId]);
+    expect(readSessions).toEqual([primarySessionId]);
+
+    const nocturneId = "20260725T201500-bbbbbbbbbbbb";
+    await user.click(
+      screen.getByRole("button", {
+        name: "Play Nocturne sketch recording",
+      }),
+    );
+    expect(
+      await screen.findByRole("button", {
+        name: "Pause Nocturne sketch recording",
+      }),
+    ).toBeTruthy();
+    expect(play).toHaveBeenCalledTimes(2);
+    expect(artifactSessions).toEqual([primarySessionId, nocturneId]);
+    expect(readSessions).toEqual([primarySessionId, nocturneId]);
+    expect(pause).toHaveBeenCalled();
   });
 
   it("renames a session inline and shows save completion", async () => {
@@ -467,9 +602,7 @@ describe("shared application", () => {
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: /Nocturne sketch/ })).toBeNull();
     });
-    expect(
-      screen.getAllByRole("button", { name: /Morning progression/ }),
-    ).toHaveLength(2);
+    expect(document.querySelectorAll(".library-session-main")).toHaveLength(2);
   });
 
   it("isolates a failed score job from session review", async () => {

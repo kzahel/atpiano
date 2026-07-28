@@ -1071,6 +1071,9 @@ export function App({
             sessions={sessionItems}
             activeSessionId={activeSession?.session_id ?? null}
             canWrite={canWrite}
+            maxEventRangeSamples={
+              capabilities.data?.max_event_range_samples ?? 5_760_000
+            }
             onNew={beginNew}
             onSelect={selectSession}
           />
