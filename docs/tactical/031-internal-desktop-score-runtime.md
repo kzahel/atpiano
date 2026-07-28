@@ -5,7 +5,8 @@ Master phase: 5. Early Tauri skeleton, R5 revision
 Topics: `multi-tenant-hybrid-service-architecture`,
 `performance-to-notation`
 
-Status: **implemented and ready for R5 human review on 2026-07-27.**
+Status: **implemented; score rendering was human-validated on 2026-07-28.
+R5 remains open for the broader desktop boundary.**
 
 ## Entry Evidence
 
@@ -151,8 +152,9 @@ other archive:
 results/desktop-internal-score/Atpiano-Internal-Score.app
 ```
 
-The final application contains 32,704 files and 2,361,066,073 installed
-bytes. Its 1,316,271,921-byte score runtime contains standalone CPython
+The initial Tactical 031 application contained 32,704 files and
+2,361,066,073 installed bytes. Its 1,316,271,921-byte score runtime contains
+standalone CPython
 3.11.14, 62 installed packages, pinned MIDI2ScoreTransformer source at
 `115432bda16ca16e0fec2e9465788f2ba369971f`, and the v0.0.1 checkpoint at
 SHA-256
@@ -175,10 +177,10 @@ started the bundled sidecar with the bundled score root and passed the full
 post-launch audit. That launch exposed and led to fixing Numba's initially
 empty in-bundle cache directory; library caches now go to mutable app data.
 
-The ordinary `stage` command was run last. It restored the 1,035,523,314-byte
-score-free runtime, left no `score-runtime` directory, and advertises
-`score_available=false`. The existing score-free R5 archive remains the only
-review archive.
+The ordinary `stage` command was run last for this initial slice. It restored
+the 1,035,523,314-byte score-free runtime, left no `score-runtime` directory,
+and advertised `score_available=false`. The existing score-free R5 archive
+remained the only review archive.
 
 Machine-readable ignored evidence:
 
@@ -191,5 +193,7 @@ results/desktop-internal-score/packaged-score-report.json
 Final automated gates passed with 177 Python tests and Ruff, 5 Node contract
 tests, 47 Vitest tests, frontend typecheck and production build, and 8 Rust
 tests plus formatting and Clippy with warnings denied. The internal
-application is ready for subjective score review. R5 remains open and Phase 6
-remains closed until explicit acceptance.
+application reached subjective score review. On 2026-07-28 the user confirmed
+that score engraving works in the desktop app. That review exposed the
+separate artifact-export gap now owned by Tactical 032. R5 remains open and
+Phase 6 remains closed until explicit acceptance.

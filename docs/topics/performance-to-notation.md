@@ -20,7 +20,11 @@ their MusicXML continues to render.
 Tactical 021 now retains the model baseline and publishes deterministic
 `music21` score variants: automatic measure-span clef cleanup is the default,
 and a safe paired enharmonic signature can be selected without rerunning the
-transformer.
+transformer. The first internal desktop review confirmed that this score
+renders successfully. Tactical 032 moves the original model MusicXML out of
+the engraving controls and labels it with the other session exports; web and
+desktop now dispatch the exact same artifact through browser download or
+native Save As behavior.
 This is not yet progressive engraving or a permanent consumer-stack
 selection. The leading score converter's GitHub source and checkpoint still
 have no explicit published license, although the paper is CC BY 4.0 and the
@@ -230,8 +234,12 @@ tied boundaries are blocked. A separate user action creates a
 pitch-preserving enharmonic key variant when one ordinary global signature has
 a safe `fifths ± 12` alternative. It respells notes and the signature together
 and is explicitly not transposition. The application exposes baseline and
-derived interpretations, makes the baseline downloadable, and promotes an
-older baseline-only snapshot on its first cleanup request.
+derived interpretations, identifies the original model MusicXML in the
+session Exports panel, and promotes an older baseline-only snapshot on its
+first cleanup request. Tactical 032 routes that and every other artifact
+through one platform-neutral export operation: the web adapter starts a
+browser download, while the desktop adapter streams authenticated loopback
+bytes to a user-selected native destination.
 
 Retained session `20260726T142937-d49ef33ca321` motivates the slice. Its
 second part opens in sustained treble-clef range but receives the upstream

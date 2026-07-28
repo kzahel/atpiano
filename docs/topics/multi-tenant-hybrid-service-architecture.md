@@ -4,7 +4,8 @@ Topic: multi-tenant-hybrid-service-architecture
 
 Status: **accepted target architecture as of 2026-07-26; Phases 1 through 4
 are complete and R2, R3, and R4 are accepted. Phase 5 reached R5 and now has
-one implemented internal-score revision held for review; R5 remains open.**
+implemented internal-score and cross-platform-export revisions held for
+review; R5 remains open.**
 Phase 4 is recorded under
 [`017-python-application-core.md`](../tactical/017-python-application-core.md)
 and Phase 3 under
@@ -32,7 +33,13 @@ Phase 6 remains closed until explicit acceptance. Tactical 031 now owns a
 separate opt-in internal build of the unresolved score runtime after the user
 provisionally accepted the checkpoint as following the paper's CC BY 4.0
 terms for internal testing. That build has passed packaged replay-to-score and
-post-launch immutability audits. The ordinary R5 and every public artifact
+post-launch immutability audits, and the user confirmed that its engraving
+renders successfully. Tactical 032 responds to the same review by moving the
+original model MusicXML into the shared Exports panel and adding one bounded
+native Save As path. Large desktop artifacts stream from the authenticated
+sidecar without crossing IPC as bytes, while the web adapter retains normal
+browser downloads. The webview still has no general filesystem, dialog,
+shell, or remote HTTP permission. The ordinary R5 and every public artifact
 remain score-free. Windows, Linux, final signing, updates, and microphone
 parity remain outside this bounded proof.
 

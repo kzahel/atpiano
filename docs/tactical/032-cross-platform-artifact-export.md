@@ -5,7 +5,7 @@ Master phase: 5. Early Tauri skeleton, R5 revision
 Topics: `multi-tenant-hybrid-service-architecture`,
 `performance-to-notation`
 
-Status: **in progress on 2026-07-28.**
+Status: **implemented and ready for R5 human export review on 2026-07-28.**
 
 ## Entry Evidence
 
@@ -110,4 +110,55 @@ remain unchanged, so rollback does not migrate or remove any session data.
 
 ## Execution Record
 
-Implementation and validation evidence will be appended as the slice lands.
+Commits:
+
+- `3d5df35` — open the bounded R5 artifact-export revision; and
+- `8ea0147` — implement shared web/desktop export and baseline placement.
+
+The shared `AtpianoRuntime` now owns `exportArtifact`. `LocalRuntime` and the
+deterministic fixture use an attached browser download link. `DesktopRuntime`
+retrieves the existing access record and invokes one custom native command
+with only its sidecar-relative content URL and supplied basename.
+
+The native command validates the exact encoded
+`/api/v1/workspaces/.../sessions/.../artifacts/.../content` route, obtains the
+destination from a blocking native Save As dialog running off the main
+thread, authenticates with native-held launch state, requires a bounded HTTP
+header and one content length, streams into a random sibling temporary file,
+syncs it, and atomically renames it. Cancellation returns without an error.
+A truncated response removes the temporary file and preserves an existing
+destination. The capability file still grants the webview only event listen
+and unlisten permissions; no dialog, filesystem, shell, or HTTP-client plugin
+permission was added.
+
+The score card now contains engraving choices only. The session Exports panel
+labels the baseline **Original model MusicXML**, the selected derivative
+**Current MusicXML score**, and other retained derivatives as alternates. The
+full-page score reader uses the same export operation.
+
+Validation passed:
+
+- 177 Python tests and Ruff;
+- 5 Node contract tests and 49 Vitest tests;
+- generated-contract check, TypeScript, dependency audit, and frontend
+  production build;
+- 11 Rust tests, formatting, and Clippy with warnings denied;
+- the complete migration regression at
+  `results/migration-regression/20260728T065607Z/report.json`;
+- a rebuilt 32,704-file, 2,361,515,181-byte internal-score application and
+  full bundle audit at
+  `results/desktop-internal-score/Atpiano-Internal-Score.app`; and
+- restart of the active shared service followed by HTTP 200 from the public
+  homepage and a valid local-runtime capability response.
+
+The internal score runtime itself remains 1,316,271,921 bytes; the rebuilt
+app's small size increase is in the native shell/frontend boundary. The
+ordinary staging tree was restored last with 13,582 files,
+1,035,523,494 bytes, and no score runtime.
+
+Automated tests cover browser dispatch and native authenticated streaming.
+The remaining checkpoint is intentionally human: open the rebuilt internal
+app, select **Original model MusicXML** under **Exports**, choose a
+destination, and confirm the saved SHA-256 starts with the prefix shown by the
+panel. Repeat one audio or MIDI export and cancel one dialog. R5 and Phase 6
+remain closed pending the user's broader acceptance.

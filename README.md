@@ -76,7 +76,9 @@ and the acceptance request are in
 [`docs/r5-desktop-boundary-review.md`](docs/r5-desktop-boundary-review.md).
 That packet also includes a separate, opt-in internal score build for the
 current review. It is not a distribution artifact and does not change the
-ordinary score-free R5 archive.
+ordinary score-free R5 archive. The reviewed score now keeps its original
+model MusicXML with the other session exports, and artifact export uses
+ordinary browser downloads on the web or a native Save As dialog on desktop.
 This is not permission to begin the signed, microphone-complete Phase 6.
 
 ## Authoritative Performance Workspace (v3)

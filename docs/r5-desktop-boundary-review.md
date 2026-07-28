@@ -1,6 +1,7 @@
 # R5 Desktop Boundary Review
 
-Status: **ready for human review on 2026-07-27; Phase 6 remains closed.**
+Status: **revised and ready for human export review on 2026-07-28; Phase 6
+remains closed.**
 
 This is the Phase 5 walking skeleton: one unsigned macOS arm64 application
 containing the shared React workspace, a thin Tauri 2 supervisor, a
@@ -79,6 +80,18 @@ committed score**. The score should render in the existing workspace and open
 in the responsive reader. Capture, review, playback, and export should remain
 available if score generation fails.
 
+The user confirmed on 2026-07-28 that score engraving works in this desktop
+build. That pass found that the nearby browser-style baseline download
+produced no visible desktop file. Tactical 032 removes that duplicate action:
+the bottom **Exports** panel now labels **Original model MusicXML** beside
+audio, MIDI, event history, score alignment, and the selected score. Web
+exports retain ordinary downloads; desktop exports open a native Save As
+dialog and stream exact authenticated artifact bytes to the chosen file.
+
+The revised ignored internal app is at the same path. Its current audit
+reconciles 32,704 files and 2,361,515,181 installed bytes. The score runtime
+and provisional license boundary are unchanged.
+
 ## Suggested Review
 
 1. Launch the app. It should open the existing Atpiano performance workspace
@@ -93,7 +106,11 @@ available if score generation fails.
 4. Quit and reopen the app. Completed sessions should still appear.
 5. In the internal score build, render a settled score and inspect its
    notation, synchronized score cursor, and source alignment.
-6. Decide whether this feels like the accepted shared application and whether
+6. Under **Exports**, save **Original model MusicXML** and one audio or MIDI
+   artifact. Confirm each Save As dialog and saved file, and verify each
+   SHA-256 starts with the prefix displayed by the panel; cancel one dialog
+   and confirm no partial file appears.
+7. Decide whether this feels like the accepted shared application and whether
    the process, bundle, and capability direction are sound.
 
 The current local application-data workspace already contains two completed
@@ -206,7 +223,8 @@ The native shell owns only:
 - one child process and its inherited environment/stdin/stdout/stderr;
 - the app-data workspace path and packaged resource paths;
 - one size-bounded ready record and one authenticated handshake;
-- one `desktop_runtime` bootstrap command; and
+- one `desktop_runtime` bootstrap command;
+- one bounded `desktop_export_artifact` Save As command; and
 - one `desktop-runtime-failed` event.
 
 The main local webview receives only `core:event:allow-listen` and
@@ -215,6 +233,16 @@ updater, tray, menu, image, or remote-origin plugin capability. The CSP loads
 the application from bundled assets and permits connections only to Tauri IPC
 and loopback HTTP/WebSocket endpoints.
 
+The custom export command is not general filesystem or dialog access. The
+webview supplies only one validated sidecar artifact-content path and a safe
+suggested basename. Native code chooses no path itself: the operating-system
+Save As dialog returns the user-selected destination. Rust then fetches from
+the already validated loopback port with its native-held bearer value,
+streams the declared length outside IPC, and atomically publishes only a
+complete file. The command rejects remote URLs, other loopback endpoints,
+path traversal, response-header overflow, transfer encoding, duplicate or
+missing lengths, and truncated bodies.
+
 The Python sidecar binds an ephemeral `127.0.0.1` port. HTTP and artifact
 requests require the per-launch bearer value. WebSocket upgrades require one
 exact token-derived subprotocol. Only `tauri://localhost` receives CORS
@@ -222,8 +250,8 @@ access. The token is passed in inherited environment, not arguments or URLs,
 and is redacted from bounded failure details.
 
 The React product components know only `AtpianoRuntime`. Tauri detection,
-bootstrap, authenticated requests, WebSocket construction, and bounded
-artifact blob URLs remain inside desktop composition/runtime files.
+bootstrap, authenticated requests, WebSocket construction, native export, and
+bounded artifact blob URLs remain inside desktop composition/runtime files.
 
 ## Bundle Inventory
 
@@ -310,21 +338,24 @@ removed and any survivor fails packaging.
 ## Commit And Test Record
 
 The Phase 5 implementation series begins at `fc7cad6`; Tactical 030 records
-the original R5 series and Tactical 031 records the internal score revision.
+the original R5 series, Tactical 031 records the internal score revision, and
+Tactical 032 records the artifact-export revision.
 
 The final gate includes:
 
 - 177 Python tests and Ruff;
-- 5 Node contract tests and 47 Vitest tests;
+- 5 Node contract tests and 49 Vitest tests;
 - frontend typecheck and production build;
-- 8 Rust lifecycle/security tests, formatting, and Clippy with warnings
+- 11 Rust lifecycle/security/export tests, formatting, and Clippy with warnings
   denied;
 - self-contained staging/import/sidecar smoke;
 - final bundle native, dependency, cache, component, and archive audit;
 - extracted-archive `env -i` launch and post-launch immutability check; and
 - direct-versus-packaged real golden replay parity; plus
 - internal packaged replay-to-score, MusicXML/alignment validation, and
-  whole-tree immutability.
+  whole-tree immutability; plus
+- a rebuilt internal app audit and authenticated, length-checked, atomic
+  artifact-streaming tests.
 
 R5 is a human hold. Do not open the complete local-desktop Phase 6 until the
 user explicitly accepts this boundary and bundle direction.

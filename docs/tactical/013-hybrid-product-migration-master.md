@@ -7,10 +7,14 @@ and R2, R3, and R4 are accepted. On 2026-07-27 the user accepted application
 parity and selected verified MP3 retention with explicit WAV opt-in. Phase 5
 reached R5 under Tactical 030; the score-unavailable review result opened the
 bounded internal-only revision in Tactical 031. That revision is implemented,
-including a real packaged replay-to-score result, and is held for review. R5
-remains open and Phase 6 remains closed. This document tracks the staged
-migration program and its human review gates. Each phase must create one or
-more smaller numbered tacticals before implementation.
+including a real packaged replay-to-score result, and the first hands-on test
+confirmed that its engraving works. The same review exposed inert
+browser-style downloads in the desktop webview. Tactical 032 now moves the
+model baseline into Exports and implements cross-platform artifact export
+through the runtime boundary. R5 remains open and Phase 6 remains closed.
+This document tracks the staged migration program and its human review gates.
+Each phase must create one or more smaller numbered tacticals before
+implementation.
 
 ## Outcome
 
@@ -68,7 +72,7 @@ result, and commit range.
 | 2. Contracts and structure | Complete (`e2c2b9d^..9f8dd16`) | [`015`](015-contracts-and-structure.md) | R2 accepted 2026-07-26 |
 | 3. Shared React application | Complete | [`016`](016-shared-react-application.md) | R3 accepted 2026-07-26 |
 | 4. Python application core | Complete | [`022`](022-durable-capture-worker-isolation.md), [`023`](023-backend-capability-degradation.md), then [`017`](017-python-application-core.md) | R4 accepted 2026-07-27 |
-| 5. Early Tauri skeleton | R5 internal-score revision implemented; held for review | [`030`](030-early-tauri-sidecar-boundary.md), [`031`](031-internal-desktop-score-runtime.md) | **R5 desktop-boundary review required** |
+| 5. Early Tauri skeleton | R5 internal-score and artifact-export revisions implemented; held for review | [`030`](030-early-tauri-sidecar-boundary.md), [`031`](031-internal-desktop-score-runtime.md), [`032`](032-cross-platform-artifact-export.md) | **R5 desktop-boundary review required** |
 | 6. Complete local desktop | Blocked by R5 acceptance | Not created | Required daily-use review |
 | 7. Hosted service | Blocked by Phase 6 | Not created | Required hosted and tenancy review |
 | 8. Collaboration, distribution, and limited sync | Blocked by Phase 7 | Not created | Separate release and sync reviews |
@@ -544,6 +548,14 @@ the checkpoint follows the paper's CC BY 4.0 terms. The upstream repository
 and checkpoint still lack their own explicit notices, so ordinary and public
 artifacts remain score-free. This revision does not accept R5 or open Phase 6.
 
+The user then confirmed that score engraving works in the internal desktop
+app and found that **Download model baseline** produced no visible file.
+[`032-cross-platform-artifact-export.md`](032-cross-platform-artifact-export.md)
+moves the immutable baseline into the shared Exports panel and implements one
+runtime export operation with ordinary browser downloads and a bounded native
+desktop Save As path. This second review revision is implemented and rebuilt
+for human export validation. It does not accept R5 or open Phase 6.
+
 ## Phase 6 — Complete The Local Desktop Vertical Slice
 
 ### Purpose
@@ -553,8 +565,8 @@ product.
 
 ### Work
 
-- Complete microphone capture, replay, Stop, history, deletion, artifacts,
-  score jobs where licensed, and local settings.
+- Complete microphone capture, replay, Stop, history, deletion, remaining
+  artifact polish, score jobs where licensed, and local settings.
 - Add SQLite catalog and durable local artifact layout with repair/re-indexing.
 - Add model-pack acquisition, signed manifests, compatibility policy, and
   visible storage requirements.
