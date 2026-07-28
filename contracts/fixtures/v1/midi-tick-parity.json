@@ -1,0 +1,139 @@
+{
+  "duration_cases": [
+    {
+      "expected_duration_ticks": 1,
+      "expected_offset_tick": 101,
+      "expected_onset_tick": 100,
+      "label": "one-tick",
+      "offset_sample": 5050,
+      "onset_sample": 5000
+    },
+    {
+      "expected_duration_ticks": 0,
+      "expected_offset_tick": 31131,
+      "expected_onset_tick": 31131,
+      "label": "same-tick",
+      "offset_sample": 1556530,
+      "onset_sample": 1556525
+    },
+    {
+      "expected_duration_ticks": 796,
+      "expected_offset_tick": 31927,
+      "expected_onset_tick": 31131,
+      "label": "retained-long",
+      "offset_sample": 1596339,
+      "onset_sample": 1556525
+    }
+  ],
+  "operation_identity": "mido-second2tick-float-python-half-even-v1",
+  "ordering": {
+    "expected_event_ids": [
+      "duration-short",
+      "later-source-sample",
+      "duration-long",
+      "identity-a",
+      "identity-b",
+      "retained-later-low",
+      "retained-half-high"
+    ],
+    "notes": [
+      {
+        "event_id": "retained-later-low",
+        "offset_sample": 1559535,
+        "onset_sample": 1556530,
+        "pitch": 65,
+        "velocity": 64
+      },
+      {
+        "event_id": "retained-half-high",
+        "offset_sample": 1596339,
+        "onset_sample": 1556525,
+        "pitch": 77,
+        "velocity": 64
+      },
+      {
+        "event_id": "duration-long",
+        "offset_sample": 5100,
+        "onset_sample": 5000,
+        "pitch": 60,
+        "velocity": 64
+      },
+      {
+        "event_id": "duration-short",
+        "offset_sample": 5050,
+        "onset_sample": 5000,
+        "pitch": 60,
+        "velocity": 64
+      },
+      {
+        "event_id": "later-source-sample",
+        "offset_sample": 5052,
+        "onset_sample": 5002,
+        "pitch": 60,
+        "velocity": 64
+      },
+      {
+        "event_id": "identity-b",
+        "offset_sample": 6050,
+        "onset_sample": 6000,
+        "pitch": 61,
+        "velocity": 64
+      },
+      {
+        "event_id": "identity-a",
+        "offset_sample": 6050,
+        "onset_sample": 6000,
+        "pitch": 61,
+        "velocity": 64
+      }
+    ]
+  },
+  "parameters": {
+    "sample_rate_hz": 48000,
+    "tempo_us_per_beat": 500000,
+    "ticks_per_beat": 480
+  },
+  "schema_version": "atpiano.midi-tick-parity.v1",
+  "tick_cases": [
+    {
+      "expected_tick": 0,
+      "label": "zero",
+      "source_sample": 0
+    },
+    {
+      "expected_tick": 0,
+      "label": "below-first-half",
+      "source_sample": 24
+    },
+    {
+      "expected_tick": 0,
+      "label": "first-half",
+      "source_sample": 25
+    },
+    {
+      "expected_tick": 1,
+      "label": "above-first-half",
+      "source_sample": 26
+    },
+    {
+      "expected_tick": 61262,
+      "label": "retained-ties-to-even-down",
+      "source_sample": 3063125
+    },
+    {
+      "expected_tick": 31131,
+      "label": "retained-float-above-half",
+      "source_sample": 1556525
+    },
+    {
+      "expected_tick": 31131,
+      "label": "retained-collision-neighbor",
+      "source_sample": 1556530
+    },
+    {
+      "expected_tick": 864000,
+      "label": "near-session-limit",
+      "source_sample": 43199999
+    }
+  ]
+}

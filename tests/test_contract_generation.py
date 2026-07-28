@@ -7,6 +7,7 @@ import pytest
 
 from atpiano.cli import build_parser
 from atpiano.contracts.generation import (
+    MIDI_TICK_FIXTURE_RELATIVE_PATH,
     OPENAPI_RELATIVE_PATH,
     TYPESCRIPT_RELATIVE_PATH,
     build_openapi_document,
@@ -63,13 +64,17 @@ def test_generation_check_detects_drift(tmp_path: Path) -> None:
     )
     executable.chmod(0o755)
 
-    openapi, typescript = generate_contracts(root=tmp_path)
+    openapi, typescript, midi_ticks = generate_contracts(root=tmp_path)
 
     assert openapi == tmp_path / OPENAPI_RELATIVE_PATH
     assert typescript == tmp_path / TYPESCRIPT_RELATIVE_PATH
     assert json.loads(openapi.read_text(encoding="utf-8"))["openapi"] == "3.1.0"
     assert typescript.read_text(encoding="utf-8") == "generated\n"
+    assert midi_ticks == tmp_path / MIDI_TICK_FIXTURE_RELATIVE_PATH
+    assert json.loads(midi_ticks.read_text(encoding="utf-8"))[
+        "operation_identity"
+    ] == "mido-second2tick-float-python-half-even-v1"
     generate_contracts(root=tmp_path, check=True)
     typescript.write_text("drifted\n", encoding="utf-8")
-    with pytest.raises(RuntimeError, match="generated API contracts"):
+    with pytest.raises(RuntimeError, match="generated contracts"):
         generate_contracts(root=tmp_path, check=True)

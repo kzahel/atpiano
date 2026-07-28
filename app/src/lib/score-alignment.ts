@@ -67,7 +67,7 @@ export function scoreRationalValue(value: ScoreRational): number {
   return value.numerator / value.denominator;
 }
 
-function transformerMidiTick(
+export function transformerMidiTick(
   sourceSample: number,
   sampleRateHz: number,
 ): bigint {
@@ -84,7 +84,7 @@ function transformerMidiTick(
   return BigInt(lower % 2 === 0 ? lower : lower + 1);
 }
 
-type TransformerMidiOrder = readonly [
+export type TransformerMidiOrder = readonly [
   onsetTick: bigint,
   pitch: number,
   durationTicks: bigint,
@@ -93,7 +93,34 @@ type TransformerMidiOrder = readonly [
   eventId: string,
 ];
 
-function compareTransformerMidiOrder(
+export function transformerMidiOrder(
+  source: {
+    readonly event_id: string;
+    readonly pitch: number;
+    readonly onset_sample: number;
+    readonly offset_sample: number;
+  },
+  sampleRateHz: number,
+): TransformerMidiOrder {
+  const onsetTick = transformerMidiTick(
+    source.onset_sample,
+    sampleRateHz,
+  );
+  const offsetTick = transformerMidiTick(
+    source.offset_sample,
+    sampleRateHz,
+  );
+  return [
+    onsetTick,
+    source.pitch,
+    offsetTick - onsetTick,
+    source.onset_sample,
+    source.offset_sample,
+    source.event_id,
+  ];
+}
+
+export function compareTransformerMidiOrder(
   left: TransformerMidiOrder,
   right: TransformerMidiOrder,
 ): number {
@@ -107,7 +134,9 @@ function compareTransformerMidiOrder(
   if (left[3] > right[3]) return 1;
   if (left[4] < right[4]) return -1;
   if (left[4] > right[4]) return 1;
-  return left[5].localeCompare(right[5]);
+  if (left[5] < right[5]) return -1;
+  if (left[5] > right[5]) return 1;
+  return 0;
 }
 
 export function parseScoreAlignment(
@@ -157,16 +186,12 @@ export function parseScoreAlignment(
     ) {
       throw new Error("Score alignment source order is invalid");
     }
-    const onsetTick = transformerMidiTick(onsetSample, sampleRateHz);
-    const offsetTick = transformerMidiTick(offsetSample, sampleRateHz);
-    const midiOrder = [
-      onsetTick,
+    const midiOrder = transformerMidiOrder({
+      event_id: item.event_id,
       pitch,
-      offsetTick - onsetTick,
-      onsetSample,
-      offsetSample,
-      item.event_id,
-    ] as const;
+      onset_sample: onsetSample,
+      offset_sample: offsetSample,
+    }, sampleRateHz);
     if (
       priorMidiOrder !== null &&
       compareTransformerMidiOrder(midiOrder, priorMidiOrder) < 0

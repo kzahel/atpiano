@@ -11,10 +11,23 @@ from typing import Any
 from pydantic.json_schema import models_json_schema
 
 from atpiano.contracts.schemas import contract_models
+from atpiano.corrected_export import (
+    MIDI_TEMPO_US_PER_BEAT,
+    MIDI_TICKS_PER_BEAT,
+    midi_tick_at_sample,
+)
+from atpiano.score_alignment import score_input_notes_document
 from atpiano.util import write_json
 
 OPENAPI_RELATIVE_PATH = Path("contracts/openapi/atpiano-api-v1.json")
 TYPESCRIPT_RELATIVE_PATH = Path("app/src/generated/schema.ts")
+MIDI_TICK_FIXTURE_RELATIVE_PATH = Path(
+    "contracts/fixtures/v1/midi-tick-parity.json"
+)
+MIDI_TICK_FIXTURE_SCHEMA = "atpiano.midi-tick-parity.v1"
+MIDI_TICK_OPERATION_IDENTITY = (
+    "mido-second2tick-float-python-half-even-v1"
+)
 
 
 def _repository_root() -> Path:
@@ -332,6 +345,135 @@ def build_openapi_document() -> dict[str, Any]:
     }
 
 
+def build_midi_tick_parity_document() -> dict[str, Any]:
+    """Generate canonical producer timing and ordering expectations."""
+
+    sample_rate_hz = 48_000
+    samples = [
+        ("zero", 0),
+        ("below-first-half", 24),
+        ("first-half", 25),
+        ("above-first-half", 26),
+        ("retained-ties-to-even-down", 3_063_125),
+        ("retained-float-above-half", 1_556_525),
+        ("retained-collision-neighbor", 1_556_530),
+        ("near-session-limit", sample_rate_hz * 15 * 60 - 1),
+    ]
+    durations = [
+        ("one-tick", 5_000, 5_050),
+        ("same-tick", 1_556_525, 1_556_530),
+        ("retained-long", 1_556_525, 1_596_339),
+    ]
+    notes = [
+        {
+            "event_id": "retained-later-low",
+            "pitch": 65,
+            "onset_sample": 1_556_530,
+            "offset_sample": 1_559_535,
+            "velocity": 64,
+        },
+        {
+            "event_id": "retained-half-high",
+            "pitch": 77,
+            "onset_sample": 1_556_525,
+            "offset_sample": 1_596_339,
+            "velocity": 64,
+        },
+        {
+            "event_id": "duration-long",
+            "pitch": 60,
+            "onset_sample": 5_000,
+            "offset_sample": 5_100,
+            "velocity": 64,
+        },
+        {
+            "event_id": "duration-short",
+            "pitch": 60,
+            "onset_sample": 5_000,
+            "offset_sample": 5_050,
+            "velocity": 64,
+        },
+        {
+            "event_id": "later-source-sample",
+            "pitch": 60,
+            "onset_sample": 5_002,
+            "offset_sample": 5_052,
+            "velocity": 64,
+        },
+        {
+            "event_id": "identity-b",
+            "pitch": 61,
+            "onset_sample": 6_000,
+            "offset_sample": 6_050,
+            "velocity": 64,
+        },
+        {
+            "event_id": "identity-a",
+            "pitch": 61,
+            "onset_sample": 6_000,
+            "offset_sample": 6_050,
+            "velocity": 64,
+        },
+    ]
+    ordered = score_input_notes_document(
+        session_id="midi-tick-parity",
+        sample_rate_hz=sample_rate_hz,
+        notes=notes,
+    )
+    return {
+        "schema_version": MIDI_TICK_FIXTURE_SCHEMA,
+        "operation_identity": MIDI_TICK_OPERATION_IDENTITY,
+        "parameters": {
+            "sample_rate_hz": sample_rate_hz,
+            "ticks_per_beat": MIDI_TICKS_PER_BEAT,
+            "tempo_us_per_beat": MIDI_TEMPO_US_PER_BEAT,
+        },
+        "tick_cases": [
+            {
+                "label": label,
+                "source_sample": source_sample,
+                "expected_tick": midi_tick_at_sample(
+                    source_sample,
+                    sample_rate_hz=sample_rate_hz,
+                ),
+            }
+            for label, source_sample in samples
+        ],
+        "duration_cases": [
+            {
+                "label": label,
+                "onset_sample": onset_sample,
+                "offset_sample": offset_sample,
+                "expected_onset_tick": midi_tick_at_sample(
+                    onset_sample,
+                    sample_rate_hz=sample_rate_hz,
+                ),
+                "expected_offset_tick": midi_tick_at_sample(
+                    offset_sample,
+                    sample_rate_hz=sample_rate_hz,
+                ),
+                "expected_duration_ticks": (
+                    midi_tick_at_sample(
+                        offset_sample,
+                        sample_rate_hz=sample_rate_hz,
+                    )
+                    - midi_tick_at_sample(
+                        onset_sample,
+                        sample_rate_hz=sample_rate_hz,
+                    )
+                ),
+            }
+            for label, onset_sample, offset_sample in durations
+        ],
+        "ordering": {
+            "notes": notes,
+            "expected_event_ids": [
+                note["event_id"] for note in ordered["notes"]
+            ],
+        },
+    }
+
+
 def _json_bytes(value: dict[str, Any]) -> bytes:
     return (
         json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n"
@@ -360,17 +502,23 @@ def generate_contracts(
     *,
     check: bool = False,
     root: Path | None = None,
-) -> tuple[Path, Path]:
+) -> tuple[Path, Path, Path]:
     root = (root or _repository_root()).resolve()
     openapi_path = root / OPENAPI_RELATIVE_PATH
     typescript_path = root / TYPESCRIPT_RELATIVE_PATH
+    midi_tick_fixture_path = root / MIDI_TICK_FIXTURE_RELATIVE_PATH
     document = build_openapi_document()
+    midi_tick_fixture = build_midi_tick_parity_document()
 
     with tempfile.TemporaryDirectory(prefix="atpiano-contracts-") as temporary:
         temporary_root = Path(temporary)
         expected_openapi = temporary_root / "openapi.json"
         expected_openapi.write_bytes(_json_bytes(document))
         expected_typescript = temporary_root / "schema.ts"
+        expected_midi_tick_fixture = temporary_root / "midi-tick-parity.json"
+        expected_midi_tick_fixture.write_bytes(
+            _json_bytes(midi_tick_fixture)
+        )
         _generate_typescript(
             root=root,
             openapi_path=expected_openapi,
@@ -383,14 +531,27 @@ def generate_contracts(
                 for path, expected in (
                     (openapi_path, expected_openapi),
                     (typescript_path, expected_typescript),
+                    (
+                        midi_tick_fixture_path,
+                        expected_midi_tick_fixture,
+                    ),
                 )
                 if not path.is_file() or path.read_bytes() != expected.read_bytes()
             ]
             if drifted:
                 names = ", ".join(str(path.relative_to(root)) for path in drifted)
-                raise RuntimeError(f"generated API contracts have drifted: {names}")
+                raise RuntimeError(
+                    f"generated contracts have drifted: {names}"
+                )
         else:
             write_json(openapi_path, document)
             typescript_path.parent.mkdir(parents=True, exist_ok=True)
             typescript_path.write_bytes(expected_typescript.read_bytes())
-    return openapi_path, typescript_path
+            midi_tick_fixture_path.parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            midi_tick_fixture_path.write_bytes(
+                expected_midi_tick_fixture.read_bytes()
+            )
+    return openapi_path, typescript_path, midi_tick_fixture_path
