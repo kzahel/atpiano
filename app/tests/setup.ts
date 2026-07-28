@@ -49,6 +49,23 @@ Object.defineProperty(URL, "revokeObjectURL", {
 vi.mock("opensheetmusicdisplay", () => ({
   OpenSheetMusicDisplay: class {
     readonly #container: HTMLElement;
+    readonly #noteheads = Array.from({ length: 17 }, (_, index) =>
+      Array.from({ length: 2 }, (_, chordIndex) => {
+        const notehead = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "g",
+        );
+        notehead.dataset.cursorIndex = String(index);
+        notehead.dataset.chordIndex = String(chordIndex);
+        const path = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "path",
+        );
+        notehead.append(path);
+        return notehead;
+      })
+    );
+    readonly #cursorElement = document.createElement("img");
     Zoom = 1;
     readonly EngravingRules = {
       NewPageAtXMLNewPageAttribute: false,
@@ -62,6 +79,7 @@ vi.mock("opensheetmusicdisplay", () => ({
     };
     readonly cursor = {
       SkipInvisibleNotes: true,
+      cursorElement: this.#cursorElement,
       Iterator: {
         CurrentSourceTimestamp: { RealValue: 0 },
         EndReached: false,
@@ -78,6 +96,18 @@ vi.mock("opensheetmusicdisplay", () => ({
       },
       show() {},
       hide() {},
+      GNotesUnderCursor: () => [{
+        getNoteheadSVGs: () => [
+          ...this.#noteheads[
+            Math.min(
+              this.#noteheads.length - 1,
+              Math.floor(
+                this.cursor.Iterator.CurrentSourceTimestamp.RealValue,
+              ),
+            )
+          ]!,
+        ],
+      }],
     };
     readonly GraphicSheet = {
       MusicPages: [0, 4, 8, 12].map((measure) => ({
@@ -119,7 +149,9 @@ vi.mock("opensheetmusicdisplay", () => ({
             "svg",
           );
           svg.setAttribute("aria-label", `Fixture score page ${index + 1}`);
+          if (index === 0) svg.append(...this.#noteheads.flat());
           page.append(svg);
+          if (index === 0) page.append(this.#cursorElement);
           return page;
         }),
       );

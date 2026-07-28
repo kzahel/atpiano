@@ -13,6 +13,10 @@ import { App } from "../../src/app.js";
 import type { AtpianoRuntime } from "../../src/runtime/atpiano-runtime.js";
 import { createFixtureRuntime } from "../../src/runtime/fixture-data.js";
 import { RuntimeProvider } from "../../src/runtime/runtime-context.js";
+import {
+  resetPlaybackStore,
+  usePlaybackStore,
+} from "../../src/state/playback-store.js";
 import { useWorkspaceStore } from "../../src/state/workspace-store.js";
 
 function renderApp(
@@ -45,6 +49,7 @@ describe("shared application", () => {
   beforeEach(() => {
     window.history.replaceState(null, "", "/");
     window.localStorage.removeItem("atpiano.score-reader-density");
+    resetPlaybackStore();
     useWorkspaceStore.setState({
       selectedSessionId: null,
       libraryIntent: true,
@@ -278,6 +283,48 @@ describe("shared application", () => {
     expect(screen.getByRole("heading", { name: "Committed score" })).toBeTruthy();
   });
 
+  it("detaches score follow without interrupting playback", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    renderApp();
+
+    await screen.findByLabelText("Rendered committed MusicXML score");
+    const play = await screen.findByRole("button", {
+      name: "Play recorded audio",
+    });
+    await waitFor(() =>
+      expect((play as HTMLButtonElement).disabled).toBe(false)
+    );
+    await user.click(play);
+    expect(usePlaybackStore.getState().status).toBe("playing");
+    expect(usePlaybackStore.getState().scoreFollow).toBe("following");
+
+    fireEvent.wheel(window);
+
+    expect(usePlaybackStore.getState().scoreFollow).toBe("detached");
+    await screen.findByRole("button", {
+      name: "Follow playback",
+    });
+    await user.click(
+      screen.getByRole("button", { name: "Pause recorded audio" }),
+    );
+    expect(usePlaybackStore.getState().status).toBe("paused");
+    expect(usePlaybackStore.getState().scoreFollow).toBe("detached");
+    await user.click(
+      screen.getByRole("button", { name: "Play recorded audio" }),
+    );
+    expect(usePlaybackStore.getState().scoreFollow).toBe("detached");
+
+    await user.click(
+      screen.getByRole("button", { name: "Follow playback" }),
+    );
+
+    expect(usePlaybackStore.getState().scoreFollow).toBe("following");
+    expect(
+      screen.queryByRole("button", { name: "Follow playback" }),
+    ).toBeNull();
+  });
+
   it("exports the model baseline through the shared runtime operation", async () => {
     const user = userEvent.setup();
     const fixture = createFixtureRuntime();
@@ -453,6 +500,48 @@ describe("shared application", () => {
       await screen.findByRole("heading", { name: "Piano roll" }),
     ).toBeTruthy();
     expect(new URL(window.location.href).searchParams.get("view")).toBeNull();
+  });
+
+  it("keeps one playback host through reader navigation", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    renderApp();
+    const play = await screen.findByRole("button", {
+      name: "Play recorded audio",
+    });
+    await waitFor(() =>
+      expect((play as HTMLButtonElement).disabled).toBe(false)
+    );
+    const audio = document.querySelector(".persistent-playback-audio");
+    await user.click(play);
+    expect(usePlaybackStore.getState().status).toBe("playing");
+
+    await user.click(
+      await screen.findByRole("button", { name: "Open score reader" }),
+    );
+
+    expect(await screen.findByText("Page 1 of 4")).toBeTruthy();
+    expect(document.querySelector(".persistent-playback-audio")).toBe(audio);
+    await user.click(
+      screen.getByRole("button", { name: "Pause recorded audio" }),
+    );
+    expect(usePlaybackStore.getState().status).toBe("paused");
+    expect(screen.getByText("Page 1 of 4")).toBeTruthy();
+    await user.click(
+      screen.getByRole("button", { name: "Play recorded audio" }),
+    );
+    expect(usePlaybackStore.getState().status).toBe("playing");
+    expect(screen.getByText("Page 1 of 4")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: /Workspace/ }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Piano roll" }),
+    ).toBeTruthy();
+    expect(document.querySelector(".persistent-playback-audio")).toBe(audio);
+    expect(
+      screen.getByRole("button", { name: "Pause recorded audio" }),
+    ).toBeTruthy();
   });
 
   it("reloads a pinned score route without resolving it as current", async () => {

@@ -7,11 +7,13 @@ import {
   moveScoreCursor,
   scoreAttackAtSample,
   type ScoreAlignment,
+  type ScoreCursorLike,
 } from "../lib/score-alignment.js";
 import type {
   ScorePageAnchor,
   ScoreReaderLayout,
 } from "../lib/score-reader-layout.js";
+import { usePlaybackStore } from "../state/playback-store.js";
 
 export interface ScoreRenderPages {
   readonly pageCount: number;
@@ -50,6 +52,47 @@ interface ReaderEngravingRules {
   PageTopMargin: number;
   PageTopMarginNarrow: number;
   PageBottomMargin: number;
+}
+
+interface PlaybackGraphicalNoteLike {
+  getNoteheadSVGs?(): HTMLElement[];
+}
+
+interface PlaybackCursorLike extends ScoreCursorLike {
+  readonly cursorElement?: HTMLElement;
+  GNotesUnderCursor?(): readonly PlaybackGraphicalNoteLike[];
+}
+
+interface ScorePanelGeometry {
+  readonly viewportTop: number;
+  readonly viewportHeight: number;
+  readonly scrollTop: number;
+  readonly scrollHeight: number;
+  readonly cursorTop: number;
+  readonly cursorHeight: number;
+}
+
+export function scorePanelFollowTop(
+  geometry: ScorePanelGeometry,
+): number | null {
+  const cursorCenter =
+    geometry.cursorTop + geometry.cursorHeight / 2;
+  const safeTop = geometry.viewportTop + geometry.viewportHeight * 0.22;
+  const safeBottom =
+    geometry.viewportTop + geometry.viewportHeight * 0.78;
+  if (cursorCenter >= safeTop && cursorCenter <= safeBottom) return null;
+  const relativeCenter = cursorCenter - geometry.viewportTop;
+  const maximum = Math.max(
+    0,
+    geometry.scrollHeight - geometry.viewportHeight,
+  );
+  return Math.max(
+    0,
+    Math.min(
+      maximum,
+      geometry.scrollTop + relativeCenter - geometry.viewportHeight / 2,
+    ),
+  );
 }
 
 function pageElements(container: HTMLElement): HTMLElement[] {
@@ -113,19 +156,46 @@ export function MusicXmlScore({
   readonly pageSpan?: 1 | 2;
   readonly onPages?: (pages: ScoreRenderPages) => void;
 }) {
+  const paper = useRef<HTMLDivElement>(null);
   const target = useRef<HTMLDivElement>(null);
   const renderer = useRef<OsmdRenderer | null>(null);
   const priorTargetQuarter = useRef<number | null>(null);
+  const highlightedQuarter = useRef<number | null>(null);
+  const highlightedNoteheads = useRef<Set<HTMLElement>>(new Set());
+  const automaticScrollUntil = useRef(0);
   const onPagesRef = useRef(onPages);
   const [error, setError] = useState<string | null>(null);
   const [renderVersion, setRenderVersion] = useState(0);
+  const playbackStatus = usePlaybackStore((state) => state.status);
+  const scoreFollow = usePlaybackStore((state) => state.scoreFollow);
+  const detachScore = usePlaybackStore((state) => state.detachScore);
+  const priorScoreFollow = useRef(scoreFollow);
   onPagesRef.current = onPages;
+
+  const clearNoteHighlight = () => {
+    for (const notehead of highlightedNoteheads.current) {
+      notehead.classList.remove("playback-note-active");
+    }
+    highlightedNoteheads.current.clear();
+    highlightedQuarter.current = null;
+  };
+
+  useEffect(() => {
+    if (
+      priorScoreFollow.current === "detached" &&
+      scoreFollow === "following"
+    ) {
+      automaticScrollUntil.current = performance.now() + 180;
+    }
+    priorScoreFollow.current = scoreFollow;
+  }, [scoreFollow]);
 
   useEffect(() => {
     const container = target.current;
     if (!container) return;
     let cancelled = false;
     let currentRenderer: OsmdRenderer | null = null;
+    clearNoteHighlight();
     renderer.current = null;
     priorTargetQuarter.current = null;
     setError(null);
@@ -138,13 +208,13 @@ export function MusicXmlScore({
           backend: "svg",
           drawTitle: false,
           drawingParameters: "compacttight",
-          followCursor: !reader,
+          followCursor: false,
           cursorsOptions: [
             {
               type: 1,
               color: "#2fbe8c",
-              alpha: 0.82,
-              follow: !reader,
+              alpha: 0.42,
+              follow: false,
             },
           ],
         });
@@ -209,6 +279,7 @@ export function MusicXmlScore({
       });
     return () => {
       cancelled = true;
+      clearNoteHighlight();
       if (renderer.current === currentRenderer) renderer.current = null;
       currentRenderer?.clear();
       container.replaceChildren();
@@ -223,6 +294,61 @@ export function MusicXmlScore({
   ]);
 
   useEffect(() => {
+    if (
+      readerLayout ||
+      playbackStatus !== "playing" ||
+      scoreFollow !== "following"
+    ) {
+      return;
+    }
+    const detachForScrollIntent = () => detachScore();
+    const detachForWindowScroll = () => {
+      if (performance.now() > automaticScrollUntil.current) {
+        detachScore();
+      }
+    };
+    const keydown = (event: KeyboardEvent) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest(
+          "button, input, select, textarea, a, [role='button']",
+        )
+      ) {
+        return;
+      }
+      if (
+        [
+          "ArrowUp",
+          "ArrowDown",
+          "PageUp",
+          "PageDown",
+          "Home",
+          "End",
+          " ",
+        ].includes(event.key)
+      ) {
+        detachScore();
+      }
+    };
+    window.addEventListener("wheel", detachForScrollIntent, {
+      passive: true,
+    });
+    window.addEventListener("touchmove", detachForScrollIntent, {
+      passive: true,
+    });
+    window.addEventListener("scroll", detachForWindowScroll, {
+      passive: true,
+    });
+    window.addEventListener("keydown", keydown);
+    return () => {
+      window.removeEventListener("wheel", detachForScrollIntent);
+      window.removeEventListener("touchmove", detachForScrollIntent);
+      window.removeEventListener("scroll", detachForWindowScroll);
+      window.removeEventListener("keydown", keydown);
+    };
+  }, [detachScore, playbackStatus, readerLayout, scoreFollow]);
+
+  useEffect(() => {
     if (!readerLayout || !target.current) return;
     for (const [index, element] of pageElements(target.current).entries()) {
       const visible = index >= pageStart && index < pageStart + pageSpan;
@@ -232,7 +358,9 @@ export function MusicXmlScore({
   }, [pageSpan, pageStart, readerLayout, renderVersion]);
 
   useEffect(() => {
-    const cursor = renderer.current?.cursor;
+    const cursor = renderer.current?.cursor as
+      | PlaybackCursorLike
+      | undefined;
     if (!cursor) return;
     const targetQuarter = scoreAttackAtSample(
       alignment,
@@ -244,10 +372,51 @@ export function MusicXmlScore({
       targetQuarter,
       priorTargetQuarter.current,
     );
+    if (highlightedQuarter.current !== targetQuarter) {
+      clearNoteHighlight();
+      if (targetQuarter !== null) {
+        for (const note of cursor.GNotesUnderCursor?.() ?? []) {
+          for (const notehead of note.getNoteheadSVGs?.() ?? []) {
+            notehead.classList.add("playback-note-active");
+            highlightedNoteheads.current.add(notehead);
+          }
+        }
+        highlightedQuarter.current = targetQuarter;
+      }
+    }
+    if (
+      readerLayout ||
+      playbackStatus !== "playing" ||
+      scoreFollow !== "following" ||
+      !paper.current ||
+      !cursor.cursorElement
+    ) {
+      return;
+    }
+    const viewport = paper.current.getBoundingClientRect();
+    const cursorBounds = cursor.cursorElement.getBoundingClientRect();
+    const nextTop = scorePanelFollowTop({
+      viewportTop: viewport.top,
+      viewportHeight: paper.current.clientHeight || viewport.height,
+      scrollTop: paper.current.scrollTop,
+      scrollHeight: paper.current.scrollHeight,
+      cursorTop: cursorBounds.top,
+      cursorHeight: cursorBounds.height,
+    });
+    if (
+      nextTop !== null &&
+      Math.abs(nextTop - paper.current.scrollTop) >= 1
+    ) {
+      automaticScrollUntil.current = performance.now() + 180;
+      paper.current.scrollTop = nextTop;
+    }
   }, [
     alignment,
     inspectionSample,
+    playbackStatus,
+    readerLayout,
     renderVersion,
+    scoreFollow,
     scoreHorizonSample,
   ]);
 
@@ -256,7 +425,18 @@ export function MusicXmlScore({
     : "score-paper rendered";
   return (
     <div
+      ref={paper}
       className={className}
+      onScroll={() => {
+        if (
+          !readerLayout &&
+          playbackStatus === "playing" &&
+          scoreFollow === "following" &&
+          performance.now() > automaticScrollUntil.current
+        ) {
+          detachScore();
+        }
+      }}
       style={
         readerLayout
           ? {

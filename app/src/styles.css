@@ -1584,6 +1584,10 @@ input:focus-visible {
   background: #eeece3;
 }
 
+.score-playback-frame {
+  position: relative;
+}
+
 .score-paper.rendered {
   height: auto;
   min-height: 220px;
@@ -1594,6 +1598,44 @@ input:focus-visible {
 
 .score-paper.rendered > div {
   min-height: 200px;
+}
+
+.score-paper .playback-note-active,
+.score-paper .playback-note-active * {
+  fill: #df6d32 !important;
+  stroke: #913b18 !important;
+}
+
+.score-follow-playback {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 3;
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 15px;
+  border: 1px solid #66d1aa;
+  border-radius: 999px;
+  color: #e7fff6;
+  background: #173d31;
+  box-shadow: 0 7px 22px rgb(4 18 14 / 32%);
+  cursor: pointer;
+  font: 600 10px "DM Mono", monospace;
+  letter-spacing: 0.02em;
+}
+
+.score-follow-playback:hover,
+.score-follow-playback:focus-visible {
+  border-color: #a3f0d4;
+  background: #205442;
+}
+
+.score-follow-playback span {
+  color: #8fe2c3;
+  font-size: 17px;
+  line-height: 1;
 }
 
 .score-render-error {

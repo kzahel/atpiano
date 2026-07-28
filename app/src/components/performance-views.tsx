@@ -13,6 +13,7 @@ import type {
   ScoreVariant,
   Session,
 } from "../runtime/atpiano-runtime.js";
+import { usePlaybackStore } from "../state/playback-store.js";
 import { useWorkspaceStore } from "../state/workspace-store.js";
 
 function PianoRoll({
@@ -212,6 +213,9 @@ function ScorePreview({
   readonly onCreateAutomaticVariant: () => void;
   readonly onCreateEnharmonicVariant: () => void;
 }) {
+  const playbackStatus = usePlaybackStore((state) => state.status);
+  const scoreFollow = usePlaybackStore((state) => state.scoreFollow);
+  const followScore = usePlaybackStore((state) => state.followScore);
   return (
     <section className="view-card score-card">
       <div className="view-heading">
@@ -314,12 +318,26 @@ function ScorePreview({
         </p>
       )}
       {scoreXml ? (
-        <MusicXmlScore
-          xml={scoreXml}
-          alignment={scoreAlignment}
-          inspectionSample={inspectionSample}
-          scoreHorizonSample={scoreHorizonSample}
-        />
+        <div className="score-playback-frame">
+          <MusicXmlScore
+            xml={scoreXml}
+            alignment={scoreAlignment}
+            inspectionSample={inspectionSample}
+            scoreHorizonSample={scoreHorizonSample}
+          />
+          {scoreAlignment &&
+            playbackStatus === "playing" &&
+            scoreFollow === "detached" && (
+              <button
+                className="score-follow-playback"
+                type="button"
+                onClick={followScore}
+              >
+                <span aria-hidden="true">↳</span>
+                Follow playback
+              </button>
+            )}
+        </div>
       ) : (
         <div className="score-empty">
           <strong>No generated score snapshot</strong>
