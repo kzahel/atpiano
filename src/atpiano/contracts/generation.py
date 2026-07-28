@@ -96,6 +96,25 @@ def build_openapi_document() -> dict[str, Any]:
         schema={"type": "integer", "minimum": 1, "maximum": 4096, "default": 100},
     )
     paths = {
+        "/api/v1/auth/login": {
+            "post": {
+                "operationId": "login",
+                "requestBody": _request("LoginRequest"),
+                "responses": _response("AuthSession"),
+            }
+        },
+        "/api/v1/auth/logout": {
+            "post": {
+                "operationId": "logout",
+                "responses": _response("LogoutResult"),
+            }
+        },
+        "/api/v1/auth/session": {
+            "get": {
+                "operationId": "getAuthSession",
+                "responses": _response("AuthSession"),
+            }
+        },
         "/api/v1/capabilities": {
             "get": {
                 "operationId": "getCapabilities",

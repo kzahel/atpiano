@@ -4,6 +4,54 @@
  */
 
 export interface paths {
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAuthSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/capabilities": {
         parameters: {
             query?: never;
@@ -317,6 +365,39 @@ export interface components {
              */
             workspace_id: string | null;
         };
+        /** AuthSession */
+        AuthSession: {
+            /**
+             * Authenticated
+             * @default true
+             * @constant
+             */
+            authenticated: true;
+            principal: components["schemas"]["AuthenticatedPrincipal"];
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+        };
+        /** AuthenticatedPrincipal */
+        AuthenticatedPrincipal: {
+            /** Display Name */
+            display_name: string;
+            /** Memberships */
+            memberships: components["schemas"]["Membership"][];
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+            /** User Id */
+            user_id: string;
+            /** Username */
+            username: string;
+        };
         /** Capture */
         Capture: {
             /** Accepted Through Sample */
@@ -617,6 +698,34 @@ export interface components {
          * @enum {string}
          */
         JobKind: "transcription" | "score" | "export" | "upload";
+        /** LoginRequest */
+        LoginRequest: {
+            /** Password */
+            password: string;
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+            /** Username */
+            username: string;
+        };
+        /** LogoutResult */
+        LogoutResult: {
+            /**
+             * Logged Out
+             * @default true
+             * @constant
+             */
+            logged_out: true;
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+        };
         /** Membership */
         Membership: {
             /**
@@ -1139,6 +1248,97 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description AuthSession */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthSession"];
+                };
+            };
+            /** @description Structured API error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description LogoutResult */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogoutResult"];
+                };
+            };
+            /** @description Structured API error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getAuthSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description AuthSession */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthSession"];
+                };
+            };
+            /** @description Structured API error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     getCapabilities: {
         parameters: {
             query?: never;

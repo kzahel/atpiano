@@ -1589,6 +1589,65 @@ def create_corrected_workbench_server(
     )
 
 
+def create_corrected_workbench_runtime(
+    workspace_directory: Path,
+    *,
+    preview_model_factory: PreviewModelFactory = _default_preview_model,
+    commit_model_factory: CommitModelFactory | None = None,
+    commit_device: str = "cpu",
+    commit_threads: int | None = 2,
+    isolate_models: bool = True,
+    correction_mode: str = "auto",
+    backend_profile_path: Path | None = None,
+    minimum_free_bytes: int = DEFAULT_MINIMUM_FREE_BYTES,
+    model_idle_timeout_s: float = DEFAULT_MODEL_IDLE_TIMEOUT_S,
+    replay_manifest: Path | None = None,
+    replay_repeat: int = 1,
+    replay_silence_s: float = 0.0,
+    replay_realtime: bool = True,
+    score_runtime: Path = Path("results/midi2score-runtime"),
+    score_runner: ScoreRunner | None = None,
+    score_variant_runner: ScoreVariantRunner | None = None,
+    web_root: Path = WEB_ROOT,
+    application_mode: str = "corrected-workbench-v2",
+    public_origin: str | None = None,
+    compact_recordings: bool = True,
+    debug_retention: bool = False,
+    debug_byte_cap: int = 64 * 1024**2,
+    debug_max_age_s: float = 72 * 60 * 60,
+) -> CorrectedWorkbenchRuntime:
+    factory = commit_model_factory or partial(
+        _default_commit_model,
+        device=commit_device,
+        thread_limit=commit_threads,
+    )
+    return CorrectedWorkbenchRuntime(
+        workspace_directory,
+        preview_model_factory=preview_model_factory,
+        commit_model_factory=factory,
+        commit_threads=commit_threads,
+        isolate_models=isolate_models,
+        correction_mode=correction_mode,
+        backend_profile_path=backend_profile_path,
+        minimum_free_bytes=minimum_free_bytes,
+        model_idle_timeout_s=model_idle_timeout_s,
+        replay_manifest=replay_manifest,
+        replay_repeat=replay_repeat,
+        replay_silence_s=replay_silence_s,
+        replay_realtime=replay_realtime,
+        score_runtime=score_runtime,
+        score_runner=score_runner,
+        score_variant_runner=score_variant_runner,
+        web_root=web_root,
+        application_mode=application_mode,
+        public_origin=public_origin,
+        compact_recordings=compact_recordings,
+        debug_retention=debug_retention,
+        debug_byte_cap=debug_byte_cap,
+        debug_max_age_s=debug_max_age_s,
+    )
+
+
 def serve_corrected_workbench(
     workspace_directory: Path,
     *,

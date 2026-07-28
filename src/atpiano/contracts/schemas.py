@@ -38,6 +38,14 @@ MediaType = Annotated[
 Cursor = Annotated[str, StringConstraints(min_length=1, max_length=512)]
 PositiveLimit = Annotated[int, Field(ge=1, le=4096)]
 SampleIndex = Annotated[int, Field(ge=0)]
+Username = Annotated[
+    str,
+    StringConstraints(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+    ),
+]
 
 
 class ContractModel(BaseModel):
@@ -186,6 +194,36 @@ class Membership(VersionedContractModel):
     user_id: OpaqueId
     role: MembershipRole
     created_at: AwareDatetime
+
+
+class AuthenticatedPrincipal(VersionedContractModel):
+    user_id: OpaqueId
+    username: Username
+    display_name: Annotated[
+        str,
+        StringConstraints(min_length=1, max_length=128),
+    ]
+    memberships: tuple[Membership, ...]
+
+
+class LoginRequest(VersionedContractModel):
+    username: Annotated[
+        str,
+        StringConstraints(min_length=1, max_length=128),
+    ]
+    password: Annotated[
+        str,
+        StringConstraints(min_length=1, max_length=1024),
+    ]
+
+
+class AuthSession(VersionedContractModel):
+    authenticated: Literal[True] = True
+    principal: AuthenticatedPrincipal
+
+
+class LogoutResult(VersionedContractModel):
+    logged_out: Literal[True] = True
 
 
 class Session(VersionedContractModel):
@@ -542,6 +580,10 @@ def contract_models() -> tuple[type[BaseModel], ...]:
         User,
         Workspace,
         Membership,
+        AuthenticatedPrincipal,
+        LoginRequest,
+        AuthSession,
+        LogoutResult,
         Session,
         Capture,
         TranscriptionRun,

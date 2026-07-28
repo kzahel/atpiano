@@ -422,6 +422,79 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_storage_arguments(shared_app_parser)
     _add_model_lifecycle_arguments(shared_app_parser)
+    family_parser = subparsers.add_parser(
+        "family-server",
+        help="run the authenticated FastAPI family workspace",
+    )
+    family_parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=Path("results/workbench-v3"),
+        help="session and identity directory (default: results/workbench-v3)",
+    )
+    family_parser.add_argument(
+        "--bind",
+        default="127.0.0.1",
+        help="address for the family application server",
+    )
+    family_parser.add_argument("--port", type=int, default=8002)
+    family_parser.add_argument(
+        "--public-origin",
+        required=True,
+        help="exact browser origin served through Caddy",
+    )
+    family_parser.add_argument(
+        "--insecure-local-cookie",
+        action="store_true",
+        help="allow an HTTP cookie only with a loopback bind for local review",
+    )
+    family_parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="do not open the family application in the default browser",
+    )
+    family_parser.add_argument(
+        "--replay",
+        type=Path,
+        help="configure this deterministic input manifest for replay",
+    )
+    family_parser.add_argument("--repeat", type=int, default=1)
+    family_parser.add_argument(
+        "--silence-seconds",
+        type=float,
+        default=0.0,
+    )
+    family_parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="run configured replay without wall-clock waits",
+    )
+    family_parser.add_argument(
+        "--minimum-free-gib",
+        type=float,
+        default=2.0,
+    )
+    family_parser.add_argument(
+        "--commit-device",
+        default="cpu",
+    )
+    family_parser.add_argument(
+        "--commit-threads",
+        type=int,
+        default=2,
+    )
+    family_parser.add_argument(
+        "--correction-mode",
+        choices=("auto", "live", "delayed", "after-stop", "unavailable"),
+        default="auto",
+    )
+    family_parser.add_argument(
+        "--backend-profile",
+        type=Path,
+        default=Path("results/backend-profile/backend-profile.json"),
+    )
+    _add_storage_arguments(family_parser)
+    _add_model_lifecycle_arguments(family_parser)
     score_setup_parser = subparsers.add_parser(
         "setup-midi2score",
         help="install the internal MIDI2ScoreTransformer runtime",
@@ -675,6 +748,36 @@ def main(argv: Sequence[str] | None = None) -> int:
             replay_realtime=not args.no_wait,
             score_runtime=args.score_runtime,
             public_origin=args.public_origin,
+            compact_recordings=args.compact_recordings,
+            debug_retention=args.debug_retention,
+            debug_byte_cap=round(
+                args.debug_byte_cap_mib * 1024**2
+            ),
+            debug_max_age_s=(
+                args.debug_max_age_hours * 60 * 60
+            ),
+        )
+        return 0
+    if args.command == "family-server":
+        from atpiano.family_server import serve_family_application
+
+        serve_family_application(
+            args.workspace,
+            bind=args.bind,
+            port=args.port,
+            public_origin=args.public_origin,
+            open_browser=not args.no_open,
+            insecure_local_cookie=args.insecure_local_cookie,
+            commit_device=args.commit_device,
+            commit_threads=args.commit_threads,
+            correction_mode=args.correction_mode,
+            backend_profile_path=args.backend_profile,
+            minimum_free_bytes=round(args.minimum_free_gib * 1024**3),
+            model_idle_timeout_s=args.model_idle_timeout_seconds,
+            replay_manifest=args.replay,
+            replay_repeat=args.repeat,
+            replay_silence_s=args.silence_seconds,
+            replay_realtime=not args.no_wait,
             compact_recordings=args.compact_recordings,
             debug_retention=args.debug_retention,
             debug_byte_cap=round(

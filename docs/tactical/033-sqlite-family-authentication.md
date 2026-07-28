@@ -5,7 +5,8 @@ Topic: home-hosted-family-sharing
 Status: **authorized on 2026-07-28; implementation in progress.** Dependency
 and initial relational-schema checkpoints are complete through Alembic head
 `20260728_0001`. The typed identity service and administrator CLI are also
-complete; authenticated HTTP and React integration remain.
+complete. The authenticated FastAPI adapter is implemented and preserves the
+legacy local/desktop server; React login integration remains.
 
 ## Outcome
 
@@ -228,3 +229,23 @@ This section becomes the execution record as commits land. Record:
   `set-password`, `disable`, `enable`, and redacted `list` commands. No
   plaintext password command-line argument exists.
 - Focused identity, CLI, migration, and dependency validation: `15 passed`.
+
+### Authenticated FastAPI composition
+
+- `0002a01` extracts transport-independent corrected-workbench runtime
+  composition while retaining the existing `ThreadingHTTPServer` adapter.
+  Its focused backend, API, migration, and desktop regression lane passed
+  `28` tests.
+- The additive `atpiano family-server` command serves that same runtime
+  through FastAPI/Uvicorn. It refuses startup without an enabled local owner.
+- Exact Host and Origin checks, bounded mutation bodies, opaque secure
+  cookies, authenticated workspace reads, role-checked mutations, protected
+  artifact bodies and range requests, and authenticated microphone
+  WebSockets are implemented.
+- Public score capability, score mutations, and private score artifacts are
+  suppressed by default without changing local or internal-desktop behavior.
+- The live launchd service still uses `workbench-v3`; authenticated cutover
+  remains behind the human checkpoint.
+- FastAPI plus legacy-server regression validation: `33 passed`. Generated
+  OpenAPI and TypeScript contracts include login, logout, and current-session
+  types and pass their drift check.
