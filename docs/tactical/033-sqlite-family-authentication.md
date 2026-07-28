@@ -292,6 +292,11 @@ This section becomes the execution record as commits land. Record:
   `local` workspace, and `score_available=false`.
 - The disposable workspace, credentials, cookies, and response bodies were
   moved to Trash after validation.
+- The active launchd service was restarted in persistent legacy mode after the
+  code changes. Public verification returned `200` for the homepage and
+  capabilities, `404` for the additive auth-session route as expected before
+  cutover, and `score_available=false`. No session or artifact enumeration
+  was performed.
 - Known non-blocking warnings are the existing `pkg_resources` warning from
   the model stack, FastAPI TestClient's transition warning from `httpx` to
   `httpx2`, npm's inherited `recursive` configuration warning, and the
@@ -307,6 +312,8 @@ This section becomes the execution record as commits land. Record:
 - `ee7db1c` — add the authenticated FastAPI family server.
 - `3aa9022` — add shared-React login, current account, and logout.
 - `ac51828` — harden sessions, login attempts, and persistent service mode.
+- `0dc3b70` — record the completed human review checkpoint.
+- `9647f1c` — disable the unresolved score runtime in public legacy mode.
 
 ### Human review hold
 
