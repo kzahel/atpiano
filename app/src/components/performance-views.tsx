@@ -1,5 +1,3 @@
-import { useMemo } from "react";
-
 import {
   AudioPlayback,
   type AudioPlaybackSource,
@@ -7,90 +5,17 @@ import {
 import { formatClock, noteName } from "../lib/format.js";
 import { noteDisplaySegments } from "../lib/note-display.js";
 import { pedalDisplaySegment } from "../lib/pedal-display.js";
-import { pianoLayout } from "../lib/piano-layout.js";
 import {
   type ScoreAlignment,
 } from "../lib/score-alignment.js";
 import { MusicXmlScore } from "./musicxml-score.js";
+import { PianoKeyboard } from "./piano-keyboard.js";
 import type {
   EventRevision,
   Horizon,
   ScoreVariant,
   Session,
 } from "../runtime/atpiano-runtime.js";
-
-function activePitches(events: readonly EventRevision[], sample: number): Set<number> {
-  return new Set(
-    events
-      .filter(
-        (event) =>
-          event.kind === "note" &&
-          event.pitch !== null &&
-          event.lifecycle !== "retracted" &&
-          event.onset_sample <= sample &&
-          (event.offset_sample ?? sample) >= sample,
-      )
-      .map((event) => event.pitch!)
-  );
-}
-
-function PianoKeyboard({
-  events,
-  session,
-  inspectionSample,
-  onInspect,
-}: {
-  readonly events: readonly EventRevision[];
-  readonly session: Session;
-  readonly inspectionSample: number | null;
-  readonly onInspect: (sample: number | null) => void;
-}) {
-  const notes = events.filter(
-    (event) => event.kind === "note" && event.lifecycle !== "retracted",
-  );
-  const latest = Math.max(0, ...notes.map((event) => event.onset_sample));
-  const sample = inspectionSample ?? latest;
-  const sounding = activePitches(notes, sample);
-  const layout = useMemo(pianoLayout, []);
-  return (
-    <section className="view-card keyboard-card">
-      <div className="view-heading">
-        <div>
-          <p className="eyebrow">Exact pitch check</p>
-          <h3>Detected keys</h3>
-        </div>
-        <output>
-          {sounding.size
-            ? [...sounding].map(noteName).join(" · ")
-            : "No keys sounding"}
-        </output>
-      </div>
-      <div
-        className="piano-keyboard"
-        role="img"
-        aria-label={
-          sounding.size
-            ? `Detected keys ${[...sounding].map(noteName).join(", ")}`
-            : "No detected piano keys"
-        }
-      >
-        {layout.map((key) => (
-          <i
-            key={key.pitch}
-            className={`${key.black ? "black" : "white"} ${
-              sounding.has(key.pitch) ? "sounding" : ""
-            }`}
-            style={{
-              left: `${key.leftPercent}%`,
-              width: `${key.widthPercent}%`,
-            }}
-            title={noteName(key.pitch)}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
 
 function PianoRoll({
   events,
@@ -523,9 +448,7 @@ export function PerformanceViews({
       {showKeyboard && (
         <PianoKeyboard
           events={events}
-          session={session}
           inspectionSample={inspectionSample}
-          onInspect={onInspect}
         />
       )}
     </div>
