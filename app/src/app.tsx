@@ -12,9 +12,12 @@ import {
 } from "@tanstack/react-query";
 
 import { ArtifactPanel } from "./components/artifact-panel.js";
-import type { AudioPlaybackSource } from "./components/audio-playback.js";
 import { CaptureDeck } from "./components/capture-deck.js";
 import { PerformanceViews } from "./components/performance-views.js";
+import {
+  PlaybackProvider,
+  type AudioPlaybackSource,
+} from "./components/playback-provider.js";
 import { ScoreReader } from "./components/score-reader.js";
 import { SessionRail } from "./components/session-rail.js";
 import { SessionTitleEditor } from "./components/session-title-editor.js";
@@ -109,10 +112,6 @@ export function App({
   const showKeyboard = useWorkspaceStore((state) => state.showKeyboard);
   const showScore = useWorkspaceStore((state) => state.showScore);
   const toggleView = useWorkspaceStore((state) => state.toggleView);
-  const inspectionSample = useWorkspaceStore((state) => state.inspectionSample);
-  const setInspectionSample = useWorkspaceStore(
-    (state) => state.setInspectionSample,
-  );
   const [eventPage, setEventPage] = useState<EventPage | null>(null);
   const [scoreJob, setScoreJob] = useState<Job | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -969,38 +968,57 @@ export function App({
   if (scoreReaderRoute !== null) {
     if (!selected) {
       return (
-        <div className="score-reader reader-boot" role="status">
-          <strong>Opening pinned score…</strong>
-          <span>
-            Loading its session and exact MusicXML snapshot.
-          </span>
-          {(selectedSession.isError || workspaces.isError) && (
-            <button type="button" onClick={closeScoreReader}>
-              Return to workspace
-            </button>
-          )}
-        </div>
+        <PlaybackProvider
+          sessionId={null}
+          sources={[]}
+          totalSamples={0}
+          sampleRateHz={48_000}
+        >
+          <div className="score-reader reader-boot" role="status">
+            <strong>Opening pinned score…</strong>
+            <span>
+              Loading its session and exact MusicXML snapshot.
+            </span>
+            {(selectedSession.isError || workspaces.isError) && (
+              <button type="button" onClick={closeScoreReader}>
+                Return to workspace
+              </button>
+            )}
+          </div>
+        </PlaybackProvider>
       );
     }
     return (
-      <ScoreReader
-        route={scoreReaderRoute}
-        session={selected}
-        xml={readerScoreXml.data}
-        xmlError={readerScoreXml.error}
-        alignment={readerScoreAlignment.data}
-        alignmentError={readerScoreAlignment.error}
-        inspectionSample={inspectionSample}
-        currentArtifactId={scoreArtifact?.artifact_id}
-        onClose={closeScoreReader}
-        onUseCurrent={useCurrentScore}
-        onDownload={() => void exportPinnedScore()}
-      />
+      <PlaybackProvider
+        sessionId={selected.session_id}
+        sources={audioPlayback.data ?? []}
+        totalSamples={selected.source_frame_count}
+        sampleRateHz={selected.sample_rate_hz}
+      >
+        <ScoreReader
+          route={scoreReaderRoute}
+          session={selected}
+          xml={readerScoreXml.data}
+          xmlError={readerScoreXml.error}
+          alignment={readerScoreAlignment.data}
+          alignmentError={readerScoreAlignment.error}
+          currentArtifactId={scoreArtifact?.artifact_id}
+          onClose={closeScoreReader}
+          onUseCurrent={useCurrentScore}
+          onDownload={() => void exportPinnedScore()}
+        />
+      </PlaybackProvider>
     );
   }
 
   return (
-    <div className="app-shell">
+    <PlaybackProvider
+      sessionId={selected?.session_id ?? null}
+      sources={audioPlayback.data ?? []}
+      totalSamples={selected?.source_frame_count ?? 0}
+      sampleRateHz={selected?.sample_rate_hz ?? 48_000}
+    >
+      <div className="app-shell">
       <SessionRail
         sessions={sessionItems.slice(0, 6)}
         selectedSessionId={selectedSessionId}
@@ -1275,7 +1293,6 @@ export function App({
               session={displayedSession}
               events={events}
               horizon={horizon.data}
-              inspectionSample={inspectionSample}
               showRoll={showRoll}
               showKeyboard={showKeyboard}
               showScore={showScore}
@@ -1290,7 +1307,6 @@ export function App({
               scoreVariants={scoreVariants.data?.items ?? []}
               selectedScoreVariant={selectedScoreVariant}
               scoreVariantBusy={scoreVariantMutation.isPending}
-              audioSources={audioPlayback.data ?? []}
               audioUnavailableReason={
                 selected.status === "active"
                   ? "Playback available after Stop"
@@ -1298,7 +1314,6 @@ export function App({
                     ? "Loading recorded audio"
                     : "Recorded audio unavailable"
               }
-              onInspect={setInspectionSample}
               onGenerateScore={() => void generateScore()}
               onOpenScoreReader={openScoreReader}
               onSelectScoreVariant={selectScoreVariant}
@@ -1330,6 +1345,7 @@ export function App({
           </div>
         )}
       </main>
-    </div>
+      </div>
+    </PlaybackProvider>
   );
 }

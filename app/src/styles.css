@@ -1102,7 +1102,7 @@ input:focus-visible {
   background: #0d1916;
 }
 
-.playback-transport audio {
+.persistent-playback-audio {
   display: none;
 }
 
@@ -2041,7 +2041,7 @@ input:focus-visible {
 .reader-toolbar {
   z-index: 4;
   display: grid;
-  grid-template-columns: auto minmax(150px, 1fr) auto auto auto auto;
+  grid-template-columns: auto minmax(150px, 1fr) auto auto auto auto auto;
   align-items: center;
   gap: 10px;
   min-height: 64px;
@@ -2069,6 +2069,18 @@ input:focus-visible {
 
 .reader-toolbar button {
   padding: 0 13px;
+}
+
+.reader-playback {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: "DM Mono", monospace;
+  font-size: 9px;
+}
+
+.reader-playback span {
+  color: var(--mint);
 }
 
 .reader-toolbar button:hover,

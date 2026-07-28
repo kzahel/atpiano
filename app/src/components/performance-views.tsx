@@ -1,7 +1,4 @@
-import {
-  AudioPlayback,
-  type AudioPlaybackSource,
-} from "./audio-playback.js";
+import { AudioPlayback } from "./audio-playback.js";
 import { formatClock, noteName } from "../lib/format.js";
 import { noteDisplaySegments } from "../lib/note-display.js";
 import { pedalDisplaySegment } from "../lib/pedal-display.js";
@@ -16,6 +13,7 @@ import type {
   ScoreVariant,
   Session,
 } from "../runtime/atpiano-runtime.js";
+import { useWorkspaceStore } from "../state/workspace-store.js";
 
 function PianoRoll({
   events,
@@ -353,7 +351,6 @@ export function PerformanceViews({
   session,
   events,
   horizon,
-  inspectionSample,
   showRoll,
   showKeyboard,
   showScore,
@@ -368,9 +365,7 @@ export function PerformanceViews({
   scoreVariants,
   selectedScoreVariant,
   scoreVariantBusy,
-  audioSources,
   audioUnavailableReason,
-  onInspect,
   onGenerateScore,
   onOpenScoreReader,
   onSelectScoreVariant,
@@ -380,7 +375,6 @@ export function PerformanceViews({
   readonly session: Session;
   readonly events: readonly EventRevision[];
   readonly horizon: Horizon | undefined;
-  readonly inspectionSample: number | null;
   readonly showRoll: boolean;
   readonly showKeyboard: boolean;
   readonly showScore: boolean;
@@ -395,25 +389,20 @@ export function PerformanceViews({
   readonly scoreVariants: readonly ScoreVariant[];
   readonly selectedScoreVariant: ScoreVariant | undefined;
   readonly scoreVariantBusy: boolean;
-  readonly audioSources: readonly AudioPlaybackSource[];
   readonly audioUnavailableReason: string;
-  readonly onInspect: (sample: number | null) => void;
   readonly onGenerateScore: () => void;
   readonly onOpenScoreReader: () => void;
   readonly onSelectScoreVariant: (variant: ScoreVariant) => void;
   readonly onCreateAutomaticVariant: () => void;
   readonly onCreateEnharmonicVariant: () => void;
 }) {
+  const inspectionSample = useWorkspaceStore(
+    (state) => state.inspectionSample,
+  );
+  const onInspect = useWorkspaceStore((state) => state.setInspectionSample);
   return (
     <div className="performance-views">
-      <AudioPlayback
-        sources={audioSources}
-        totalSamples={session.source_frame_count}
-        sampleRateHz={session.sample_rate_hz}
-        inspectionSample={inspectionSample}
-        onInspect={onInspect}
-        unavailableReason={audioUnavailableReason}
-      />
+      <AudioPlayback unavailableReason={audioUnavailableReason} />
       {showScore && (
         <ScorePreview
           session={session}

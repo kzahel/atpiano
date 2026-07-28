@@ -22,6 +22,9 @@ import {
 } from "../lib/score-reader-layout.js";
 import type { ScoreReaderRoute } from "../lib/session-url.js";
 import type { Session } from "../runtime/atpiano-runtime.js";
+import { usePlaybackControls } from "./playback-provider.js";
+import { usePlaybackStore } from "../state/playback-store.js";
+import { useWorkspaceStore } from "../state/workspace-store.js";
 
 const densityStorageKey = "atpiano.score-reader-density";
 
@@ -49,7 +52,6 @@ export function ScoreReader({
   xmlError,
   alignment,
   alignmentError,
-  inspectionSample,
   currentArtifactId,
   onClose,
   onUseCurrent,
@@ -61,12 +63,21 @@ export function ScoreReader({
   readonly xmlError: Error | null;
   readonly alignment: ScoreAlignment | undefined;
   readonly alignmentError: Error | null;
-  readonly inspectionSample: number | null;
   readonly currentArtifactId: string | undefined;
   readonly onClose: () => void;
   readonly onUseCurrent: () => void;
   readonly onDownload: () => void;
 }) {
+  const playback = usePlaybackControls();
+  const playbackAvailable = usePlaybackStore((state) => state.available);
+  const playbackStatus = usePlaybackStore((state) => state.status);
+  const playbackPosition = usePlaybackStore(
+    (state) => state.positionSample,
+  );
+  const playbackError = usePlaybackStore((state) => state.error);
+  const inspectionSample = useWorkspaceStore(
+    (state) => state.inspectionSample,
+  );
   const shell = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const swipeStart = useRef<number | null>(null);
@@ -275,6 +286,22 @@ export function ScoreReader({
             <option value="compact">Compact</option>
           </select>
         </label>
+        <button
+          className="reader-playback"
+          type="button"
+          disabled={!playbackAvailable}
+          onClick={playback.toggle}
+          aria-label={
+            playbackStatus === "playing"
+              ? "Pause recorded audio"
+              : "Play recorded audio"
+          }
+        >
+          <span aria-hidden="true">
+            {playbackStatus === "playing" ? "Ⅱ" : "▶"}
+          </span>
+          {formatClock(playbackPosition, session.sample_rate_hz)}
+        </button>
         <button type="button" onClick={onDownload}>Export</button>
         <button
           type="button"
@@ -294,9 +321,10 @@ export function ScoreReader({
           A newer committed score is available · Use newer score
         </button>
       )}
-      {(alignmentError || fullscreenError) && (
+      {(alignmentError || fullscreenError || playbackError) && (
         <p className="reader-advisory" role="status">
           {fullscreenError ??
+            playbackError ??
             "The score is readable, but its playback cursor is unavailable."}
         </p>
       )}
