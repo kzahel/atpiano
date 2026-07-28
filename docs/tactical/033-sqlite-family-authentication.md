@@ -277,6 +277,10 @@ This section becomes the execution record as commits land. Record:
 - `ATPIANO_FAMILY_AUTH=true` selects the authenticated launchd composition,
   and the choice persists in its private service runtime directory. The
   unreviewed default remains `false`; no cutover happened automatically.
+- The legacy public mode uses an absent score-runtime path while it remains
+  live for review. This closes the previously verified
+  `score_available=true` gap without changing ordinary local or internal
+  desktop score behavior.
 - The repository-wide migration regression passed at
   `results/migration-regression/20260728T083201Z/report.json`: `196` Python
   tests, `54` frontend tests, generated-contract drift, npm high-severity

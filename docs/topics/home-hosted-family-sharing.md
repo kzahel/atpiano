@@ -133,10 +133,11 @@ Until then:
 - avoid relying on it as the only copy of irreplaceable recordings; and
 - do not publicly expose the unresolved internal score runtime.
 
-The authenticated composition is now implemented and suppresses the public
-score capability, score mutations, and private score artifacts by default.
-Those properties have not yet changed the live process because service
-cutover is the current human hold.
+The authenticated composition suppresses the public score capability, score
+mutations, and private score artifacts by default. While service cutover is
+held for review, the legacy public launcher also points at a deliberately
+absent score runtime. Neither public composition advertises or operates the
+unresolved internal score integration.
 
 ## Operating Contract
 
