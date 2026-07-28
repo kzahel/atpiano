@@ -46,3 +46,5 @@ execution record; continuing status and direction belong in the relevant
 | [`032-cross-platform-artifact-export.md`](032-cross-platform-artifact-export.md) | Complete; R5 accepted | Shared browser downloads and bounded native desktop Save As export through the runtime boundary |
 | [`033-sqlite-family-authentication.md`](033-sqlite-family-authentication.md) | Complete; live | Typed SQLAlchemy/Alembic identity catalog, CLI-created family users, cookie sessions, authenticated FastAPI composition, and minimal React login |
 | [`034-authenticated-family-scores.md`](034-authenticated-family-scores.md) | Complete; live | Default score generation and rendering for the authenticated private family service |
+| [`035-browser-score-cursor-parity.md`](035-browser-score-cursor-parity.md) | Complete; live | Exact browser parity with producer MIDI rounding and score-cursor ordering |
+| [`036-musical-session-workspace-refresh.md`](036-musical-session-workspace-refresh.md) | Active | Sessions homepage, compact performance identity, contextual feedback, editable naming, and keyboard audition |

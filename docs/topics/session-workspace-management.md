@@ -2,7 +2,13 @@
 
 Topic: session-workspace-management
 
-Status: accepted foundation on 2026-07-26; Phase 3 and R3 are complete under
+Status: accepted foundation on 2026-07-26; a player-facing workspace refresh
+is active under
+[`036-musical-session-workspace-refresh.md`](../tactical/036-musical-session-workspace-refresh.md).
+It adds application-owned human names, aggregate musical summaries, a
+dedicated Sessions homepage, compact selected-session identity, contextual
+feedback, and keyboard audition without changing session evidence or the
+selected-versus-active boundary. Phase 3 and R3 are complete under
 [`016-shared-react-application.md`](../tactical/016-shared-react-application.md).
 The Phase 4 extraction is implemented locally under
 [`017-python-application-core.md`](../tactical/017-python-application-core.md)
@@ -158,9 +164,13 @@ recent historical session with an explicit historical label and a prominent
 New action. Selection belongs in the URL or client state, not in the server,
 so reload and multiple tabs behave predictably.
 
-Human naming is not required in the first slice. If editable labels are added,
-store them as workspace annotations rather than rewriting transcription
-evidence.
+The accepted 2026-07-28 refresh adds human naming as application-owned
+annotations rather than rewriting transcription evidence. Automatic
+date-and-source text remains the fallback for sessions without an annotation.
+
+The same refresh promotes the bounded history into a dedicated Sessions
+homepage. Its opening-phrase previews and playback hydrate lazily; listing
+history must not eagerly load every session's artifacts or events.
 
 ### Delete
 
