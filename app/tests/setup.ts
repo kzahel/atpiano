@@ -5,6 +5,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 Object.defineProperty(window, "matchMedia", {

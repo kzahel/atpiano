@@ -23,43 +23,64 @@ export function SessionTitleEditor({
   const [value, setValue] = useState(persisted);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
-  const saveSequence = useRef(0);
+  const valueRef = useRef(persisted);
+  const lastSavedValue = useRef(persisted);
+  const saving = useRef(false);
+  const exitWhenSaved = useRef(false);
 
   useEffect(() => {
-    if (!editing) setValue(persisted);
+    lastSavedValue.current = persisted;
+    if (!editing) {
+      valueRef.current = persisted;
+      setValue(persisted);
+    }
   }, [editing, persisted, session.session_id]);
 
   const save = async (exitAfterSave: boolean) => {
-    const normalized = value.trim();
-    if (!normalized) {
-      setSaveState("error");
-      setError("Enter a session name.");
-      return;
-    }
-    if (normalized.length > 200) {
-      setSaveState("error");
-      setError("Session names can contain at most 200 characters.");
-      return;
-    }
-    if (normalized === persisted) {
-      setSaveState("idle");
-      setError(null);
-      if (exitAfterSave) setEditing(false);
-      return;
-    }
-    const sequence = ++saveSequence.current;
-    setSaveState("saving");
-    setError(null);
+    exitWhenSaved.current ||= exitAfterSave;
+    if (saving.current) return;
+    saving.current = true;
     try {
-      await onSave(normalized);
-      if (sequence !== saveSequence.current) return;
-      setValue(normalized);
+      while (true) {
+        const normalized = valueRef.current.trim();
+        if (!normalized) {
+          setSaveState("error");
+          setError("Enter a session name.");
+          exitWhenSaved.current = false;
+          return;
+        }
+        if (normalized.length > 200) {
+          setSaveState("error");
+          setError("Session names can contain at most 200 characters.");
+          exitWhenSaved.current = false;
+          return;
+        }
+        if (normalized === lastSavedValue.current) {
+          setSaveState("idle");
+          setError(null);
+          if (exitWhenSaved.current) setEditing(false);
+          return;
+        }
+
+        setSaveState("saving");
+        setError(null);
+        await onSave(normalized);
+        lastSavedValue.current = normalized;
+        if (valueRef.current.trim() !== normalized) continue;
+
+        valueRef.current = normalized;
+        setValue(normalized);
+        break;
+      }
       setSaveState("saved");
-      if (exitAfterSave) setEditing(false);
+      if (exitWhenSaved.current) setEditing(false);
     } catch (reason) {
-      if (sequence !== saveSequence.current) return;
       setSaveState("error");
       setError(reason instanceof Error ? reason.message : String(reason));
+      exitWhenSaved.current = false;
+    } finally {
+      saving.current = false;
+      exitWhenSaved.current = false;
     }
   };
 
@@ -80,7 +101,7 @@ export function SessionTitleEditor({
   }, [saveState]);
 
   const cancel = () => {
-    saveSequence.current += 1;
+    valueRef.current = persisted;
     setValue(persisted);
     setSaveState("idle");
     setError(null);
@@ -130,7 +151,8 @@ export function SessionTitleEditor({
           value={value}
           maxLength={200}
           onChange={(event) => {
-            setValue(event.currentTarget.value);
+            valueRef.current = event.currentTarget.value;
+            setValue(valueRef.current);
             setSaveState("idle");
             setError(null);
           }}
