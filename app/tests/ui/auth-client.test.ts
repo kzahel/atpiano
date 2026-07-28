@@ -25,6 +25,21 @@ function jsonResponse(value: unknown, status = 200): Response {
 }
 
 describe("authentication client", () => {
+  it("invokes browser fetch with the global receiver", async () => {
+    let receiver: unknown;
+    const fetchImplementation = function (this: unknown) {
+      receiver = this;
+      return Promise.resolve(jsonResponse({}, 401));
+    } as typeof fetch;
+    const client = new HttpAuthenticationClient(fetchImplementation);
+
+    await expect(client.bootstrap()).resolves.toEqual({
+      mode: "required",
+      session: null,
+    });
+    expect(receiver).toBe(globalThis);
+  });
+
   it("bypasses legacy local servers and requests login after 401", async () => {
     const legacy = new HttpAuthenticationClient(
       vi.fn(async () => jsonResponse({}, 404)),

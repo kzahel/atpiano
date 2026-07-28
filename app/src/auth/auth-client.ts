@@ -55,7 +55,7 @@ export class HttpAuthenticationClient implements AuthenticationClient {
   readonly #fetch: typeof fetch;
 
   constructor(fetchImplementation: typeof fetch = globalThis.fetch) {
-    this.#fetch = fetchImplementation;
+    this.#fetch = fetchImplementation.bind(globalThis);
   }
 
   async bootstrap(): Promise<AuthenticationBootstrap> {
