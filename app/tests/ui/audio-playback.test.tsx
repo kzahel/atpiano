@@ -50,6 +50,49 @@ describe("recorded audio playback", () => {
     ).toBeTruthy();
   });
 
+  it("keeps a manual seek while audio metadata is still loading", () => {
+    let readyState = 0;
+    vi.spyOn(
+      HTMLMediaElement.prototype,
+      "readyState",
+      "get",
+    ).mockImplementation(() => readyState);
+    render(
+      <PlaybackProvider
+        sessionId="session-1"
+        sources={[
+          {
+            artifactId: "audio-1",
+            url: "data:audio/wav;base64,UklGRg==",
+            startSample: 0,
+            endSample: 96_000,
+          },
+        ]}
+        totalSamples={96_000}
+        sampleRateHz={48_000}
+      >
+        <AudioPlayback unavailableReason="Unavailable" />
+      </PlaybackProvider>,
+    );
+    const audio = document.querySelector("audio")!;
+
+    fireEvent.change(screen.getByRole("slider"), {
+      target: { value: "48_000" },
+    });
+    expect(usePlaybackStore.getState().positionSample).toBe(48_000);
+
+    readyState = 1;
+    audio.currentTime = 0;
+    fireEvent.timeUpdate(audio);
+    expect(usePlaybackStore.getState().positionSample).toBe(48_000);
+
+    fireEvent.loadedMetadata(audio);
+    expect(audio.currentTime).toBe(1);
+    fireEvent.seeked(audio);
+    fireEvent.timeUpdate(audio);
+    expect(usePlaybackStore.getState().positionSample).toBe(48_000);
+  });
+
   it("publishes segment transitions, completion, and a fresh restart", async () => {
     vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
     render(

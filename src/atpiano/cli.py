@@ -538,6 +538,61 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("results/midi2score-runtime"),
         help="isolated MIDI2ScoreTransformer runtime directory",
     )
+    score_validation_parser = subparsers.add_parser(
+        "validate-scores",
+        help="audit all retained scores structurally and in real browsers",
+    )
+    score_validation_parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=Path("results/workbench-v3"),
+        help="retained session directory (default: results/workbench-v3)",
+    )
+    score_validation_parser.add_argument(
+        "--base-url",
+        help="running family-service origin used by browser checks",
+    )
+    score_validation_parser.add_argument(
+        "--browser",
+        action="append",
+        choices=("chromium", "webkit"),
+        default=[],
+        help="Playwright browser to exercise; repeat for both engines",
+    )
+    browser_mode = score_validation_parser.add_mutually_exclusive_group()
+    browser_mode.add_argument(
+        "--headed",
+        dest="headed",
+        action="store_true",
+        default=True,
+        help="show browser windows during validation (default)",
+    )
+    browser_mode.add_argument(
+        "--headless",
+        dest="headed",
+        action="store_false",
+        help="run requested browsers without visible windows",
+    )
+    score_validation_parser.add_argument(
+        "--structural-only",
+        action="store_true",
+        help="skip Playwright and validate retained artifacts only",
+    )
+    score_validation_parser.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=45.0,
+        help="per-browser-stage timeout (default: 45)",
+    )
+    score_validation_parser.add_argument(
+        "--as-user",
+        help="enabled workspace member to use (default: first owner)",
+    )
+    score_validation_parser.add_argument(
+        "--output",
+        type=Path,
+        help="report path (default: timestamped path under results/)",
+    )
     score_setup_parser = subparsers.add_parser(
         "setup-midi2score",
         help="install the internal MIDI2ScoreTransformer runtime",
@@ -836,6 +891,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         from atpiano.family_check import run_family_check
 
         return run_family_check(args)
+    if args.command == "validate-scores":
+        from atpiano.score_validation import run_score_validation
+
+        return run_score_validation(args)
     if args.command == "setup-midi2score":
         from atpiano.score_snapshot import setup_score_runtime
 

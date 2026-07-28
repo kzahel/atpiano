@@ -113,14 +113,13 @@ export function PlaybackProvider({
     desiredSample.current = sample;
     publishPosition(sample);
     if (!sources.length) return;
+    seeking.current = true;
     const nextIndex = sourceIndexAt(sources, sample);
     if (nextIndex !== activeIndex) {
-      seeking.current = true;
       setActiveIndex(nextIndex);
       return;
     }
     if (audio.current && source && audio.current.readyState >= 1) {
-      seeking.current = true;
       audio.current.currentTime =
         (sample - source.startSample) / sampleRateHz;
       if (shouldPlay.current) playElement();
