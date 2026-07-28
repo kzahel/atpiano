@@ -139,6 +139,30 @@ audit, Ruff, JavaScript syntax, and Git whitespace. The separate production
 build is included because it is a Phase 3 acceptance gate but is not currently
 part of `migration-regression`.
 
+Retained score rendering has a separate, deliberately slow browser gate.
+Install its development-only Playwright engines once:
+
+```text
+npm exec --prefix app playwright -- install chromium webkit
+```
+
+Then exercise every complete, non-trashed recording against a running
+authenticated service in visible browser windows:
+
+```text
+uv run atpiano validate-scores \
+  --workspace results/workbench-v3 \
+  --base-url https://atpiano.graehlarts.com \
+  --browser chromium \
+  --browser webkit \
+  --headed
+```
+
+Use `--headless` for unattended browser execution or `--structural-only` for
+the fast read-only artifact lane. Reports and failure screenshots are written
+below ignored `results/score-validation/` paths. Playwright WebKit is a WebKit
+compatibility engine, not automation of the installed Safari application.
+
 ## Home-Hosted Family Sharing
 
 The home Pi at `pi.graehlarts.com` runs Caddy and proxies

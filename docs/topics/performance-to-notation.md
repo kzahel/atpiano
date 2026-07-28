@@ -73,12 +73,17 @@ post-fix sweep then exercised all nine current retained recordings in both
 browsers: all 18 combinations rendered inline notation, exposed a visible
 cursor at a mapped attack, and rendered their complete score-reader pages
 without an engraving, alignment, cursor, or reader error.
-Tactical 044 now owns turning that ad hoc evidence into an explicit slow
-headed-browser validator. It also owns one generated MIDI-tick corpus consumed
-by Python and TypeScript so producer and cursor ordering cannot drift
-independently again. This lane remains opt-in and read-only rather than making
-real retained recordings or downloaded browser engines part of the ordinary
-migration gate.
+Tactical 044 is implemented. The opt-in `validate-scores` command freezes and
+structurally checks every complete retained recording, then drives the real
+deployed application through headed Playwright Chromium and WebKit. Its final
+clean live run passed all nine recordings in both engines, exercising 54
+cursor positions and 108 reader pages without a score, alignment, cursor,
+reader, page-exception, or operator-cleanup failure. All nine snapshots
+reported current producer freshness. The run also found and fixed a real
+pre-metadata playback race that could reset a manual seek to sample zero.
+One generated MIDI-tick corpus is now consumed by Python and TypeScript so
+producer and cursor ordering cannot drift independently again. The slow lane
+remains read-only and separate from the ordinary migration gate.
 This is not yet progressive engraving or a permanent consumer-stack
 selection. The leading score converter's GitHub source and checkpoint still
 have no explicit published license, although the paper is CC BY 4.0 and the

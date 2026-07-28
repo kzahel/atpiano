@@ -2,7 +2,7 @@
 
 Topic: performance-to-notation
 
-Status: **planned on 2026-07-28.**
+Status: **complete and exercised against the live service on 2026-07-28.**
 
 ## Goal
 
@@ -248,3 +248,62 @@ application route and open tab, not only scores.
 - The report contains no credential material.
 - The existing frontend, TypeScript, generated-contract, Python, and migration
   regression gates remain green.
+
+## Implementation Evidence
+
+The shared generated fixture now lives at
+`contracts/fixtures/v1/midi-tick-parity.json`. Python generates and validates
+the producer's exact `mido.second2tick` floating operation, ties-to-even
+rounding, duration, and complete row ordering. TypeScript consumes the same
+file through exported pure cursor-order helpers. The corpus includes both
+retained failures, half-tick boundaries, collisions, tie-breaks, and a
+15-minute near-limit position.
+
+`uv run atpiano validate-scores` now inventories every page of complete,
+non-trashed sessions and freezes the selected pointer and artifact hashes.
+The structural lane verifies MusicXML, alignment identity and order, catalog
+metadata, producer freshness, and post-run pointer stability without changing
+the workspace. The browser lane passes a temporary operator credential only
+through child-process standard input, closes browser state, revokes the
+credential in `finally`, verifies revocation, and omits credential material
+from its report. Timeout and interruption regressions exercise that cleanup.
+
+The first live validator runs exposed two harness assumptions and one
+application race:
+
+- exact mapped attacks were not always legal positions on the 480-sample UI
+  slider, so the runner now records the attack and seeks to the first legal
+  sample at or after it;
+- React controlled inputs require the native input setter, and the validator
+  must wait until the real scrubber is enabled rather than synthesizing input
+  while audio blobs are still loading; and
+- a manual seek before audio metadata arrived could be overwritten by a
+  stale media update at sample zero. The playback provider now keeps the seek
+  pending until metadata and has a focused event-order regression.
+
+The final headed report is
+`results/score-validation/20260728-headed-final/report.json`. It ran from a
+clean `6b716b1` worktree against deployed client build `6470eb5b…` and
+completed in 52.37 seconds:
+
+- all nine complete retained sessions passed structural validation and
+  reported current producer freshness;
+- Chromium 151.0.7922.34 and Playwright WebKit 26.5 each passed all nine
+  sessions, for 18 successful browser checks;
+- each engine exercised 27 first/middle/last cursor positions and 54 reader
+  pages, including forward, last-page, return-to-first, and workspace-return
+  behavior;
+- there were no score, alignment, reader, page-exception, or credential
+  cleanup failures; and
+- the temporary `kyle` operator session was revoked and verified.
+
+The report still records cancelled artifact reads when a reader route closes:
+Chromium observed 21 failed requests and 11 related console messages; WebKit
+observed 10 of each. They were request cancellations during route teardown,
+not missing retained artifacts, page exceptions, or rendering failures. They
+remain visible evidence rather than being filtered out.
+
+Validation passed with 22 focused Python tests, 11 frontend Node tests, 102
+Vitest tests, TypeScript checking, Ruff, JavaScript syntax, generated-contract
+checking, a production Vite build, and the complete migration regression
+gate.
