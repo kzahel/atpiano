@@ -23,6 +23,8 @@ export type ScoreVariant = Schemas["ScoreVariant"];
 export type ScoreVariantPage = Schemas["ScoreVariantPage"];
 export type ScoreVariantRequest = Schemas["ScoreVariantRequest"];
 export type Job = Schemas["Job"];
+export type SessionAnnotation = Schemas["SessionAnnotation"];
+export type SessionAnnotationPatch = Schemas["SessionAnnotationPatch"];
 export type DeleteSessionRequest = Schemas["DeleteSessionRequest"];
 export type DeleteSessionResult = Schemas["DeleteSessionResult"];
 
@@ -89,6 +91,10 @@ export interface AtpianoRuntime {
     sessionId: string,
     request: RuntimeRequest,
   ): Promise<Session>;
+  updateSessionAnnotation(
+    input: SessionAnnotationPatch,
+    request: RuntimeRequest,
+  ): Promise<SessionAnnotation>;
   getHorizon(
     workspaceId: string,
     sessionId: string,

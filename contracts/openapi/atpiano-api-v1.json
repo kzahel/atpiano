@@ -2109,6 +2109,11 @@
             "default": null,
             "title": "Completed At"
           },
+          "corrected_note_count": {
+            "minimum": 0,
+            "title": "Corrected Note Count",
+            "type": "integer"
+          },
           "correction_mode": {
             "anyOf": [
               {
@@ -2176,6 +2181,11 @@
             "default": null,
             "title": "Display Name"
           },
+          "recognized_note_count": {
+            "minimum": 0,
+            "title": "Recognized Note Count",
+            "type": "integer"
+          },
           "sample_rate_hz": {
             "maximum": 384000,
             "minimum": 8000,
@@ -2226,9 +2236,101 @@
           "source",
           "sample_rate_hz",
           "source_frame_count",
-          "started_at"
+          "started_at",
+          "recognized_note_count",
+          "corrected_note_count"
         ],
         "title": "Session",
+        "type": "object"
+      },
+      "SessionAnnotation": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "display_name",
+          "updated_at"
+        ],
+        "title": "SessionAnnotation",
+        "type": "object"
+      },
+      "SessionAnnotationPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "request_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "atpiano.contract.v1",
+            "default": "atpiano.contract.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "workspace_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "display_name",
+          "request_id"
+        ],
+        "title": "SessionAnnotationPatch",
         "type": "object"
       },
       "SessionPage": {
@@ -2875,6 +2977,59 @@
               }
             },
             "description": "Session"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Structured API error"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateSessionAnnotation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionAnnotationPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionAnnotation"
+                }
+              }
+            },
+            "description": "SessionAnnotation"
           },
           "default": {
             "content": {

@@ -13,6 +13,7 @@ from atpiano.contracts.schemas import (
     DeleteSessionRequest,
     ScoreJobStart,
     ScoreVariantRequest,
+    SessionAnnotationPatch,
 )
 from atpiano.corrected import CORRECTED_EVENT_SCHEMA, CorrectedSession
 from atpiano.corrected_export import write_corrected_exports
@@ -427,6 +428,46 @@ def test_api_delete_is_recoverable_and_structured(
     assert failure["error"]["code"] == "not-found"
     assert (tmp_path / newer_id / "session.json").is_file()
     assert len(list((tmp_path / ".trash").iterdir())) == 1
+
+
+def test_api_updates_application_owned_session_name(
+    tmp_path: Path,
+) -> None:
+    session_id = "20260726T100000-aaaaaaaaaaaa"
+    _session(tmp_path, session_id)
+    server = create_corrected_workbench_server(
+        tmp_path,
+        port=0,
+        minimum_free_bytes=0,
+        commit_model_factory=lambda: None,
+    )
+    thread, base_url = _serve(server)
+    api = f"{base_url}/api/v1"
+    try:
+        request = SessionAnnotationPatch(
+            workspace_id="local",
+            session_id=session_id,
+            display_name="  Evening invention  ",
+            request_id="request-rename-1",
+        )
+        status, result = _request_json(
+            f"{api}/workspaces/local/sessions/{session_id}",
+            value=request.model_dump(mode="json"),
+            origin=base_url,
+            method="PATCH",
+        )
+        renamed = _get(
+            f"{api}/workspaces/local/sessions/{session_id}"
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert status == 200
+    assert result["display_name"] == "Evening invention"
+    assert renamed["display_name"] == "Evening invention"
+    assert (tmp_path / session_id / "session.json").is_file()
 
 
 def test_api_delete_rejects_active_session(

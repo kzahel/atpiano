@@ -216,6 +216,23 @@ def test_owner_cookie_authenticates_api_artifacts_and_websocket(
         )
         assert ranged.status_code == 206
         assert len(ranged.content) == 4
+        rename = client.patch(
+            f"/api/v1/workspaces/local/sessions/{SESSION_ID}",
+            headers={"Origin": PUBLIC_ORIGIN},
+            json={
+                "schema_version": "atpiano.contract.v1",
+                "workspace_id": "local",
+                "session_id": SESSION_ID,
+                "display_name": "Family nocturne",
+                "request_id": "request:rename",
+            },
+        )
+        assert rename.status_code == 200
+        assert rename.json()["display_name"] == "Family nocturne"
+        selected = client.get(
+            f"/api/v1/workspaces/local/sessions/{SESSION_ID}"
+        )
+        assert selected.json()["display_name"] == "Family nocturne"
 
         with client.websocket_connect(
             "wss://family.test/api/live",
@@ -255,7 +272,7 @@ def test_available_score_runtime_is_exposed_by_default(
         engine.dispose()
 
 
-def test_viewer_cannot_replay_or_delete(tmp_path: Path) -> None:
+def test_viewer_cannot_replay_rename_or_delete(tmp_path: Path) -> None:
     client, runtime, _identity, engine = _environment(tmp_path)
     try:
         assert (
@@ -268,6 +285,18 @@ def test_viewer_cannot_replay_or_delete(tmp_path: Path) -> None:
             json={"fixture_id": "fixture:default"},
         )
         assert replay.status_code == 403
+        rename = client.patch(
+            f"/api/v1/workspaces/local/sessions/{SESSION_ID}",
+            headers={"Origin": PUBLIC_ORIGIN},
+            json={
+                "schema_version": "atpiano.contract.v1",
+                "workspace_id": "local",
+                "session_id": SESSION_ID,
+                "display_name": "Unauthorized title",
+                "request_id": "request:rename",
+            },
+        )
+        assert rename.status_code == 403
         deletion = client.request(
             "DELETE",
             f"/api/v1/workspaces/local/sessions/{SESSION_ID}",

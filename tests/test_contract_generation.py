@@ -31,6 +31,10 @@ def test_openapi_uses_explicit_targets_and_pydantic_components() -> None:
         "/api/v1/workspaces/{workspace_id}/sessions/{session_id}"
     )
     assert paths[session_path]["get"]["operationId"] == "getSession"
+    assert (
+        paths[session_path]["patch"]["operationId"]
+        == "updateSessionAnnotation"
+    )
     assert paths[session_path]["delete"]["operationId"] == "deleteSession"
     assert paths[
         (

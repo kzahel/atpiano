@@ -6,6 +6,7 @@ import json
 import mimetypes
 import re
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,7 @@ from atpiano.contracts.schemas import (
     ScoreVariantPage,
     ScoreVariantRole,
     Session,
+    SessionAnnotation,
     SessionPage,
     SessionStatus,
     SourceKind,
@@ -46,6 +48,7 @@ from atpiano.corrected_export import (
     ensure_materialized_index,
     query_history_index,
     query_materialized_index,
+    query_materialized_note_counts,
 )
 from atpiano.score_snapshot import (
     SCORE_SNAPSHOT_SCHEMA,
@@ -57,6 +60,7 @@ LOCAL_WORKSPACE_ID = "local"
 SESSION_ID_PATTERN = re.compile(r"\d{8}T\d{6}-[0-9a-f]{12}")
 DEFAULT_PAGE_LIMIT = 100
 MAX_SESSION_PAGE_LIMIT = 500
+APPLICATION_SESSION_SCHEMA = "atpiano.application-session.v1"
 
 
 class LocalSessionNotFoundError(LookupError):
@@ -86,6 +90,7 @@ class LocalSessionStore:
     def __init__(self, workspace_directory: Path) -> None:
         self.workspace_directory = workspace_directory.resolve()
         self.workspace_directory.mkdir(parents=True, exist_ok=True)
+        self._annotation_lock = threading.Lock()
 
     def _validate_session_id(self, session_id: str) -> str:
         if not SESSION_ID_PATTERN.fullmatch(session_id):
@@ -305,6 +310,29 @@ class LocalSessionStore:
                 correction_profile_id = str(profile_value)
         started_at = _parse_time(manifest["started_at"], field="session.started_at")
         display_time = started_at.astimezone().strftime("%d %b %Y, %H:%M")
+        automatic_display_name = f"{display_time}, {source.value}"
+        display_name = automatic_display_name
+        try:
+            application = read_json(directory / "application.json")
+            annotations = application.get("annotations")
+            if (
+                application.get("schema_version") == APPLICATION_SESSION_SCHEMA
+                and isinstance(annotations, dict)
+                and isinstance(annotations.get("display_name"), str)
+                and annotations["display_name"].strip()
+                and len(annotations["display_name"].strip()) <= 200
+            ):
+                display_name = annotations["display_name"].strip()
+        except (OSError, ValueError):
+            pass
+        try:
+            recognized_note_count, corrected_note_count = (
+                query_materialized_note_counts(
+                    directory / "event-index.sqlite3"
+                )
+            )
+        except (OSError, sqlite3.Error):
+            recognized_note_count, corrected_note_count = 0, 0
         return Session(
             workspace_id=LOCAL_WORKSPACE_ID,
             session_id=session_id,
@@ -323,11 +351,51 @@ class LocalSessionStore:
                 else None
             ),
             current_transcription_run_id=_legacy_run_id(session_id),
-            display_name=f"{display_time}, {source.value}",
+            display_name=display_name,
+            recognized_note_count=recognized_note_count,
+            corrected_note_count=corrected_note_count,
             available_artifact_kinds=self._available_artifact_kinds(directory),
             correction_mode=correction_mode,
             correction_reason=correction_reason,
             correction_profile_id=correction_profile_id,
+        )
+
+    def update_session_annotation(
+        self,
+        session_id: str,
+        *,
+        display_name: str,
+    ) -> SessionAnnotation:
+        directory = self.resolve(session_id)
+        normalized = display_name.strip()
+        if not normalized or len(normalized) > 200:
+            raise ValueError("session display name must contain 1 to 200 characters")
+        with self._annotation_lock:
+            application_path = directory / "application.json"
+            try:
+                application = read_json(application_path)
+            except FileNotFoundError:
+                application = {
+                    "schema_version": APPLICATION_SESSION_SCHEMA,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }
+            if application.get("schema_version") != APPLICATION_SESSION_SCHEMA:
+                raise ValueError("session application document is incompatible")
+            updated_at = datetime.now(timezone.utc)
+            annotations = application.get("annotations")
+            if not isinstance(annotations, dict):
+                annotations = {}
+            application["annotations"] = {
+                **annotations,
+                "display_name": normalized,
+                "updated_at": updated_at.isoformat(),
+            }
+            write_json(application_path, application)
+        return SessionAnnotation(
+            workspace_id=LOCAL_WORKSPACE_ID,
+            session_id=session_id,
+            display_name=normalized,
+            updated_at=updated_at,
         )
 
     def list_sessions(

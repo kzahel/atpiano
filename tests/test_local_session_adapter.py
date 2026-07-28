@@ -117,6 +117,37 @@ def test_local_reader_converts_events_and_horizons_to_contract(
     assert events.items[0].transcription_run_id.endswith(session_id)
     assert horizon.audio_head_sample == 100
     assert horizon.commit_sample == 80
+    summary = store.get_session(session_id)
+    assert summary.recognized_note_count == 1
+    assert summary.corrected_note_count == 1
+
+
+def test_local_annotations_preserve_application_metadata(
+    tmp_path: Path,
+) -> None:
+    session_id = "20260726T100000-aaaaaaaaaaaa"
+    session = _session(tmp_path, session_id)
+    session.finalize()
+    write_json(
+        session.directory / "application.json",
+        {
+            "schema_version": "atpiano.application-session.v1",
+            "created_at": "2026-07-26T10:00:00Z",
+            "storage": {"compact_recording": True},
+        },
+    )
+    store = LocalSessionStore(tmp_path)
+
+    result = store.update_session_annotation(
+        session_id,
+        display_name="  Quiet chords  ",
+    )
+    application = store.read_document(session_id, "application.json")
+
+    assert result.display_name == "Quiet chords"
+    assert store.get_session(session_id).display_name == "Quiet chords"
+    assert application["storage"] == {"compact_recording": True}
+    assert application["annotations"]["display_name"] == "Quiet chords"
 
 
 def test_local_artifacts_are_explicit_and_path_safe(tmp_path: Path) -> None:

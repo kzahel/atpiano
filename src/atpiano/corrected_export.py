@@ -134,6 +134,31 @@ def query_materialized_index(
     return [json.loads(row[0]) for row in rows]
 
 
+def query_materialized_note_counts(
+    database_path: Path,
+) -> tuple[int, int]:
+    """Count visible note identities and their committed subset."""
+
+    with _connect_index(database_path) as connection:
+        row = connection.execute(
+            """
+            SELECT
+                COUNT(*) FILTER (
+                    WHERE lifecycle != 'retracted'
+                      AND json_extract(payload, '$.controller') IS NULL
+                ),
+                COUNT(*) FILTER (
+                    WHERE lifecycle = 'committed'
+                      AND json_extract(payload, '$.controller') IS NULL
+                )
+            FROM materialized_events
+            """
+        ).fetchone()
+    if row is None:
+        return 0, 0
+    return int(row[0]), int(row[1])
+
+
 def query_history_index(
     database_path: Path,
     *,

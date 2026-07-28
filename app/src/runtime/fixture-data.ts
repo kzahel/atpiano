@@ -188,6 +188,8 @@ function session(
     active_capture_id: status === "active" ? `capture:${sessionId}` : null,
     current_transcription_run_id: `run:${sessionId}`,
     display_name: displayName,
+    recognized_note_count: 0,
+    corrected_note_count: 0,
     correction_mode: "delayed",
     correction_profile_id: null,
     correction_reason: "deterministic fixture policy",
@@ -319,13 +321,28 @@ function record(
   values: EventRevision[],
   withArtifacts = false,
 ): FixtureSessionData {
+  const recognizedNoteCount = values.filter(
+    (event) =>
+      event.kind === "note" &&
+      event.lifecycle !== "retracted",
+  ).length;
+  const correctedNoteCount = values.filter(
+    (event) =>
+      event.kind === "note" &&
+      event.lifecycle === "committed",
+  ).length;
+  const summary = {
+    ...value,
+    recognized_note_count: recognizedNoteCount,
+    corrected_note_count: correctedNoteCount,
+  };
   const artifacts = withArtifacts
     ? [
-        artifact(value, "audio", "000000.wav"),
-        artifact(value, "midi", "session.mid"),
-        artifact(value, "event-history", "session.jsonl"),
-        artifact(value, "musicxml", "score.musicxml"),
-        artifact(value, "score-alignment", "alignment.json"),
+        artifact(summary, "audio", "000000.wav"),
+        artifact(summary, "midi", "session.mid"),
+        artifact(summary, "event-history", "session.jsonl"),
+        artifact(summary, "musicxml", "score.musicxml"),
+        artifact(summary, "score-alignment", "alignment.json"),
       ]
     : [];
   const mappedNotes = values
@@ -408,21 +425,24 @@ function record(
     ]),
   );
   return {
-    session: value,
-    horizon: horizon(value, Math.max(0, value.source_frame_count - sampleRate)),
+    session: summary,
+    horizon: horizon(
+      summary,
+      Math.max(0, summary.source_frame_count - sampleRate),
+    ),
     events: {
       schema_version: schemaVersion,
       workspace_id: workspaceId,
-      session_id: value.session_id,
+      session_id: summary.session_id,
       start_sample: 0,
-      end_sample: value.source_frame_count,
+      end_sample: summary.source_frame_count,
       items: values,
       next_cursor: null,
     },
     artifacts: {
       schema_version: schemaVersion,
       workspace_id: workspaceId,
-      session_id: value.session_id,
+      session_id: summary.session_id,
       items: artifacts,
       next_cursor: null,
     },

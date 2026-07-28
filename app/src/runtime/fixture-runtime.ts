@@ -26,6 +26,8 @@ import type {
   ScoreVariantPage,
   ScoreVariantRequest,
   Session,
+  SessionAnnotation,
+  SessionAnnotationPatch,
   SessionPage,
   Workspace,
   WorkspacePage,
@@ -147,6 +149,33 @@ export class FixtureRuntime implements AtpianoRuntime {
       : this.#record(sessionId).session;
   }
 
+  async updateSessionAnnotation(
+    input: SessionAnnotationPatch,
+    request: RuntimeRequest,
+  ): Promise<SessionAnnotation> {
+    assertRequest(request);
+    this.#assertTarget(input.workspace_id, input.session_id);
+    const record = this.#record(input.session_id);
+    const updated = {
+      ...record.session,
+      display_name: input.display_name,
+    };
+    this.#sessions.set(input.session_id, {
+      ...record,
+      session: updated,
+    });
+    if (this.#session.session_id === input.session_id) {
+      this.#session = updated;
+    }
+    return {
+      schema_version: "atpiano.contract.v1",
+      workspace_id: input.workspace_id,
+      session_id: input.session_id,
+      display_name: input.display_name,
+      updated_at: this.#data.trashedAt,
+    };
+  }
+
   async getHorizon(
     workspaceId: string,
     sessionId: string,
@@ -191,6 +220,8 @@ export class FixtureRuntime implements AtpianoRuntime {
       source: "microphone",
       status: "active",
       source_frame_count: 0,
+      recognized_note_count: 0,
+      corrected_note_count: 0,
       completed_at: null,
       active_capture_id: this.#capture.capture_id,
     };

@@ -30,6 +30,8 @@ import type {
   ScoreVariantPage,
   ScoreVariantRequest,
   Session,
+  SessionAnnotation,
+  SessionAnnotationPatch,
   SessionPage,
   WorkspacePage,
 } from "./atpiano-runtime.js";
@@ -238,6 +240,27 @@ export class LocalRuntime implements AtpianoRuntime {
               session_id: sessionId,
             },
           },
+        },
+      ),
+    );
+  }
+
+  async updateSessionAnnotation(
+    input: SessionAnnotationPatch,
+    request: RuntimeRequest,
+  ): Promise<SessionAnnotation> {
+    return dataOrThrow(
+      await this.#client.PATCH(
+        "/api/v1/workspaces/{workspace_id}/sessions/{session_id}",
+        {
+          ...abortOptions(request),
+          params: {
+            path: {
+              workspace_id: input.workspace_id,
+              session_id: input.session_id,
+            },
+          },
+          body: input,
         },
       ),
     );

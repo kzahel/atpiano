@@ -14,6 +14,7 @@ from atpiano.contracts.schemas import (
     Horizon,
     ScoreVariantPage,
     Session,
+    SessionAnnotation,
     SessionPage,
     Workspace,
 )
@@ -74,6 +75,13 @@ class SessionRepository(Protocol):
     ) -> tuple[Artifact, Path]: ...
 
     def score_variants(self, session_id: str) -> ScoreVariantPage: ...
+
+    def update_session_annotation(
+        self,
+        session_id: str,
+        *,
+        display_name: str,
+    ) -> SessionAnnotation: ...
 
     def current_score_snapshot(
         self,

@@ -60,6 +60,7 @@ from atpiano.contracts.schemas import (
     ScoreJobStart,
     ScoreVariant,
     ScoreVariantRequest,
+    SessionAnnotationPatch,
     SourceKind,
 )
 from atpiano.corrected import CorrectedSession
@@ -1139,6 +1140,77 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.NOT_FOUND)
             return
 
+    def do_PATCH(self) -> None:
+        if not self._require_local_host():
+            return
+        request_path = unquote(urlsplit(self.path).path)
+        if not self._require_desktop_auth(request_path):
+            return
+        match = re.fullmatch(
+            r"/api/v1/workspaces/([^/]+)/sessions/([^/]+)",
+            request_path,
+        )
+        if not match:
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        workspace_id, session_id = match.groups()
+        if not self._origin_is_trusted():
+            self._send_api_error(
+                "API actions require a trusted origin",
+                code=ErrorCode.INVALID_REQUEST,
+                status=HTTPStatus.FORBIDDEN,
+                workspace_id=workspace_id,
+                session_id=session_id,
+            )
+            return
+        try:
+            annotation = SessionAnnotationPatch.model_validate(
+                self._read_api_json()
+            )
+            if (
+                workspace_id != LOCAL_WORKSPACE_ID
+                or annotation.workspace_id != workspace_id
+                or annotation.session_id != session_id
+            ):
+                raise ValueError(
+                    "session annotation target does not match its path"
+                )
+            result = (
+                self.server.application.sessions.update_session_annotation(
+                    workspace_id,
+                    session_id,
+                    display_name=annotation.display_name,
+                )
+            )
+        except ValidationError as error:
+            self._send_api_error(
+                str(error),
+                code=ErrorCode.INVALID_REQUEST,
+                status=HTTPStatus.BAD_REQUEST,
+                workspace_id=workspace_id,
+                session_id=session_id,
+            )
+            return
+        except LocalSessionNotFoundError as error:
+            self._send_api_error(
+                str(error),
+                code=ErrorCode.NOT_FOUND,
+                status=HTTPStatus.NOT_FOUND,
+                workspace_id=workspace_id,
+                session_id=session_id,
+            )
+            return
+        except (OSError, TypeError, ValueError) as error:
+            self._send_api_error(
+                str(error),
+                code=ErrorCode.INVALID_REQUEST,
+                status=HTTPStatus.BAD_REQUEST,
+                workspace_id=workspace_id,
+                session_id=session_id,
+            )
+            return
+        self._send_json(result.model_dump(mode="json"))
+
     def do_DELETE(self) -> None:
         if not self._require_local_host():
             return
@@ -1252,7 +1324,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         self._send_desktop_cors_headers()
         self.send_header(
             "Access-Control-Allow-Methods",
-            "GET, HEAD, POST, DELETE",
+            "GET, HEAD, POST, PATCH, DELETE",
         )
         self.send_header(
             "Access-Control-Allow-Headers",

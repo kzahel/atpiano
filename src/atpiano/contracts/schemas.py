@@ -238,6 +238,8 @@ class Session(VersionedContractModel):
     active_capture_id: OpaqueId | None = None
     current_transcription_run_id: OpaqueId | None = None
     display_name: Annotated[str, StringConstraints(min_length=1, max_length=200)] | None = None
+    recognized_note_count: Annotated[int, Field(ge=0)]
+    corrected_note_count: Annotated[int, Field(ge=0)]
     available_artifact_kinds: tuple[ArtifactKind, ...] = ()
     correction_mode: CorrectionMode | None = None
     correction_reason: Annotated[
@@ -248,6 +250,10 @@ class Session(VersionedContractModel):
 
     @model_validator(mode="after")
     def validate_lifecycle(self) -> Session:
+        if self.corrected_note_count > self.recognized_note_count:
+            raise ValueError(
+                "corrected note count cannot exceed recognized note count"
+            )
         if self.status is SessionStatus.COMPLETE and self.completed_at is None:
             raise ValueError("completed session requires completed_at")
         if self.status in {SessionStatus.ACTIVE, SessionStatus.STOPPING}:
@@ -512,6 +518,27 @@ class ScoreVariantRequest(VersionedContractModel):
     request_id: OpaqueId
 
 
+class SessionAnnotationPatch(VersionedContractModel):
+    workspace_id: OpaqueId
+    session_id: OpaqueId
+    display_name: Annotated[
+        str,
+        StringConstraints(
+            min_length=1,
+            max_length=200,
+            strip_whitespace=True,
+        ),
+    ]
+    request_id: OpaqueId
+
+
+class SessionAnnotation(VersionedContractModel):
+    workspace_id: OpaqueId
+    session_id: OpaqueId
+    display_name: Annotated[str, StringConstraints(min_length=1, max_length=200)]
+    updated_at: AwareDatetime
+
+
 class DeleteSessionRequest(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
@@ -602,6 +629,8 @@ def contract_models() -> tuple[type[BaseModel], ...]:
         ReplayStart,
         ScoreJobStart,
         ScoreVariantRequest,
+        SessionAnnotationPatch,
+        SessionAnnotation,
         DeleteSessionRequest,
         DeleteSessionResult,
         ArtifactAccess,

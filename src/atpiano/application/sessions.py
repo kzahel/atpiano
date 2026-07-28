@@ -15,6 +15,7 @@ from atpiano.contracts.schemas import (
     Horizon,
     ScoreVariantPage,
     Session,
+    SessionAnnotation,
     SessionPage,
     WorkspacePage,
 )
@@ -146,6 +147,19 @@ class SessionApplicationService:
     ) -> ScoreVariantPage:
         self.require_workspace(workspace_id)
         return self._repository.score_variants(session_id)
+
+    def update_session_annotation(
+        self,
+        workspace_id: str,
+        session_id: str,
+        *,
+        display_name: str,
+    ) -> SessionAnnotation:
+        self.require_workspace(workspace_id)
+        return self._repository.update_session_annotation(
+            session_id,
+            display_name=display_name,
+        )
 
     def delete_session(
         self,

@@ -58,9 +58,20 @@ def test_application_sessions_read_and_delete_without_http(
         active_session_id=None,
     )
     historical = service.get_session(LOCAL_WORKSPACE_ID, older_id)
+    annotation = service.update_session_annotation(
+        LOCAL_WORKSPACE_ID,
+        older_id,
+        display_name="  Evening idea  ",
+    )
+    renamed = service.get_session(LOCAL_WORKSPACE_ID, older_id)
 
     assert [item.session_id for item in page.items] == [newer_id]
     assert historical.session_id == older_id
+    assert annotation.display_name == "Evening idea"
+    assert renamed.display_name == "Evening idea"
+    assert (
+        tmp_path / older_id / "application.json"
+    ).read_text(encoding="utf-8").find('"Evening idea"') >= 0
     with pytest.raises(LookupError, match="workspace"):
         service.list_sessions("another-workspace")
     with pytest.raises(LocalSessionConflictError, match="active"):

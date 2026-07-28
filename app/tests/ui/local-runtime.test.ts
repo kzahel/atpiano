@@ -16,6 +16,8 @@ const session: Session = {
   active_capture_id: null,
   current_transcription_run_id: "run-local",
   display_name: "Local capture",
+  recognized_note_count: 4,
+  corrected_note_count: 3,
   correction_mode: null,
   correction_profile_id: null,
   correction_reason: null,
@@ -44,6 +46,16 @@ const fakeFetch: typeof fetch = async (input, init) => {
     });
   }
   if (url.pathname === "/api/v1/workspaces/local/sessions/session-local") {
+    if (request.method === "PATCH") {
+      const body = await request.json() as { display_name: string };
+      return response({
+        schema_version: "atpiano.contract.v1",
+        workspace_id: "local",
+        session_id: "session-local",
+        display_name: body.display_name,
+        updated_at: "2026-07-28T12:00:00Z",
+      });
+    }
     return response(session);
   }
   if (
@@ -110,6 +122,28 @@ class FakeWebSocket {
 }
 
 describe("local runtime", () => {
+  it("updates an explicitly targeted session annotation", async () => {
+    const runtime = new LocalRuntime({
+      baseUrl: "http://127.0.0.1:8002",
+      fetchImplementation: fakeFetch,
+      WebSocketImplementation: FakeWebSocket as unknown as typeof WebSocket,
+    });
+
+    const annotation = await runtime.updateSessionAnnotation(
+      {
+        schema_version: "atpiano.contract.v1",
+        workspace_id: "local",
+        session_id: "session-local",
+        display_name: "Evening chords",
+        request_id: "rename-1",
+      },
+      { requestId: "rename-1" },
+    );
+
+    expect(annotation.display_name).toBe("Evening chords");
+    expect(annotation.session_id).toBe("session-local");
+  });
+
   it("binds direct artifact fetches to the browser global", async () => {
     const receivers: unknown[] = [];
     const receiverSensitiveFetch = function (

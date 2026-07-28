@@ -61,6 +61,7 @@ from atpiano.contracts.schemas import (
     ScoreJobStart,
     ScoreVariantPage,
     ScoreVariantRequest,
+    SessionAnnotationPatch,
     SourceKind,
 )
 from atpiano.corrected import CorrectedSession
@@ -556,6 +557,29 @@ def create_family_application(
                 session_id,
                 active_session_id=runtime.active_session_id(),
             )
+        ).model_dump(mode="json")
+
+    @app.patch(
+        "/api/v1/workspaces/{workspace_id}/sessions/{session_id}",
+    )
+    def update_session_annotation(
+        request: Request,
+        workspace_id: str,
+        session_id: str,
+        annotation: SessionAnnotationPatch,
+    ) -> dict[str, Any]:
+        workspace_principal(request, workspace_id, write=True)
+        if (
+            annotation.workspace_id != workspace_id
+            or annotation.session_id != session_id
+        ):
+            raise ValueError(
+                "session annotation target does not match its path"
+            )
+        return runtime.application.sessions.update_session_annotation(
+            workspace_id,
+            session_id,
+            display_name=annotation.display_name,
         ).model_dump(mode="json")
 
     @app.get(

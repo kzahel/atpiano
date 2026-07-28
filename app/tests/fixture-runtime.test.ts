@@ -104,6 +104,27 @@ test("fixture runtime exercises replay, PCM, Stop, and explicit reads", async ()
     sessions.items[0]?.session_id,
     data.sessions[0]!.session.session_id,
   );
+  const annotation = await runtime.updateSessionAnnotation(
+    {
+      schema_version: "atpiano.contract.v1",
+      workspace_id: data.workspace.workspace_id,
+      session_id: data.sessions[0]!.session.session_id,
+      display_name: "Renamed fixture",
+      request_id: "request-rename",
+    },
+    request,
+  );
+  assert.equal(annotation.display_name, "Renamed fixture");
+  assert.equal(
+    (
+      await runtime.getSession(
+        data.workspace.workspace_id,
+        data.sessions[0]!.session.session_id,
+        request,
+      )
+    ).display_name,
+    "Renamed fixture",
+  );
 
   const capture = await runtime.startReplay(
     {

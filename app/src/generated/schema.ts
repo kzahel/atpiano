@@ -129,7 +129,7 @@ export interface paths {
         delete: operations["deleteSession"];
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["updateSessionAnnotation"];
         trace?: never;
     };
     "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/artifacts": {
@@ -1068,6 +1068,8 @@ export interface components {
              * @default null
              */
             completed_at: string | null;
+            /** Corrected Note Count */
+            corrected_note_count: number;
             /** @default null */
             correction_mode: components["schemas"]["CorrectionMode"] | null;
             /**
@@ -1090,6 +1092,8 @@ export interface components {
              * @default null
              */
             display_name: string | null;
+            /** Recognized Note Count */
+            recognized_note_count: number;
             /** Sample Rate Hz */
             sample_rate_hz: number;
             /**
@@ -1109,6 +1113,43 @@ export interface components {
              */
             started_at: string;
             status: components["schemas"]["SessionStatus"];
+            /** Workspace Id */
+            workspace_id: string;
+        };
+        /** SessionAnnotation */
+        SessionAnnotation: {
+            /** Display Name */
+            display_name: string;
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+            /** Session Id */
+            session_id: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Workspace Id */
+            workspace_id: string;
+        };
+        /** SessionAnnotationPatch */
+        SessionAnnotationPatch: {
+            /** Display Name */
+            display_name: string;
+            /** Request Id */
+            request_id: string;
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+            /** Session Id */
+            session_id: string;
             /** Workspace Id */
             workspace_id: string;
         };
@@ -1520,6 +1561,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteSessionResult"];
+                };
+            };
+            /** @description Structured API error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateSessionAnnotation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionAnnotationPatch"];
+            };
+        };
+        responses: {
+            /** @description SessionAnnotation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionAnnotation"];
                 };
             };
             /** @description Structured API error */

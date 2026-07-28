@@ -141,6 +141,12 @@ def build_openapi_document() -> dict[str, Any]:
                 "parameters": [workspace_id, session_id],
                 "responses": _response("Session"),
             },
+            "patch": {
+                "operationId": "updateSessionAnnotation",
+                "parameters": [workspace_id, session_id],
+                "requestBody": _request("SessionAnnotationPatch"),
+                "responses": _response("SessionAnnotation"),
+            },
             "delete": {
                 "operationId": "deleteSession",
                 "parameters": [workspace_id, session_id],

@@ -17,6 +17,7 @@ from atpiano.contracts.schemas import (
     PcmEnvelope,
     Provenance,
     Session,
+    SessionAnnotationPatch,
     SessionStatus,
     SourceKind,
     Workspace,
@@ -54,6 +55,8 @@ def test_representative_contract_objects_round_trip_strictly() -> None:
         started_at=NOW,
         completed_at=NOW,
         current_transcription_run_id="run-1",
+        recognized_note_count=12,
+        corrected_note_count=10,
         available_artifact_kinds=(ArtifactKind.AUDIO, ArtifactKind.MIDI),
     )
     artifact = Artifact(
@@ -102,6 +105,39 @@ def test_session_lifecycle_requires_consistent_completion() -> None:
             sample_rate_hz=48_000,
             source_frame_count=1,
             started_at=NOW,
+            recognized_note_count=0,
+            corrected_note_count=0,
+        )
+
+    with pytest.raises(ValidationError, match="cannot exceed"):
+        Session(
+            workspace_id="local",
+            session_id="session-1",
+            status=SessionStatus.ACTIVE,
+            source=SourceKind.REPLAY,
+            sample_rate_hz=48_000,
+            source_frame_count=1,
+            started_at=NOW,
+            recognized_note_count=1,
+            corrected_note_count=2,
+        )
+
+
+def test_session_annotation_patch_normalizes_and_rejects_blank_names() -> None:
+    annotation = SessionAnnotationPatch(
+        workspace_id="local",
+        session_id="session-1",
+        display_name="  Nocturne sketch  ",
+        request_id="rename-1",
+    )
+
+    assert annotation.display_name == "Nocturne sketch"
+    with pytest.raises(ValidationError):
+        SessionAnnotationPatch(
+            workspace_id="local",
+            session_id="session-1",
+            display_name="   ",
+            request_id="rename-2",
         )
 
 
