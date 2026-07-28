@@ -19,6 +19,7 @@ template_path="${script_directory}/launchd/${service_label}.plist.in"
 runtime_directory="${ATPIANO_SERVICE_RUNTIME_DIR:-${repository_directory}/results/share-atpiano-service}"
 generated_plist="${runtime_directory}/${service_label}.plist"
 generated_runner="${runtime_directory}/share-atpiano-service-runner"
+family_auth_mode_file="${runtime_directory}/family-auth-mode"
 account_name="$(id -un)"
 account_directory="$(/usr/bin/dscl . -read "/Users/${account_name}" NFSHomeDirectory |
   /usr/bin/sed -n 's/^NFSHomeDirectory: //p')"
@@ -39,6 +40,13 @@ bind_address="${ATPIANO_BIND_ADDRESS:-192.168.1.104}"
 port="${ATPIANO_PORT:-8002}"
 public_origin="${ATPIANO_PUBLIC_ORIGIN:-https://atpiano.graehlarts.com}"
 model_idle_timeout_seconds="${ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS:-600}"
+if [[ -n "${ATPIANO_FAMILY_AUTH+x}" ]]; then
+  family_auth="${ATPIANO_FAMILY_AUTH}"
+elif [[ -f "${family_auth_mode_file}" ]]; then
+  family_auth="$(/usr/bin/head -1 "${family_auth_mode_file}")"
+else
+  family_auth="false"
+fi
 
 if [[ ! "${log_file_count}" =~ ^[1-9][0-9]*$ ]]; then
   printf 'error: ATPIANO_SERVICE_LOG_COUNT must be a positive integer.\n' >&2
@@ -50,6 +58,10 @@ if [[ ! "${log_size}" =~ ^[1-9][0-9]*[BKMG]$ ]]; then
 fi
 if [[ ! "${model_idle_timeout_seconds}" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)$ ]]; then
   printf 'error: ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS must be nonnegative.\n' >&2
+  exit 64
+fi
+if [[ "${family_auth}" != "true" && "${family_auth}" != "false" ]]; then
+  printf 'error: ATPIANO_FAMILY_AUTH must be true or false.\n' >&2
   exit 64
 fi
 
@@ -120,6 +132,8 @@ render_plist() {
     "${port}" "${generated_plist}"
   /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS -string \
     "${model_idle_timeout_seconds}" "${generated_plist}"
+  /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_FAMILY_AUTH -string \
+    "${family_auth}" "${generated_plist}"
   /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_PUBLIC_ORIGIN -string \
     "${public_origin}" "${generated_plist}"
   /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_SERVICE_LOG_COUNT -string \
@@ -140,6 +154,10 @@ render_plist() {
     "${service_path}" "${generated_plist}"
   /usr/bin/plutil -lint "${generated_plist}" >/dev/null
   chmod 600 "${generated_plist}"
+  family_auth_mode_temporary="${family_auth_mode_file}.tmp.$$"
+  printf '%s\n' "${family_auth}" >"${family_auth_mode_temporary}"
+  chmod 600 "${family_auth_mode_temporary}"
+  mv "${family_auth_mode_temporary}" "${family_auth_mode_file}"
 }
 
 print_status() {
@@ -170,6 +188,7 @@ print_status() {
     "${bind_address}" "${port}" "$([[ -n "${listener}" ]] && printf 'ready' || printf 'not ready')"
   printf 'Public origin: %s\n' "${public_origin}"
   printf 'Model idle timeout: %s seconds\n' "${model_idle_timeout_seconds}"
+  printf 'Family authentication: %s\n' "${family_auth}"
   printf 'Logs: %s\n' "${log_directory}"
 }
 
@@ -191,7 +210,7 @@ start_service() {
 
   render_plist
   record_lifecycle \
-    "event=start_requested label=${service_label} repository=${repository_directory} bind=${bind_address} port=${port} model_idle_timeout_seconds=${model_idle_timeout_seconds}"
+    "event=start_requested label=${service_label} repository=${repository_directory} bind=${bind_address} port=${port} model_idle_timeout_seconds=${model_idle_timeout_seconds} family_auth=${family_auth}"
   if ! /bin/launchctl bootstrap "${service_domain}" "${generated_plist}"; then
     record_lifecycle "event=start_failed label=${service_label}"
     printf 'error: launchd could not bootstrap %s; inspect %s.\n' \

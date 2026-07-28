@@ -79,3 +79,7 @@ def test_launchd_template_is_on_demand_and_supervised() -> None:
         job["EnvironmentVariables"]["ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS"]
         == "__ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS__"
     )
+    assert (
+        job["EnvironmentVariables"]["ATPIANO_FAMILY_AUTH"]
+        == "__ATPIANO_FAMILY_AUTH__"
+    )

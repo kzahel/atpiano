@@ -23,6 +23,7 @@ MINIMUM_PASSWORD_CHARACTERS = 12
 MAXIMUM_PASSWORD_BYTES = 1024
 DEFAULT_IDLE_SESSION_LIFETIME = timedelta(days=7)
 DEFAULT_ABSOLUTE_SESSION_LIFETIME = timedelta(days=30)
+DEFAULT_SESSION_TOUCH_INTERVAL = timedelta(minutes=5)
 
 
 @dataclass(frozen=True)
@@ -142,6 +143,7 @@ class IdentityRepository(Protocol):
         token_digest: str,
         now: datetime,
         idle_extension: timedelta,
+        touch_interval: timedelta,
     ) -> Principal | None: ...
 
     def delete_web_session(self, token_digest: str) -> None: ...
@@ -194,6 +196,9 @@ class IdentityApplicationService:
         absolute_session_lifetime: timedelta = (
             DEFAULT_ABSOLUTE_SESSION_LIFETIME
         ),
+        session_touch_interval: timedelta = (
+            DEFAULT_SESSION_TOUCH_INTERVAL
+        ),
     ) -> None:
         if idle_session_lifetime <= timedelta():
             raise ValueError("idle session lifetime must be positive")
@@ -201,12 +206,21 @@ class IdentityApplicationService:
             raise ValueError(
                 "absolute session lifetime cannot be shorter than idle lifetime"
             )
+        if (
+            session_touch_interval <= timedelta()
+            or session_touch_interval >= idle_session_lifetime
+        ):
+            raise ValueError(
+                "session touch interval must be positive and shorter "
+                "than the idle lifetime"
+            )
         self._repository = repository
         self._password_hasher = password_hasher
         self.workspace_id = workspace_id
         self._now = now or (lambda: datetime.now(timezone.utc))
         self._idle_session_lifetime = idle_session_lifetime
         self._absolute_session_lifetime = absolute_session_lifetime
+        self._session_touch_interval = session_touch_interval
         self._dummy_hash = password_hasher.hash(
             secrets.token_urlsafe(32)
         )
@@ -332,6 +346,7 @@ class IdentityApplicationService:
             token_digest=digest,
             now=self._now(),
             idle_extension=self._idle_session_lifetime,
+            touch_interval=self._session_touch_interval,
         )
         if principal is None:
             raise AuthenticationError("authentication is required")

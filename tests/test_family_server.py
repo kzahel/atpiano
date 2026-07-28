@@ -114,6 +114,7 @@ def test_static_login_is_public_but_data_and_websocket_are_not(
     try:
         assert client.get("/").status_code == 200
         assert client.get("/api/v1/capabilities").status_code == 401
+        assert client.get("/api/legacy").status_code == 404
         artifact_url = (
             f"/api/v1/workspaces/local/sessions/{SESSION_ID}/artifacts"
         )
@@ -257,6 +258,38 @@ def test_family_server_rejects_untrusted_host(tmp_path: Path) -> None:
             headers={"Host": "attacker.example"},
         )
         assert response.status_code == 400
+    finally:
+        runtime.close()
+        engine.dispose()
+
+
+def test_failed_logins_are_rate_limited_without_plain_username_state(
+    tmp_path: Path,
+) -> None:
+    client, runtime, _identity, engine = _environment(tmp_path)
+    try:
+        for _attempt in range(5):
+            response = _login(
+                client,
+                "owner",
+                "the password is incorrect",
+            )
+            assert response.status_code == 401
+        limited = _login(
+            client,
+            "owner",
+            "the password is incorrect",
+        )
+        assert limited.status_code == 429
+        assert int(limited.headers["retry-after"]) > 0
+        assert (
+            _login(
+                client,
+                "viewer",
+                "the viewer family password",
+            ).status_code
+            == 200
+        )
     finally:
         runtime.close()
         engine.dispose()

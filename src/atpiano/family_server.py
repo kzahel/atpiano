@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import json
 import sqlite3
@@ -9,8 +10,10 @@ import subprocess
 import time
 import uuid
 import webbrowser
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Lock
 from typing import Any
 from urllib.parse import quote, urlsplit
 
@@ -76,11 +79,87 @@ SECURE_SESSION_COOKIE = "__Host-atpiano_session"
 LOCAL_SESSION_COOKIE = "atpiano_session"
 MAX_API_BODY_BYTES = 64 * 1024
 WEBSOCKET_REAUTHENTICATION_SECONDS = 60.0
+LOGIN_ATTEMPT_LIMIT = 5
+LOGIN_ATTEMPT_WINDOW_SECONDS = 5 * 60.0
+MAX_LOGIN_ATTEMPT_BUCKETS = 1024
 PRIVATE_SCORE_ARTIFACT_KINDS = {
     ArtifactKind.MUSICXML,
     ArtifactKind.SCORE_INPUT_MIDI,
     ArtifactKind.SCORE_ALIGNMENT,
 }
+
+
+class LoginRateLimitError(RuntimeError):
+    def __init__(self, retry_after_seconds: int) -> None:
+        super().__init__("too many login attempts; try again later")
+        self.retry_after_seconds = retry_after_seconds
+
+
+@dataclass
+class _LoginAttempts:
+    count: int
+    first_attempt: float
+
+
+class LoginAttemptLimiter:
+    """Bounded in-process limiter keyed without retaining usernames."""
+
+    def __init__(self) -> None:
+        self._attempts: dict[bytes, _LoginAttempts] = {}
+        self._lock = Lock()
+
+    @staticmethod
+    def _key(client: str, username: str) -> bytes:
+        return hashlib.sha256(
+            f"{client}\0{username.casefold()}".encode()
+        ).digest()
+
+    def _prune(self, now: float) -> None:
+        expired = [
+            key
+            for key, value in self._attempts.items()
+            if now - value.first_attempt >= LOGIN_ATTEMPT_WINDOW_SECONDS
+        ]
+        for key in expired:
+            del self._attempts[key]
+        while len(self._attempts) >= MAX_LOGIN_ATTEMPT_BUCKETS:
+            oldest = min(
+                self._attempts,
+                key=lambda key: self._attempts[key].first_attempt,
+            )
+            del self._attempts[oldest]
+
+    def check(self, client: str, username: str) -> None:
+        now = time.monotonic()
+        key = self._key(client, username)
+        with self._lock:
+            self._prune(now)
+            value = self._attempts.get(key)
+            if value is None or value.count < LOGIN_ATTEMPT_LIMIT:
+                return
+            remaining = LOGIN_ATTEMPT_WINDOW_SECONDS - (
+                now - value.first_attempt
+            )
+            raise LoginRateLimitError(max(1, round(remaining)))
+
+    def failure(self, client: str, username: str) -> None:
+        now = time.monotonic()
+        key = self._key(client, username)
+        with self._lock:
+            self._prune(now)
+            value = self._attempts.get(key)
+            if value is None:
+                self._attempts[key] = _LoginAttempts(
+                    count=1,
+                    first_attempt=now,
+                )
+            else:
+                value.count += 1
+
+    def success(self, client: str, username: str) -> None:
+        key = self._key(client, username)
+        with self._lock:
+            self._attempts.pop(key, None)
 
 
 def _principal_contract(principal: Principal) -> AuthenticatedPrincipal:
@@ -109,6 +188,7 @@ def _error_response(
     *,
     status_code: int,
     code: ErrorCode,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     error = ErrorResponse(
         error=AtpianoError(
@@ -118,10 +198,12 @@ def _error_response(
             retryable=False,
         )
     )
+    response_headers = {"Cache-Control": "no-store"}
+    response_headers.update(headers or {})
     return JSONResponse(
         error.model_dump(mode="json"),
         status_code=status_code,
-        headers={"Cache-Control": "no-store"},
+        headers=response_headers,
     )
 
 
@@ -147,6 +229,7 @@ def create_family_application(
     ):
         raise ValueError("public origin is not a valid exact origin")
     identity.require_enabled_owner()
+    login_limiter = LoginAttemptLimiter()
     cookie_name = (
         SECURE_SESSION_COOKIE if secure_cookie else LOCAL_SESSION_COOKIE
     )
@@ -235,6 +318,20 @@ def create_family_application(
             code=ErrorCode.INVALID_REQUEST,
         )
 
+    @app.exception_handler(LoginRateLimitError)
+    async def login_rate_limit(
+        _request: Request,
+        error: LoginRateLimitError,
+    ) -> JSONResponse:
+        return _error_response(
+            str(error),
+            status_code=429,
+            code=ErrorCode.CONFLICT,
+            headers={
+                "Retry-After": str(error.retry_after_seconds),
+            },
+        )
+
     @app.exception_handler(ApplicationNotFoundError)
     @app.exception_handler(LocalSessionNotFoundError)
     async def missing_resource(
@@ -318,10 +415,21 @@ def create_family_application(
 
     @app.post("/api/v1/auth/login", response_model=AuthSession)
     def login(request: Request, credentials: LoginRequest) -> Response:
-        issued = identity.login(
-            credentials.username,
-            credentials.password,
+        client = (
+            request.client.host
+            if request.client is not None
+            else "unknown"
         )
+        login_limiter.check(client, credentials.username)
+        try:
+            issued = identity.login(
+                credentials.username,
+                credentials.password,
+            )
+        except AuthenticationError:
+            login_limiter.failure(client, credentials.username)
+            raise
+        login_limiter.success(client, credentials.username)
         response = JSONResponse(
             _auth_session(issued.principal).model_dump(mode="json")
         )
@@ -910,6 +1018,14 @@ def create_family_application(
                     )
                 )
 
+    @app.get("/api/{api_path:path}", include_in_schema=False)
+    def unknown_api(api_path: str) -> JSONResponse:
+        return _error_response(
+            f"API resource does not exist: /api/{api_path}",
+            status_code=404,
+            code=ErrorCode.NOT_FOUND,
+        )
+
     @app.get("/{asset_path:path}", include_in_schema=False)
     def static_asset(asset_path: str) -> FileResponse:
         request_path = f"/{asset_path}"
@@ -975,7 +1091,7 @@ def serve_family_application(
         replay_realtime=replay_realtime,
         web_root=app_root / "dist",
         application_mode="shared-react-family",
-        public_origin=public_origin,
+        public_origin=None,
         compact_recordings=compact_recordings,
         debug_retention=debug_retention,
         debug_byte_cap=debug_byte_cap,

@@ -13,6 +13,7 @@ bind_address="${ATPIANO_BIND_ADDRESS:-192.168.1.104}"
 port="${ATPIANO_PORT:-8002}"
 public_origin="${ATPIANO_PUBLIC_ORIGIN:-https://atpiano.graehlarts.com}"
 model_idle_timeout_seconds="${ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS:-600}"
+family_auth="${ATPIANO_FAMILY_AUTH:-false}"
 uv_path="${ATPIANO_UV:-$(command -v uv || true)}"
 
 if [[ -z "${uv_path}" || ! -x "${uv_path}" ]]; then
@@ -20,7 +21,17 @@ if [[ -z "${uv_path}" || ! -x "${uv_path}" ]]; then
   exit 69
 fi
 
-exec /usr/bin/caffeinate -im "${uv_path}" run atpiano workbench-v3 \
+if [[ "${family_auth}" != "true" && "${family_auth}" != "false" ]]; then
+  printf 'error: ATPIANO_FAMILY_AUTH must be true or false.\n' >&2
+  exit 64
+fi
+
+server_command="workbench-v3"
+if [[ "${family_auth}" == "true" ]]; then
+  server_command="family-server"
+fi
+
+exec /usr/bin/caffeinate -im "${uv_path}" run atpiano "${server_command}" \
   --bind "${bind_address}" \
   --port "${port}" \
   --public-origin "${public_origin}" \

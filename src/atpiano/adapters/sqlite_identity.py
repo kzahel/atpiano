@@ -278,6 +278,7 @@ class SqlAlchemyIdentityRepository:
         token_digest: str,
         now: datetime,
         idle_extension: timedelta,
+        touch_interval: timedelta,
     ) -> Principal | None:
         with Session(self._engine) as session, session.begin():
             web_session = session.scalar(
@@ -296,11 +297,12 @@ class SqlAlchemyIdentityRepository:
             ):
                 session.delete(web_session)
                 return None
-            web_session.last_seen_at = now
-            web_session.idle_expires_at = min(
-                now + idle_extension,
-                _aware(web_session.absolute_expires_at),
-            )
+            if now - _aware(web_session.last_seen_at) >= touch_interval:
+                web_session.last_seen_at = now
+                web_session.idle_expires_at = min(
+                    now + idle_extension,
+                    _aware(web_session.absolute_expires_at),
+                )
             return _principal(session, user)
 
     def delete_web_session(self, token_digest: str) -> None:
