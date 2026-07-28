@@ -53,3 +53,4 @@ execution record; continuing status and direction belong in the relevant
 | [`039-continuous-library-playback.md`](039-continuous-library-playback.md) | Complete; live | One route-independent playback transport, library seeking, first-note cueing, and clickable synchronized opening previews |
 | [`040-websocket-runtime-dependency.md`](040-websocket-runtime-dependency.md) | Complete; live | Locked WebSocket protocol support for local, authenticated family, and packaged capture runtimes |
 | [`040-score-producer-provenance.md`](040-score-producer-provenance.md) | Complete; live | Durable score-pipeline provenance, compatibility freshness, and actionable legacy-cursor feedback |
+| [`041-post-capture-delete-settlement.md`](041-post-capture-delete-settlement.md) | Implementing | Immediate post-settlement deletion and automatic catalog lifecycle convergence |
