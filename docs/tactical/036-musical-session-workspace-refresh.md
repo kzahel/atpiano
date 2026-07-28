@@ -263,3 +263,6 @@ without fixture terminology. A future recording import remains a separate
 product and transport contract. Focused backend tests passed 19 cases; the
 frontend suite passed 79 tests across 17 files, with TypeScript, generated
 contract drift, Ruff, the production build, and Git whitespace also passing.
+The active authenticated service was restarted with the corrected bundle; a
+temporary local-operator session observed only `microphone` in the live
+capability response and was then logged out and verified revoked.
