@@ -47,9 +47,9 @@ function PianoRoll({
           <h3>Piano roll</h3>
         </div>
         <div className="legend">
-          <span><i className="legend-dot provisional" /> provisional</span>
-          <span><i className="legend-dot committed" /> corrected</span>
-          <span><i className="legend-line" /> commit horizon</span>
+          <span><i className="legend-dot provisional" /> live estimate</span>
+          <span><i className="legend-dot committed" /> settled</span>
+          <span><i className="legend-line" /> settled through</span>
         </div>
       </div>
       <div

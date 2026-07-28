@@ -412,6 +412,8 @@ class CaptureApplicationService:
         *,
         sample_rate_hz: int,
         client_metadata: dict[str, Any],
+        created_by_user_id: str | None = None,
+        performed_by_profile_id: str | None = None,
     ) -> CaptureStart:
         session_id, directory = self.claim_session(source="microphone")
         return self._start_claimed_session(
@@ -420,6 +422,8 @@ class CaptureApplicationService:
             source="microphone",
             sample_rate_hz=sample_rate_hz,
             client_metadata=client_metadata,
+            created_by_user_id=created_by_user_id,
+            performed_by_profile_id=performed_by_profile_id,
         )
 
     def _start_claimed_session(
@@ -430,6 +434,8 @@ class CaptureApplicationService:
         source: str,
         sample_rate_hz: int,
         client_metadata: dict[str, Any] | None,
+        created_by_user_id: str | None = None,
+        performed_by_profile_id: str | None = None,
     ) -> CaptureStart:
         preview_model = self.preview_model()
         correction_mode = self._models.correction_mode
@@ -462,6 +468,44 @@ class CaptureApplicationService:
         )
         if self._storage is not None:
             self._storage.initialize_session(session_id)
+        if (
+            created_by_user_id is not None
+            or performed_by_profile_id is not None
+        ):
+            try:
+                application = self._repository.read_document(
+                    session_id,
+                    "application.json",
+                )
+            except (FileNotFoundError, LookupError):
+                application = {
+                    "schema_version": "atpiano.application-session.v1",
+                    "created_at": utc_now(),
+                }
+            provenance = application.get("provenance")
+            if not isinstance(provenance, dict):
+                provenance = {}
+            if created_by_user_id is not None:
+                provenance = {
+                    **provenance,
+                    "created_by_user_id": created_by_user_id,
+                }
+            annotations = application.get("annotations")
+            if not isinstance(annotations, dict):
+                annotations = {}
+            if performed_by_profile_id is not None:
+                annotations = {
+                    **annotations,
+                    "performed_by_profile_id": performed_by_profile_id,
+                    "updated_at": utc_now(),
+                }
+            application["provenance"] = provenance
+            application["annotations"] = annotations
+            self._repository.write_document(
+                session_id,
+                "application.json",
+                application,
+            )
         debug_enabled = (
             self._storage.debug_enabled
             if self._storage is not None
@@ -584,7 +628,13 @@ class CaptureApplicationService:
         except Exception as error:
             self.abort_microphone(error)
 
-    def start_upload(self, source: UploadSource) -> CaptureStart:
+    def start_upload(
+        self,
+        source: UploadSource,
+        *,
+        created_by_user_id: str | None = None,
+        performed_by_profile_id: str | None = None,
+    ) -> CaptureStart:
         if not self._upload_enabled:
             source.close()
             raise RuntimeError("recording import is unavailable")
@@ -600,6 +650,8 @@ class CaptureApplicationService:
                 source="upload",
                 sample_rate_hz=source.sample_rate_hz,
                 client_metadata=None,
+                created_by_user_id=created_by_user_id,
+                performed_by_profile_id=performed_by_profile_id,
             )
             self._repository.write_document(
                 session_id,

@@ -26,6 +26,10 @@ normally reuse the document slug in its `Topic:` trailers.
   measured internal desktop score footprint, duplicated dependency evidence,
   inference-only checkpoint opportunity, safe pruning order, and parity
   gates.
+- [`family-workspaces-and-attribution.md`](family-workspaces-and-attribution.md):
+  implemented managed performer profiles, fast shared-piano selection, and
+  explicit creator-versus-performer attribution, with shareable multi-space
+  roots retained as the next bounded extension.
 - [`home-hosted-family-sharing.md`](home-hosted-family-sharing.md):
   accepted near-term Mac-hosted family deployment through the home Pi/Caddy,
   with on-demand availability, local persistence, proportionate access

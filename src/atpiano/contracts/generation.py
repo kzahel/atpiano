@@ -87,6 +87,7 @@ def build_openapi_document() -> dict[str, Any]:
     )
     schemas = combined["$defs"]
     workspace_id = _path_parameter("workspace_id")
+    group_id = _path_parameter("group_id")
     session_id = _path_parameter("session_id")
     job_id = _path_parameter("job_id")
     artifact_id = _path_parameter("artifact_id")
@@ -128,6 +129,27 @@ def build_openapi_document() -> dict[str, Any]:
                 "responses": _response("WorkspacePage"),
             }
         },
+        "/api/v1/groups": {
+            "get": {
+                "operationId": "listGroups",
+                "responses": _response("GroupPage"),
+            }
+        },
+        "/api/v1/groups/{group_id}/profiles": {
+            "post": {
+                "operationId": "createProfile",
+                "parameters": [group_id],
+                "requestBody": _request("ProfileCreate"),
+                "responses": _response("Profile", status="201"),
+            }
+        },
+        "/api/v1/workspaces/{workspace_id}/profiles": {
+            "get": {
+                "operationId": "listProfiles",
+                "parameters": [workspace_id, cursor, limit],
+                "responses": _response("ProfilePage"),
+            }
+        },
         "/api/v1/workspaces/{workspace_id}/sessions": {
             "get": {
                 "operationId": "listSessions",
@@ -150,6 +172,12 @@ def build_openapi_document() -> dict[str, Any]:
                         "name": "X-Atpiano-Request-Id",
                         "in": "header",
                         "required": True,
+                        "schema": {"type": "string", "maxLength": 128},
+                    },
+                    {
+                        "name": "X-Atpiano-Performer-Profile",
+                        "in": "header",
+                        "required": False,
                         "schema": {"type": "string", "maxLength": 128},
                     },
                 ],
@@ -197,6 +225,19 @@ def build_openapi_document() -> dict[str, Any]:
                 "requestBody": _request("DeleteSessionRequest"),
                 "responses": _response("DeleteSessionResult"),
             },
+        },
+        (
+            "/api/v1/workspaces/{workspace_id}/sessions/{session_id}"
+            "/performer"
+        ): {
+            "patch": {
+                "operationId": "updateSessionPerformer",
+                "parameters": [workspace_id, session_id],
+                "requestBody": _request("SessionPerformerPatch"),
+                "responses": _response(
+                    "SessionPerformerAttribution"
+                ),
+            }
         },
         "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/horizon": {
             "get": {

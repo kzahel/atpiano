@@ -153,6 +153,8 @@ const workspace: Workspace = {
   mode: "local",
   created_at: "2026-07-26T09:12:00Z",
   owner_user_id: null,
+  administrative_group_id: "group:fixture",
+  home_profile_id: "profile:fixture",
 };
 
 const capabilities: RuntimeCapabilities = {
@@ -187,6 +189,8 @@ function session(
     completed_at: status === "complete" ? startedAt : null,
     active_capture_id: status === "active" ? `capture:${sessionId}` : null,
     current_transcription_run_id: `run:${sessionId}`,
+    created_by_user_id: null,
+    performed_by_profile_id: "profile:fixture",
     display_name: displayName,
     recognized_note_count: 0,
     corrected_note_count: 0,

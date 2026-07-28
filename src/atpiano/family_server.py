@@ -57,9 +57,15 @@ from atpiano.contracts.schemas import (
     DeleteSessionRequest,
     ErrorCode,
     ErrorResponse,
+    Group,
+    GroupMembership,
+    GroupPage,
     LoginRequest,
     LogoutResult,
     Membership,
+    Profile,
+    ProfileCreate,
+    ProfilePage,
     RecordingImportStart,
     RuntimeCapabilities,
     RuntimeMode,
@@ -67,6 +73,8 @@ from atpiano.contracts.schemas import (
     ScoreVariantPage,
     ScoreVariantRequest,
     SessionAnnotationPatch,
+    SessionPerformerAttribution,
+    SessionPerformerPatch,
     SourceKind,
 )
 from atpiano.corrected import CorrectedSession
@@ -182,6 +190,37 @@ def _principal_contract(principal: Principal) -> AuthenticatedPrincipal:
             )
             for membership in principal.memberships
         ),
+        group_memberships=tuple(
+            GroupMembership(
+                group_id=membership.group_id,
+                user_id=principal.user_id,
+                role=membership.role,
+                created_at=membership.created_at,
+            )
+            for membership in principal.group_memberships
+        ),
+    )
+
+
+def _group_contract(value: Any) -> Group:
+    return Group(
+        group_id=value.group_id,
+        name=value.name,
+        kind=value.kind,
+        default_space_audience=value.default_space_audience,
+        default_space_role=value.default_space_role,
+        created_at=value.created_at,
+        current_user_role=value.current_user_role,
+    )
+
+
+def _profile_contract(value: Any) -> Profile:
+    return Profile(
+        profile_id=value.profile_id,
+        display_name=value.display_name,
+        disabled=value.disabled,
+        created_at=value.created_at,
+        controller_role=value.controller_role,
     )
 
 
@@ -539,12 +578,86 @@ def create_family_application(
             page.model_copy(
                 update={
                     "items": tuple(
-                        item
+                        item.model_copy(
+                            update={
+                                "name": metadata.name,
+                                "owner_user_id": (
+                                    metadata.created_by_user_id
+                                ),
+                                "administrative_group_id": (
+                                    metadata.administrative_group_id
+                                ),
+                                "home_profile_id": (
+                                    metadata.home_profile_id
+                                ),
+                            }
+                        )
                         for item in page.items
                         if item.workspace_id in allowed
+                        for metadata in (
+                            identity.workspace(
+                                principal,
+                                item.workspace_id,
+                            ),
+                        )
                     )
                 }
             ).model_dump(mode="json")
+        )
+
+    @app.get("/api/v1/groups", response_model=GroupPage)
+    def groups(request: Request) -> GroupPage:
+        principal = principal_for_request(request)
+        return GroupPage(
+            items=tuple(
+                _group_contract(group)
+                for group in identity.list_groups(principal)
+            )
+        )
+
+    @app.get(
+        "/api/v1/workspaces/{workspace_id}/profiles",
+        response_model=ProfilePage,
+    )
+    def profiles(request: Request, workspace_id: str) -> ProfilePage:
+        principal = workspace_principal(request, workspace_id)
+        return ProfilePage(
+            workspace_id=workspace_id,
+            group_id=identity.workspace_group_id(
+                principal,
+                workspace_id,
+            ),
+            items=tuple(
+                _profile_contract(profile)
+                for profile in identity.list_profiles(
+                    principal,
+                    workspace_id,
+                )
+                if not profile.disabled
+            ),
+        )
+
+    @app.post(
+        "/api/v1/groups/{group_id}/profiles",
+        response_model=Profile,
+        status_code=201,
+    )
+    def create_profile(
+        request: Request,
+        group_id: str,
+        profile: ProfileCreate,
+    ) -> Profile:
+        principal = principal_for_request(request)
+        if profile.group_id != group_id:
+            raise ValueError(
+                "profile group does not match its path"
+            )
+        return _profile_contract(
+            identity.create_managed_profile(
+                principal,
+                group_id=group_id,
+                display_name=profile.display_name,
+            )
         )
 
     @app.get("/api/v1/workspaces/{workspace_id}/sessions")
@@ -578,7 +691,11 @@ def create_family_application(
         request: Request,
         workspace_id: str,
     ) -> Capture:
-        workspace_principal(request, workspace_id, write=True)
+        principal = workspace_principal(
+            request,
+            workspace_id,
+            write=True,
+        )
         spool_path: Path | None = None
         try:
             content_length = int(
@@ -590,6 +707,13 @@ def create_family_application(
             request_id = request.headers.get(
                 "x-atpiano-request-id",
                 "",
+            )
+            performer_profile_id = (
+                request.headers.get(
+                    "x-atpiano-performer-profile",
+                    "",
+                ).strip()
+                or None
             )
             media_type = request.headers.get(
                 "content-type",
@@ -607,7 +731,13 @@ def create_family_application(
                 filename=normalized_filename,
                 media_type=normalized_media_type,
                 byte_count=content_length,
+                performed_by_profile_id=performer_profile_id,
                 request_id=request_id,
+            )
+            identity.require_profile(
+                principal,
+                workspace_id=workspace_id,
+                profile_id=start.performed_by_profile_id,
             )
             spool_path = runtime.recording_uploads.new_spool_path()
             digest = hashlib.sha256()
@@ -636,7 +766,13 @@ def create_family_application(
                 sha256=digest.hexdigest(),
             )
             try:
-                capture = runtime.start_recording_import(source)
+                capture = runtime.start_recording_import(
+                    source,
+                    created_by_user_id=principal.user_id,
+                    performed_by_profile_id=(
+                        start.performed_by_profile_id
+                    ),
+                )
             except RuntimeError as error:
                 raise ApplicationConflictError(str(error)) from error
             spool_path = None
@@ -689,6 +825,44 @@ def create_family_application(
             session_id,
             display_name=annotation.display_name,
         ).model_dump(mode="json")
+
+    @app.patch(
+        (
+            "/api/v1/workspaces/{workspace_id}/sessions/{session_id}"
+            "/performer"
+        ),
+        response_model=SessionPerformerAttribution,
+    )
+    def update_session_performer(
+        request: Request,
+        workspace_id: str,
+        session_id: str,
+        performer: SessionPerformerPatch,
+    ) -> SessionPerformerAttribution:
+        principal = workspace_principal(
+            request,
+            workspace_id,
+            write=True,
+        )
+        if (
+            performer.workspace_id != workspace_id
+            or performer.session_id != session_id
+        ):
+            raise ValueError(
+                "session performer target does not match its path"
+            )
+        identity.require_profile(
+            principal,
+            workspace_id=workspace_id,
+            profile_id=performer.performed_by_profile_id,
+        )
+        return runtime.application.sessions.update_session_performer(
+            workspace_id,
+            session_id,
+            performed_by_profile_id=(
+                performer.performed_by_profile_id
+            ),
+        )
 
     @app.get(
         "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/horizon",
@@ -1036,11 +1210,21 @@ def create_family_application(
                         )
                     sample_rate_hz = control.get("sample_rate_hz")
                     metadata = control.get("client_metadata")
+                    performer_profile_id = control.get(
+                        "performed_by_profile_id"
+                    )
                     if (
                         not isinstance(sample_rate_hz, int)
                         or isinstance(sample_rate_hz, bool)
                         or not 8_000 <= sample_rate_hz <= 192_000
                         or not isinstance(metadata, dict)
+                        or (
+                            performer_profile_id is not None
+                            and not isinstance(
+                                performer_profile_id,
+                                str,
+                            )
+                        )
                     ):
                         raise ValueError(
                             "microphone Start metadata is invalid"
@@ -1056,10 +1240,19 @@ def create_family_application(
                         raise ValueError(
                             "microphone client metadata is too large"
                         )
+                    identity.require_profile(
+                        principal,
+                        workspace_id=LOCAL_WORKSPACE_ID,
+                        profile_id=performer_profile_id,
+                    )
                     started = (
                         runtime.application.capture.start_microphone(
                             sample_rate_hz=sample_rate_hz,
                             client_metadata=metadata,
+                            created_by_user_id=principal.user_id,
+                            performed_by_profile_id=(
+                                performer_profile_id
+                            ),
                         )
                     )
                     capture_session = started.session

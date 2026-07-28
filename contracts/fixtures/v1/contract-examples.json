@@ -12,7 +12,9 @@
     {
       "model": "Workspace",
       "value": {
+        "administrative_group_id": null,
         "created_at": "2026-07-26T10:00:00Z",
+        "home_profile_id": null,
         "mode": "local",
         "name": "On this device",
         "owner_user_id": null,
@@ -44,9 +46,11 @@
         "correction_mode": "delayed",
         "correction_profile_id": null,
         "correction_reason": "measured local backend profile",
+        "created_by_user_id": null,
         "current_transcription_run_id": "run-1",
         "corrected_note_count": 144,
         "display_name": "26 Jul 2026, replay",
+        "performed_by_profile_id": null,
         "recognized_note_count": 147,
         "sample_rate_hz": 48000,
         "schema_version": "atpiano.contract.v1",

@@ -11,6 +11,7 @@ import {
 import { openingEventPage } from "../lib/opening-event-page.js";
 import type {
   EventRevision,
+  Profile,
   Session,
 } from "../runtime/atpiano-runtime.js";
 import { useRuntime } from "../runtime/runtime-context.js";
@@ -128,11 +129,13 @@ function OpeningPhrase({
 
 function SessionLibraryRow({
   session,
+  performerName,
   active,
   maxEventRangeSamples,
   onSelect,
 }: {
   readonly session: Session;
+  readonly performerName: string;
   readonly active: boolean;
   readonly maxEventRangeSamples: number;
   readonly onSelect: (sessionId: string) => void;
@@ -153,6 +156,17 @@ function SessionLibraryRow({
     !playbackAvailable &&
     playbackStatus !== "error" &&
     !active;
+  const settlingNoteCount = Math.max(
+    0,
+    session.recognized_note_count - session.corrected_note_count,
+  );
+  const showSettlingNoteCount =
+    settlingNoteCount > 0 &&
+    (
+      active ||
+      session.status === "active" ||
+      session.status === "stopping"
+    );
 
   const preview = useQuery({
     queryKey: [
@@ -202,6 +216,8 @@ function SessionLibraryRow({
           {active && <i className="live-pill">live</i>}
         </span>
         <span className="library-session-meta">
+          {performerName}
+          <i aria-hidden="true">·</i>
           {formatSessionDate(session.started_at)}
           <i aria-hidden="true">·</i>
           {sessionSourceLabel(session.source)}
@@ -210,8 +226,12 @@ function SessionLibraryRow({
         </span>
         <span className="library-session-summary">
           {session.recognized_note_count} notes
-          <i aria-hidden="true">·</i>
-          {session.corrected_note_count} corrected
+          {showSettlingNoteCount && (
+            <>
+              <i aria-hidden="true">·</i>
+              {settlingNoteCount} settling
+            </>
+          )}
         </span>
         <span className="library-session-open" aria-hidden="true">Open →</span>
       </button>
@@ -320,6 +340,7 @@ function SessionLibraryRow({
 
 export function SessionsHome({
   sessions,
+  profiles,
   activeSessionId,
   canWrite,
   maxEventRangeSamples,
@@ -327,12 +348,27 @@ export function SessionsHome({
   onSelect,
 }: {
   readonly sessions: readonly Session[];
+  readonly profiles: readonly Profile[];
   readonly activeSessionId: string | null;
   readonly canWrite: boolean;
   readonly maxEventRangeSamples: number;
   readonly onNew: () => void;
   readonly onSelect: (sessionId: string) => void;
 }) {
+  const [performerFilter, setPerformerFilter] = useState("all");
+  const visibleSessions = performerFilter === "all"
+    ? sessions
+    : sessions.filter((session) =>
+        performerFilter === "unassigned"
+          ? session.performed_by_profile_id === null
+          : session.performed_by_profile_id === performerFilter
+      );
+  const profileNames = new Map(
+    profiles.map((profile) => [
+      profile.profile_id,
+      profile.display_name,
+    ]),
+  );
   return (
     <section className="sessions-home" aria-labelledby="sessions-title">
       <header className="sessions-home-heading">
@@ -346,14 +382,38 @@ export function SessionsHome({
             New session
           </button>
         )}
+        <label className="session-performer-filter">
+          <span>Show</span>
+          <select
+            value={performerFilter}
+            onChange={(event) =>
+              setPerformerFilter(event.currentTarget.value)
+            }
+          >
+            <option value="all">All performers</option>
+            {profiles.map((profile) => (
+              <option key={profile.profile_id} value={profile.profile_id}>
+                {profile.display_name}
+              </option>
+            ))}
+            <option value="unassigned">Unassigned</option>
+          </select>
+        </label>
       </header>
 
-      {sessions.length ? (
+      {visibleSessions.length ? (
         <div className="session-library-list">
-          {sessions.map((session) => (
+          {visibleSessions.map((session) => (
             <SessionLibraryRow
               key={session.session_id}
               session={session}
+              performerName={
+                session.performed_by_profile_id === null
+                  ? "Unassigned"
+                  : profileNames.get(
+                      session.performed_by_profile_id,
+                    ) ?? "Unknown performer"
+              }
               active={session.session_id === activeSessionId}
               maxEventRangeSamples={maxEventRangeSamples}
               onSelect={onSelect}
@@ -363,8 +423,14 @@ export function SessionsHome({
       ) : (
         <div className="sessions-empty">
           <span aria-hidden="true">♪</span>
-          <h2>No sessions yet</h2>
-          <p>Your recorded performances will collect here.</p>
+          <h2>
+            {sessions.length ? "No matching sessions" : "No sessions yet"}
+          </h2>
+          <p>
+            {sessions.length
+              ? "Choose another performer to see more recordings."
+              : "Your recorded performances will collect here."}
+          </p>
           {canWrite && (
             <button className="button primary" type="button" onClick={onNew}>
               Create a new session

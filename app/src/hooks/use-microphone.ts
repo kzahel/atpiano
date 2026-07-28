@@ -54,11 +54,13 @@ async function closeBrowserCapture(value: BrowserCapture): Promise<void> {
 export function useMicrophone({
   runtime,
   workspaceId,
+  performerProfileId,
   onChanged,
   onStopped,
 }: {
   readonly runtime: AtpianoRuntime;
   readonly workspaceId: string | undefined;
+  readonly performerProfileId: string | null;
   readonly onChanged: () => Promise<void>;
   readonly onStopped: (session: Session) => void;
 }) {
@@ -94,6 +96,7 @@ export function useMicrophone({
           workspace_id: workspaceId,
           source: "microphone",
           sample_rate_hz: context.sampleRate,
+          performed_by_profile_id: performerProfileId,
           request_id: operationId,
         },
         { requestId: operationId },
@@ -170,6 +173,7 @@ export function useMicrophone({
     beginCapture,
     failCapture,
     onChanged,
+    performerProfileId,
     recordCapture,
     runtime,
     warmCapture,

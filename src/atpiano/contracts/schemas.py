@@ -80,6 +80,24 @@ class MembershipRole(str, Enum):
     VIEWER = "viewer"
 
 
+class GroupKind(str, Enum):
+    HOUSEHOLD = "household"
+    STUDIO = "studio"
+    FRIENDS = "friends"
+    OTHER = "other"
+
+
+class GroupRole(str, Enum):
+    OWNER = "owner"
+    ADMIN = "admin"
+    MEMBER = "member"
+
+
+class ProfileControllerRole(str, Enum):
+    OWNER = "owner"
+    MANAGER = "manager"
+
+
 class SessionStatus(str, Enum):
     ACTIVE = "active"
     STOPPING = "stopping"
@@ -207,6 +225,8 @@ class Workspace(VersionedContractModel):
     mode: WorkspaceMode
     created_at: AwareDatetime
     owner_user_id: OpaqueId | None = None
+    administrative_group_id: OpaqueId | None = None
+    home_profile_id: OpaqueId | None = None
 
 
 class Membership(VersionedContractModel):
@@ -214,6 +234,47 @@ class Membership(VersionedContractModel):
     user_id: OpaqueId
     role: MembershipRole
     created_at: AwareDatetime
+
+
+class GroupMembership(VersionedContractModel):
+    group_id: OpaqueId
+    user_id: OpaqueId
+    role: GroupRole
+    created_at: AwareDatetime
+
+
+class Group(VersionedContractModel):
+    group_id: OpaqueId
+    name: Annotated[str, StringConstraints(min_length=1, max_length=200)]
+    kind: GroupKind
+    default_space_audience: Literal["group", "controllers"]
+    default_space_role: Literal[MembershipRole.EDITOR, MembershipRole.VIEWER]
+    created_at: AwareDatetime
+    current_user_role: GroupRole
+
+
+class Profile(VersionedContractModel):
+    profile_id: OpaqueId
+    display_name: Annotated[
+        str,
+        StringConstraints(min_length=1, max_length=128),
+    ]
+    disabled: bool
+    created_at: AwareDatetime
+    controller_role: ProfileControllerRole | None = None
+
+
+class ProfileCreate(VersionedContractModel):
+    group_id: OpaqueId
+    display_name: Annotated[
+        str,
+        StringConstraints(
+            min_length=1,
+            max_length=128,
+            strip_whitespace=True,
+        ),
+    ]
+    request_id: OpaqueId
 
 
 class AuthenticatedPrincipal(VersionedContractModel):
@@ -224,6 +285,7 @@ class AuthenticatedPrincipal(VersionedContractModel):
         StringConstraints(min_length=1, max_length=128),
     ]
     memberships: tuple[Membership, ...]
+    group_memberships: tuple[GroupMembership, ...] = ()
 
 
 class LoginRequest(VersionedContractModel):
@@ -257,6 +319,8 @@ class Session(VersionedContractModel):
     completed_at: AwareDatetime | None = None
     active_capture_id: OpaqueId | None = None
     current_transcription_run_id: OpaqueId | None = None
+    created_by_user_id: OpaqueId | None = None
+    performed_by_profile_id: OpaqueId | None = None
     display_name: Annotated[str, StringConstraints(min_length=1, max_length=200)] | None = None
     recognized_note_count: Annotated[int, Field(ge=0)]
     corrected_note_count: Annotated[int, Field(ge=0)]
@@ -536,6 +600,7 @@ class CaptureStart(VersionedContractModel):
     workspace_id: OpaqueId
     source: Literal[SourceKind.MICROPHONE]
     sample_rate_hz: Annotated[int, Field(ge=8_000, le=384_000)]
+    performed_by_profile_id: OpaqueId | None = None
     request_id: OpaqueId
 
 
@@ -564,6 +629,7 @@ class RecordingImportStart(VersionedContractModel):
     ]
     media_type: MediaType
     byte_count: Annotated[int, Field(ge=1, le=2_147_483_648)]
+    performed_by_profile_id: OpaqueId | None = None
     request_id: OpaqueId
 
 
@@ -606,6 +672,20 @@ class SessionAnnotation(VersionedContractModel):
     updated_at: AwareDatetime
 
 
+class SessionPerformerPatch(VersionedContractModel):
+    workspace_id: OpaqueId
+    session_id: OpaqueId
+    performed_by_profile_id: OpaqueId | None = None
+    request_id: OpaqueId
+
+
+class SessionPerformerAttribution(VersionedContractModel):
+    workspace_id: OpaqueId
+    session_id: OpaqueId
+    performed_by_profile_id: OpaqueId | None = None
+    updated_at: AwareDatetime
+
+
 class DeleteSessionRequest(VersionedContractModel):
     workspace_id: OpaqueId
     session_id: OpaqueId
@@ -632,6 +712,18 @@ class ArtifactAccess(VersionedContractModel):
 
 class WorkspacePage(VersionedContractModel):
     items: tuple[Workspace, ...]
+    next_cursor: Cursor | None = None
+
+
+class GroupPage(VersionedContractModel):
+    items: tuple[Group, ...]
+    next_cursor: Cursor | None = None
+
+
+class ProfilePage(VersionedContractModel):
+    workspace_id: OpaqueId
+    group_id: OpaqueId
+    items: tuple[Profile, ...]
     next_cursor: Cursor | None = None
 
 
@@ -676,6 +768,10 @@ def contract_models() -> tuple[type[BaseModel], ...]:
         User,
         Workspace,
         Membership,
+        GroupMembership,
+        Group,
+        Profile,
+        ProfileCreate,
         AuthenticatedPrincipal,
         LoginRequest,
         AuthSession,
@@ -703,10 +799,14 @@ def contract_models() -> tuple[type[BaseModel], ...]:
         ScoreVariantRequest,
         SessionAnnotationPatch,
         SessionAnnotation,
+        SessionPerformerPatch,
+        SessionPerformerAttribution,
         DeleteSessionRequest,
         DeleteSessionResult,
         ArtifactAccess,
         WorkspacePage,
+        GroupPage,
+        ProfilePage,
         SessionPage,
         EventPage,
         ArtifactPage,

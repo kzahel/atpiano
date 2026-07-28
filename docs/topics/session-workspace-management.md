@@ -173,6 +173,14 @@ Selecting a historical session opens its timeline, keyboard, score, exports,
 and status read-only. The page clearly labels **Viewing completed session**
 instead of presenting old data as a live current session.
 
+Finished-session cards and summaries show one final note total. While a
+session is active or stopping, they may additionally show only the outstanding
+difference as **N settling**. The API's `corrected_note_count` remains a
+settled-subset count for compatibility; it is not a count of notes that
+changed, so the UI does not label that value **corrected**. Timeline legends
+use the player-facing terms **live estimate**, **settled**, and **settled
+through** while internal event lifecycles remain provisional and committed.
+
 On narrow mobile screens, history remains available from a persistent
 **Sessions** control in the workspace top bar. It opens the complete
 newest-first history in an overlaid drawer, supports explicit close, backdrop

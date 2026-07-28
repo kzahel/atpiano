@@ -15,6 +15,10 @@ import { ArtifactPanel } from "./components/artifact-panel.js";
 import { CaptureDeck } from "./components/capture-deck.js";
 import { PerformanceViews } from "./components/performance-views.js";
 import {
+  AccountMenu,
+  PerformerSelect,
+} from "./components/profile-controls.js";
+import {
   PlaybackProvider,
   type AudioPlaybackSource,
 } from "./components/playback-provider.js";
@@ -81,8 +85,7 @@ function EmptyWorkspace({ onNew }: { readonly onNew: () => void }) {
       <h1>Begin a performance</h1>
       <p>
         Record your piano through the microphone or import a WAV or MP3.
-        Atpiano keeps the immediate recognition visible while corrected notes
-        settle behind it.
+        Atpiano keeps the live estimate visible while notes settle behind it.
       </p>
       <button className="button primary" type="button" onClick={onNew}>
         Create a new session
@@ -145,6 +148,8 @@ export function App({
   const [autoScoringSessionId, setAutoScoringSessionId] =
     useState<string | null>(null);
   const [sessionNavOpen, setSessionNavOpen] = useState(false);
+  const [selectedPerformerProfileId, setSelectedPerformerProfileId] =
+    useState<string | null>(null);
   const sessionNavTrigger = useRef<HTMLButtonElement>(null);
   const canWrite = viewer?.canWrite ?? true;
 
@@ -217,6 +222,104 @@ export function App({
     staleTime: 30_000,
   });
   const workspace = workspaces.data?.items[0];
+  const groups = useQuery({
+    queryKey: ["groups"],
+    queryFn: ({ signal }) =>
+      runtime.listGroups({
+        requestId: requestId("groups"),
+        signal,
+        limit: 100,
+      }),
+    staleTime: 30_000,
+  });
+  const profiles = useQuery({
+    queryKey: ["profiles", workspace?.workspace_id],
+    queryFn: ({ signal }) =>
+      runtime.listProfiles(workspace!.workspace_id, {
+        requestId: requestId("profiles"),
+        signal,
+        limit: 100,
+      }),
+    enabled: workspace !== undefined,
+    staleTime: 30_000,
+  });
+  const profileItems = profiles.data?.items ?? [];
+  const group = groups.data?.items.find(
+    (candidate) => candidate.group_id === profiles.data?.group_id,
+  );
+
+  const choosePerformer = useCallback((
+    profileId: string | null,
+  ) => {
+    setSelectedPerformerProfileId(profileId);
+    if (workspace) {
+      if (profileId === null) {
+        window.localStorage.removeItem(
+          `atpiano:performer:${workspace.workspace_id}`,
+        );
+      } else {
+        window.localStorage.setItem(
+          `atpiano:performer:${workspace.workspace_id}`,
+          profileId,
+        );
+      }
+    }
+  }, [workspace]);
+
+  useEffect(() => {
+    if (!workspace || profileItems.length === 0) return;
+    const key = `atpiano:performer:${workspace.workspace_id}`;
+    const stored = window.localStorage.getItem(key);
+    const preferred = (
+      profileItems.find((profile) => profile.profile_id === stored) ??
+      profileItems.find(
+        (profile) => profile.display_name === viewer?.displayName,
+      ) ??
+      profileItems.find(
+        (profile) =>
+          profile.profile_id === workspace.home_profile_id,
+      ) ??
+      profileItems[0]
+    )?.profile_id ?? null;
+    if (
+      selectedPerformerProfileId === null ||
+      !profileItems.some(
+        (profile) =>
+          profile.profile_id === selectedPerformerProfileId,
+      )
+    ) {
+      setSelectedPerformerProfileId(preferred);
+      if (preferred !== null) {
+        window.localStorage.setItem(key, preferred);
+      }
+    }
+  }, [
+    profileItems,
+    selectedPerformerProfileId,
+    viewer?.displayName,
+    workspace,
+  ]);
+
+  const createProfile = useMutation({
+    mutationFn: (displayName: string) => {
+      if (!group) throw new Error("The profile group is unavailable.");
+      const operationId = requestId("profile");
+      return runtime.createProfile(
+        {
+          schema_version: "atpiano.contract.v1",
+          group_id: group.group_id,
+          display_name: displayName,
+          request_id: operationId,
+        },
+        { requestId: operationId },
+      );
+    },
+    onSuccess: async (profile) => {
+      await queryClient.invalidateQueries({ queryKey: ["profiles"] });
+      choosePerformer(profile.profile_id);
+      setToast(`${profile.display_name} is ready to record.`);
+    },
+  });
   const sessions = useQuery({
     queryKey: ["sessions", workspace?.workspace_id],
     queryFn: ({ signal }) =>
@@ -710,6 +813,7 @@ export function App({
   const microphone = useMicrophone({
     runtime,
     workspaceId: workspace?.workspace_id,
+    performerProfileId: selectedPerformerProfileId,
     onChanged: invalidateWorkspace,
     onStopped: (session) => setPendingAutoScoreSessionId(session.session_id),
   });
@@ -741,6 +845,7 @@ export function App({
           filename: file.name,
           media_type: suffix === "wav" ? "audio/wav" : "audio/mpeg",
           byte_count: file.size,
+          performed_by_profile_id: selectedPerformerProfileId,
           request_id: operationId,
         },
         file,
@@ -758,6 +863,7 @@ export function App({
     invalidateWorkspace,
     recordCapture,
     runtime,
+    selectedPerformerProfileId,
     workspace,
   ]);
 
@@ -858,6 +964,33 @@ export function App({
     },
     onError: (error) => {
       if (error instanceof DOMException && error.name === "AbortError") return;
+      setSessionActionError(
+        error instanceof Error ? error.message : String(error),
+      );
+    },
+  });
+
+  const performerMutation = useMutation({
+    mutationFn: async (profileId: string | null) => {
+      const target = selectedSession.data;
+      if (!target) throw new Error("No session is selected.");
+      return runtime.updateSessionPerformer(
+        {
+          schema_version: "atpiano.contract.v1",
+          workspace_id: target.workspace_id,
+          session_id: target.session_id,
+          performed_by_profile_id: profileId,
+          request_id: requestId("session-performer"),
+        },
+        { requestId: requestId("session-performer-update") },
+      );
+    },
+    onSuccess: async () => {
+      setSessionActionError(null);
+      setToast("Performer updated.");
+      await invalidateWorkspace();
+    },
+    onError: (error) => {
       setSessionActionError(
         error instanceof Error ? error.message : String(error),
       );
@@ -1154,6 +1287,12 @@ export function App({
   const settlePercent = settleAudioHead > 0
     ? Math.min(100, Math.round((settleCommit / settleAudioHead) * 100))
     : 0;
+  const settlingNoteCount = selected
+    ? Math.max(
+        0,
+        selected.recognized_note_count - selected.corrected_note_count,
+      )
+    : 0;
   const selectedScoreJob =
     scoreJob?.session_id === selected?.session_id ? scoreJob : null;
   const scoreStatus = selectedScoreJob?.status ?? (
@@ -1272,16 +1411,26 @@ export function App({
           </div>
           <div className="topbar-actions">
             {viewer !== undefined && (
-              <div className="viewer-control">
-                <span title={viewer.username}>{viewer.displayName}</span>
-                <button
-                  type="button"
-                  disabled={viewer.logoutPending}
-                  onClick={viewer.onLogout}
-                >
-                  {viewer.logoutPending ? "Signing out…" : "Logout"}
-                </button>
-              </div>
+              <AccountMenu
+                username={viewer.username}
+                displayName={viewer.displayName}
+                workspaceName={workspace?.name ?? "Workspace"}
+                group={group}
+                profiles={profileItems}
+                selectedProfileId={selectedPerformerProfileId}
+                logoutPending={viewer.logoutPending}
+                createPending={createProfile.isPending}
+                createError={
+                  createProfile.error instanceof Error
+                    ? createProfile.error.message
+                    : createProfile.error
+                      ? String(createProfile.error)
+                      : null
+                }
+                onSelectProfile={choosePerformer}
+                onCreateProfile={(name) => createProfile.mutate(name)}
+                onLogout={viewer.onLogout}
+              />
             )}
           </div>
         </header>
@@ -1297,6 +1446,7 @@ export function App({
         {libraryIntent && !sessions.isLoading && !sessions.isError && (
           <SessionsHome
             sessions={sessionItems}
+            profiles={profileItems}
             activeSessionId={activeSession?.session_id ?? null}
             canWrite={canWrite}
             maxEventRangeSamples={
@@ -1316,6 +1466,9 @@ export function App({
             capabilities={capabilities.data}
             captureState={captureState}
             activeSession={activeSession}
+            profiles={profileItems}
+            performerProfileId={selectedPerformerProfileId}
+            onPerformerChange={choosePerformer}
             onMicrophone={() => void microphone.start()}
             onImport={(file) => void importRecording(file)}
             onReplay={() => void replay()}
@@ -1345,6 +1498,16 @@ export function App({
                   <span>·</span>
                   {formatClock(selectedFrames, selected.sample_rate_hz)}
                 </p>
+                <PerformerSelect
+                  profiles={profileItems}
+                  value={selected.performed_by_profile_id}
+                  includeUnassigned
+                  disabled={!canWrite || performerMutation.isPending}
+                  label="Performed by"
+                  onChange={(profileId) =>
+                    performerMutation.mutate(profileId)
+                  }
+                />
               </div>
               <div className="session-actions">
                 {selectedIsActive && captureState.capture?.source === "microphone" && (
@@ -1406,13 +1569,13 @@ export function App({
                     ? captureState.capture?.source === "upload"
                       ? "Processing imported recording"
                       : selected.correction_mode === "after-stop"
-                        ? "Listening now; correction begins after Stop"
+                        ? "Listening now; settling begins after Stop"
                         : selected.correction_mode === "unavailable"
-                          ? "Listening with provisional recognition"
-                          : "Listening with background correction"
+                          ? "Listening with a live estimate"
+                          : "Listening while notes settle"
                     : captureState.phase === "stopping"
                       ? captureState.capture?.source === "upload"
-                        ? "Recording imported; correction is settling"
+                        ? "Recording imported; notes are settling"
                         : "Closing microphone capture"
                       : captureState.phase === "failed"
                         ? "Capture needs attention"
@@ -1428,13 +1591,13 @@ export function App({
                 {captureState.phase === "stopping" && (
                   <div className="settle-progress">
                     <span>
-                      Corrected {formatClock(settleCommit, selected.sample_rate_hz)}
+                      Settled {formatClock(settleCommit, selected.sample_rate_hz)}
                       {" "}of {formatClock(settleAudioHead, selected.sample_rate_hz)}
                     </span>
                     <progress
                       max={100}
                       value={settlePercent}
-                      aria-label="Final correction progress"
+                      aria-label="Final settling progress"
                     />
                   </div>
                 )}
@@ -1446,18 +1609,18 @@ export function App({
                 <i aria-hidden="true" />
                 <strong>
                   {selected.source === "upload"
-                    ? "Recording imported; correction is settling"
-                    : "Capture complete; correction is settling"}
+                    ? "Recording imported; notes are settling"
+                    : "Capture complete; notes are settling"}
                 </strong>
                 <span>
-                  Corrected {formatClock(settleCommit, selected.sample_rate_hz)}
+                  Settled {formatClock(settleCommit, selected.sample_rate_hz)}
                   {" "}of {formatClock(settleAudioHead, selected.sample_rate_hz)}
                 </span>
                 <div className="settle-progress">
                   <progress
                     max={100}
                     value={settlePercent}
-                    aria-label="Background correction progress"
+                    aria-label="Background settling progress"
                   />
                 </div>
               </div>
@@ -1467,15 +1630,19 @@ export function App({
               <span>
                 <strong>{selected.recognized_note_count}</strong> notes
               </span>
-              <i aria-hidden="true">·</i>
-              <span>
-                <strong>{selected.corrected_note_count}</strong> corrected
-              </span>
+              {selectedIsActive && settlingNoteCount > 0 && (
+                <>
+                  <i aria-hidden="true">·</i>
+                  <span>
+                    <strong>{settlingNoteCount}</strong> settling
+                  </span>
+                </>
+              )}
               {selected.status === "stopping" && (
                 <>
                   <i aria-hidden="true">·</i>
                   <span>
-                    corrected through{" "}
+                    settled through{" "}
                     <strong>
                       {formatClock(
                         horizon.data?.commit_sample ?? 0,

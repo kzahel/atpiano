@@ -51,6 +51,130 @@ class UserRow(Base):
     )
 
 
+class GroupRow(Base):
+    __tablename__ = "groups"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('household', 'studio', 'friends', 'other')",
+            name="ck_groups_kind",
+        ),
+        CheckConstraint(
+            "default_space_audience IN ('group', 'controllers')",
+            name="ck_groups_default_space_audience",
+        ),
+        CheckConstraint(
+            "default_space_role IN ('editor', 'viewer')",
+            name="ck_groups_default_space_role",
+        ),
+        CheckConstraint(
+            "length(name) BETWEEN 1 AND 200",
+            name="ck_groups_name_length",
+        ),
+    )
+
+    group_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    kind: Mapped[str] = mapped_column(String(16))
+    default_space_audience: Mapped[str] = mapped_column(String(16))
+    default_space_role: Mapped[str] = mapped_column(String(16))
+    created_by_user_id: Mapped[str | None] = mapped_column(
+        String(128),
+        ForeignKey("users.user_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
+class GroupMembershipRow(Base):
+    __tablename__ = "group_memberships"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('owner', 'admin', 'member')",
+            name="ck_group_memberships_role",
+        ),
+        Index("ix_group_memberships_user_id", "user_id"),
+    )
+
+    group_id: Mapped[str] = mapped_column(
+        String(128),
+        ForeignKey("groups.group_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(128),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    role: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ProfileRow(Base):
+    __tablename__ = "profiles"
+    __table_args__ = (
+        CheckConstraint(
+            "length(display_name) BETWEEN 1 AND 128",
+            name="ck_profiles_display_name_length",
+        ),
+    )
+
+    profile_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    display_name: Mapped[str] = mapped_column(String(128))
+    created_by_user_id: Mapped[str | None] = mapped_column(
+        String(128),
+        ForeignKey("users.user_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    disabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ProfileControllerRow(Base):
+    __tablename__ = "profile_controllers"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('owner', 'manager')",
+            name="ck_profile_controllers_role",
+        ),
+        Index("ix_profile_controllers_user_id", "user_id"),
+    )
+
+    profile_id: Mapped[str] = mapped_column(
+        String(128),
+        ForeignKey("profiles.profile_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(128),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    role: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class GroupProfileRow(Base):
+    __tablename__ = "group_profiles"
+
+    group_id: Mapped[str] = mapped_column(
+        String(128),
+        ForeignKey("groups.group_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    profile_id: Mapped[str] = mapped_column(
+        String(128),
+        ForeignKey("profiles.profile_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class WorkspaceRow(Base):
     __tablename__ = "workspaces"
     __table_args__ = (
@@ -68,6 +192,34 @@ class WorkspaceRow(Base):
     name: Mapped[str] = mapped_column(String(200))
     mode: Mapped[str] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    administrative_group_id: Mapped[str | None] = mapped_column(
+        String(128),
+        ForeignKey("groups.group_id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    home_profile_id: Mapped[str | None] = mapped_column(
+        String(128),
+        ForeignKey("profiles.profile_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    storage_key: Mapped[str | None] = mapped_column(
+        String(255),
+        unique=True,
+        nullable=True,
+    )
+    created_by_user_id: Mapped[str | None] = mapped_column(
+        String(128),
+        ForeignKey("users.user_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
 
 class MembershipRow(Base):
@@ -91,6 +243,35 @@ class MembershipRow(Base):
         primary_key=True,
     )
     role: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class WorkspaceGroupGrantRow(Base):
+    __tablename__ = "workspace_group_grants"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('editor', 'viewer')",
+            name="ck_workspace_group_grants_role",
+        ),
+        Index("ix_workspace_group_grants_group_id", "group_id"),
+    )
+
+    workspace_id: Mapped[str] = mapped_column(
+        String(128),
+        ForeignKey("workspaces.workspace_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    group_id: Mapped[str] = mapped_column(
+        String(128),
+        ForeignKey("groups.group_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    role: Mapped[str] = mapped_column(String(16))
+    granted_by_user_id: Mapped[str | None] = mapped_column(
+        String(128),
+        ForeignKey("users.user_id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 

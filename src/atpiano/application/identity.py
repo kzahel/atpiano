@@ -16,7 +16,12 @@ from atpiano.application.errors import (
     AuthenticationError,
     AuthorizationError,
 )
-from atpiano.contracts.schemas import MembershipRole
+from atpiano.contracts.schemas import (
+    GroupKind,
+    GroupRole,
+    MembershipRole,
+    ProfileControllerRole,
+)
 
 USERNAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 MINIMUM_PASSWORD_CHARACTERS = 12
@@ -35,6 +40,7 @@ class IdentityUser:
     disabled: bool
     created_at: datetime
     memberships: tuple[WorkspaceMembership, ...]
+    group_memberships: tuple[GroupMembership, ...]
 
 
 @dataclass(frozen=True)
@@ -51,11 +57,48 @@ class WorkspaceMembership:
 
 
 @dataclass(frozen=True)
+class GroupMembership:
+    group_id: str
+    role: GroupRole
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class IdentityGroup:
+    group_id: str
+    name: str
+    kind: GroupKind
+    default_space_audience: str
+    default_space_role: MembershipRole
+    created_at: datetime
+    current_user_role: GroupRole
+
+
+@dataclass(frozen=True)
+class IdentityProfile:
+    profile_id: str
+    display_name: str
+    disabled: bool
+    created_at: datetime
+    controller_role: ProfileControllerRole | None
+
+
+@dataclass(frozen=True)
+class IdentityWorkspace:
+    workspace_id: str
+    name: str
+    administrative_group_id: str | None
+    home_profile_id: str | None
+    created_by_user_id: str | None
+
+
+@dataclass(frozen=True)
 class Principal:
     user_id: str
     username: str
     display_name: str
     memberships: tuple[WorkspaceMembership, ...]
+    group_memberships: tuple[GroupMembership, ...]
 
     def membership(self, workspace_id: str) -> WorkspaceMembership:
         for membership in self.memberships:
@@ -67,6 +110,18 @@ class Principal:
         membership = self.membership(workspace_id)
         if membership.role is MembershipRole.VIEWER:
             raise AuthorizationError("workspace write access is not allowed")
+        return membership
+
+    def group_membership(self, group_id: str) -> GroupMembership:
+        for membership in self.group_memberships:
+            if membership.group_id == group_id:
+                return membership
+        raise AuthorizationError("group access is not allowed")
+
+    def require_group_manage(self, group_id: str) -> GroupMembership:
+        membership = self.group_membership(group_id)
+        if membership.role is GroupRole.MEMBER:
+            raise AuthorizationError("group management is not allowed")
         return membership
 
 
@@ -103,6 +158,36 @@ class IdentityRepository(Protocol):
     ) -> IdentityUser: ...
 
     def users(self, workspace_id: str) -> tuple[IdentityUser, ...]: ...
+
+    def groups(self, user_id: str) -> tuple[IdentityGroup, ...]: ...
+
+    def profiles(
+        self,
+        *,
+        workspace_id: str,
+        controller_user_id: str,
+    ) -> tuple[IdentityProfile, ...]: ...
+
+    def workspace_group_id(self, workspace_id: str) -> str: ...
+
+    def workspace(self, workspace_id: str) -> IdentityWorkspace | None: ...
+
+    def create_profile(
+        self,
+        *,
+        profile_id: str,
+        group_id: str,
+        display_name: str,
+        created_by_user_id: str,
+        now: datetime,
+    ) -> IdentityProfile: ...
+
+    def profile_available(
+        self,
+        *,
+        workspace_id: str,
+        profile_id: str,
+    ) -> bool: ...
 
     def credentials(
         self,
@@ -180,7 +265,16 @@ def _principal(user: IdentityUser) -> Principal:
         username=user.username,
         display_name=user.display_name,
         memberships=user.memberships,
+        group_memberships=user.group_memberships,
     )
+
+
+def self_profile_id(user_id: str) -> str:
+    value = uuid.uuid5(
+        uuid.NAMESPACE_URL,
+        f"https://atpiano.local/profile/{user_id}",
+    )
+    return f"profile:{value.hex}"
 
 
 class IdentityApplicationService:
@@ -254,6 +348,78 @@ class IdentityApplicationService:
 
     def list_users(self) -> tuple[IdentityUser, ...]:
         return self._repository.users(self.workspace_id)
+
+    def list_groups(self, principal: Principal) -> tuple[IdentityGroup, ...]:
+        return self._repository.groups(principal.user_id)
+
+    def list_profiles(
+        self,
+        principal: Principal,
+        workspace_id: str,
+    ) -> tuple[IdentityProfile, ...]:
+        principal.membership(workspace_id)
+        return self._repository.profiles(
+            workspace_id=workspace_id,
+            controller_user_id=principal.user_id,
+        )
+
+    def workspace_group_id(
+        self,
+        principal: Principal,
+        workspace_id: str,
+    ) -> str:
+        principal.membership(workspace_id)
+        return self._repository.workspace_group_id(workspace_id)
+
+    def workspace(
+        self,
+        principal: Principal,
+        workspace_id: str,
+    ) -> IdentityWorkspace:
+        principal.membership(workspace_id)
+        workspace = self._repository.workspace(workspace_id)
+        if workspace is None:
+            raise ApplicationConflictError("workspace is unavailable")
+        return workspace
+
+    def create_managed_profile(
+        self,
+        principal: Principal,
+        *,
+        group_id: str,
+        display_name: str,
+    ) -> IdentityProfile:
+        principal.require_group_manage(group_id)
+        normalized = display_name.strip()
+        if not 1 <= len(normalized) <= 128:
+            raise ValueError(
+                "profile display name must contain 1-128 characters"
+            )
+        return self._repository.create_profile(
+            profile_id=f"profile:{uuid.uuid4().hex}",
+            group_id=group_id,
+            display_name=normalized,
+            created_by_user_id=principal.user_id,
+            now=self._now(),
+        )
+
+    def require_profile(
+        self,
+        principal: Principal,
+        *,
+        workspace_id: str,
+        profile_id: str | None,
+    ) -> None:
+        principal.membership(workspace_id)
+        if profile_id is None:
+            return
+        if not self._repository.profile_available(
+            workspace_id=workspace_id,
+            profile_id=profile_id,
+        ):
+            raise AuthorizationError(
+                "performer profile is not available in this workspace"
+            )
 
     def set_password(self, username: str, password: str) -> None:
         normalized = normalize_username(username)

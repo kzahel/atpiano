@@ -68,6 +68,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listGroups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups/{group_id}/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createProfile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -92,6 +124,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listWorkspaces"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listProfiles"];
         put?: never;
         post?: never;
         delete?: never;
@@ -210,6 +258,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/performer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateSessionPerformer"];
         trace?: never;
     };
     "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/score-jobs": {
@@ -401,6 +465,11 @@ export interface components {
         AuthenticatedPrincipal: {
             /** Display Name */
             display_name: string;
+            /**
+             * Group Memberships
+             * @default []
+             */
+            group_memberships: components["schemas"]["GroupMembership"][];
             /** Memberships */
             memberships: components["schemas"]["Membership"][];
             /**
@@ -452,6 +521,11 @@ export interface components {
         };
         /** CaptureStart */
         CaptureStart: {
+            /**
+             * Performed By Profile Id
+             * @default null
+             */
+            performed_by_profile_id: string | null;
             /** Request Id */
             request_id: string;
             /** Sample Rate Hz */
@@ -640,6 +714,81 @@ export interface components {
             /** Workspace Id */
             workspace_id: string;
         };
+        /** Group */
+        Group: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            current_user_role: components["schemas"]["GroupRole"];
+            /**
+             * Default Space Audience
+             * @enum {string}
+             */
+            default_space_audience: "group" | "controllers";
+            /**
+             * Default Space Role
+             * @enum {string}
+             */
+            default_space_role: "editor" | "viewer";
+            /** Group Id */
+            group_id: string;
+            kind: components["schemas"]["GroupKind"];
+            /** Name */
+            name: string;
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+        };
+        /**
+         * GroupKind
+         * @enum {string}
+         */
+        GroupKind: "household" | "studio" | "friends" | "other";
+        /** GroupMembership */
+        GroupMembership: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Group Id */
+            group_id: string;
+            role: components["schemas"]["GroupRole"];
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+            /** User Id */
+            user_id: string;
+        };
+        /** GroupPage */
+        GroupPage: {
+            /** Items */
+            items: components["schemas"]["Group"][];
+            /**
+             * Next Cursor
+             * @default null
+             */
+            next_cursor: string | null;
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+        };
+        /**
+         * GroupRole
+         * @enum {string}
+         */
+        GroupRole: "owner" | "admin" | "member";
         /** Horizon */
         Horizon: {
             /** Audio Head Sample */
@@ -806,6 +955,68 @@ export interface components {
             /** Workspace Id */
             workspace_id: string;
         };
+        /** Profile */
+        Profile: {
+            /** @default null */
+            controller_role: components["schemas"]["ProfileControllerRole"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Disabled */
+            disabled: boolean;
+            /** Display Name */
+            display_name: string;
+            /** Profile Id */
+            profile_id: string;
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+        };
+        /**
+         * ProfileControllerRole
+         * @enum {string}
+         */
+        ProfileControllerRole: "owner" | "manager";
+        /** ProfileCreate */
+        ProfileCreate: {
+            /** Display Name */
+            display_name: string;
+            /** Group Id */
+            group_id: string;
+            /** Request Id */
+            request_id: string;
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+        };
+        /** ProfilePage */
+        ProfilePage: {
+            /** Group Id */
+            group_id: string;
+            /** Items */
+            items: components["schemas"]["Profile"][];
+            /**
+             * Next Cursor
+             * @default null
+             */
+            next_cursor: string | null;
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+            /** Workspace Id */
+            workspace_id: string;
+        };
         /** Provenance */
         Provenance: {
             /** Adapter */
@@ -853,6 +1064,11 @@ export interface components {
             filename: string;
             /** Media Type */
             media_type: string;
+            /**
+             * Performed By Profile Id
+             * @default null
+             */
+            performed_by_profile_id: string | null;
             /** Request Id */
             request_id: string;
             /**
@@ -1196,6 +1412,11 @@ export interface components {
              */
             correction_reason: string | null;
             /**
+             * Created By User Id
+             * @default null
+             */
+            created_by_user_id: string | null;
+            /**
              * Current Transcription Run Id
              * @default null
              */
@@ -1205,6 +1426,11 @@ export interface components {
              * @default null
              */
             display_name: string | null;
+            /**
+             * Performed By Profile Id
+             * @default null
+             */
+            performed_by_profile_id: string | null;
             /** Recognized Note Count */
             recognized_note_count: number;
             /** Sample Rate Hz */
@@ -1284,6 +1510,49 @@ export interface components {
             /** Workspace Id */
             workspace_id: string;
         };
+        /** SessionPerformerAttribution */
+        SessionPerformerAttribution: {
+            /**
+             * Performed By Profile Id
+             * @default null
+             */
+            performed_by_profile_id: string | null;
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+            /** Session Id */
+            session_id: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Workspace Id */
+            workspace_id: string;
+        };
+        /** SessionPerformerPatch */
+        SessionPerformerPatch: {
+            /**
+             * Performed By Profile Id
+             * @default null
+             */
+            performed_by_profile_id: string | null;
+            /** Request Id */
+            request_id: string;
+            /**
+             * Schema Version
+             * @default atpiano.contract.v1
+             * @constant
+             */
+            schema_version: "atpiano.contract.v1";
+            /** Session Id */
+            session_id: string;
+            /** Workspace Id */
+            workspace_id: string;
+        };
         /**
          * SessionStatus
          * @enum {string}
@@ -1351,10 +1620,20 @@ export interface components {
         /** Workspace */
         Workspace: {
             /**
+             * Administrative Group Id
+             * @default null
+             */
+            administrative_group_id: string | null;
+            /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Home Profile Id
+             * @default null
+             */
+            home_profile_id: string | null;
             mode: components["schemas"]["WorkspaceMode"];
             /** Name */
             name: string;
@@ -1522,6 +1801,70 @@ export interface operations {
             };
         };
     };
+    listGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description GroupPage */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupPage"];
+                };
+            };
+            /** @description Structured API error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileCreate"];
+            };
+        };
+        responses: {
+            /** @description Profile */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Profile"];
+                };
+            };
+            /** @description Structured API error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     getJob: {
         parameters: {
             query?: never;
@@ -1585,12 +1928,47 @@ export interface operations {
             };
         };
     };
+    listProfiles: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ProfilePage */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfilePage"];
+                };
+            };
+            /** @description Structured API error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     importRecording: {
         parameters: {
             query?: never;
             header: {
                 "X-Atpiano-Filename": string;
                 "X-Atpiano-Request-Id": string;
+                "X-Atpiano-Performer-Profile"?: string;
             };
             path: {
                 workspace_id: string;
@@ -1887,6 +2265,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Horizon"];
+                };
+            };
+            /** @description Structured API error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateSessionPerformer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionPerformerPatch"];
+            };
+        };
+        responses: {
+            /** @description SessionPerformerAttribution */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionPerformerAttribution"];
                 };
             };
             /** @description Structured API error */

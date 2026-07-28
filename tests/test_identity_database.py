@@ -9,12 +9,24 @@ from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from atpiano.application.identity import self_profile_id
 from atpiano.persistence.catalog import (
+    HOME_GROUP_ID,
     catalog_head_revision,
     catalog_revision,
     initialize_catalog,
+    upgrade_catalog,
 )
-from atpiano.persistence.models import MembershipRow, WorkspaceRow
+from atpiano.persistence.database import create_catalog_engine
+from atpiano.persistence.models import (
+    GroupMembershipRow,
+    GroupProfileRow,
+    GroupRow,
+    MembershipRow,
+    ProfileControllerRow,
+    ProfileRow,
+    WorkspaceRow,
+)
 
 
 def test_empty_catalog_migrates_to_head_and_seeds_local_workspace(
@@ -27,18 +39,108 @@ def test_empty_catalog_migrates_to_head_and_seeds_local_workspace(
         assert set(inspect(engine).get_table_names()) == {
             "alembic_version",
             "memberships",
+            "group_memberships",
+            "group_profiles",
+            "groups",
+            "profile_controllers",
+            "profiles",
             "users",
             "web_sessions",
+            "workspace_group_grants",
             "workspaces",
         }
         with Session(engine) as session:
             workspace = session.get(WorkspaceRow, "local")
             assert workspace is not None
-            assert workspace.name == "On this device"
+            assert workspace.name == "Family recordings"
             assert workspace.mode == "local"
+            assert workspace.administrative_group_id == HOME_GROUP_ID
+            assert workspace.storage_key == "."
+            group = session.get(GroupRow, HOME_GROUP_ID)
+            assert group is not None
+            assert group.name == "Family"
         with engine.connect() as connection:
             assert connection.scalar(text("PRAGMA foreign_keys")) == 1
             assert connection.scalar(text("PRAGMA journal_mode")) == "wal"
+    finally:
+        engine.dispose()
+
+
+def test_v1_catalog_backfills_family_group_and_self_profile(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "catalog.sqlite3"
+    engine = create_catalog_engine(database_path)
+    created_at = datetime(2026, 7, 28, tzinfo=timezone.utc)
+    try:
+        upgrade_catalog(engine, "20260728_0001")
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO workspaces (
+                        workspace_id, name, mode, created_at
+                    ) VALUES (
+                        'local', 'On this device', 'local', :created_at
+                    )
+                    """
+                ),
+                {"created_at": created_at},
+            )
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO users (
+                        user_id, username, normalized_username, display_name,
+                        password_hash, disabled, created_at, updated_at,
+                        password_changed_at
+                    ) VALUES (
+                        'user:kyle', 'kyle', 'kyle', 'Kyle', 'hash', 0,
+                        :created_at, :created_at, :created_at
+                    )
+                    """
+                ),
+                {"created_at": created_at},
+            )
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO memberships (
+                        workspace_id, user_id, role, created_at
+                    ) VALUES ('local', 'user:kyle', 'owner', :created_at)
+                    """
+                ),
+                {"created_at": created_at},
+            )
+
+        upgrade_catalog(engine)
+
+        profile_id = self_profile_id("user:kyle")
+        with Session(engine) as session:
+            workspace = session.get(WorkspaceRow, "local")
+            assert workspace is not None
+            assert workspace.administrative_group_id == HOME_GROUP_ID
+            assert workspace.home_profile_id == profile_id
+            assert workspace.name == "Family recordings"
+            assert workspace.created_by_user_id == "user:kyle"
+            assert workspace.storage_key == "."
+            membership = session.get(
+                GroupMembershipRow,
+                (HOME_GROUP_ID, "user:kyle"),
+            )
+            assert membership is not None
+            assert membership.role == "owner"
+            profile = session.get(ProfileRow, profile_id)
+            assert profile is not None
+            assert profile.display_name == "Kyle"
+            assert session.get(
+                ProfileControllerRow,
+                (profile_id, "user:kyle"),
+            ) is not None
+            assert session.get(
+                GroupProfileRow,
+                (HOME_GROUP_ID, profile_id),
+            ) is not None
     finally:
         engine.dispose()
 

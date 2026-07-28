@@ -27,6 +27,9 @@
 - `home-hosted-family-sharing` — on-demand Mac-hosted family access through
   the home Pi/Caddy, local persistence, and proportionate operational and
   security boundaries
+- `family-workspaces-and-attribution` — managed performer profiles, fast
+  shared-piano selection, shareable local spaces, and
+  creator-versus-performer recording attribution
 - `musical-session-workspace-refresh` — player-facing Sessions library,
   compact performance identity, editable naming, contextual feedback, and
   playable pitch audition

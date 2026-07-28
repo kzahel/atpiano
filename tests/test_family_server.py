@@ -344,15 +344,29 @@ def test_family_recording_import_requires_writer_and_accepts_wav(
         tmp_path / "owner"
     )
     try:
-        assert (
-            _login(
-                owner_client,
-                "owner",
-                "the owner family password",
-            ).status_code
-            == 200
+        login = _login(
+            owner_client,
+            "owner",
+            "the owner family password",
         )
-        imported = owner_client.post(url, headers=headers, content=body)
+        assert login.status_code == 200
+        owner_profile = next(
+            profile
+            for profile in owner_client.get(
+                "/api/v1/workspaces/local/profiles"
+            ).json()["items"]
+            if profile["display_name"] == "owner"
+        )
+        imported = owner_client.post(
+            url,
+            headers={
+                **headers,
+                "X-Atpiano-Performer-Profile": (
+                    owner_profile["profile_id"]
+                ),
+            },
+            content=body,
+        )
         assert imported.status_code == 202, imported.text
         capture = imported.json()
         deadline = time.monotonic() + 10
@@ -372,12 +386,107 @@ def test_family_recording_import_requires_writer_and_accepts_wav(
         assert session["status"] == "complete"
         assert session["source"] == "upload"
         assert session["display_name"] == "Family practice"
+        assert (
+            session["created_by_user_id"]
+            == login.json()["principal"]["user_id"]
+        )
+        assert (
+            session["performed_by_profile_id"]
+            == owner_profile["profile_id"]
+        )
         assert not any(
             owner_runtime.recording_uploads.spool_directory.glob("*.part")
         )
     finally:
         owner_runtime.close()
         owner_engine.dispose()
+
+
+def test_family_profiles_can_be_created_listed_and_assigned(
+    tmp_path: Path,
+) -> None:
+    client, runtime, _identity, engine = _environment(tmp_path)
+    try:
+        login = _login(
+            client,
+            "owner",
+            "the owner family password",
+        )
+        assert login.status_code == 200
+        groups = client.get("/api/v1/groups")
+        assert groups.status_code == 200
+        group = groups.json()["items"][0]
+        assert group["name"] == "Family"
+        assert group["kind"] == "household"
+        assert group["current_user_role"] == "owner"
+
+        existing = client.get("/api/v1/workspaces/local/profiles")
+        assert existing.status_code == 200
+        assert {item["display_name"] for item in existing.json()["items"]} == {
+            "owner",
+            "viewer",
+        }
+
+        created = client.post(
+            f"/api/v1/groups/{group['group_id']}/profiles",
+            headers={"Origin": PUBLIC_ORIGIN},
+            json={
+                "schema_version": "atpiano.contract.v1",
+                "group_id": group["group_id"],
+                "display_name": "Daughter",
+                "request_id": "request:profile",
+            },
+        )
+        assert created.status_code == 201, created.text
+        daughter_id = created.json()["profile_id"]
+
+        attribution = client.patch(
+            (
+                f"/api/v1/workspaces/local/sessions/{SESSION_ID}"
+                "/performer"
+            ),
+            headers={"Origin": PUBLIC_ORIGIN},
+            json={
+                "schema_version": "atpiano.contract.v1",
+                "workspace_id": "local",
+                "session_id": SESSION_ID,
+                "performed_by_profile_id": daughter_id,
+                "request_id": "request:performer",
+            },
+        )
+        assert attribution.status_code == 200, attribution.text
+        assert attribution.json()["performed_by_profile_id"] == daughter_id
+        selected = client.get(
+            f"/api/v1/workspaces/local/sessions/{SESSION_ID}"
+        )
+        assert selected.json()["performed_by_profile_id"] == daughter_id
+
+        assert client.post(
+            "/api/v1/auth/logout",
+            headers={"Origin": PUBLIC_ORIGIN},
+        ).status_code == 200
+        assert _login(
+            client,
+            "viewer",
+            "the viewer family password",
+        ).status_code == 200
+        assert client.get(
+            "/api/v1/workspaces/local/profiles"
+        ).status_code == 200
+        forbidden = client.post(
+            f"/api/v1/groups/{group['group_id']}/profiles",
+            headers={"Origin": PUBLIC_ORIGIN},
+            json={
+                "schema_version": "atpiano.contract.v1",
+                "group_id": group["group_id"],
+                "display_name": "Nephew",
+                "request_id": "request:profile-forbidden",
+            },
+        )
+        assert forbidden.status_code == 403
+    finally:
+        runtime.close()
+        engine.dispose()
 
 
 def test_available_score_runtime_is_exposed_by_default(

@@ -22,6 +22,9 @@ import type {
   Job,
   PageRequest,
   PcmBlock,
+  Profile,
+  ProfileCreate,
+  ProfilePage,
   RecordingImportStart,
   ReplayStart,
   RuntimeCapabilities,
@@ -34,6 +37,9 @@ import type {
   SessionAnnotation,
   SessionAnnotationPatch,
   SessionPage,
+  SessionPerformerAttribution,
+  SessionPerformerPatch,
+  GroupPage,
   WorkspacePage,
 } from "./atpiano-runtime.js";
 
@@ -212,6 +218,55 @@ export class LocalRuntime implements AtpianoRuntime {
     );
   }
 
+  async listGroups(request: PageRequest): Promise<GroupPage> {
+    return dataOrThrow(
+      await this.#client.GET("/api/v1/groups", {
+        ...abortOptions(request),
+      }),
+      "Groups could not be loaded.",
+    );
+  }
+
+  async listProfiles(
+    workspaceId: string,
+    request: PageRequest,
+  ): Promise<ProfilePage> {
+    return dataOrThrow(
+      await this.#client.GET(
+        "/api/v1/workspaces/{workspace_id}/profiles",
+        {
+          ...abortOptions(request),
+          params: {
+            path: { workspace_id: workspaceId },
+            query: {
+              ...(request.cursor === undefined
+                ? {}
+                : { cursor: request.cursor }),
+              ...(request.limit === undefined
+                ? {}
+                : { limit: request.limit }),
+            },
+          },
+        },
+      ),
+      "Profiles could not be loaded.",
+    );
+  }
+
+  async createProfile(
+    input: ProfileCreate,
+    request: RuntimeRequest,
+  ): Promise<Profile> {
+    return dataOrThrow(
+      await this.#client.POST("/api/v1/groups/{group_id}/profiles", {
+        ...abortOptions(request),
+        params: { path: { group_id: input.group_id } },
+        body: input,
+      }),
+      "The profile could not be created.",
+    );
+  }
+
   async listSessions(
     workspaceId: string,
     request: PageRequest,
@@ -272,6 +327,28 @@ export class LocalRuntime implements AtpianoRuntime {
         },
       ),
       "The session name could not be saved.",
+    );
+  }
+
+  async updateSessionPerformer(
+    input: SessionPerformerPatch,
+    request: RuntimeRequest,
+  ): Promise<SessionPerformerAttribution> {
+    return dataOrThrow(
+      await this.#client.PATCH(
+        "/api/v1/workspaces/{workspace_id}/sessions/{session_id}/performer",
+        {
+          ...abortOptions(request),
+          params: {
+            path: {
+              workspace_id: input.workspace_id,
+              session_id: input.session_id,
+            },
+          },
+          body: input,
+        },
+      ),
+      "The performer could not be saved.",
     );
   }
 
@@ -348,6 +425,7 @@ export class LocalRuntime implements AtpianoRuntime {
           schema_version: streamSchema,
           type: "start",
           sample_rate_hz: input.sample_rate_hz,
+          performed_by_profile_id: input.performed_by_profile_id,
           client_metadata: {
             started_at: new Date().toISOString(),
             request_id: input.request_id,
@@ -550,6 +628,12 @@ export class LocalRuntime implements AtpianoRuntime {
           "Content-Type": input.media_type,
           "X-Atpiano-Filename": encodeURIComponent(input.filename),
           "X-Atpiano-Request-Id": input.request_id,
+          ...(input.performed_by_profile_id === null
+            ? {}
+            : {
+                "X-Atpiano-Performer-Profile":
+                  input.performed_by_profile_id,
+              }),
         },
         body: file,
       },

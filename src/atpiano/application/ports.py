@@ -16,6 +16,7 @@ from atpiano.contracts.schemas import (
     Session,
     SessionAnnotation,
     SessionPage,
+    SessionPerformerAttribution,
     Workspace,
 )
 
@@ -82,6 +83,13 @@ class SessionRepository(Protocol):
         *,
         display_name: str,
     ) -> SessionAnnotation: ...
+
+    def update_session_performer(
+        self,
+        session_id: str,
+        *,
+        performed_by_profile_id: str | None,
+    ) -> SessionPerformerAttribution: ...
 
     def current_score_snapshot(
         self,

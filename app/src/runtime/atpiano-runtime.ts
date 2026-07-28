@@ -5,6 +5,11 @@ type Schemas = components["schemas"];
 export type RuntimeCapabilities = Schemas["RuntimeCapabilities"];
 export type Workspace = Schemas["Workspace"];
 export type WorkspacePage = Schemas["WorkspacePage"];
+export type Group = Schemas["Group"];
+export type GroupPage = Schemas["GroupPage"];
+export type Profile = Schemas["Profile"];
+export type ProfileCreate = Schemas["ProfileCreate"];
+export type ProfilePage = Schemas["ProfilePage"];
 export type Session = Schemas["Session"];
 export type SessionPage = Schemas["SessionPage"];
 export type Capture = Schemas["Capture"];
@@ -28,6 +33,9 @@ export type ScoreVariantRequest = Schemas["ScoreVariantRequest"];
 export type Job = Schemas["Job"];
 export type SessionAnnotation = Schemas["SessionAnnotation"];
 export type SessionAnnotationPatch = Schemas["SessionAnnotationPatch"];
+export type SessionPerformerPatch = Schemas["SessionPerformerPatch"];
+export type SessionPerformerAttribution =
+  Schemas["SessionPerformerAttribution"];
 export type DeleteSessionRequest = Schemas["DeleteSessionRequest"];
 export type DeleteSessionResult = Schemas["DeleteSessionResult"];
 
@@ -85,6 +93,15 @@ export interface ArtifactExportResult {
 export interface AtpianoRuntime {
   getCapabilities(request: RuntimeRequest): Promise<RuntimeCapabilities>;
   listWorkspaces(request: PageRequest): Promise<WorkspacePage>;
+  listGroups(request: PageRequest): Promise<GroupPage>;
+  listProfiles(
+    workspaceId: string,
+    request: PageRequest,
+  ): Promise<ProfilePage>;
+  createProfile(
+    input: ProfileCreate,
+    request: RuntimeRequest,
+  ): Promise<Profile>;
   listSessions(
     workspaceId: string,
     request: PageRequest,
@@ -98,6 +115,10 @@ export interface AtpianoRuntime {
     input: SessionAnnotationPatch,
     request: RuntimeRequest,
   ): Promise<SessionAnnotation>;
+  updateSessionPerformer(
+    input: SessionPerformerPatch,
+    request: RuntimeRequest,
+  ): Promise<SessionPerformerAttribution>;
   getHorizon(
     workspaceId: string,
     sessionId: string,

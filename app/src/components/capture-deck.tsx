@@ -1,10 +1,12 @@
 import { useRef, useState, type ChangeEvent } from "react";
 
 import type {
+  Profile,
   RuntimeCapabilities,
   Session,
 } from "../runtime/atpiano-runtime.js";
 import type { CaptureState } from "../state/workspace-store.js";
+import { PerformerSelect } from "./profile-controls.js";
 
 const phaseCopy: Record<CaptureState["phase"], string> = {
   idle: "Ready for a new performance",
@@ -19,6 +21,9 @@ export function CaptureDeck({
   capabilities,
   captureState,
   activeSession,
+  profiles = [],
+  performerProfileId = null,
+  onPerformerChange = () => {},
   onMicrophone,
   onImport,
   onReplay,
@@ -28,6 +33,9 @@ export function CaptureDeck({
   readonly capabilities: RuntimeCapabilities | undefined;
   readonly captureState: CaptureState;
   readonly activeSession: Session | undefined;
+  readonly profiles: readonly Profile[];
+  readonly performerProfileId: string | null;
+  readonly onPerformerChange: (profileId: string | null) => void;
   readonly onMicrophone: () => void;
   readonly onImport: (file: File) => void;
   readonly onReplay: () => void;
@@ -70,10 +78,16 @@ export function CaptureDeck({
             : importAvailable
               ? "Play through your microphone, or import a WAV or MP3 recording. "
               : "Start a new performance using your piano. "}
-          Notes appear as you play; corrected notes settle behind them.
+          Notes appear as you play; live estimates settle behind them.
         </p>
       </div>
       <div className="capture-actions">
+        <PerformerSelect
+          profiles={profiles}
+          value={performerProfileId}
+          disabled={busy}
+          onChange={onPerformerChange}
+        />
         <button
           className="button primary"
           type="button"

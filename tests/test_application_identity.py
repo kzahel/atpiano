@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from sqlalchemy.orm import Session
 
 from atpiano.adapters.passwords import Argon2PasswordHasher
 from atpiano.adapters.sqlite_identity import SqlAlchemyIdentityRepository
@@ -13,8 +14,13 @@ from atpiano.application.errors import (
     AuthorizationError,
 )
 from atpiano.application.identity import IdentityApplicationService
-from atpiano.contracts.schemas import MembershipRole
+from atpiano.contracts.schemas import GroupRole, MembershipRole
 from atpiano.persistence import initialize_catalog
+from atpiano.persistence.catalog import HOME_GROUP_ID
+from atpiano.persistence.models import (
+    WorkspaceGroupGrantRow,
+    WorkspaceRow,
+)
 
 
 def _service(
@@ -178,5 +184,132 @@ def test_username_and_password_policy(tmp_path: Path) -> None:
                 "casename",
                 "another sufficiently long password",
             )
+    finally:
+        engine.dispose()
+
+
+def test_group_profiles_separate_performer_from_login_account(
+    tmp_path: Path,
+) -> None:
+    service, engine = _service(tmp_path)
+    try:
+        owner = service.create_user(
+            "owner",
+            "the owner has a sufficiently long password",
+            display_name="Kyle",
+        )
+        viewer = service.create_user(
+            "brother",
+            "the brother has a sufficiently long password",
+            display_name="Brother",
+            role=MembershipRole.VIEWER,
+        )
+        owner_principal = service.login(
+            "owner",
+            "the owner has a sufficiently long password",
+        ).principal
+        brother_principal = service.login(
+            "brother",
+            "the brother has a sufficiently long password",
+        ).principal
+
+        groups = service.list_groups(owner_principal)
+        assert len(groups) == 1
+        assert groups[0].current_user_role is GroupRole.OWNER
+        assert brother_principal.group_membership(
+            groups[0].group_id
+        ).role is GroupRole.MEMBER
+
+        child = service.create_managed_profile(
+            owner_principal,
+            group_id=groups[0].group_id,
+            display_name="Daughter",
+        )
+        profiles = service.list_profiles(owner_principal, "local")
+        assert {profile.display_name for profile in profiles} == {
+            "Brother",
+            "Daughter",
+            "Kyle",
+        }
+        brother_profiles = service.list_profiles(
+            brother_principal,
+            "local",
+        )
+        assert {
+            profile.display_name for profile in brother_profiles
+        } == {"Brother", "Daughter", "Kyle"}
+        assert next(
+            profile
+            for profile in brother_profiles
+            if profile.display_name == "Brother"
+        ).controller_role is not None
+        service.require_profile(
+            brother_principal,
+            workspace_id="local",
+            profile_id=child.profile_id,
+        )
+        with pytest.raises(AuthorizationError, match="management"):
+            service.create_managed_profile(
+                brother_principal,
+                group_id=groups[0].group_id,
+                display_name="Nephew",
+            )
+        assert owner.group_memberships
+        assert viewer.group_memberships
+    finally:
+        engine.dispose()
+
+
+def test_group_workspace_grant_is_explicit_and_does_not_leak(
+    tmp_path: Path,
+) -> None:
+    service, engine = _service(tmp_path)
+    try:
+        owner = service.create_user(
+            "owner",
+            "the owner has a sufficiently long password",
+        )
+        service.create_user(
+            "brother",
+            "the brother has a sufficiently long password",
+            role=MembershipRole.VIEWER,
+        )
+        now = datetime(2026, 7, 28, tzinfo=timezone.utc)
+        with Session(engine) as session, session.begin():
+            for workspace_id in ("shared", "private"):
+                session.add(
+                    WorkspaceRow(
+                        workspace_id=workspace_id,
+                        name=workspace_id.title(),
+                        mode="local",
+                        created_at=now,
+                        administrative_group_id=HOME_GROUP_ID,
+                        home_profile_id=None,
+                        storage_key=f"test:{workspace_id}",
+                        created_by_user_id=owner.user_id,
+                        updated_at=now,
+                        archived_at=None,
+                    )
+                )
+            session.flush()
+            session.add(
+                WorkspaceGroupGrantRow(
+                    workspace_id="shared",
+                    group_id=HOME_GROUP_ID,
+                    role=MembershipRole.EDITOR.value,
+                    granted_by_user_id=owner.user_id,
+                    created_at=now,
+                )
+            )
+
+        principal = service.login(
+            "brother",
+            "the brother has a sufficiently long password",
+        ).principal
+        assert principal.membership(
+            "shared"
+        ).role is MembershipRole.EDITOR
+        with pytest.raises(AuthorizationError, match="not allowed"):
+            principal.membership("private")
     finally:
         engine.dispose()

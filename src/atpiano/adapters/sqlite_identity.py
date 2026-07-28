@@ -13,16 +13,32 @@ from atpiano.application.errors import (
     AuthenticationError,
 )
 from atpiano.application.identity import (
+    GroupMembership,
+    IdentityGroup,
+    IdentityProfile,
     IdentityUser,
+    IdentityWorkspace,
     Principal,
     StoredCredentials,
     WorkspaceMembership,
+    self_profile_id,
 )
-from atpiano.contracts.schemas import MembershipRole
+from atpiano.contracts.schemas import (
+    GroupKind,
+    GroupRole,
+    MembershipRole,
+    ProfileControllerRole,
+)
 from atpiano.persistence.models import (
+    GroupMembershipRow,
+    GroupProfileRow,
+    GroupRow,
     MembershipRow,
+    ProfileControllerRow,
+    ProfileRow,
     UserRow,
     WebSessionRow,
+    WorkspaceGroupGrantRow,
     WorkspaceRow,
 )
 
@@ -37,15 +53,63 @@ def _memberships(
     session: Session,
     user_id: str,
 ) -> tuple[WorkspaceMembership, ...]:
-    rows = session.scalars(
+    roles: dict[str, tuple[MembershipRole, datetime]] = {}
+    direct_rows = session.scalars(
         select(MembershipRow)
         .where(MembershipRow.user_id == user_id)
         .order_by(MembershipRow.workspace_id)
     )
+    strength = {
+        MembershipRole.VIEWER: 1,
+        MembershipRole.EDITOR: 2,
+        MembershipRole.OWNER: 3,
+    }
+    for row in direct_rows:
+        roles[row.workspace_id] = (
+            MembershipRole(row.role),
+            _aware(row.created_at),
+        )
+    grant_rows = session.execute(
+        select(
+            WorkspaceGroupGrantRow.workspace_id,
+            WorkspaceGroupGrantRow.role,
+            WorkspaceGroupGrantRow.created_at,
+        )
+        .join(
+            GroupMembershipRow,
+            GroupMembershipRow.group_id
+            == WorkspaceGroupGrantRow.group_id,
+        )
+        .where(GroupMembershipRow.user_id == user_id)
+    )
+    for workspace_id, role_value, created_at in grant_rows:
+        role = MembershipRole(role_value)
+        current = roles.get(workspace_id)
+        if current is None or strength[role] > strength[current[0]]:
+            roles[workspace_id] = (role, _aware(created_at))
     return tuple(
         WorkspaceMembership(
-            workspace_id=row.workspace_id,
-            role=MembershipRole(row.role),
+            workspace_id=workspace_id,
+            role=role,
+            created_at=created_at,
+        )
+        for workspace_id, (role, created_at) in sorted(roles.items())
+    )
+
+
+def _group_memberships(
+    session: Session,
+    user_id: str,
+) -> tuple[GroupMembership, ...]:
+    rows = session.scalars(
+        select(GroupMembershipRow)
+        .where(GroupMembershipRow.user_id == user_id)
+        .order_by(GroupMembershipRow.group_id)
+    )
+    return tuple(
+        GroupMembership(
+            group_id=row.group_id,
+            role=GroupRole(row.role),
             created_at=_aware(row.created_at),
         )
         for row in rows
@@ -60,6 +124,7 @@ def _identity_user(session: Session, row: UserRow) -> IdentityUser:
         disabled=row.disabled,
         created_at=_aware(row.created_at),
         memberships=_memberships(session, row.user_id),
+        group_memberships=_group_memberships(session, row.user_id),
     )
 
 
@@ -70,6 +135,7 @@ def _principal(session: Session, row: UserRow) -> Principal:
         username=user.username,
         display_name=user.display_name,
         memberships=user.memberships,
+        group_memberships=user.group_memberships,
     )
 
 
@@ -118,6 +184,66 @@ class SqlAlchemyIdentityRepository:
                         created_at=now,
                     )
                 )
+                workspace = session.get(WorkspaceRow, workspace_id)
+                if (
+                    workspace is None
+                    or workspace.administrative_group_id is None
+                ):
+                    raise ApplicationConflictError(
+                        "workspace group is unavailable"
+                    )
+                group_id = workspace.administrative_group_id
+                session.add(
+                    GroupMembershipRow(
+                        group_id=group_id,
+                        user_id=user_id,
+                        role=(
+                            GroupRole.OWNER.value
+                            if role is MembershipRole.OWNER
+                            else GroupRole.MEMBER.value
+                        ),
+                        created_at=now,
+                    )
+                )
+                profile_id = self_profile_id(user_id)
+                session.add(
+                    ProfileRow(
+                        profile_id=profile_id,
+                        display_name=display_name,
+                        created_by_user_id=user_id,
+                        disabled=False,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                )
+                session.flush()
+                session.add(
+                    ProfileControllerRow(
+                        profile_id=profile_id,
+                        user_id=user_id,
+                        role=ProfileControllerRole.OWNER.value,
+                        created_at=now,
+                    )
+                )
+                session.add(
+                    GroupProfileRow(
+                        group_id=group_id,
+                        profile_id=profile_id,
+                        created_at=now,
+                    )
+                )
+                group = session.get(GroupRow, group_id)
+                if group is not None and group.created_by_user_id is None:
+                    group.created_by_user_id = user_id
+                    group.updated_at = now
+                workspace = session.get(WorkspaceRow, workspace_id)
+                if (
+                    workspace is not None
+                    and workspace.home_profile_id is None
+                    and role is MembershipRole.OWNER
+                ):
+                    workspace.home_profile_id = profile_id
+                    workspace.updated_at = now
                 session.flush()
                 return _identity_user(session, row)
         except IntegrityError as error:
@@ -137,6 +263,190 @@ class SqlAlchemyIdentityRepository:
                 .order_by(UserRow.normalized_username)
             )
             return tuple(_identity_user(session, row) for row in rows)
+
+    def groups(self, user_id: str) -> tuple[IdentityGroup, ...]:
+        with Session(self._engine) as session:
+            rows = session.execute(
+                select(GroupRow, GroupMembershipRow)
+                .join(
+                    GroupMembershipRow,
+                    GroupMembershipRow.group_id == GroupRow.group_id,
+                )
+                .where(
+                    GroupMembershipRow.user_id == user_id,
+                    GroupRow.archived_at.is_(None),
+                )
+                .order_by(GroupRow.name, GroupRow.group_id)
+            )
+            return tuple(
+                IdentityGroup(
+                    group_id=group.group_id,
+                    name=group.name,
+                    kind=GroupKind(group.kind),
+                    default_space_audience=group.default_space_audience,
+                    default_space_role=MembershipRole(
+                        group.default_space_role
+                    ),
+                    created_at=_aware(group.created_at),
+                    current_user_role=GroupRole(membership.role),
+                )
+                for group, membership in rows
+            )
+
+    def profiles(
+        self,
+        *,
+        workspace_id: str,
+        controller_user_id: str,
+    ) -> tuple[IdentityProfile, ...]:
+        with Session(self._engine) as session:
+            workspace = session.get(WorkspaceRow, workspace_id)
+            if (
+                workspace is None
+                or workspace.administrative_group_id is None
+            ):
+                raise ApplicationConflictError(
+                    "workspace group is unavailable"
+                )
+            rows = session.scalars(
+                select(ProfileRow)
+                .join(
+                    GroupProfileRow,
+                    GroupProfileRow.profile_id == ProfileRow.profile_id,
+                )
+                .where(
+                    GroupProfileRow.group_id
+                    == workspace.administrative_group_id,
+                )
+                .order_by(ProfileRow.display_name, ProfileRow.profile_id)
+            )
+            profiles: list[IdentityProfile] = []
+            for row in rows:
+                controller = session.get(
+                    ProfileControllerRow,
+                    (row.profile_id, controller_user_id),
+                )
+                profiles.append(
+                    IdentityProfile(
+                        profile_id=row.profile_id,
+                        display_name=row.display_name,
+                        disabled=row.disabled,
+                        created_at=_aware(row.created_at),
+                        controller_role=(
+                            ProfileControllerRole(controller.role)
+                            if controller is not None
+                            else None
+                        ),
+                    )
+                )
+            return tuple(profiles)
+
+    def workspace_group_id(self, workspace_id: str) -> str:
+        with Session(self._engine) as session:
+            workspace = session.get(WorkspaceRow, workspace_id)
+            if (
+                workspace is None
+                or workspace.administrative_group_id is None
+            ):
+                raise ApplicationConflictError(
+                    "workspace group is unavailable"
+                )
+            return workspace.administrative_group_id
+
+    def workspace(self, workspace_id: str) -> IdentityWorkspace | None:
+        with Session(self._engine) as session:
+            workspace = session.get(WorkspaceRow, workspace_id)
+            if workspace is None:
+                return None
+            return IdentityWorkspace(
+                workspace_id=workspace.workspace_id,
+                name=workspace.name,
+                administrative_group_id=(
+                    workspace.administrative_group_id
+                ),
+                home_profile_id=workspace.home_profile_id,
+                created_by_user_id=workspace.created_by_user_id,
+            )
+
+    def create_profile(
+        self,
+        *,
+        profile_id: str,
+        group_id: str,
+        display_name: str,
+        created_by_user_id: str,
+        now: datetime,
+    ) -> IdentityProfile:
+        try:
+            with Session(self._engine) as session, session.begin():
+                if session.get(GroupRow, group_id) is None:
+                    raise ApplicationConflictError("group does not exist")
+                row = ProfileRow(
+                    profile_id=profile_id,
+                    display_name=display_name,
+                    created_by_user_id=created_by_user_id,
+                    disabled=False,
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(row)
+                session.flush()
+                session.add(
+                    ProfileControllerRow(
+                        profile_id=profile_id,
+                        user_id=created_by_user_id,
+                        role=ProfileControllerRole.OWNER.value,
+                        created_at=now,
+                    )
+                )
+                session.add(
+                    GroupProfileRow(
+                        group_id=group_id,
+                        profile_id=profile_id,
+                        created_at=now,
+                    )
+                )
+                session.flush()
+                return IdentityProfile(
+                    profile_id=row.profile_id,
+                    display_name=row.display_name,
+                    disabled=row.disabled,
+                    created_at=_aware(row.created_at),
+                    controller_role=ProfileControllerRole.OWNER,
+                )
+        except IntegrityError as error:
+            raise ApplicationConflictError(
+                "profile could not be created"
+            ) from error
+
+    def profile_available(
+        self,
+        *,
+        workspace_id: str,
+        profile_id: str,
+    ) -> bool:
+        with Session(self._engine) as session:
+            workspace = session.get(WorkspaceRow, workspace_id)
+            if (
+                workspace is None
+                or workspace.administrative_group_id is None
+            ):
+                return False
+            count = session.scalar(
+                select(func.count())
+                .select_from(ProfileRow)
+                .join(
+                    GroupProfileRow,
+                    GroupProfileRow.profile_id == ProfileRow.profile_id,
+                )
+                .where(
+                    ProfileRow.profile_id == profile_id,
+                    ProfileRow.disabled.is_(False),
+                    GroupProfileRow.group_id
+                    == workspace.administrative_group_id,
+                )
+            )
+            return bool(count)
 
     def credentials(
         self,

@@ -75,10 +75,64 @@ describe("shared application", () => {
     expect(screen.getByText("Your musical notebook")).toBeTruthy();
     await screen.findAllByText("Morning progression");
     expect(document.querySelectorAll(".library-session-main")).toHaveLength(3);
+    const summaries = [
+      ...document.querySelectorAll(".library-session-summary"),
+    ].map((summary) => summary.textContent?.replace(/\s+/g, " ").trim());
+    expect(summaries).toContain("18 notes");
+    expect(summaries).toContain("6 notes");
+    expect(summaries.some((summary) => summary?.includes("settling")))
+      .toBe(false);
+    expect(summaries.some((summary) => summary?.includes("corrected")))
+      .toBe(false);
     expect(screen.queryByText("Schema v1")).toBeNull();
     expect(screen.queryByText("Local engine")).toBeNull();
     expect(screen.queryByText("On this device")).toBeNull();
     expect(new URL(window.location.href).searchParams.get("session")).toBeNull();
+  });
+
+  it("shows only the outstanding note count while a session settles", async () => {
+    const fixture = createFixtureRuntime();
+    const runtime = new Proxy(fixture, {
+      get(target, property) {
+        if (property === "listSessions") {
+          return async (...args: Parameters<AtpianoRuntime["listSessions"]>) => {
+            const page = await target.listSessions(...args);
+            return {
+              ...page,
+              items: page.items.map((session, index) =>
+                index === 0
+                  ? { ...session, status: "stopping" as const }
+                  : session,
+              ),
+            };
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) satisfies AtpianoRuntime;
+
+    renderApp(runtime, { home: true });
+
+    await screen.findByRole("heading", { name: "Sessions" });
+    await waitFor(() => {
+      expect(document.querySelector(".library-session-summary")?.textContent)
+        .toMatch(/18 notes.*2 settling/);
+    });
+    expect(screen.queryByText("16 corrected")).toBeNull();
+  });
+
+  it("uses plain-language piano-roll states", async () => {
+    renderApp();
+
+    await screen.findByRole("heading", { name: "Morning progression" });
+    expect(document.querySelector(".session-summary")?.textContent?.trim())
+      .toBe("18 notes");
+    expect(document.querySelector(".session-summary")?.textContent)
+      .not.toContain("corrected");
+    expect(screen.getByText("live estimate")).toBeTruthy();
+    expect(screen.getByText("settled", { exact: true })).toBeTruthy();
+    expect(screen.getByText("settled through", { exact: true })).toBeTruthy();
   });
 
   it("imports a WAV as a product session without showing replay controls", async () => {
@@ -886,7 +940,7 @@ describe("shared application", () => {
     await user.click(screen.getByRole("button", { name: /Run test recording/ }));
 
     expect(
-      await screen.findByText("Listening with background correction"),
+      await screen.findByText("Listening while notes settle"),
     ).toBeTruthy();
     expect(
       await screen.findByRole("heading", { name: "Morning progression" }),

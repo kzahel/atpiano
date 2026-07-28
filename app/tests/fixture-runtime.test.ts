@@ -191,6 +191,7 @@ test("fixture runtime models recording import as upload, not replay", async () =
       filename: "Player take.wav",
       media_type: "audio/wav",
       byte_count: file.size,
+      performed_by_profile_id: null,
       request_id: "request-import",
     },
     file,

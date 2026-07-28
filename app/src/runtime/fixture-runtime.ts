@@ -18,6 +18,9 @@ import type {
   Job,
   PageRequest,
   PcmBlock,
+  Profile,
+  ProfileCreate,
+  ProfilePage,
   RecordingImportStart,
   ReplayStart,
   RuntimeCapabilities,
@@ -30,6 +33,9 @@ import type {
   SessionAnnotation,
   SessionAnnotationPatch,
   SessionPage,
+  SessionPerformerAttribution,
+  SessionPerformerPatch,
+  GroupPage,
   Workspace,
   WorkspacePage,
 } from "./atpiano-runtime.js";
@@ -88,6 +94,7 @@ export class FixtureRuntime implements AtpianoRuntime {
   readonly #sessions: Map<string, FixtureSessionData>;
   #capture: Capture;
   #session: Session;
+  #profiles: Profile[];
   #nextSample = 0;
 
   constructor(data: FixtureRuntimeData) {
@@ -100,6 +107,16 @@ export class FixtureRuntime implements AtpianoRuntime {
     );
     this.#capture = data.capture;
     this.#session = data.sessions[0]!.session;
+    this.#profiles = [
+      {
+        schema_version: "atpiano.contract.v1",
+        profile_id: data.workspace.home_profile_id ?? "profile:fixture",
+        display_name: "Pianist",
+        disabled: false,
+        created_at: data.workspace.created_at,
+        controller_role: "owner",
+      },
+    ];
   }
 
   async getCapabilities(request: RuntimeRequest): Promise<RuntimeCapabilities> {
@@ -114,6 +131,60 @@ export class FixtureRuntime implements AtpianoRuntime {
       items: pageWindow([this.#data.workspace], request),
       next_cursor: null,
     };
+  }
+
+  async listGroups(request: PageRequest): Promise<GroupPage> {
+    assertRequest(request);
+    return {
+      schema_version: "atpiano.contract.v1",
+      items: pageWindow([
+        {
+          schema_version: "atpiano.contract.v1",
+          group_id:
+            this.#data.workspace.administrative_group_id ?? "group:fixture",
+          name: "Fixture household",
+          kind: "household",
+          default_space_audience: "group",
+          default_space_role: "editor",
+          created_at: this.#data.workspace.created_at,
+          current_user_role: "owner",
+        },
+      ], request),
+      next_cursor: null,
+    };
+  }
+
+  async listProfiles(
+    workspaceId: string,
+    request: PageRequest,
+  ): Promise<ProfilePage> {
+    assertRequest(request);
+    this.#assertWorkspace(workspaceId);
+    return {
+      schema_version: "atpiano.contract.v1",
+      workspace_id: workspaceId,
+      group_id:
+        this.#data.workspace.administrative_group_id ?? "group:fixture",
+      items: pageWindow(this.#profiles, request),
+      next_cursor: null,
+    };
+  }
+
+  async createProfile(
+    input: ProfileCreate,
+    request: RuntimeRequest,
+  ): Promise<Profile> {
+    assertRequest(request);
+    const profile: Profile = {
+      schema_version: "atpiano.contract.v1",
+      profile_id: `profile:fixture-${this.#profiles.length + 1}`,
+      display_name: input.display_name,
+      disabled: false,
+      created_at: this.#data.workspace.created_at,
+      controller_role: "owner",
+    };
+    this.#profiles.push(profile);
+    return profile;
   }
 
   async listSessions(
@@ -177,6 +248,33 @@ export class FixtureRuntime implements AtpianoRuntime {
     };
   }
 
+  async updateSessionPerformer(
+    input: SessionPerformerPatch,
+    request: RuntimeRequest,
+  ): Promise<SessionPerformerAttribution> {
+    assertRequest(request);
+    this.#assertTarget(input.workspace_id, input.session_id);
+    const record = this.#record(input.session_id);
+    const updated = {
+      ...record.session,
+      performed_by_profile_id: input.performed_by_profile_id,
+    };
+    this.#sessions.set(input.session_id, {
+      ...record,
+      session: updated,
+    });
+    if (this.#session.session_id === input.session_id) {
+      this.#session = updated;
+    }
+    return {
+      schema_version: "atpiano.contract.v1",
+      workspace_id: input.workspace_id,
+      session_id: input.session_id,
+      performed_by_profile_id: input.performed_by_profile_id,
+      updated_at: this.#data.trashedAt,
+    };
+  }
+
   async getHorizon(
     workspaceId: string,
     sessionId: string,
@@ -223,6 +321,7 @@ export class FixtureRuntime implements AtpianoRuntime {
       source_frame_count: 0,
       recognized_note_count: 0,
       corrected_note_count: 0,
+      performed_by_profile_id: input.performed_by_profile_id,
       completed_at: null,
       active_capture_id: this.#capture.capture_id,
     };
@@ -326,6 +425,7 @@ export class FixtureRuntime implements AtpianoRuntime {
       source: "upload",
       status: "complete",
       display_name: displayName,
+      performed_by_profile_id: input.performed_by_profile_id,
       completed_at: this.#data.trashedAt,
       active_capture_id: null,
     };

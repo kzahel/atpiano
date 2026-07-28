@@ -2,15 +2,16 @@
 
 Topic: home-hosted-family-sharing
 
-Status: **accepted near-term deployment direction as of 2026-07-28; basic
-family identity is implemented and live under Tactical 033.** The v3
-application is shared on demand from the Mac through the home Pi and Caddy.
-The live launchd service uses the authenticated FastAPI composition backed by
-SQLite users, memberships, and cookie sessions. Its configured local score
-runtime is enabled by default under Tactical 034 because committed scores are
-a core requirement of the private application. The managed PostgreSQL,
-object-storage, OIDC, broad tenancy, and sync program remains deferred with
-no active implementation schedule.
+Status: **accepted near-term deployment direction as of 2026-07-28; family
+identity and performer profiles are implemented and live under Tacticals 033
+and 042.** The v3 application is shared on demand from the Mac through the
+home Pi and Caddy. The live launchd service uses the authenticated FastAPI
+composition backed by SQLite accounts, memberships, groups, profiles, and
+cookie sessions. Its configured local score runtime is enabled by default
+under Tactical 034 because committed scores are a core requirement of the
+private application. The managed PostgreSQL, object-storage, OIDC, broad
+tenancy, and sync program remains deferred with no active implementation
+schedule.
 
 ## Scope And Relationship
 
@@ -32,6 +33,10 @@ sequence or a prerequisite for local work.
 session identities, selected-versus-active behavior, and local catalog
 contract. [`long-session-storage-retention.md`](long-session-storage-retention.md)
 owns recording and artifact disk growth.
+[`family-workspaces-and-attribution.md`](family-workspaces-and-attribution.md)
+owns the implemented account-versus-performer profile boundary, fast
+shared-piano selection, creator-versus-performer attribution, and the deferred
+shareable multi-space extension.
 
 This is not a production multi-tenant service, a high-availability promise,
 or a public score-runtime distribution artifact. The installed internal score

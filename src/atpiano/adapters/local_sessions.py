@@ -37,6 +37,7 @@ from atpiano.contracts.schemas import (
     Session,
     SessionAnnotation,
     SessionPage,
+    SessionPerformerAttribution,
     SessionStatus,
     SourceKind,
     Workspace,
@@ -337,6 +338,8 @@ class LocalSessionStore:
             name="On this device",
             mode=WorkspaceMode.LOCAL,
             created_at=created_at,
+            administrative_group_id="group:local",
+            home_profile_id="profile:local",
         )
 
     def _available_artifact_kinds(self, directory: Path) -> tuple[ArtifactKind, ...]:
@@ -435,9 +438,16 @@ class LocalSessionStore:
             except (OSError, ValueError):
                 pass
         display_name = automatic_display_name
+        created_by_user_id: str | None = None
+        performed_by_profile_id: str | None = None
         try:
             application = read_json(directory / "application.json")
             annotations = application.get("annotations")
+            provenance = application.get("provenance")
+            if isinstance(provenance, dict):
+                creator = provenance.get("created_by_user_id")
+                if isinstance(creator, str) and creator.strip():
+                    created_by_user_id = creator
             if (
                 application.get("schema_version") == APPLICATION_SESSION_SCHEMA
                 and isinstance(annotations, dict)
@@ -446,6 +456,10 @@ class LocalSessionStore:
                 and len(annotations["display_name"].strip()) <= 200
             ):
                 display_name = annotations["display_name"].strip()
+            if isinstance(annotations, dict):
+                performer = annotations.get("performed_by_profile_id")
+                if isinstance(performer, str) and performer.strip():
+                    performed_by_profile_id = performer
         except (OSError, ValueError):
             pass
         try:
@@ -474,6 +488,8 @@ class LocalSessionStore:
                 else None
             ),
             current_transcription_run_id=_legacy_run_id(session_id),
+            created_by_user_id=created_by_user_id,
+            performed_by_profile_id=performed_by_profile_id,
             display_name=display_name,
             recognized_note_count=recognized_note_count,
             corrected_note_count=corrected_note_count,
@@ -518,6 +534,50 @@ class LocalSessionStore:
             workspace_id=LOCAL_WORKSPACE_ID,
             session_id=session_id,
             display_name=normalized,
+            updated_at=updated_at,
+        )
+
+    def update_session_performer(
+        self,
+        session_id: str,
+        *,
+        performed_by_profile_id: str | None,
+    ) -> SessionPerformerAttribution:
+        directory = self.resolve(session_id)
+        if (
+            performed_by_profile_id is not None
+            and not performed_by_profile_id.strip()
+        ):
+            raise ValueError("performer profile ID cannot be blank")
+        with self._annotation_lock:
+            application_path = directory / "application.json"
+            try:
+                application = read_json(application_path)
+            except FileNotFoundError:
+                application = {
+                    "schema_version": APPLICATION_SESSION_SCHEMA,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }
+            if application.get("schema_version") != APPLICATION_SESSION_SCHEMA:
+                raise ValueError("session application document is incompatible")
+            updated_at = datetime.now(timezone.utc)
+            annotations = application.get("annotations")
+            if not isinstance(annotations, dict):
+                annotations = {}
+            annotations = dict(annotations)
+            if performed_by_profile_id is None:
+                annotations.pop("performed_by_profile_id", None)
+            else:
+                annotations["performed_by_profile_id"] = (
+                    performed_by_profile_id
+                )
+            annotations["updated_at"] = updated_at.isoformat()
+            application["annotations"] = annotations
+            write_json(application_path, application)
+        return SessionPerformerAttribution(
+            workspace_id=LOCAL_WORKSPACE_ID,
+            session_id=session_id,
+            performed_by_profile_id=performed_by_profile_id,
             updated_at=updated_at,
         )
 

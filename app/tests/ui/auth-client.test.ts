@@ -14,6 +14,7 @@ const session: AuthSession = {
     username: "alice",
     display_name: "Alice",
     memberships: [],
+    group_memberships: [],
   },
 };
 

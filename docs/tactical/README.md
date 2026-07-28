@@ -54,3 +54,4 @@ execution record; continuing status and direction belong in the relevant
 | [`040-websocket-runtime-dependency.md`](040-websocket-runtime-dependency.md) | Complete; live | Locked WebSocket protocol support for local, authenticated family, and packaged capture runtimes |
 | [`040-score-producer-provenance.md`](040-score-producer-provenance.md) | Complete; live | Durable score-pipeline provenance, compatibility freshness, and actionable legacy-cursor feedback |
 | [`041-post-capture-delete-settlement.md`](041-post-capture-delete-settlement.md) | Complete; live | Immediate post-settlement deletion and automatic catalog lifecycle convergence |
+| [`042-family-profile-schema-and-ui.md`](042-family-profile-schema-and-ui.md) | Complete; live | Seeded generic group/profile schema, creator-versus-performer attribution, and the profile-first Family UI |

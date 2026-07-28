@@ -17,6 +17,7 @@ from atpiano.contracts.schemas import (
     Session,
     SessionAnnotation,
     SessionPage,
+    SessionPerformerAttribution,
     WorkspacePage,
 )
 
@@ -159,6 +160,19 @@ class SessionApplicationService:
         return self._repository.update_session_annotation(
             session_id,
             display_name=display_name,
+        )
+
+    def update_session_performer(
+        self,
+        workspace_id: str,
+        session_id: str,
+        *,
+        performed_by_profile_id: str | None,
+    ) -> SessionPerformerAttribution:
+        self.require_workspace(workspace_id)
+        return self._repository.update_session_performer(
+            session_id,
+            performed_by_profile_id=performed_by_profile_id,
         )
 
     def delete_session(

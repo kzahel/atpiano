@@ -61,7 +61,14 @@ from atpiano.contracts.schemas import (
     DeleteSessionRequest,
     ErrorCode,
     ErrorResponse,
+    Group,
+    GroupKind,
+    GroupPage,
+    GroupRole,
     Job,
+    MembershipRole,
+    Profile,
+    ProfilePage,
     RecordingImportStart,
     RuntimeCapabilities,
     RuntimeMode,
@@ -69,6 +76,7 @@ from atpiano.contracts.schemas import (
     ScoreVariant,
     ScoreVariantRequest,
     SessionAnnotationPatch,
+    SessionPerformerPatch,
     SourceKind,
 )
 from atpiano.corrected import CorrectedSession
@@ -428,8 +436,15 @@ class CorrectedWorkbenchRuntime:
     def start_recording_import(
         self,
         source: LocalUploadSource,
+        *,
+        created_by_user_id: str | None = None,
+        performed_by_profile_id: str | None = None,
     ) -> Capture:
-        started = self.application.capture.start_upload(source)
+        started = self.application.capture.start_upload(
+            source,
+            created_by_user_id=created_by_user_id,
+            performed_by_profile_id=performed_by_profile_id,
+        )
         session = started.session
         return Capture(
             workspace_id=LOCAL_WORKSPACE_ID,
@@ -785,6 +800,50 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                 page = self.server.application.sessions.list_workspaces()
                 self._send_json(page.model_dump(mode="json"))
                 return True
+            if request_path == f"{prefix}/groups":
+                workspace = (
+                    self.server.application.sessions.list_workspaces().items[0]
+                )
+                page = GroupPage(
+                    items=(
+                        Group(
+                            group_id="group:local",
+                            name="On this device",
+                            kind=GroupKind.HOUSEHOLD,
+                            default_space_audience="controllers",
+                            default_space_role=MembershipRole.EDITOR,
+                            created_at=workspace.created_at,
+                            current_user_role=GroupRole.MEMBER,
+                        ),
+                    )
+                )
+                self._send_json(page.model_dump(mode="json"))
+                return True
+            profile_match = re.fullmatch(
+                f"{prefix}/workspaces/([^/]+)/profiles",
+                request_path,
+            )
+            if profile_match:
+                workspace_id = profile_match.group(1)
+                if workspace_id != LOCAL_WORKSPACE_ID:
+                    raise ValueError("profile workspace is invalid")
+                workspace = (
+                    self.server.application.sessions.list_workspaces().items[0]
+                )
+                page = ProfilePage(
+                    workspace_id=workspace_id,
+                    group_id="group:local",
+                    items=(
+                        Profile(
+                            profile_id="profile:local",
+                            display_name="Pianist",
+                            disabled=False,
+                            created_at=workspace.created_at,
+                        ),
+                    ),
+                )
+                self._send_json(page.model_dump(mode="json"))
+                return True
             job_match = re.fullmatch(f"{prefix}/jobs/([^/]+)", request_path)
             if job_match:
                 job = self.server.score_job(job_match.group(1))
@@ -1060,6 +1119,13 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     "X-Atpiano-Request-Id",
                     "",
                 )
+                performer_profile_id = (
+                    self.headers.get(
+                        "X-Atpiano-Performer-Profile",
+                        "",
+                    ).strip()
+                    or None
+                )
                 media_type = self.headers.get(
                     "Content-Type",
                     "application/octet-stream",
@@ -1076,6 +1142,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     filename=normalized_filename,
                     media_type=normalized_media_type,
                     byte_count=content_length,
+                    performed_by_profile_id=performer_profile_id,
                     request_id=request_id,
                 )
                 if start.workspace_id != LOCAL_WORKSPACE_ID:
@@ -1107,7 +1174,12 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                     byte_count=byte_count,
                     sha256=sha256,
                 )
-                capture = self.server.start_recording_import(source)
+                capture = self.server.start_recording_import(
+                    source,
+                    performed_by_profile_id=(
+                        start.performed_by_profile_id
+                    ),
+                )
                 spool_path = None
             except ValidationError as error:
                 self._send_api_error(
@@ -1300,14 +1372,22 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
         request_path = unquote(urlsplit(self.path).path)
         if not self._require_desktop_auth(request_path):
             return
+        performer_match = re.fullmatch(
+            (
+                r"/api/v1/workspaces/([^/]+)/sessions/([^/]+)"
+                r"/performer"
+            ),
+            request_path,
+        )
         match = re.fullmatch(
             r"/api/v1/workspaces/([^/]+)/sessions/([^/]+)",
             request_path,
         )
-        if not match:
+        target_match = performer_match or match
+        if not target_match:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
-        workspace_id, session_id = match.groups()
+        workspace_id, session_id = target_match.groups()
         if not self._origin_is_trusted():
             self._send_api_error(
                 "API actions require a trusted origin",
@@ -1318,6 +1398,30 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             )
             return
         try:
+            if performer_match:
+                performer = SessionPerformerPatch.model_validate(
+                    self._read_api_json()
+                )
+                if (
+                    workspace_id != LOCAL_WORKSPACE_ID
+                    or performer.workspace_id != workspace_id
+                    or performer.session_id != session_id
+                ):
+                    raise ValueError(
+                        "session performer target does not match its path"
+                    )
+                result = (
+                    self.server.application.sessions
+                    .update_session_performer(
+                        workspace_id,
+                        session_id,
+                        performed_by_profile_id=(
+                            performer.performed_by_profile_id
+                        ),
+                    )
+                )
+                self._send_json(result.model_dump(mode="json"))
+                return
             annotation = SessionAnnotationPatch.model_validate(
                 self._read_api_json()
             )
@@ -1662,11 +1766,21 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                         raise ValueError("microphone session already started")
                     sample_rate_hz = message.get("sample_rate_hz")
                     metadata = message.get("client_metadata")
+                    performer_profile_id = message.get(
+                        "performed_by_profile_id"
+                    )
                     if (
                         not isinstance(sample_rate_hz, int)
                         or isinstance(sample_rate_hz, bool)
                         or not 8_000 <= sample_rate_hz <= 192_000
                         or not isinstance(metadata, dict)
+                        or (
+                            performer_profile_id is not None
+                            and not isinstance(
+                                performer_profile_id,
+                                str,
+                            )
+                        )
                     ):
                         raise ValueError("microphone Start metadata is invalid")
                     encoded_metadata = json.dumps(metadata, allow_nan=False).encode()
@@ -1676,6 +1790,9 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                         self.server.application.capture.start_microphone(
                         sample_rate_hz=sample_rate_hz,
                         client_metadata=metadata,
+                        performed_by_profile_id=(
+                            performer_profile_id
+                        ),
                     )
                     )
                     session = started.session
