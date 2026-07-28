@@ -129,8 +129,12 @@ visualizations and enters an unpersisted ready state. It does not create a
 directory because the microphone's actual sample rate and capture metadata
 are not known yet, and abandoned clicks should not create empty history.
 
-From that state, **Start microphone** or fixture replay creates the concrete
-session, returns its ID, selects it in the initiating tab, and begins capture.
+From that state, **Start microphone** creates the concrete session, returns
+its ID, selects it in the initiating tab, and begins capture. Deterministic
+replay is an engineering fixture, not sound-file upload; its UI is retained
+only when the explicit fixture runtime is selected. A future **Import
+recording** workflow requires its own upload and provenance contract.
+
 When another tab connected to the same local process already owns the one
 active capture, New may still show a blank intent, but starting another
 capture is disabled with the active session identified. The future hosted

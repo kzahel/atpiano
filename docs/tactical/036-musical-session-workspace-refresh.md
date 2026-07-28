@@ -247,3 +247,19 @@ same subdivision through the real SQLite adapter. The reported 1,804-note
 session resolved in three reads to a 222-item opening interval; every retained
 session resolved in at most four reads and the largest returned interval held
 239 items, below the 256-item boundary.
+
+### Post-live fixture-action correction
+
+The next live review exposed `Replay musical fixture` as an internal
+deterministic-test action in the ordinary family capture screen. The family
+composition had no replay manifest, but its capability response still
+advertised replay, so the action failed with
+`no replay manifest was configured`. It was never a sound-file upload path.
+
+`a3980b3` derives replay capability from the actual capture composition and
+keeps the renamed `Run test recording` action only in explicit fixture mode.
+Normal local, family, and desktop capture UI now presents microphone capture
+without fixture terminology. A future recording import remains a separate
+product and transport contract. Focused backend tests passed 19 cases; the
+frontend suite passed 79 tests across 17 files, with TypeScript, generated
+contract drift, Ruff, the production build, and Git whitespace also passing.
