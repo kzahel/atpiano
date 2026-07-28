@@ -75,7 +75,18 @@ function EmptyWorkspace({ onNew }: { readonly onNew: () => void }) {
   );
 }
 
-export function App() {
+export interface AppViewer {
+  readonly username: string;
+  readonly displayName: string;
+  readonly logoutPending: boolean;
+  readonly onLogout: () => void;
+}
+
+export function App({
+  viewer,
+}: {
+  readonly viewer?: AppViewer;
+} = {}) {
   const runtime = useRuntime();
   const queryClient = useQueryClient();
   const selectedSessionId = useWorkspaceStore((state) => state.selectedSessionId);
@@ -979,6 +990,18 @@ export function App() {
             </span>
           </div>
           <div className="topbar-actions">
+            {viewer !== undefined && (
+              <div className="viewer-control">
+                <span title={viewer.username}>{viewer.displayName}</span>
+                <button
+                  type="button"
+                  disabled={viewer.logoutPending}
+                  onClick={viewer.onLogout}
+                >
+                  {viewer.logoutPending ? "Signing out…" : "Logout"}
+                </button>
+              </div>
+            )}
             <span>Schema v1</span>
             <button
               className="help-button"

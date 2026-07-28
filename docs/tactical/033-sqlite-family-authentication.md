@@ -6,7 +6,8 @@ Status: **authorized on 2026-07-28; implementation in progress.** Dependency
 and initial relational-schema checkpoints are complete through Alembic head
 `20260728_0001`. The typed identity service and administrator CLI are also
 complete. The authenticated FastAPI adapter is implemented and preserves the
-legacy local/desktop server; React login integration remains.
+legacy local/desktop server. Minimal React login/logout integration is
+complete; operational hardening and the review build remain.
 
 ## Outcome
 
@@ -249,3 +250,20 @@ This section becomes the execution record as commits land. Record:
 - FastAPI plus legacy-server regression validation: `33 passed`. Generated
   OpenAPI and TypeScript contracts include login, logout, and current-session
   types and pass their drift check.
+
+### React login boundary
+
+- The browser probes the current-authentication-session route before mounting
+  workspace queries. `401` selects the family login; the legacy local
+  server's `404` preserves its no-login behavior.
+- Fixture and Tauri modes bypass browser login explicitly. The desktop keeps
+  its existing per-launch loopback bearer and does not gain profiles or web
+  cookies.
+- The accessible login form clears its password state immediately on submit,
+  reports bounded failures, and renders the shared application only after a
+  valid session response.
+- The workspace top bar shows the current display name and Logout. Logout
+  clears React Query state before returning to the login form.
+- Validation: TypeScript passed, all `54` frontend tests passed, and the Vite
+  production build completed. The existing large score-renderer chunk warning
+  remains unrelated footprint evidence.

@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { App } from "./app.js";
+import { HttpAuthenticationClient } from "./auth/auth-client.js";
+import { AuthenticationBoundary } from "./auth/authentication-boundary.js";
 import { createFixtureRuntime } from "./runtime/fixture-data.js";
 import {
   createDesktopRuntime,
@@ -26,9 +28,16 @@ const queryClient = new QueryClient({
 function Root({
   runtime,
   desktop,
+  viewer,
 }: {
   readonly runtime: AtpianoRuntime;
   readonly desktop?: DesktopRuntimeBootstrap;
+  readonly viewer?: {
+    readonly username: string;
+    readonly displayName: string;
+    readonly logoutPending: boolean;
+    readonly onLogout: () => void;
+  };
 }) {
   const [failure, setFailure] = useState<string | null>(null);
   useEffect(() => {
@@ -61,16 +70,46 @@ function Root({
   return (
     <QueryClientProvider client={queryClient}>
       <RuntimeProvider runtime={runtime}>
-        <App />
+        <App viewer={viewer} />
       </RuntimeProvider>
     </QueryClientProvider>
   );
 }
 
-function render(runtime: AtpianoRuntime, desktop?: DesktopRuntimeBootstrap) {
+function render(
+  runtime: AtpianoRuntime,
+  desktop?: DesktopRuntimeBootstrap,
+) {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <Root runtime={runtime} desktop={desktop} />
+    </StrictMode>,
+  );
+}
+
+function renderAuthenticated(
+  runtime: AtpianoRuntime,
+  client: HttpAuthenticationClient,
+  initialSession: Awaited<ReturnType<typeof client.login>> | null,
+) {
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <AuthenticationBoundary
+        client={client}
+        initialSession={initialSession}
+        onLogout={() => queryClient.clear()}
+        renderAuthenticated={(session, logout, logoutPending) => (
+          <Root
+            runtime={runtime}
+            viewer={{
+              username: session.principal.username,
+              displayName: session.principal.display_name,
+              logoutPending,
+              onLogout: logout,
+            }}
+          />
+        )}
+      />
     </StrictMode>,
   );
 }
@@ -88,7 +127,19 @@ async function main() {
     (import.meta.env.DEV && runtimeChoice !== "local")
       ? createFixtureRuntime()
       : new LocalRuntime();
-  render(runtime);
+  if (runtimeChoice === "fixture" || (
+    import.meta.env.DEV && runtimeChoice !== "local"
+  )) {
+    render(runtime);
+    return;
+  }
+  const authentication = new HttpAuthenticationClient();
+  const bootstrap = await authentication.bootstrap();
+  if (bootstrap.mode === "bypass") {
+    render(runtime);
+    return;
+  }
+  renderAuthenticated(runtime, authentication, bootstrap.session);
 }
 
 void main().catch((error: unknown) => {
