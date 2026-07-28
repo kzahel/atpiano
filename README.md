@@ -180,11 +180,30 @@ WebSockets. Override `ATPIANO_BIND_ADDRESS`, `ATPIANO_PORT`,
 registering the service to change its generated launch configuration.
 `ATPIANO_SERVICE_LOG_SIZE` and `ATPIANO_SERVICE_LOG_COUNT` adjust rotation.
 
-The current public-origin checks are not user authentication. Keep this a
-limited trusted trial until a proportionate Caddy or private-network access
-boundary is selected. The accepted near-term topology, local SQLite direction,
-operational limits, and conditions for reconsidering managed cloud
-infrastructure are recorded in
+The authenticated family composition uses FastAPI, a SQLite
+SQLAlchemy/Alembic catalog, Argon2 passwords, opaque browser sessions, and
+owner/editor/viewer workspace memberships. Accounts are created
+interactively; there is no public signup, email, or password-reset flow:
+
+```text
+uv run atpiano users --workspace results/workbench-v3 create USERNAME
+```
+
+The legacy sharing command remains the safe service default until the first
+real owner and login UI have been reviewed. After that explicit checkpoint,
+register the persistent authenticated mode with:
+
+```text
+ATPIANO_FAMILY_AUTH=true scripts/share-atpiano-service restart
+```
+
+The selected mode is retained in the service runtime directory for later
+restarts. Supplying `ATPIANO_FAMILY_AUTH=false` during a restart explicitly
+returns to the legacy composition; that mode is unauthenticated and should
+not be used as a public fallback.
+
+The accepted near-term topology, SQLite direction, operational limits, and
+conditions for reconsidering managed cloud infrastructure are recorded in
 [`docs/topics/home-hosted-family-sharing.md`](docs/topics/home-hosted-family-sharing.md).
 
 Machine-dependent microphone, real Transkun, internal score-runtime, and

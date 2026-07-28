@@ -2,12 +2,11 @@
 
 Topic: home-hosted-family-sharing
 
-Status: **authorized on 2026-07-28; implementation in progress.** Dependency
-and initial relational-schema checkpoints are complete through Alembic head
-`20260728_0001`. The typed identity service and administrator CLI are also
-complete. The authenticated FastAPI adapter is implemented and preserves the
-legacy local/desktop server. Minimal React login/logout integration is
-complete; operational hardening and the review build remain.
+Status: **implemented and held for human login/cutover review on
+2026-07-28.** Alembic head `20260728_0001`, the typed identity service,
+administrator CLI, authenticated FastAPI adapter, minimal React login/logout
+boundary, and operational hardening are complete. The live launchd service
+has not been switched to authenticated mode.
 
 ## Outcome
 
@@ -267,3 +266,56 @@ This section becomes the execution record as commits land. Record:
 - Validation: TypeScript passed, all `54` frontend tests passed, and the Vite
   production build completed. The existing large score-renderer chunk warning
   remains unrelated footprint evidence.
+
+### Hardening and review build
+
+- Five failed attempts in five minutes limit one hashed username/client
+  bucket. The in-memory limiter retains no plaintext usernames and is capped
+  at `1024` buckets.
+- High-frequency workspace polling validates every request but extends an
+  active SQLite session at most once per five minutes.
+- `ATPIANO_FAMILY_AUTH=true` selects the authenticated launchd composition,
+  and the choice persists in its private service runtime directory. The
+  unreviewed default remains `false`; no cutover happened automatically.
+- The repository-wide migration regression passed at
+  `results/migration-regression/20260728T083201Z/report.json`: `196` Python
+  tests, `54` frontend tests, generated-contract drift, npm high-severity
+  audit, Ruff, JavaScript syntax, and Git whitespace all passed.
+- A disposable real `atpiano family-server`/Uvicorn process returned `200`
+  for its app shell, `401` for unauthenticated capabilities, `200` for login,
+  authenticated session, workspace, capabilities, and logout, then `401`
+  when the revoked session was reused. It reported the owner role, the
+  `local` workspace, and `score_available=false`.
+- The disposable workspace, credentials, cookies, and response bodies were
+  moved to Trash after validation.
+- Known non-blocking warnings are the existing `pkg_resources` warning from
+  the model stack, FastAPI TestClient's transition warning from `httpx` to
+  `httpx2`, npm's inherited `recursive` configuration warning, and the
+  already-tracked large score-renderer frontend chunk.
+
+### Commit series
+
+- `10f85d8` — plan the bounded family-authentication implementation.
+- `efdaaee` — add resolved authentication and persistence dependencies.
+- `a7b1efd` — add Alembic head and typed SQLite identity models.
+- `e291100` — add the identity service, Argon2 adapter, repository, and CLI.
+- `0002a01` — extract transport-independent workbench composition.
+- `ee7db1c` — add the authenticated FastAPI family server.
+- `3aa9022` — add shared-React login, current account, and logout.
+- `ac51828` — harden sessions, login attempts, and persistent service mode.
+
+### Human review hold
+
+Do not invent or commit the real owner password. The reviewer should:
+
+1. run
+   `uv run atpiano users --workspace results/workbench-v3 create USERNAME`;
+2. run the family server locally or explicitly authorize live cutover;
+3. sign in, review history and one artifact, confirm viewer mutation denial
+   if a viewer account is desired, and log out; and
+4. only after acceptance, run
+   `ATPIANO_FAMILY_AUTH=true scripts/share-atpiano-service restart`.
+
+The authenticated service fails closed when no enabled owner exists. The
+legacy service remains live and unauthenticated at this checkpoint, so keep
+the existing limited-trial handling until cutover.

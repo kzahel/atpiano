@@ -3,11 +3,14 @@
 Topic: home-hosted-family-sharing
 
 Status: **accepted near-term deployment direction as of 2026-07-28; basic
-family identity implementation is authorized under Tactical 033.** The v3
-application is shared on demand from the Mac through the home Pi and Caddy.
-SQLite users, memberships, and cookie sessions are now active implementation
-scope. The managed PostgreSQL, object-storage, OIDC, broad tenancy, and sync
-program remains deferred with no active implementation schedule.
+family identity is implemented and held for human login/cutover review under
+Tactical 033.** The v3 application is shared on demand from the Mac through
+the home Pi and Caddy. SQLite users, memberships, and cookie sessions are
+implemented, but the live launchd service still uses the explicitly
+unauthenticated legacy composition until a real owner is created and the
+review accepts cutover. The managed PostgreSQL, object-storage, OIDC, broad
+tenancy, and sync program remains deferred with no active implementation
+schedule.
 
 ## Scope And Relationship
 
@@ -74,9 +77,11 @@ rebuildable range/history index over append-only JSONL evidence, so the
 bundled Python runtime already exercises SQLite. What R5 did not implement is
 a workspace-level SQLite catalog.
 
-Tactical 033 adds a transactional SQLite catalog on the Mac. Its identity and
-authorization rows are authoritative relational data; its references to
-capture sessions remain a rebuildable index over filesystem evidence:
+Tactical 033 adds a transactional SQLite identity catalog on the Mac. Its
+identity and authorization rows are authoritative relational data. The
+capture-session catalog still scans authoritative filesystem manifests; if a
+relational session index is added later, it must remain rebuildable from that
+filesystem evidence:
 
 - session and artifact manifests remain sufficient to repair or re-index it;
 - recordings, MIDI, JSONL, MusicXML, and other large artifacts remain files;
@@ -98,8 +103,8 @@ reach an unauthenticated public hostname is not made trusted merely because
 the intended audience is family.
 
 Before the service is treated as private durable family storage or its URL is
-shared more broadly, complete the bounded SQLite account and cookie-session
-system in
+shared more broadly, accept and cut over the bounded SQLite account and
+cookie-session system in
 [`033-sqlite-family-authentication.md`](../tactical/033-sqlite-family-authentication.md).
 Validate ordinary HTTP, artifacts, and microphone WebSockets through it.
 This authorization does not include public signup, invitations, email,
@@ -127,6 +132,11 @@ Until then:
 - keep the service off when it is not intentionally being shared;
 - avoid relying on it as the only copy of irreplaceable recordings; and
 - do not publicly expose the unresolved internal score runtime.
+
+The authenticated composition is now implemented and suppresses the public
+score capability, score mutations, and private score artifacts by default.
+Those properties have not yet changed the live process because service
+cutover is the current human hold.
 
 ## Operating Contract
 
@@ -156,8 +166,8 @@ eight-phase hosted migration:
 
 1. preserve and improve the working local application;
 2. reduce the desktop score/runtime footprint behind exact parity gates;
-3. complete the SQLite family identity and session catalog;
-4. enforce proportionate family access control before broader sharing; and
+3. review and cut over the implemented SQLite family identity catalog;
+4. enforce the implemented family access control before broader sharing; and
 5. add backup, restore, or health checks only from an observed operational
    need.
 
