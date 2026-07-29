@@ -2,7 +2,7 @@
 
 Topic: practice-companion-product-vision
 
-Status: proposed product direction as of 2026-07-26. This topic records the
+Status: proposed product direction as of 2026-07-29. This topic records the
 product framing and its boundaries; it is not evidence that the complete
 phone, collaboration, teaching, analysis, or hosted experience exists.
 
@@ -49,11 +49,27 @@ response loop. A teacher marketplace, curriculum product, generalized social
 network, or numeric grading system is not part of the initial promise.
 
 [`playful-piano-learning.md`](playful-piano-learning.md) owns a separate
-family-facing route into this notebook: caregiver-and-toddler sound play,
-ear-led imitation and invention, notation bridges, forgiving acoustic
-turn-taking, and faster MIDI games. That direction can reuse captured moments
-and performer profiles without replacing this topic's initial product wedge
-or turning the musical notebook into a linear children's curriculum.
+full-screen family and studio route over the same musical core:
+caregiver-and-toddler sound play, ear-led imitation and invention, notation
+bridges, forgiving acoustic turn-taking, and faster MIDI games. That direction
+can reuse captured moments and performer profiles without inserting child
+game chrome into the professional workspace, replacing this topic's initial
+product wedge, or turning the musical notebook into a linear children's
+curriculum.
+
+[`generative-musical-response-and-accompaniment.md`](generative-musical-response-and-accompaniment.md)
+owns deterministic arrangements, musical answers and variations, optional
+full-audio renders, and the provenance boundary between source performance and
+generated material. Those capabilities may serve Play and later turn a
+Notebook moment into a related arrangement, but they are not authoritative
+performance evidence or a dependency of the initial notebook loop.
+
+[`natural-language-musical-editing.md`](natural-language-musical-editing.md)
+owns selection-scoped commands that propose explicit performance corrections,
+notation overrides, or creative edits. Notebook may let a player highlight a
+note or passage and describe the intended repair, but raw performance evidence
+remains immutable and every accepted change becomes a previewed, versioned
+artifact.
 
 ## Core Loop
 
@@ -204,7 +220,8 @@ It should not:
 - invent exact notes, chords, meter, or form from intuition when the evidence
   or tools do not support them;
 - correct the acoustic transcript or engraving merely because another result
-  sounds linguistically plausible;
+  sounds linguistically plausible; a separate selection-scoped editing
+  workflow may turn explicit player intent into a previewed structured change;
 - present ambiguous functional-harmony labels as facts;
 - treat the player's mental model as an error to be corrected; or
 - become a required dependency for capture, review, or engraving.
@@ -278,6 +295,24 @@ The phone, hosted web application, and offline desktop application are
 surfaces over the same session, moment, interpretation, and collaboration
 model rather than independent products.
 
+The working product-family boundary distinguishes **Atpiano Notebook**, the
+current quiet professional capture and review experience, from **Atpiano
+Play**, the separate full-screen family and studio experience owned by
+[`playful-piano-learning.md`](playful-piano-learning.md). These are working
+labels rather than selected public brands. They may share input adapters,
+profiles, sessions, moments, storage, and runtime contracts without sharing
+navigation, visual language, or feedback vocabulary.
+
+### Play
+
+- a dedicated full-screen shell rather than games embedded in Sessions;
+- sound, ear, imitation, invention, contour, and notation activities;
+- forgiving acoustic interaction and measured low-latency MIDI interaction;
+- co-play for young children and bounded studio-station use;
+- browser and Chromebook discovery, installed Android and iPad hypotheses,
+  and a fully offline desktop tier; and
+- optional promotion of a child-created tune into the musical notebook.
+
 ### Phone capture companion
 
 - one-tap, low-distraction recording beside the piano;
@@ -303,6 +338,9 @@ model rather than independent products.
 
 The accepted runtime and workspace boundaries for these surfaces live in
 [`multi-tenant-hybrid-service-architecture.md`](multi-tenant-hybrid-service-architecture.md).
+Play may reuse them, but cross-platform MIDI, mobile packaging, offline game
+assets, and studio operation require their own validation before they become
+accepted architecture.
 
 ## Product Principles
 
@@ -335,6 +373,12 @@ The accepted runtime and workspace boundaries for these surfaces live in
 This sequence is a product dependency order, not an implementation tactical.
 Each bounded implementation slice should receive its own document under
 `docs/tactical/`.
+
+Play is a parallel discovery track rather than an implicit fifth Notebook
+phase. A bounded Play shell and two or three activities may validate with
+families and piano studios while the Notebook sequence continues, provided
+the experiment consumes shared contracts and does not destabilize or clutter
+the professional workspace.
 
 ## Open Product Questions
 

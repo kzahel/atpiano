@@ -71,6 +71,12 @@ and the general latency/quality benchmark. This topic applies those contracts
 to a user-operated browser session. The downstream piano-roll or notation
 consumer remains separable and must also accept direct MIDI.
 
+[`natural-language-musical-editing.md`](natural-language-musical-editing.md)
+owns future user-authored correction proposals over selected source ranges.
+Those corrections may derive a new event view, but must preserve raw audio,
+model events, revision history, and whether an inserted or changed note came
+from the player rather than an acoustic model.
+
 [`session-workspace-management.md`](session-workspace-management.md) owns the
 accepted refactor that separates the active capture session from each
 browser's selected session, then adds explicit New, history, and recoverable

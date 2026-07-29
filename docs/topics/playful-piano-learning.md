@@ -3,10 +3,12 @@
 Topic: playful-piano-learning
 
 Status: proposed product direction as of 2026-07-29. This topic records
-motivation, experience principles, a growth continuum, candidate games, input
+motivation, the separate Play product surface, a studio-discovery wedge,
+experience principles, a growth continuum, candidate games, input and offline
 contracts, precedents, and open questions. It is not evidence that Web MIDI,
-the game runtime, child-oriented progression, or any activity described here
-has been implemented or validated with children.
+the game runtime, child-oriented progression, mobile packaging, studio mode,
+or any activity described here has been implemented or validated with
+children or teachers.
 
 ## Scope And Relationship
 
@@ -18,8 +20,11 @@ the controller for musical exploration and learning. It includes:
 - pitch, interval, rhythm, notation, and five-finger activities;
 - improvisation and composition;
 - character and world responses driven by real playing;
+- a separate full-screen Play shell over shared Atpiano capabilities;
 - slow, uncertainty-tolerant acoustic interaction;
 - low-latency MIDI interaction;
+- browser, tablet, and offline desktop delivery hypotheses;
+- piano-studio discovery and teacher feedback;
 - readiness-based progression from first cause and effect through independent
   practice; and
 - evidence for whether play leads back to voluntary music-making.
@@ -43,6 +48,18 @@ later, but it is not a login or an authorization principal.
 [`session-workspace-management.md`](session-workspace-management.md) continues
 to own durable performances and annotations. A game may propose a named
 musical moment or related take, but must not rewrite source evidence.
+
+[`generative-musical-response-and-accompaniment.md`](generative-musical-response-and-accompaniment.md)
+owns deterministic backing parts, generated answers and variations, model
+experiments, and the separation between a child's source tune and derived
+music. Play may consume those capabilities, but its first experiment does not
+depend on them.
+
+[`natural-language-musical-editing.md`](natural-language-musical-editing.md)
+owns the shared selection, correction, composer, preview, and versioning
+primitives that may sit beneath Play and Notebook. Play should expose those
+primitives through direct, age-appropriate manipulation rather than requiring
+a child to issue precise verbal commands.
 
 Every bounded implementation should receive a tactical. This topic does not
 authorize a broad curriculum, child account system, content marketplace, or
@@ -84,6 +101,68 @@ The system should be fun for a child and accompanying adult. An adult should
 be able to enjoy the same call-and-response, improvisation, sight-reading, and
 rhythm mechanics at a deeper level rather than occupying a separate
 administrative surface.
+
+## Product Surface Boundary
+
+Play should be a separate experience over the same musical core, not a
+collection of games inserted into the current professional workspace. Working
+product-family vocabulary is:
+
+- **Atpiano Notebook:** the current quiet, professional Sessions, capture,
+  transcription, review, score, export, and musical-memory experience; and
+- **Atpiano Play:** a full-screen world for exploration, games, learning, and
+  studio use.
+
+These names describe a boundary and are not selected public brands.
+
+Entering Play may begin from a clear launcher in the shared application, but
+Play owns its own navigation, visual language, feedback vocabulary, activity
+state, and caregiver exit. Characters, rewards, lesson choices, and teacher
+controls should not accumulate in a selected Notebook session. Conversely,
+children should not encounter model horizons, artifact provenance, capture
+diagnostics, or professional workspace chrome while playing.
+
+The surfaces may share:
+
+- normalized acoustic and MIDI input adapters;
+- the local piano synthesizer;
+- performer profiles and authorization;
+- optional sessions, moments, and named child-created tunes;
+- runtime and storage boundaries; and
+- reusable React components whose presentation actually fits both surfaces.
+
+They should not be forced into one information architecture merely because
+they share implementation. A later Android or iPad store listing may present
+Play independently while still consuming the same contracts and repository.
+That decision should follow product evidence rather than precede it.
+
+## Learning Center And The Role Of Notation
+
+The center is musical familiarity: listening, finding, remembering,
+answering, varying, and inventing. Staff notation is the written language that
+can name and preserve those relationships, but it need not be the entrance or
+the spine of the experience.
+
+A representative learning loop is:
+
+```text
+hear -> find -> imitate -> invent -> recognize shape -> see symbol -> read back
+```
+
+For example, a child can invent a three-note duck call, hear the duck copy it,
+notice that it rises and repeats, see the same contour on a staff, and later
+read that personally meaningful call back. This joins ear training,
+improvisation, keyboard geography, memory, and notation without treating
+written-note decoding as a prerequisite for making music.
+
+The product should still support direct sight-reading activities for players
+and teachers who want them. The distinction is priority rather than
+exclusion:
+
+- sound and musical agency establish meaning;
+- spatial and contour views expose relationships;
+- notation represents and extends those relationships; and
+- reading eventually becomes another route back to sound.
 
 ## Why Play Rather Than Cosmetic Gamification
 
@@ -210,6 +289,59 @@ If audio and MIDI are captured together, the audio sample clock remains the
 source timeline for the retained session. MIDI receipt time must be explicitly
 mapped to that clock. Fast controller response must not invent a second
 unreconciled performance history.
+
+## Delivery And Offline Contract
+
+Play should expose capability honestly instead of promising that every device
+runs every model:
+
+| Capability tier | Expected execution | Product role |
+| --- | --- | --- |
+| Play core | Local activity engine with MIDI, pointer, or authored prompts; no transcription model required | Fast games, exploration, notation, and studio stations |
+| Acoustic Play | Provisional pitch or onset input from a capable browser, native adapter, or nearby host | Slower echo, finding, contour, and acoustic-piano play |
+| Notebook | Full capture, retained audio, polyphonic transcription, correction, review, and export | Professional musical memory and deeper post-play evidence |
+
+The initial platform hypothesis is:
+
+- **Browser and Chromebook:** zero-install discovery and studio pilots,
+  especially on Chromium systems with a compatible wired MIDI path;
+- **desktop application:** the strongest fully offline surface, including
+  local models, storage, MIDI, and studio operation;
+- **Android:** an eventual installed Play surface with offline assets and
+  tested native or browser MIDI and audio adapters;
+- **iPad:** an eventual installed Play surface whose UI can be shared but
+  whose reliable MIDI path will probably require a native adapter; and
+- **tablet browser:** a useful acoustic, pointer, or hosted fallback where the
+  required device API exists.
+
+[Web MIDI](https://developer.mozilla.org/en-US/docs/Web/API/Web_MIDI_API)
+remains a limited-availability, secure-context, permission-gated API. WebKit's
+[open Web MIDI implementation issue](https://bugs.webkit.org/show_bug.cgi?id=107250)
+means an iPad web page must not be assumed to reach a MIDI keyboard. Android,
+ChromeOS, wired USB, Bluetooth, suspend/resume, permission, and event-latency
+behavior all require tests on representative devices before support claims.
+
+The repository already uses Tauri 2 for the desktop application, and
+[Tauri 2 supports Android and iOS](https://v2.tauri.app/blog/tauri-20/).
+That makes shared UI and native Kotlin or Swift input bridges plausible, but
+the current desktop bundle is not mobile validation. Packaging, native MIDI,
+audio capture, local storage, model execution, signing, store policy, and
+upgrades remain separate evidence gates.
+
+For a piano studio, **offline** should mean:
+
+- local play does not require an account or active internet connection;
+- previously installed activities and sounds remain available;
+- MIDI activities do not call a hosted service;
+- local performer selection and bounded progress continue to work;
+- a failed update or unavailable server does not interrupt a lesson; and
+- data can be explicitly exported or later published rather than being held
+  only in a vendor account.
+
+Full acoustic correction can remain a desktop-only capability while lighter
+Play activities work on tablets. A future studio desktop may also serve
+nearby devices over the LAN, but Play should not require that topology for
+ordinary MIDI use.
 
 ## Readiness Continuum
 
@@ -375,6 +507,8 @@ Projects can include:
 
 - compose a tune for a chosen character;
 - make three variations of a saved phrase;
+- dress the same tune as a lullaby, march, or waltz;
+- build a backing band one audible part at a time;
 - create a musical question and answer;
 - orchestrate registers or dynamics into a scene;
 - compare two takes without assigning one universal numeric score;
@@ -426,6 +560,7 @@ The first slice should deliberately omit:
 - two-hand or fingering claims;
 - a general curriculum;
 - generative dialogue;
+- generated accompaniment or a full-audio music model;
 - public sharing;
 - purchasable rewards;
 - an elaborate map or economy; and
@@ -442,18 +577,86 @@ co-play with a toddler. It should launch directly, respond to every credible
 note, require no target sequence, support sound-only use, and allow the parent
 to introduce turn-taking without operating controls.
 
+## Piano-Studio Discovery Wedge
+
+The first external distribution channel should be a small group of piano
+teachers reached through the motivating retired teacher's studio network.
+These teachers are discovery partners rather than merely a launch audience.
+Their studios provide repeated, situated use with different ages, teaching
+methods, devices, instruments, and attention spans.
+
+The concrete early workflow is a waiting-sibling station:
+
+1. A teacher or caregiver selects a performer and one bounded activity.
+2. The student plays for roughly five to ten minutes while a sibling receives
+   a lesson.
+3. The station resets cleanly for the next student.
+4. The teacher can see or record a tiny musically meaningful observation.
+5. Play remains supplemental to the lesson and does not claim to replace the
+   teacher.
+
+A minimal studio surface may need:
+
+- fast managed-profile switching without child accounts;
+- teacher-selected activity, readiness, pitch range, and input;
+- a full-screen or kiosk-like student surface;
+- no child-facing setup, purchase, or account controls;
+- immediate reset between students;
+- local and offline operation;
+- a small teacher summary rather than a universal numeric grade; and
+- simple authoring of a call, pattern, familiar fragment, or assignment later.
+
+Before or alongside a pilot, interview teachers about:
+
+- what waiting siblings currently do;
+- which ages and musical concerns are least well served;
+- what computers, tablets, acoustic pianos, and MIDI keyboards already exist;
+- which prior games children voluntarily requested again;
+- what demanded too much teacher intervention;
+- what subscriptions, accounts, updates, or network dependencies failed; and
+- what observation would actually affect the next lesson.
+
+An initial cohort might be five to eight studios, intentionally including
+teachers beyond one family or pedagogical network. Pilot only Pond Echo, Wake
+the Pond, and perhaps one notation bridge rather than presenting a
+comprehensive curriculum.
+
+Useful lightweight teacher observations include:
+
+- **engaged**;
+- **asked to repeat**;
+- **too easy**;
+- **too hard**;
+- **confusing**;
+- **recognition problem**; and
+- one optional musical note.
+
+The evidence bar is repeated voluntary use, not favorable concept feedback.
+Promising evidence would include several teachers choosing to use the station
+again over multiple weeks, children asking to return, low setup and
+intervention cost, continued off-screen piano exploration, and teachers
+naming a musically useful observation. Do not build a broad teacher portal,
+assignment marketplace, or studio billing system before that evidence exists.
+
 ## Existing Product Precedents
 
-The individual mechanics are established rather than novel:
+The category is established but fragmented. Current products show meaningful
+investment in lessons, notation, assessment, child presentation, and studio
+tools; the absence of one satisfying product in informal search is not proof
+of an empty market.
 
 | Product | Relevant precedent | Implication for Atpiano |
 | --- | --- | --- |
+| [Duolingo Music](https://blog.duolingo.com/music-course/) | Ear, rhythm, note-name, staff, and familiar-song work inside the main Duolingo app using an on-screen keyboard and no required instrument | A polished character-led course exists, but it does not make the family's physical piano the controller |
 | [Mussila Music](https://mussila.com/music/) | Learn, play, practice, and create modes; theory, instrument, rhythm, melody, composition, and acoustic tone recognition; designed primarily for ages 5–11 | A broad colorful music world and acoustic feedback are proven product territory |
-| [Piano Maestro](https://www.hellosimply.com/teachers/resources/guidelines/PianoMaestro_ParentsGuidelines.pdf) | Child-oriented, game-like piano and sight-reading work that listens to an acoustic piano | Characters and microphone-assisted reading are not differentiators by themselves |
+| [Piano Maestro](https://apps.apple.com/us/app/piano-maestro/id604699751) | Current iPad-only family and teacher product with acoustic recognition, MIDI, a large song/exercise library, teacher reports, and home assignments | This is the closest studio precedent; Android, open-ended play, and a less course-centered learning loop remain possible distinctions |
+| [Piano Marvel](https://play.google.com/store/apps/details?id=com.us.pianomarvel.google) | Android and other surfaces, MIDI assessment, teacher use, uploaded music, reading, repertoire, and structured curriculum | Cross-platform studio assessment exists, but it emphasizes practice and evaluation rather than a young child's responsive musical world |
+| [Mazaam](https://www.mazaam.com/en/the-mazaam-app/) | Listening games and classical-music concepts designed for younger children, with web and mobile ambitions | Younger-child musical play exists without turning a real piano into the controller; current Android distribution also illustrates platform fragility |
 | [Yousician](https://support.yousician.com/hc/en-us/articles/204799551-Choosing-your-set-up-for-Yousician-piano) | Microphone input for acoustic piano plus USB, wired MIDI, and Bluetooth MIDI | Supporting both slower acoustic and more exact MIDI paths is a familiar and understandable setup |
 | [Skoove](https://www.skoove.com/en) | Guided lessons and real-time listening feedback for acoustic and digital pianos | Atpiano should not compete first on the size of a linear lesson catalog |
 | [Synthesia](https://synthesiagame.com/) | Falling notes, wait-for-the-correct-note practice, MIDI play, notation, hands-separate practice, finger hints, and progression tracking | Fast MIDI performance and spatial note guidance are mature patterns; transition beyond falling notes must be intentional |
 | [Chrome Music Lab](https://musiclab.chromeexperiments.com/) | Immediate, accessible, account-free musical experiments and a simple shareable Song Maker | Low-friction exploration and authorship can be valuable without a curriculum or score |
+| [Mario Paint](https://www.nintendo.com/fr-ca/whatsnew/mario-paint-sintegre-a-la-collection-de-jeux-super-nes/) | Music composition inside a playful creative suite, using iconic objects, humorous sounds, tight constraints, and immediate replay | Treat creation itself as the reward; let the physical piano feed a playful composer whose underlying music can later open in the serious studio |
 
 The opportunity is the combination and emphasis:
 
@@ -465,7 +668,9 @@ The opportunity is the combination and emphasis:
 - alternation between copying and child leadership;
 - improvised material retained as a named musical memory;
 - family calls, answers, and later variations attached to performers;
-- multiple musical views grounded in the same captured evidence; and
+- multiple musical views grounded in the same captured evidence;
+- a studio-ready local/offline option without requiring every child to hold
+  an account or subscription; and
 - honest handling of provisional recognition rather than false precision.
 
 This landscape should be revisited before implementation because products,
@@ -602,28 +807,50 @@ review. Any release beyond private family use requires a separate review of
 applicable law, store policy, consent, retention, analytics, and account
 design.
 
+The commercial model is unresolved, but the recommended studio contract is
+that a purchased local core remains usable offline without a recurring
+subscription or periodic network license check. Paid major upgrades may fund
+continued platform maintenance. Hosted backup, cross-device publication,
+remote collaboration, or multi-studio synchronization may be optional
+services, but loss of those services should not revoke local activities or
+student data.
+
+Perpetual use does not mean frozen software. Android, iPadOS, macOS, browser,
+USB, MIDI, signing, and store changes still require maintenance. Updates must
+be recoverable and should not make an installed studio station unusable during
+a lesson.
+
 ## Recommended Sequence
 
-1. **Input experiment:** define a normalized game-attack boundary, connect the
-   current provisional acoustic lane, add a wired Web MIDI spike, and measure
-   action-to-paint latency separately.
+1. **Surface and input experiment:** establish a distinct full-screen Play
+   route, define a normalized game-attack boundary, connect the current
+   provisional acoustic lane, add a wired Web MIDI spike, and measure
+   action-to-paint latency separately without changing Notebook interaction.
 2. **Pond Echo:** validate two-note copy and child-led playback with the
    motivating six-year-old on both inputs.
 3. **Wake the Pond:** validate no-wrong-answer caregiver-and-toddler play,
    including sound-only and minimal-attention presentation.
-4. **Musical relationships:** add high/low, same/different, direction, and
+4. **Studio discovery:** interview a small teacher cohort, then validate the
+   three-activity station, fast performer handoff, reset, offline behavior,
+   and lightweight observations in repeated real use.
+5. **Musical relationships:** add high/low, same/different, direction, and
    contour activities over the same world.
-5. **Notation bridge:** add landmarks, steps, skips, and short untimed
+6. **Platform spikes:** validate browser and Chromebook MIDI, Android
+   packaging and device input, iPad native MIDI bridging, and desktop offline
+   operation before claiming cross-device parity.
+7. **Notation bridge:** add landmarks, steps, skips, and short untimed
    sight-reading without claiming generated score quality.
-6. **MIDI timing:** add pulse and fast-response activities only after the
+8. **MIDI timing:** add pulse and fast-response activities only after the
    wired path's latency and browser support pass a tactile review.
-7. **Musical memory:** save, name, revisit, vary, and exchange child-created
+9. **Musical memory:** save, name, revisit, vary, and exchange child-created
    moments through the existing family notebook boundaries.
 
-This is a dependency order, not permission to implement all seven slices.
+This is a dependency order, not permission to implement all nine slices.
 
 ## Open Questions
 
+- Are **Notebook** and **Play** the right product-family names, and should Play
+  eventually receive a separate store identity?
 - Is a coherent pond or forest world more engaging than a collection of
   unrelated experiments?
 - What response latency still feels conversational on the acoustic piano to
@@ -634,6 +861,10 @@ This is a dependency order, not permission to implement all seven slices.
   without being mistaken for the durable polyphonic transcript?
 - Which wired and Bluetooth MIDI paths work across the intended web, desktop,
   phone, and tablet surfaces?
+- What native MIDI and audio bridge is required for iPad and Android, and
+  which interaction and content code can remain shared?
+- What exact functionality must remain available under a perpetual offline
+  studio license, and what optional hosted services would teachers value?
 - How should MIDI timestamps map to the audio sample clock when both inputs
   are retained?
 - Does the toddler attend to the piano and caregiver, or does animation pull
@@ -643,6 +874,10 @@ This is a dependency order, not permission to implement all seven slices.
   character to accept a musically related response?
 - How should a parent author a tiny call, familiar-tune fragment, or playable
   range without entering a lesson editor?
+- What is the smallest teacher handoff, reset, assignment, and observation
+  surface that works in a real waiting-sibling station?
+- Which repeated-use and teacher-intervention evidence is sufficient to move
+  beyond a small studio pilot?
 - What is the smallest useful notation bridge for the motivating child?
 - Can saved improvisations become future echo, reading, and variation
   material without exposing transcription errors as the child's mistakes?

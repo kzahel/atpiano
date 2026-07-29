@@ -146,6 +146,14 @@ provisional license status or authorize distribution.
 The source performance remains authoritative. A score is one editable,
 versioned interpretation of it, not a replacement for the source note times.
 
+[`natural-language-musical-editing.md`](natural-language-musical-editing.md)
+owns a future selection-scoped correction surface. A command such as **Write
+these notes as a triplet** should become an explicit notation override and new
+score version, while **The transcription missed E4 here** should create a
+separate manual performance-correction version before the score is
+regenerated. Neither command may silently mutate raw events or an existing
+MusicXML artifact.
+
 ## Product Question
 
 Can a pianist get a score that is pleasant enough to read, while still being

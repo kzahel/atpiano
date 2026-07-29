@@ -30,9 +30,16 @@
 - `family-workspaces-and-attribution` — managed performer profiles, fast
   shared-piano selection, shareable local spaces, and
   creator-versus-performer recording attribution
+- `generative-musical-response-and-accompaniment` — deterministic backing
+  parts, symbolic and audio generation experiments, player agency, artifact
+  provenance, and source-versus-generated boundaries
+- `natural-language-musical-editing` — selection-scoped performance
+  correction, notation overrides, creative edits, structured proposals,
+  audition, provenance, and shared Play-to-Notebook composer primitives
 - `musical-session-workspace-refresh` — player-facing Sessions library,
   compact performance identity, editable naming, contextual feedback, and
   playable pitch audition
-- `playful-piano-learning` — caregiver-and-toddler sound play, ear-led piano
-  games, readiness-based progression, acoustic turn-taking, MIDI-speed
-  interaction, notation, and child-created musical memories
+- `playful-piano-learning` — separate Play product surface,
+  caregiver-and-toddler sound play, ear-led piano games, studio discovery,
+  acoustic and MIDI interaction, notation, offline delivery, and
+  child-created musical memories

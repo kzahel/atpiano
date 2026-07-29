@@ -30,6 +30,10 @@ normally reuse the document slug in its `Topic:` trailers.
   implemented managed performer profiles, fast shared-piano selection, and
   explicit creator-versus-performer attribution, with shareable multi-space
   roots retained as the next bounded extension.
+- [`generative-musical-response-and-accompaniment.md`](generative-musical-response-and-accompaniment.md):
+  proposed deterministic and model-assisted responses to player-created
+  melodies, spanning backing-band play, symbolic arrangement, optional audio
+  renders, source separation, provenance, rights, and staged experiments.
 - [`home-hosted-family-sharing.md`](home-hosted-family-sharing.md):
   accepted near-term Mac-hosted family deployment through the home Pi/Caddy,
   with on-demand availability, local persistence, proportionate access
@@ -51,13 +55,18 @@ normally reuse the document slug in its `Topic:` trailers.
   deferred PostgreSQL, object-storage, managed-identity, worker, tenancy, and
   sync architecture retained as a future option rather than the current
   implementation sequence.
+- [`natural-language-musical-editing.md`](natural-language-musical-editing.md):
+  proposed selection-scoped correction and composition workflow that turns
+  typed, spoken, played, or direct-manipulation intent into previewed,
+  versioned performance, notation, or arrangement edits.
 - [`performance-to-notation.md`](performance-to-notation.md):
   evaluated downstream conversion prototype whose artifacts are inspectable
   but whose first target-piano score failed the readability goal.
 - [`playful-piano-learning.md`](playful-piano-learning.md):
-  proposed family piano-play direction spanning caregiver-and-toddler
+  proposed separate Play product surface spanning caregiver-and-toddler
   cause-and-effect, ear-led imitation and invention, notation bridges,
-  acoustic turn-taking, and low-latency MIDI games.
+  acoustic turn-taking, low-latency MIDI games, studio discovery, and
+  cross-device offline delivery.
 - [`practice-companion-product-vision.md`](practice-companion-product-vision.md):
   proposed musical-notebook direction joining quiet practice capture,
   moment-centered reflection, readable engraving, cautious tool-backed
