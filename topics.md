@@ -33,3 +33,6 @@
 - `musical-session-workspace-refresh` — player-facing Sessions library,
   compact performance identity, editable naming, contextual feedback, and
   playable pitch audition
+- `playful-piano-learning` — caregiver-and-toddler sound play, ear-led piano
+  games, readiness-based progression, acoustic turn-taking, MIDI-speed
+  interaction, notation, and child-created musical memories

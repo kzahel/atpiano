@@ -54,6 +54,10 @@ normally reuse the document slug in its `Topic:` trailers.
 - [`performance-to-notation.md`](performance-to-notation.md):
   evaluated downstream conversion prototype whose artifacts are inspectable
   but whose first target-piano score failed the readability goal.
+- [`playful-piano-learning.md`](playful-piano-learning.md):
+  proposed family piano-play direction spanning caregiver-and-toddler
+  cause-and-effect, ear-led imitation and invention, notation bridges,
+  acoustic turn-taking, and low-latency MIDI games.
 - [`practice-companion-product-vision.md`](practice-companion-product-vision.md):
   proposed musical-notebook direction joining quiet practice capture,
   moment-centered reflection, readable engraving, cautious tool-backed

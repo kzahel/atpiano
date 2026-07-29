@@ -48,6 +48,13 @@ Teacher-student work is a natural extension of the same reflection and
 response loop. A teacher marketplace, curriculum product, generalized social
 network, or numeric grading system is not part of the initial promise.
 
+[`playful-piano-learning.md`](playful-piano-learning.md) owns a separate
+family-facing route into this notebook: caregiver-and-toddler sound play,
+ear-led imitation and invention, notation bridges, forgiving acoustic
+turn-taking, and faster MIDI games. That direction can reuse captured moments
+and performer profiles without replacing this topic's initial product wedge
+or turning the musical notebook into a linear children's curriculum.
+
 ## Core Loop
 
 ```text
