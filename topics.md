@@ -43,3 +43,6 @@
   caregiver-and-toddler sound play, ear-led piano games, studio discovery,
   acoustic and MIDI interaction, notation, offline delivery, and
   child-created musical memories
+- `nvidia-accelerated-low-latency-pipeline` — RTX 4090 Transkun and score-model
+  CUDA experiments, scheduler latency sweeps, concurrent GPU behavior, and
+  hosted premium-tier cost evidence

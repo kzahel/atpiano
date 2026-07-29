@@ -59,6 +59,10 @@ normally reuse the document slug in its `Topic:` trailers.
   proposed selection-scoped correction and composition workflow that turns
   typed, spoken, played, or direct-manipulation intent into previewed,
   versioned performance, notation, or arrangement edits.
+- [`nvidia-accelerated-low-latency-pipeline.md`](nvidia-accelerated-low-latency-pipeline.md):
+  proposed RTX 4090 ceiling experiment for CUDA Transkun correction,
+  opt-in score-model acceleration, scheduler latency sweeps, concurrent GPU
+  behavior, and hosted premium-tier cost evidence.
 - [`performance-to-notation.md`](performance-to-notation.md):
   evaluated downstream conversion prototype whose artifacts are inspectable
   but whose first target-piano score failed the readability goal.
