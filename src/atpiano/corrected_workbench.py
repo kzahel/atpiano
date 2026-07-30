@@ -48,6 +48,7 @@ from atpiano.application import (
     SessionApplicationService,
     StorageApplicationService,
 )
+from atpiano.application.errors import bounded_error_message
 from atpiano.backend_profile import (
     BackendSchedulerIdentity,
 )
@@ -715,7 +716,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             error=AtpianoError(
                 error_id=f"error:{uuid.uuid4().hex[:16]}",
                 code=code,
-                message=message,
+                message=bounded_error_message(message),
                 retryable=code
                 in {
                     ErrorCode.CAPTURE_BUSY,

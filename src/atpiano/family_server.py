@@ -39,6 +39,7 @@ from atpiano.application.errors import (
     ApplicationNotFoundError,
     AuthenticationError,
     AuthorizationError,
+    bounded_error_message,
 )
 from atpiano.application.identity import (
     IdentityApplicationService,
@@ -239,7 +240,7 @@ def _error_response(
         error=AtpianoError(
             error_id=f"error:{uuid.uuid4().hex[:16]}",
             code=code,
-            message=message,
+            message=bounded_error_message(message),
             retryable=False,
         )
     )

@@ -9,7 +9,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
-from atpiano.application.errors import ApplicationNotFoundError
+from atpiano.application.errors import (
+    ApplicationNotFoundError,
+    bounded_error_message,
+)
 from atpiano.application.ports import SessionRepository
 from atpiano.contracts.schemas import (
     ArtifactKind,
@@ -217,7 +220,10 @@ class ScoreApplicationService:
                     and self._commit_sample == commit_sample
                 ):
                     self._status = "failed"
-                    self._error = str(error)
+                    self._error = bounded_error_message(
+                        error,
+                        fallback="Score generation failed.",
+                    )
                     self._completed_at = datetime.now(timezone.utc)
         else:
             with self._lock:

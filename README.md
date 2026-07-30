@@ -63,7 +63,10 @@ installs, and score
 alignment now reconciles generated score attacks to source events with an
 explicit monotonic exact-pitch pass instead of assuming generated token
 positions retain source identity. The corrected contract passes the retained
-public two-minute session that exposed the defect.
+public two-minute session that exposed the defect. Score-input MIDI also
+preserves overlapping instances of the same pitch on separate melodic
+channels; the retained public session that exposed same-channel note-off
+ambiguity now generates and renders a current score.
 
 Current direction and research questions live in [`docs/topics/`](docs/topics/README.md).
 Acoustic-model benchmarking, live browser transcription, and downstream

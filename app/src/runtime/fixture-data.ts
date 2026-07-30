@@ -546,7 +546,7 @@ const scoreVariants: ScoreVariantPage = {
   session_id: primary.session_id,
   producer: {
     schema_version: "atpiano.score-producer.v1",
-    pipeline_revision: 3,
+    pipeline_revision: 4,
     pipeline_fingerprint:
       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     application_version: "0.1.0",
@@ -564,8 +564,8 @@ const scoreVariants: ScoreVariantPage = {
     schema_version: "atpiano.score-freshness.v1",
     status: "current",
     reason: "current",
-    current_pipeline_revision: 3,
-    snapshot_pipeline_revision: 3,
+    current_pipeline_revision: 4,
+    snapshot_pipeline_revision: 4,
     refresh_recommended: false,
   },
   items: [

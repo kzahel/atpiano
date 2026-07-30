@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,7 @@ from atpiano.score_snapshot import (
     SCORE_POSTPROCESSOR_VERSION,
     generate_score_snapshot,
     generate_score_variant,
+    run_score_adapter,
     score_pipeline_fingerprint,
     score_snapshot_is_plausible,
 )
@@ -59,6 +61,46 @@ def test_score_producer_provenance_records_the_pinned_runtime(
     assert producer["application_dirty"] is True
     assert producer["model_repository_commit"] == "c" * 40
     assert producer["model_checkpoint_sha256"] == "d" * 64
+
+
+def test_score_adapter_failure_reports_concise_final_cause(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        score_snapshot,
+        "inspect_score_runtime",
+        lambda _directory: {"available": True},
+    )
+
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise subprocess.CalledProcessError(
+            1,
+            ["score-adapter"],
+            stderr=(
+                "Traceback (most recent call last):\n"
+                + "context\n" * 200
+                + "ValueError: score input-note order differs from MIDI\n"
+            ),
+        )
+
+    monkeypatch.setattr(score_snapshot.subprocess, "run", fail)
+
+    with pytest.raises(RuntimeError) as captured:
+        run_score_adapter(
+            tmp_path,
+            tmp_path / "input.mid",
+            tmp_path / "input-notes.json",
+            tmp_path / "output.musicxml",
+            tmp_path / "output-alignment.json",
+            output_baseline_musicxml=tmp_path / "baseline.musicxml",
+            output_baseline_alignment=tmp_path / "baseline-alignment.json",
+        )
+
+    assert str(captured.value) == (
+        "score adapter failed: "
+        "ValueError: score input-note order differs from MIDI"
+    )
 
 
 def _event(

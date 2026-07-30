@@ -587,7 +587,7 @@ describe("shared application", () => {
     renderApp();
 
     expect(
-      await screen.findByText("Score revision · r3 · current"),
+      await screen.findByText("Score revision · r4 · current"),
     ).toBeTruthy();
   });
 
@@ -607,7 +607,7 @@ describe("shared application", () => {
                 schema_version: "atpiano.score-freshness.v1" as const,
                 status: "incompatible" as const,
                 reason: "alignment-schema-unsupported" as const,
-                current_pipeline_revision: 3,
+                current_pipeline_revision: 4,
                 snapshot_pipeline_revision: null,
                 refresh_recommended: true,
               },

@@ -38,6 +38,20 @@ class _BlockingScoreExecutor:
         raise AssertionError("variant execution was not requested")
 
 
+class _FailingScoreExecutor(_BlockingScoreExecutor):
+    def generate_snapshot(
+        self,
+        session_directory: Path,
+        *,
+        commit_sample: int,
+    ) -> dict[str, Any]:
+        raise RuntimeError(
+            "score adapter failed: Traceback "
+            + "x" * 600
+            + " ValueError: preserved final cause"
+        )
+
+
 def _committed_session(workspace: Path, session_id: str) -> CorrectedSession:
     session = CorrectedSession(
         workspace / session_id,
@@ -115,3 +129,30 @@ def test_score_service_freezes_explicit_target_without_http(
     assert job.session_id == older_id
     assert job.input_horizon_sample == 80
     assert service.running_session_id() is None
+
+
+def test_score_service_bounds_failed_job_error_contract(
+    tmp_path: Path,
+) -> None:
+    session_id = "20260726T100000-aaaaaaaaaaaa"
+    _committed_session(tmp_path, session_id)
+    service = ScoreApplicationService(
+        LocalSessionStore(tmp_path),
+        _FailingScoreExecutor(),
+        workspace_id=LOCAL_WORKSPACE_ID,
+        current_session_id=lambda: session_id,
+    )
+
+    job = service.start(session_id, expected_commit_sample=80)
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        job = service.job(job.job_id)
+        if job.status.value != "running":
+            break
+        time.sleep(0.01)
+
+    assert job.status.value == "failed"
+    assert job.error is not None
+    assert len(job.error.message) == 500
+    assert job.error.message.startswith("score adapter failed: Traceback")
+    assert job.error.message.endswith("ValueError: preserved final cause")

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from atpiano import __version__
+from atpiano.application.errors import bounded_error_message
 from atpiano.corrected import CORRECTED_SESSION_SCHEMA
 from atpiano.corrected_export import iter_latest_committed_index, write_midi
 from atpiano.notation import summarize_musicxml
@@ -41,7 +42,7 @@ SCORE_SNAPSHOT_SCHEMA = "atpiano.committed-score-snapshot.v1"
 SCORE_VARIANT_SCHEMA = "atpiano.score-variant.v1"
 SCORE_RUNTIME_SCHEMA = "atpiano.midi2score-runtime.v2"
 SCORE_PRODUCER_SCHEMA = "atpiano.score-producer.v1"
-SCORE_PIPELINE_REVISION = 3
+SCORE_PIPELINE_REVISION = 4
 MIDI2SCORE_REPOSITORY = "https://github.com/TimFelixBeyer/MIDI2ScoreTransformer.git"
 MIDI2SCORE_COMMIT = "115432bda16ca16e0fec2e9465788f2ba369971f"
 MIDI2SCORE_CHECKPOINT_URL = (
@@ -355,7 +356,19 @@ def run_score_adapter(
         )
     except subprocess.CalledProcessError as error:
         detail = (error.stderr or error.stdout or str(error)).strip()
-        raise RuntimeError(f"score adapter failed: {detail[-4000:]}") from error
+        final_line = next(
+            (
+                line.strip()
+                for line in reversed(detail.splitlines())
+                if line.strip()
+            ),
+            str(error),
+        )
+        raise RuntimeError(
+            bounded_error_message(
+                f"score adapter failed: {final_line}",
+            )
+        ) from error
     lines = [line for line in result.stdout.splitlines() if line.strip()]
     if not lines:
         raise RuntimeError("score adapter returned no result")

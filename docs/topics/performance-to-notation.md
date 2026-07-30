@@ -34,6 +34,17 @@ The shared score card now calls the selector **Notation version**, explains the
 baseline, automatic-clef, and enharmonic choices, and labels the action
 **Use six sharps**. Existing r2 snapshots remain readable; refreshing one
 publishes r3 evidence and exposes the corrected action.
+Score-pipeline revision r4 fixes retained public session
+`20260730T175918-aa11aa63cb5a`. Two overlapping pitch-46 source notes were
+written on one MIDI channel, where the earlier note-off also clipped the later
+identity in the transformer's PrettyMIDI reader. Score-input MIDI now assigns
+only overlapping instances of the same pitch to separate melodic channels and
+broadcasts controller intervals across channels used by the export. The exact
+151-note input passes the pinned reader and verifier, generated a current
+60,164-byte score, and passed deployed Chromium engraving, cursor, and reader
+checks. Failed score jobs also bound their structured message and retain the
+adapter's concise final cause instead of producing a secondary validation
+error. Tactical 048 is the execution record.
 Tactical 034 now enables the installed pinned runtime by default in the
 authenticated private Mac/Pi family service because the owner considers the
 application unusable without committed scores. This is accepted private use,

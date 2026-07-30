@@ -21,6 +21,9 @@ DEFAULT_QUERY_LIMIT = 1024
 MAX_QUERY_LIMIT = 4096
 MIDI_TICKS_PER_BEAT = 480
 MIDI_TEMPO_US_PER_BEAT = 500_000
+MIDI_MELODIC_CHANNELS = tuple(
+    channel for channel in range(16) if channel != 9
+)
 PLAYBACK_BITRATE = "128k"
 
 _LATEST_JOIN = """
@@ -229,9 +232,11 @@ def _write_midi(
     sample_rate_hz: int,
 ) -> tuple[int, int]:
     timeline: list[tuple[int, int, mido.Message]] = []
+    notes: list[tuple[int, int, int, int, int]] = []
+    controllers: list[tuple[int, int, int, int]] = []
     note_count = 0
     pedal_count = 0
-    for event in events:
+    for source_index, event in enumerate(events):
         onset_sample = int(event["onset_sample"])
         offset_value = event.get("offset_sample")
         offset_sample = (
@@ -243,37 +248,101 @@ def _write_midi(
         pitch = event.get("pitch")
         controller = event.get("controller")
         if isinstance(pitch, int) and 0 <= pitch <= 127:
-            timeline.append(
+            notes.append(
                 (
                     onset_sample,
-                    2,
-                    mido.Message("note_on", note=pitch, velocity=velocity),
-                )
-            )
-            timeline.append(
-                (
                     offset_sample,
-                    0,
-                    mido.Message("note_off", note=pitch, velocity=0),
+                    pitch,
+                    velocity,
+                    source_index,
                 )
             )
             note_count += 1
         elif isinstance(controller, int) and 0 <= controller <= 127:
+            controllers.append(
+                (onset_sample, offset_sample, controller, velocity)
+            )
+            pedal_count += 1
+
+    active_channels: dict[int, dict[int, int]] = {}
+    used_channels: set[int] = set()
+    for onset_sample, offset_sample, pitch, velocity, _ in sorted(
+        notes,
+        key=lambda item: (item[0], item[2], item[1], item[4]),
+    ):
+        active = {
+            channel: active_offset
+            for channel, active_offset in active_channels.get(
+                pitch,
+                {},
+            ).items()
+            if active_offset > onset_sample
+        }
+        try:
+            channel = next(
+                candidate
+                for candidate in MIDI_MELODIC_CHANNELS
+                if candidate not in active
+            )
+        except StopIteration as error:
+            raise ValueError(
+                "MIDI export exceeds 15 overlapping voices for one pitch"
+            ) from error
+        active[channel] = offset_sample
+        active_channels[pitch] = active
+        used_channels.add(channel)
+        timeline.append(
+            (
+                onset_sample,
+                2,
+                mido.Message(
+                    "note_on",
+                    note=pitch,
+                    velocity=velocity,
+                    channel=channel,
+                ),
+            )
+        )
+        timeline.append(
+            (
+                offset_sample,
+                0,
+                mido.Message(
+                    "note_off",
+                    note=pitch,
+                    velocity=0,
+                    channel=channel,
+                ),
+            )
+        )
+
+    controller_channels = sorted(used_channels or {0})
+    for onset_sample, offset_sample, controller, velocity in controllers:
+        for channel in controller_channels:
             timeline.append(
                 (
                     onset_sample,
                     3,
-                    mido.Message("control_change", control=controller, value=velocity),
+                    mido.Message(
+                        "control_change",
+                        control=controller,
+                        value=velocity,
+                        channel=channel,
+                    ),
                 )
             )
             timeline.append(
                 (
                     offset_sample,
                     1,
-                    mido.Message("control_change", control=controller, value=0),
+                    mido.Message(
+                        "control_change",
+                        control=controller,
+                        value=0,
+                        channel=channel,
+                    ),
                 )
             )
-            pedal_count += 1
 
     midi = mido.MidiFile(type=1, ticks_per_beat=MIDI_TICKS_PER_BEAT)
     track = mido.MidiTrack()
@@ -308,7 +377,7 @@ def write_midi(
     *,
     sample_rate_hz: int,
 ) -> tuple[int, int]:
-    """Write normalized note/controller events to a source-time MIDI file."""
+    """Write source-time MIDI without collapsing same-pitch overlaps."""
 
     return _write_midi(path, events, sample_rate_hz=sample_rate_hz)
 

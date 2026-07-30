@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import mido
+import pretty_midi
 import pytest
 
 from atpiano.corrected import CORRECTED_EVENT_SCHEMA, CorrectedSession
@@ -11,6 +12,7 @@ from atpiano.corrected_export import (
     query_history_index,
     query_materialized_index,
     write_corrected_exports,
+    write_midi,
     write_playback_audio,
 )
 
@@ -123,6 +125,74 @@ def test_exports_preserve_history_and_emit_latest_notes_and_pedals(
     assert [message.type for message in messages].count("note_on") == 1
     assert [message.type for message in messages].count("note_off") == 1
     assert [message.type for message in messages].count("control_change") == 2
+
+
+def test_midi_preserves_overlapping_same_pitch_note_offsets(
+    tmp_path: Path,
+) -> None:
+    midi_path = tmp_path / "overlapping.mid"
+    events = [
+        _event(
+            "earlier",
+            1,
+            onset=2_685_315,
+            offset=2_878_440,
+            lifecycle="committed",
+            pitch=46,
+        ),
+        _event(
+            "later",
+            1,
+            onset=2_849_542,
+            offset=2_976_217,
+            lifecycle="committed",
+            pitch=46,
+        ),
+        _event(
+            "pedal",
+            1,
+            onset=2_600_000,
+            offset=3_000_000,
+            lifecycle="committed",
+            pitch=None,
+            controller=64,
+        ),
+    ]
+
+    note_count, pedal_count = write_midi(
+        midi_path,
+        events,
+        sample_rate_hz=48_000,
+    )
+
+    raw = mido.MidiFile(midi_path)
+    assert (note_count, pedal_count) == (2, 1)
+    note_on_channels = [
+        message.channel
+        for message in raw.tracks[0]
+        if message.type == "note_on" and message.velocity
+    ]
+    assert note_on_channels == [0, 1]
+    assert [
+        message.channel
+        for message in raw.tracks[0]
+        if message.type == "control_change"
+    ] == [0, 1, 0, 1]
+    parsed = sorted(
+        [
+            note
+            for instrument in pretty_midi.PrettyMIDI(
+                str(midi_path)
+            ).instruments
+            for note in instrument.notes
+        ],
+        key=lambda note: (note.start, note.pitch, note.end - note.start),
+    )
+    assert len(parsed) == 2
+    assert parsed[0].start == pytest.approx(2_685_315 / 48_000, abs=0.002)
+    assert parsed[0].end == pytest.approx(2_878_440 / 48_000, abs=0.002)
+    assert parsed[1].start == pytest.approx(2_849_542 / 48_000, abs=0.002)
+    assert parsed[1].end == pytest.approx(2_976_217 / 48_000, abs=0.002)
 
 
 def test_playback_mp3_is_derived_without_replacing_wav_segments(
