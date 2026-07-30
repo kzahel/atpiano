@@ -809,6 +809,15 @@ class CaptureApplicationService:
             raise ValueError(
                 "microphone transport evidence is invalid"
             )
+        diagnostics = transport.get("capture_diagnostics")
+        if diagnostics is not None and (
+            not isinstance(diagnostics, dict)
+            or diagnostics.get("schema_version")
+            != "atpiano.browser-capture-diagnostics.v1"
+        ):
+            raise ValueError(
+                "microphone capture diagnostics are invalid"
+            )
 
     def abort_microphone(self, error: Exception) -> None:
         with self._lock:

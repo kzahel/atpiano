@@ -182,6 +182,28 @@ def _stop_empty_capture(service: CaptureApplicationService) -> None:
     raise AssertionError("capture settlement callback did not complete")
 
 
+def test_capture_service_rejects_unknown_browser_diagnostics() -> None:
+    with pytest.raises(
+        ValueError,
+        match="capture diagnostics are invalid",
+    ):
+        CaptureApplicationService._validate_transport(
+            {
+                "sent_frame_count": 8,
+                "sent_block_count": 1,
+                "acknowledged_frame_count": 8,
+                "acknowledged_block_count": 1,
+                "socket_buffered_bytes_at_stop": 0,
+                "socket_buffered_bytes_high_water": 0,
+                "capture_diagnostics": {
+                    "schema_version": "unknown",
+                },
+            },
+            frame_count=8,
+            block_count=1,
+        )
+
+
 def test_capture_service_owns_start_pcm_stop_and_settlement_without_http(
     tmp_path: Path,
 ) -> None:
@@ -221,6 +243,14 @@ def test_capture_service_owns_start_pcm_stop_and_settlement_without_http(
             "acknowledged_block_count": 1,
             "socket_buffered_bytes_at_stop": 0,
             "socket_buffered_bytes_high_water": 200,
+            "capture_diagnostics": {
+                "schema_version": (
+                    "atpiano.browser-capture-diagnostics.v1"
+                ),
+                "worklet": {
+                    "render_quantum_count": 1,
+                },
+            },
         },
     )
 
@@ -237,6 +267,12 @@ def test_capture_service_owns_start_pcm_stop_and_settlement_without_http(
             "socket_buffered_bytes_high_water"
         ]
         == 200
+    )
+    assert (
+        read_json(session.directory / "transport.json")[
+            "capture_diagnostics"
+        ]["worklet"]["render_quantum_count"]
+        == 1
     )
 
     service.close()

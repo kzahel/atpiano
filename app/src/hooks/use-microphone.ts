@@ -1,9 +1,14 @@
 import { useCallback, useRef } from "react";
 
 import { requestId } from "../lib/format.js";
+import {
+  CAPTURE_LATENCY_HINT,
+  collectBrowserCaptureMetadata,
+} from "../lib/capture-metadata.js";
 import type {
   AtpianoRuntime,
   Capture,
+  CaptureDiagnosticRecord,
   Session,
 } from "../runtime/atpiano-runtime.js";
 import { useWorkspaceStore } from "../state/workspace-store.js";
@@ -26,6 +31,14 @@ interface BrowserCapture {
   frameCount: number;
   sequence: number;
   stoppedFrameCount: number | null;
+  workletDiagnostics: CaptureDiagnosticRecord | null;
+  chunkMessageCount: number;
+  previousChunkReceivedAtMs: number | null;
+  chunkMessageIntervalTotalMs: number;
+  chunkMessageIntervalMaximumMs: number;
+  deliveryDelayCount: number;
+  deliveryDelayTotalS: number;
+  deliveryDelayMaximumS: number;
   stopWorklet: ((complete: boolean) => void) | null;
 }
 
@@ -49,6 +62,41 @@ async function closeBrowserCapture(value: BrowserCapture): Promise<void> {
   value.node.disconnect();
   value.muted.disconnect();
   if (value.context.state !== "closed") await value.context.close();
+}
+
+function captureDiagnostics(state: BrowserCapture): CaptureDiagnosticRecord {
+  const intervalCount = Math.max(0, state.chunkMessageCount - 1);
+  return {
+    schema_version: "atpiano.browser-capture-diagnostics.v1",
+    recorded_at: new Date().toISOString(),
+    worklet: state.workletDiagnostics,
+    main_thread_delivery: {
+      chunk_message_count: state.chunkMessageCount,
+      expected_chunk_interval_s: 2_048 / state.context.sampleRate,
+      message_interval_s: {
+        count: intervalCount,
+        mean: intervalCount === 0
+          ? null
+          : state.chunkMessageIntervalTotalMs / intervalCount / 1_000,
+        maximum: intervalCount === 0
+          ? null
+          : state.chunkMessageIntervalMaximumMs / 1_000,
+      },
+      worklet_to_main_audio_clock_delay_s: {
+        count: state.deliveryDelayCount,
+        mean: state.deliveryDelayCount === 0
+          ? null
+          : state.deliveryDelayTotalS / state.deliveryDelayCount,
+        maximum: state.deliveryDelayCount === 0
+          ? null
+          : state.deliveryDelayMaximumS,
+      },
+    },
+    page: {
+      visibility_state_at_stop: document.visibilityState,
+      audio_context_state_at_stop: state.context.state,
+    },
+  };
 }
 
 export function useMicrophone({
@@ -86,10 +134,33 @@ export function useMicrophone({
         audio: constraints,
         video: false,
       });
-      context = new AudioContext();
+      context = new AudioContext({ latencyHint: CAPTURE_LATENCY_HINT });
       await context.resume();
       await context.audioWorklet.addModule("/capture-processor.js");
       warmCapture(operationId);
+      let clientMetadata: CaptureDiagnosticRecord;
+      try {
+        clientMetadata = await collectBrowserCaptureMetadata({
+          stream,
+          context,
+          requestId: operationId,
+          requestedConstraints: constraints,
+          requestedLatencyHint: CAPTURE_LATENCY_HINT,
+        });
+      } catch (error) {
+        clientMetadata = {
+          schema_version: "atpiano.browser-capture-client.v1",
+          started_at: new Date().toISOString(),
+          request_id: operationId,
+          browser: {
+            user_agent: navigator.userAgent,
+          },
+          metadata_error:
+            error instanceof Error
+              ? `${error.name}: ${error.message}`
+              : String(error),
+        };
+      }
       const capture = await runtime.startCapture(
         {
           schema_version: "atpiano.contract.v1",
@@ -100,6 +171,7 @@ export function useMicrophone({
           request_id: operationId,
         },
         { requestId: operationId },
+        clientMetadata,
       );
       const source = context.createMediaStreamSource(stream);
       const node = new AudioWorkletNode(context, "atpiano-capture");
@@ -116,6 +188,14 @@ export function useMicrophone({
         frameCount: 0,
         sequence: 0,
         stoppedFrameCount: null,
+        workletDiagnostics: null,
+        chunkMessageCount: 0,
+        previousChunkReceivedAtMs: null,
+        chunkMessageIntervalTotalMs: 0,
+        chunkMessageIntervalMaximumMs: 0,
+        deliveryDelayCount: 0,
+        deliveryDelayTotalS: 0,
+        deliveryDelayMaximumS: 0,
         stopWorklet: null,
       };
       browserCapture.current = state;
@@ -124,9 +204,12 @@ export function useMicrophone({
         firstSample?: number;
         frameCount?: number;
         samples?: ArrayBuffer;
+        workletTime?: number;
+        diagnostics?: CaptureDiagnosticRecord;
       }>) => {
         if (event.data.type === "stopped") {
           state.stoppedFrameCount = event.data.frameCount ?? null;
+          state.workletDiagnostics = event.data.diagnostics ?? null;
           state.stopWorklet?.(true);
           return;
         }
@@ -136,6 +219,32 @@ export function useMicrophone({
         ) {
           failCapture(operationId, new Error("Browser sample sequence became discontinuous."));
           return;
+        }
+        const receivedAtMs = performance.now();
+        if (state.previousChunkReceivedAtMs !== null) {
+          const intervalMs = receivedAtMs - state.previousChunkReceivedAtMs;
+          state.chunkMessageIntervalTotalMs += intervalMs;
+          state.chunkMessageIntervalMaximumMs = Math.max(
+            state.chunkMessageIntervalMaximumMs,
+            intervalMs,
+          );
+        }
+        state.previousChunkReceivedAtMs = receivedAtMs;
+        state.chunkMessageCount += 1;
+        if (
+          event.data.workletTime !== undefined &&
+          Number.isFinite(event.data.workletTime)
+        ) {
+          const delayS = Math.max(
+            0,
+            context!.currentTime - event.data.workletTime,
+          );
+          state.deliveryDelayCount += 1;
+          state.deliveryDelayTotalS += delayS;
+          state.deliveryDelayMaximumS = Math.max(
+            state.deliveryDelayMaximumS,
+            delayS,
+          );
         }
         const samples = new Float32Array(event.data.samples);
         const payload = pcm16(samples);
@@ -208,6 +317,7 @@ export function useMicrophone({
           request_id: state.operationId,
         },
         { requestId: state.operationId },
+        captureDiagnostics(state),
       );
       await closeBrowserCapture(state);
       browserCapture.current = null;

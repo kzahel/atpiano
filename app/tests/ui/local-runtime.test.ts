@@ -293,10 +293,20 @@ describe("local runtime", () => {
         request_id: "capture-1",
       },
       { requestId: "capture-1" },
+      {
+        schema_version: "atpiano.browser-capture-client.v1",
+        browser: { user_agent: "test browser" },
+      },
     );
     const socket = FakeWebSocket.instances[0]!;
     socket.emit("open");
-    expect(JSON.parse(socket.sent[0] as string).type).toBe("start");
+    expect(JSON.parse(socket.sent[0] as string)).toMatchObject({
+      type: "start",
+      client_metadata: {
+        schema_version: "atpiano.browser-capture-client.v1",
+        browser: { user_agent: "test browser" },
+      },
+    });
     socket.message({
       schema_version: "atpiano.corrected-stream.v1",
       type: "ready",
@@ -336,6 +346,10 @@ describe("local runtime", () => {
         request_id: "capture-1",
       },
       { requestId: "capture-1" },
+      {
+        schema_version: "atpiano.browser-capture-diagnostics.v1",
+        worklet: { render_quantum_count: 2 },
+      },
     );
     expect(JSON.parse(socket.sent[2] as string)).toMatchObject({
       type: "stop",
@@ -346,6 +360,10 @@ describe("local runtime", () => {
         sent_block_count: 1,
         acknowledged_frame_count: 0,
         acknowledged_block_count: 0,
+        capture_diagnostics: {
+          schema_version: "atpiano.browser-capture-diagnostics.v1",
+          worklet: { render_quantum_count: 2 },
+        },
       },
     });
     socket.message({

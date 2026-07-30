@@ -10,6 +10,7 @@ import type {
   ArtifactPage,
   AtpianoRuntime,
   Capture,
+  CaptureDiagnosticRecord,
   CaptureStart,
   CaptureStop,
   DeleteSessionRequest,
@@ -377,6 +378,7 @@ export class LocalRuntime implements AtpianoRuntime {
   async startCapture(
     input: CaptureStart,
     request: RuntimeRequest,
+    clientMetadata?: CaptureDiagnosticRecord,
   ): Promise<Capture> {
     if (request.signal?.aborted) {
       throw request.signal.reason ?? new DOMException("Aborted", "AbortError");
@@ -426,10 +428,13 @@ export class LocalRuntime implements AtpianoRuntime {
           type: "start",
           sample_rate_hz: input.sample_rate_hz,
           performed_by_profile_id: input.performed_by_profile_id,
-          client_metadata: {
+          client_metadata: clientMetadata ?? {
+            schema_version: "atpiano.browser-capture-client.v1",
             started_at: new Date().toISOString(),
             request_id: input.request_id,
-            user_agent: navigator.userAgent,
+            browser: {
+              user_agent: navigator.userAgent,
+            },
           },
         }),
       );
@@ -536,6 +541,7 @@ export class LocalRuntime implements AtpianoRuntime {
   async stopCapture(
     input: CaptureStop,
     request: RuntimeRequest,
+    captureDiagnostics?: CaptureDiagnosticRecord,
   ): Promise<Session> {
     const pending = this.#pendingSocket;
     if (
@@ -562,6 +568,9 @@ export class LocalRuntime implements AtpianoRuntime {
           acknowledged_block_count: pending.acknowledgedBlockCount,
           socket_buffered_bytes_at_stop: pending.socket.bufferedAmount,
           socket_buffered_bytes_high_water: pending.bufferedAmountHighWater,
+          ...(captureDiagnostics === undefined
+            ? {}
+            : { capture_diagnostics: captureDiagnostics }),
         },
       }),
     );

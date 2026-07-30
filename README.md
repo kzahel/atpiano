@@ -53,9 +53,13 @@ defaults to a measured capability profile or conservative after-Stop mode.
 The Linux rerun now confirms continuous ingest, responsive Basic Pitch under a
 saturated isolated Transkun worker, sub-second Stop acknowledgement, reload
 reattachment, and complete checksummed settlement. This host's measured
-two-thread CPU profile selects after-Stop correction. A consentful human
-browser-microphone review, a multi-hour real-model soak, and Linux latency
-parity have not been validated. The internal score runtime installs, and score
+two-thread CPU profile selects after-Stop correction. A physical Android
+browser-microphone review exposed render-quantum-aligned audio discontinuities
+despite complete server ingest. New captures retain browser, OS, device,
+audio-track, worklet, main-thread delivery, and transport evidence and request
+reliability-oriented audio buffering; same-device follow-up remains pending.
+Linux latency parity has not been validated. The internal score runtime
+installs, and score
 alignment now reconciles generated score attacks to source events with an
 explicit monotonic exact-pitch pass instead of assuming generated token
 positions retain source identity. The corrected contract passes the retained

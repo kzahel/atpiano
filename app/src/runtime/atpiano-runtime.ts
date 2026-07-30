@@ -44,6 +44,8 @@ export interface RuntimeRequest {
   readonly signal?: AbortSignal;
 }
 
+export type CaptureDiagnosticRecord = Readonly<Record<string, unknown>>;
+
 export interface PageRequest extends RuntimeRequest {
   readonly cursor?: string;
   readonly limit?: number;
@@ -124,9 +126,17 @@ export interface AtpianoRuntime {
     sessionId: string,
     request: RuntimeRequest,
   ): Promise<Horizon>;
-  startCapture(input: CaptureStart, request: RuntimeRequest): Promise<Capture>;
+  startCapture(
+    input: CaptureStart,
+    request: RuntimeRequest,
+    clientMetadata?: CaptureDiagnosticRecord,
+  ): Promise<Capture>;
   streamPcm(block: PcmBlock): void;
-  stopCapture(input: CaptureStop, request: RuntimeRequest): Promise<Session>;
+  stopCapture(
+    input: CaptureStop,
+    request: RuntimeRequest,
+    captureDiagnostics?: CaptureDiagnosticRecord,
+  ): Promise<Session>;
   startReplay(input: ReplayStart, request: RuntimeRequest): Promise<Capture>;
   importRecording(
     input: RecordingImportStart,

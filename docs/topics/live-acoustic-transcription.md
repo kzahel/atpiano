@@ -53,6 +53,17 @@ locked runtime now includes `websockets`, Uvicorn selects its Sans-I/O
 protocol, and a public authenticated handshake reaches the application. The
 fix does not change PCM, capture, or model semantics.
 
+On 2026-07-30 the retained Android family session
+`20260727T185541-a2298f1afaaf` supplied the first concrete microphone-pop
+evidence. Its server transport is complete and has negligible queued bytes,
+but all 49 decoded sample jumps of at least 0.08 full scale align exactly to
+128-frame Web Audio render-quantum boundaries. Tactical
+[`046-browser-capture-pop-diagnostics.md`](../tactical/046-browser-capture-pop-diagnostics.md)
+records the analysis and adds capture-start browser/OS/device/audio metadata,
+worklet quantum and discontinuity aggregates, main-thread delivery evidence,
+truthful missing-input silence, and a reliability-oriented AudioContext
+latency hint. A same-device follow-up capture is pending.
+
 ## Scope And Relationship
 
 This topic owns the live user path:
@@ -655,6 +666,14 @@ failure. The host rejects gaps, duplicates, reordering, sample-rate changes,
 invalid payloads, and oversized sessions rather than silently repairing them.
 It stores the lossless session waveform independently of rolling inference so
 every live run can be replayed.
+
+The shared React capture path also retains the actual microphone-track and
+AudioContext settings, high-entropy User-Agent Client Hints when the browser
+permits them, worklet render-clock and boundary-jump aggregates, missing input
+frames, main-thread chunk delivery delay, and WebSocket high-water. The
+capture-only context requests playback-oriented buffering because sustained
+recording integrity is more important than minimum output latency. Browser
+granted latency remains evidence rather than an assumption.
 
 Musical time remains the audio sample clock. Periodic clock exchanges fit
 offset and drift between browser and host monotonic clocks. Browser paint
