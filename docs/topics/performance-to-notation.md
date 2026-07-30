@@ -25,6 +25,15 @@ renders successfully. Tactical 032 moves the original model MusicXML out of
 the engraving controls and labels it with the other session exports; web and
 desktop now dispatch the exact same artifact through browser download or
 native Save As behavior.
+Score-pipeline revision r3 fixes a retained BWV 858 regression found on
+2026-07-30. The transformer supplied its six-flat key count as a NumPy integer,
+which the first postprocessor incorrectly rejected as nontraditional because
+it accepted only Python's built-in `int`. The v2 postprocessor normalizes any
+ordinary integral count before evaluating the safe six-flat/six-sharp pair.
+The shared score card now calls the selector **Notation version**, explains the
+baseline, automatic-clef, and enharmonic choices, and labels the action
+**Use six sharps**. Existing r2 snapshots remain readable; refreshing one
+publishes r3 evidence and exposes the corrected action.
 Tactical 034 now enables the installed pinned runtime by default in the
 authenticated private Mac/Pi family service because the owner considers the
 application unusable without committed scores. This is accepted private use,
@@ -331,6 +340,19 @@ that case would require a separately designed mid-measure clef or staff/voice
 operation; the current pass does not hide it or move notes between inferred
 parts.
 
+Retained session `20260730T171231-934e654037fc`, a performance of BWV 858,
+exposed a model-runtime type boundary missed by the first retained fixture.
+Its baseline MusicXML contains one global six-flat signature in both parts,
+but the in-memory transformer score represented `KeySignature.sharps` as
+`numpy.int64(-6)`. The strict built-in-integer test therefore stored a false
+“local or nontraditional” report and hid the six-sharp action. Pipeline r3
+accepts integral scalar types while still rejecting booleans, floats, and
+counts outside seven accidentals.
+
+After the authenticated shared service restarted onto r3, the user refreshed
+that retained score and confirmed on 2026-07-30 that **Use six sharps**
+produces the intended result.
+
 ### Responsive score reader direction
 
 [`020-responsive-score-reader.md`](../tactical/020-responsive-score-reader.md)
@@ -582,8 +604,8 @@ currently a usable grid source for this material.
 
 Notation is no longer paused. The immediate work is:
 
-1. complete the automatic clef and enharmonic-variant pipeline defined by
-   Tactical 021 without mutating model baselines;
+1. validate the r3 key control against retained five-, six-, and
+   seven-accidental signatures without mutating model baselines;
 2. resolve the MIDI2ScoreTransformer license, or treat its architecture as a
    design to reimplement rather than a dependency;
 3. adopt Transkun behind the existing offline model-adapter boundary;

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from atpiano.score_postprocess import (
@@ -16,6 +17,7 @@ from atpiano.score_postprocess import (
     respell_pitch,
     score_variant_id,
     sequence_ledger_metrics,
+    traditional_fifths,
 )
 
 
@@ -88,6 +90,15 @@ def test_chord_noteheads_each_contribute_to_readability_cost() -> None:
 def test_enharmonic_signature_pairs(source: int, target: int) -> None:
     assert enharmonic_fifths(source) == target
     assert enharmonic_fifths(target) == source
+
+
+def test_traditional_fifths_normalizes_model_numpy_integers() -> None:
+    assert traditional_fifths(np.int64(-6)) == -6
+    assert traditional_fifths(-7) == -7
+    assert traditional_fifths(7) == 7
+    assert traditional_fifths(True) is None
+    assert traditional_fifths(-6.0) is None
+    assert traditional_fifths(8) is None
 
 
 def test_enharmonic_respelling_preserves_pitch_and_diatonic_mapping() -> None:

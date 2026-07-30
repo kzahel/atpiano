@@ -477,10 +477,15 @@ describe("shared application", () => {
     expect(screen.getByRole("heading", { name: "Committed score" })).toBeTruthy();
     expect(
       await screen.findByRole("button", {
-        name: "Enharmonic key · Six sharps",
+        name: "Use six sharps",
       }),
     ).toBeTruthy();
-    expect(screen.getByLabelText("Engraving")).toBeTruthy();
+    expect(screen.getByLabelText("Notation version")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Same notes and key spelling, with clef changes that reduce ledger lines.",
+      ),
+    ).toBeTruthy();
     expect(
       await screen.findByRole("button", { name: /Original model MusicXML/ }),
     ).toBeTruthy();
@@ -582,7 +587,7 @@ describe("shared application", () => {
     renderApp();
 
     expect(
-      await screen.findByText("Score revision · r2 · current"),
+      await screen.findByText("Score revision · r3 · current"),
     ).toBeTruthy();
   });
 
@@ -602,7 +607,7 @@ describe("shared application", () => {
                 schema_version: "atpiano.score-freshness.v1" as const,
                 status: "incompatible" as const,
                 reason: "alignment-schema-unsupported" as const,
-                current_pipeline_revision: 2,
+                current_pipeline_revision: 3,
                 snapshot_pipeline_revision: null,
                 refresh_recommended: true,
               },

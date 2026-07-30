@@ -1826,6 +1826,13 @@ input:focus-visible {
   font: 10px "DM Mono", monospace;
 }
 
+.score-variant-description {
+  flex-basis: 100%;
+  margin: 0;
+  color: #71857c;
+  font-size: 9px;
+}
+
 .score-render-warning {
   margin: -4px 0 12px;
   color: #d8b56b;

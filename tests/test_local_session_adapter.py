@@ -40,21 +40,21 @@ def _producer(revision: int) -> dict[str, object]:
     [
         (
             "atpiano.score-alignment.v2",
-            _producer(2),
+            _producer(3),
             "current",
             "current",
             False,
         ),
         (
             "atpiano.score-alignment.v2",
-            _producer(1),
+            _producer(2),
             "older-compatible",
             "pipeline-outdated",
             True,
         ),
         (
             "atpiano.score-alignment.v2",
-            _producer(3),
+            _producer(4),
             "incompatible",
             "pipeline-newer",
             False,

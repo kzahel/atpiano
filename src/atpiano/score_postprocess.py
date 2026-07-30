@@ -14,10 +14,11 @@ from collections import defaultdict, deque
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
+from numbers import Integral
 from typing import Any
 
 SCORE_POSTPROCESSOR_SCHEMA = "atpiano.score-postprocessor.v1"
-SCORE_POSTPROCESSOR_VERSION = "deterministic-engraving-v1"
+SCORE_POSTPROCESSOR_VERSION = "deterministic-engraving-v2"
 
 TREBLE_CLEF = "treble"
 BASS_CLEF = "bass"
@@ -434,6 +435,15 @@ def normalized_options(
     }
 
 
+def traditional_fifths(value: object) -> int | None:
+    """Normalize an ordinary key-signature count without accepting floats."""
+
+    if isinstance(value, bool) or not isinstance(value, Integral):
+        return None
+    fifths = int(value)
+    return fifths if -7 <= fifths <= 7 else None
+
+
 def _score_key_signature(score: object) -> dict[str, Any]:
     from music21 import key
 
@@ -448,10 +458,9 @@ def _score_key_signature(score: object) -> dict[str, Any]:
                 "alternative_fifths": None,
             }
         signature = signatures[0]
-        sharps = signature.sharps
+        sharps = traditional_fifths(signature.sharps)
         if (
-            not isinstance(sharps, int)
-            or not -7 <= sharps <= 7
+            sharps is None
             or Fraction(signature.getOffsetInHierarchy(part)) != 0
         ):
             return {

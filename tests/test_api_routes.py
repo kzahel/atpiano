@@ -470,14 +470,14 @@ def test_api_score_job_and_artifacts_remain_targeted_to_history(
     assert alignment["source_horizon_sample"] == 80
     assert b"score-partwise" in body
     assert alignment_body["summary"]["mapped_source_notes"] == 1
-    assert variants["producer"]["pipeline_revision"] == 2
+    assert variants["producer"]["pipeline_revision"] == 3
     assert variants["producer"]["execution"] == "injected-runner"
     assert variants["freshness"] == {
         "schema_version": "atpiano.score-freshness.v1",
         "status": "current",
         "reason": "current",
-        "current_pipeline_revision": 2,
-        "snapshot_pipeline_revision": 2,
+        "current_pipeline_revision": 3,
+        "snapshot_pipeline_revision": 3,
         "refresh_recommended": False,
     }
     assert variant_status == 201

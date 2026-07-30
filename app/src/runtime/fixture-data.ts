@@ -537,7 +537,7 @@ const scoreVariants: ScoreVariantPage = {
   session_id: primary.session_id,
   producer: {
     schema_version: "atpiano.score-producer.v1",
-    pipeline_revision: 2,
+    pipeline_revision: 3,
     pipeline_fingerprint:
       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     application_version: "0.1.0",
@@ -546,7 +546,7 @@ const scoreVariants: ScoreVariantPage = {
     execution: "pinned-runtime",
     adapter_schema: "atpiano.midi2score-adapter.v1",
     alignment_schema: "atpiano.score-alignment.v2",
-    postprocessor_version: "deterministic-engraving-v1",
+    postprocessor_version: "deterministic-engraving-v2",
     model_repository_commit: "cccccccccccccccccccccccccccccccccccccccc",
     model_checkpoint_sha256:
       "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
@@ -555,8 +555,8 @@ const scoreVariants: ScoreVariantPage = {
     schema_version: "atpiano.score-freshness.v1",
     status: "current",
     reason: "current",
-    current_pipeline_revision: 2,
-    snapshot_pipeline_revision: 2,
+    current_pipeline_revision: 3,
+    snapshot_pipeline_revision: 3,
     refresh_recommended: false,
   },
   items: [

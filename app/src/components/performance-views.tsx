@@ -251,6 +251,17 @@ function ScorePreview({
           : `Atpiano ${scoreProducer.application_version}`,
       ].join(" · ")
     : undefined;
+  const selectedVariantDescription = (() => {
+    if (!selectedScoreVariant) return null;
+    switch (selectedScoreVariant.role) {
+      case "baseline":
+        return "Original model notation, kept unchanged for comparison.";
+      case "automatic":
+        return "Same notes and key spelling, with clef changes that reduce ledger lines.";
+      case "enharmonic":
+        return "Same sounding pitches, respelled in the selected enharmonic key.";
+    }
+  })();
   return (
     <section className="view-card score-card">
       <div className="view-heading">
@@ -297,7 +308,7 @@ function ScorePreview({
       {scoreXml && scoreVariants.length > 0 && (
         <div className="score-engraving-controls">
           <label>
-            <span>Engraving</span>
+            <span>Notation version</span>
             <select
               value={selectedScoreVariant?.score_variant_id ?? ""}
               disabled={scoreVariantBusy}
@@ -327,9 +338,10 @@ function ScorePreview({
                 disabled={scoreVariantBusy}
                 onClick={onCreateEnharmonicVariant}
               >
-                Enharmonic key · {
+                Use {
                   selectedScoreVariant.available_enharmonic_label
-                    ?.split(" — ")[0] ?? "Alternative spelling"
+                    ?.split(" — ")[0]
+                    .toLowerCase() ?? "alternative spelling"
                 }
               </button>
             )}
@@ -344,6 +356,11 @@ function ScorePreview({
                 Apply automatic clefs
               </button>
             )}
+          {selectedVariantDescription && (
+            <p className="score-variant-description">
+              {selectedVariantDescription}
+            </p>
+          )}
         </div>
       )}
       {selectedScoreVariant?.needs_review && (
