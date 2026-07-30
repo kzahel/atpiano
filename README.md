@@ -189,6 +189,27 @@ installed as a login item, so a reboot leaves it stopped until the explicit
 `start` command is run again. Use `restart`, `logs --follow`, or `stop` for
 the corresponding lifecycle operations.
 
+To push and then redeploy the already-active service from this Mac, use:
+
+```text
+scripts/share-atpiano-push-deploy [git-push-args...]
+```
+
+That helper runs `git push`, then restarts the share service only after
+a successful push. Server startup rebuilds the Vite frontend before serving
+the public origin. To make ordinary `git push` trigger the same local
+build/restart check from this checkout, install the local hook:
+
+```text
+scripts/share-atpiano-push-deploy --install-pre-push-hook
+```
+
+Git has no standard post-push hook, so the installed hook runs before
+the remote accepts the push. Use the wrapper command when exact
+after-success ordering matters. Both paths refuse to start a stopped
+service and skip restarting from a dirty worktree unless
+`ATPIANO_PUSH_DEPLOY_ALLOW_DIRTY=true` is set.
+
 Capture models remain unloaded until the first microphone or replay session.
 After a session fully settles, warmed model workers remain available for ten
 minutes and then unload. A new capture cancels pending eviction, and the next

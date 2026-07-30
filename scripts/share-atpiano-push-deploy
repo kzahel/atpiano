@@ -1,0 +1,247 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repository_directory="$(cd "${script_directory}/.." && pwd)"
+service_script="${repository_directory}/scripts/share-atpiano-service"
+mode="push"
+force_install="false"
+
+usage() {
+  printf 'Usage:\n'
+  printf '  scripts/share-atpiano-push-deploy [git-push-args...]\n'
+  printf '  scripts/share-atpiano-push-deploy --deploy-only\n'
+  printf '  scripts/share-atpiano-push-deploy --install-pre-push-hook [--force]\n'
+  printf '\n'
+  printf 'Runs git push and, after a successful push, restarts and verifies the\n'
+  printf 'already-active atpiano share service. The installed pre-push hook makes\n'
+  printf 'ordinary "git push" trigger the same deploy check before Git updates the\n'
+  printf 'remote, because Git has no built-in post-push hook.\n'
+}
+
+case "${1:-}" in
+  --deploy-only)
+    mode="deploy"
+    shift
+    if [[ "${1:-}" == "--hook" ]]; then
+      shift
+    fi
+    ;;
+  --install-pre-push-hook)
+    mode="install-hook"
+    shift
+    while [[ "${#}" -gt 0 ]]; do
+      case "${1}" in
+        --force)
+          force_install="true"
+          shift
+          ;;
+        --help|-h)
+          usage
+          exit 0
+          ;;
+        *)
+          printf 'error: unknown install option: %s\n' "${1}" >&2
+          usage >&2
+          exit 64
+          ;;
+      esac
+    done
+    ;;
+  --help|-h)
+    usage
+    exit 0
+    ;;
+esac
+
+is_true() {
+  case "${1:-}" in
+    true|TRUE|1|yes|YES|on|ON)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+push_is_dry_run() {
+  for argument in "$@"; do
+    case "${argument}" in
+      --dry-run|-n)
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+worktree_is_dirty() {
+  if ! git -C "${repository_directory}" diff --quiet --ignore-submodules --; then
+    return 0
+  fi
+  if ! git -C "${repository_directory}" diff --cached --quiet --ignore-submodules --; then
+    return 0
+  fi
+  [[ -n "$(git -C "${repository_directory}" ls-files --others --exclude-standard)" ]]
+}
+
+status_output() {
+  "${service_script}" status 2>&1
+}
+
+extract_public_origin() {
+  sed -n 's/^Public origin: //p' | head -1
+}
+
+http_status() {
+  url="${1:?missing URL}"
+  curl --silent --show-error --location --output /dev/null \
+    --max-time "${ATPIANO_PUSH_DEPLOY_CURL_TIMEOUT_SECONDS:-10}" \
+    --write-out '%{http_code}' "${url}"
+}
+
+verify_public_routes() {
+  status_text="${1:?missing service status}"
+  public_origin="$(printf '%s\n' "${status_text}" | extract_public_origin)"
+  if [[ -z "${public_origin}" ]]; then
+    public_origin="${ATPIANO_PUBLIC_ORIGIN:-https://atpiano.graehlarts.com}"
+  fi
+
+  if ! homepage_status="$(http_status "${public_origin}/")"; then
+    printf 'error: could not reach %s/.\n' "${public_origin}" >&2
+    return 1
+  fi
+  if [[ "${homepage_status}" != "200" ]]; then
+    printf 'error: %s/ returned HTTP %s, expected 200.\n' \
+      "${public_origin}" "${homepage_status}" >&2
+    return 1
+  fi
+
+  if ! capabilities_status="$(http_status "${public_origin}/api/v1/capabilities")"; then
+    printf 'error: could not reach %s/api/v1/capabilities.\n' \
+      "${public_origin}" >&2
+    return 1
+  fi
+  case "${capabilities_status}" in
+    200|401)
+      ;;
+    *)
+      printf 'error: %s/api/v1/capabilities returned HTTP %s, expected 200 or 401.\n' \
+        "${public_origin}" "${capabilities_status}" >&2
+      return 1
+      ;;
+  esac
+
+  printf 'Verified %s/ HTTP %s and /api/v1/capabilities HTTP %s.\n' \
+    "${public_origin}" "${homepage_status}" "${capabilities_status}"
+}
+
+deploy_active_service() {
+  system_name="$(uname -s 2>/dev/null || printf 'unknown')"
+  if [[ "${system_name}" != "Darwin" ]]; then
+    printf 'Atpiano push deploy skipped: share service requires macOS launchd; detected %s.\n' \
+      "${system_name}" >&2
+    return 0
+  fi
+
+  if status_text="$(status_output)"; then
+    status_code=0
+  else
+    status_code="${?}"
+  fi
+  if [[ "${status_code}" -eq 3 ]]; then
+    printf 'Atpiano share service is stopped; not starting it after push.\n'
+    return 0
+  fi
+  if [[ "${status_code}" -ne 0 ]]; then
+    printf '%s\n' "${status_text}" >&2
+    return "${status_code}"
+  fi
+
+  if worktree_is_dirty && ! is_true "${ATPIANO_PUSH_DEPLOY_ALLOW_DIRTY:-false}"; then
+    printf 'Atpiano push deploy skipped: worktree has uncommitted files.\n' >&2
+    printf 'The live service builds this checkout directly; commit or stash first,\n' >&2
+    printf 'or set ATPIANO_PUSH_DEPLOY_ALLOW_DIRTY=true to override.\n' >&2
+    git -C "${repository_directory}" status --short >&2
+    return 0
+  fi
+
+  printf 'Restarting active atpiano share service from %s.\n' \
+    "${repository_directory}"
+  "${service_script}" restart
+
+  if ! is_true "${ATPIANO_PUSH_DEPLOY_SKIP_VERIFY:-false}"; then
+    if ! restarted_status="$(status_output)"; then
+      printf '%s\n' "${restarted_status}" >&2
+      return 1
+    fi
+    verify_public_routes "${restarted_status}"
+  fi
+}
+
+install_pre_push_hook() {
+  hook_path="$(git -C "${repository_directory}" rev-parse --git-path hooks/pre-push)"
+  case "${hook_path}" in
+    /*)
+      ;;
+    *)
+      hook_path="${repository_directory}/${hook_path}"
+      ;;
+  esac
+  mkdir -p "$(dirname "${hook_path}")"
+
+  if [[ -e "${hook_path}" ]] &&
+    ! grep -q 'share-atpiano-push-deploy' "${hook_path}" &&
+    [[ "${force_install}" != "true" ]]; then
+    printf 'error: %s already exists and was not installed by this script.\n' \
+      "${hook_path}" >&2
+    printf 'Re-run with --force if replacing it is intentional.\n' >&2
+    return 1
+  fi
+
+  temporary_hook="${hook_path}.tmp.$$"
+  cat >"${temporary_hook}" <<'HOOK'
+#!/usr/bin/env bash
+set -euo pipefail
+
+repository_root="$(git rev-parse --show-toplevel)"
+if "${repository_root}/scripts/share-atpiano-push-deploy" --deploy-only --hook "$@"; then
+  deploy_status=0
+else
+  deploy_status="${?}"
+fi
+if [[ "${deploy_status}" -ne 0 ]]; then
+  printf 'Atpiano pre-push deploy failed with status %s.\n' "${deploy_status}" >&2
+  if [[ "${ATPIANO_PUSH_DEPLOY_BLOCK_PUSH:-false}" == "true" ]]; then
+    exit "${deploy_status}"
+  fi
+  printf 'Continuing with push. Set ATPIANO_PUSH_DEPLOY_BLOCK_PUSH=true to block pushes on deploy failure.\n' >&2
+fi
+HOOK
+  chmod 700 "${temporary_hook}"
+  mv "${temporary_hook}" "${hook_path}"
+  printf 'Installed local pre-push deploy hook at %s.\n' "${hook_path}"
+  printf 'Note: Git runs pre-push hooks before the remote accepts the push.\n'
+}
+
+case "${mode}" in
+  push)
+    git -C "${repository_directory}" push "$@"
+    if push_is_dry_run "$@"; then
+      printf 'Atpiano push deploy skipped after git push --dry-run.\n'
+      exit 0
+    fi
+    deploy_active_service
+    ;;
+  deploy)
+    deploy_active_service
+    ;;
+  install-hook)
+    install_pre_push_hook
+    ;;
+  *)
+    usage >&2
+    exit 64
+    ;;
+esac

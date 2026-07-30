@@ -235,6 +235,28 @@ scripts/share-atpiano-service restart
 scripts/share-atpiano-service stop
 ```
 
+Local push-triggered deployment is repository-managed build/restart
+automation, not a separate hosted deployment. The tracked helper:
+
+```text
+scripts/share-atpiano-push-deploy [git-push-args...]
+```
+
+runs `git push`, then restarts and publicly verifies the already-active
+share service after a successful push. Installing the local hook:
+
+```text
+scripts/share-atpiano-push-deploy --install-pre-push-hook
+```
+
+makes ordinary `git push` trigger the same deploy check from this
+machine. Git has no built-in post-push hook, so the installed hook runs
+before the remote accepts the push; use the wrapper command when exact
+after-success ordering matters. Both paths preserve the existing
+inactive-service contract: they do not start a stopped service, and they
+skip restarting from a dirty checkout unless
+`ATPIANO_PUSH_DEPLOY_ALLOW_DIRTY=true` is set.
+
 An operator can check a specific retained session without a human password:
 
 ```text
