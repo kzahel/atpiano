@@ -1038,6 +1038,80 @@ describe("shared application", () => {
     expect(screen.getByRole("heading", { name: "Piano roll" })).toBeTruthy();
   });
 
+  it("refreshes and retries once when auto-score races final settlement", async () => {
+    const user = userEvent.setup();
+    const fixture = createFixtureRuntime();
+    const staleCommitSample = 1_968_000;
+    const finalCommitSample = 2_016_000;
+    let horizonCalls = 0;
+    const scoreInputs: Parameters<AtpianoRuntime["startScoreJob"]>[0][] = [];
+    const runtime = new Proxy(fixture, {
+      get(target, property) {
+        if (property === "getHorizon") {
+          return async (
+            ...args: Parameters<AtpianoRuntime["getHorizon"]>
+          ) => {
+            const horizon = await target.getHorizon(...args);
+            horizonCalls += 1;
+            return {
+              ...horizon,
+              audio_head_sample: finalCommitSample,
+              provisional_sample: finalCommitSample,
+              commit_sample:
+                horizonCalls <= 2 ? staleCommitSample : finalCommitSample,
+            };
+          };
+        }
+        if (property === "startScoreJob") {
+          return async (
+            input: Parameters<AtpianoRuntime["startScoreJob"]>[0],
+          ) => {
+            scoreInputs.push(input);
+            if (scoreInputs.length === 1) {
+              throw new Error("score request commit horizon is stale");
+            }
+            return {
+              schema_version: "atpiano.contract.v1" as const,
+              workspace_id: input.workspace_id,
+              session_id: input.session_id,
+              job_id: "job:auto-score-retry",
+              kind: "score" as const,
+              status: "complete" as const,
+              input_horizon_sample: input.commit_sample,
+              created_at: "2026-07-30T17:15:00Z",
+              started_at: "2026-07-30T17:15:00Z",
+              completed_at: "2026-07-30T17:15:01Z",
+              artifact_ids: [],
+              error: null,
+            };
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) satisfies AtpianoRuntime;
+    renderApp(runtime, { home: true });
+    await user.click(
+      await screen.findByRole("button", { name: "New session" }),
+    );
+    const file = new File(["wav bytes"], "Auto score race.wav", {
+      type: "audio/wav",
+    });
+
+    await user.upload(
+      screen.getByLabelText("Choose WAV or MP3 recording"),
+      file,
+    );
+
+    await waitFor(() => expect(scoreInputs).toHaveLength(2));
+    expect(scoreInputs.map((input) => input.commit_sample)).toEqual([
+      staleCommitSample,
+      finalCommitSample,
+    ]);
+    expect(horizonCalls).toBeGreaterThanOrEqual(3);
+    expect(screen.queryByText(/commit horizon is stale/i)).toBeNull();
+  });
+
   it("explains when the committed model detected no piano notes", async () => {
     const user = userEvent.setup();
     const fixture = createFixtureRuntime();

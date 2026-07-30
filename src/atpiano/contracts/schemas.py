@@ -122,6 +122,13 @@ class CorrectionMode(str, Enum):
     UNAVAILABLE = "unavailable"
 
 
+class CorrectionProfileStatus(str, Enum):
+    NOT_CONFIGURED = "not-configured"
+    AVAILABLE = "available"
+    MISSING = "missing"
+    INVALID = "invalid"
+
+
 class SourceKind(str, Enum):
     MICROPHONE = "microphone"
     REPLAY = "replay"
@@ -563,11 +570,28 @@ class Job(VersionedContractModel):
         return self
 
 
+class CorrectionCapability(ContractModel):
+    configured_mode: Literal[
+        "auto",
+        "live",
+        "delayed",
+        "after-stop",
+        "unavailable",
+    ]
+    default_mode: CorrectionMode
+    reason: str
+    backend_profile_path: str | None = None
+    backend_profile_status: CorrectionProfileStatus
+    backend_profile_id: Sha256 | None = None
+    backend_profile_recommendation: CorrectionMode | None = None
+
+
 class RuntimeCapabilities(VersionedContractModel):
     runtime_mode: RuntimeMode
     supported_schema_versions: tuple[str, ...]
     supported_pcm_protocol_versions: tuple[str, ...]
     capture_sources: tuple[SourceKind, ...]
+    correction: CorrectionCapability
     score_available: bool
     recoverable_delete: bool
     max_pcm_block_frames: Annotated[int, Field(ge=1)]
@@ -789,6 +813,7 @@ def contract_models() -> tuple[type[BaseModel], ...]:
         ScoreFreshness,
         AtpianoError,
         Job,
+        CorrectionCapability,
         RuntimeCapabilities,
         PcmEnvelope,
         CaptureStart,

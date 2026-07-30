@@ -57,6 +57,9 @@ export function CaptureDeck({
   const importing =
     importName !== null &&
     ["requesting", "warming"].includes(captureState.phase);
+  const missingCorrectionProfile =
+    capabilities?.correction.configured_mode === "auto" &&
+    capabilities.correction.backend_profile_status !== "available";
   const chooseImport = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
@@ -141,6 +144,12 @@ export function CaptureDeck({
           </button>
         )}
       </div>
+      {missingCorrectionProfile && (
+        <p className="capture-capability-warning" role="alert">
+          <strong>Background settling profile unavailable.</strong>
+          Live estimates will continue, but final notes will settle after Stop.
+        </p>
+      )}
       <div className={`capture-status ${captureState.phase}`} role="status">
         <i aria-hidden="true" />
         <span>

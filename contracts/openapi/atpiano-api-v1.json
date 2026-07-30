@@ -677,6 +677,76 @@
         "title": "CaptureStop",
         "type": "object"
       },
+      "CorrectionCapability": {
+        "additionalProperties": false,
+        "properties": {
+          "backend_profile_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Backend Profile Id"
+          },
+          "backend_profile_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Backend Profile Path"
+          },
+          "backend_profile_recommendation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CorrectionMode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "backend_profile_status": {
+            "$ref": "#/components/schemas/CorrectionProfileStatus"
+          },
+          "configured_mode": {
+            "enum": [
+              "auto",
+              "live",
+              "delayed",
+              "after-stop",
+              "unavailable"
+            ],
+            "title": "Configured Mode",
+            "type": "string"
+          },
+          "default_mode": {
+            "$ref": "#/components/schemas/CorrectionMode"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "configured_mode",
+          "default_mode",
+          "reason",
+          "backend_profile_status"
+        ],
+        "title": "CorrectionCapability",
+        "type": "object"
+      },
       "CorrectionMode": {
         "enum": [
           "live",
@@ -685,6 +755,16 @@
           "unavailable"
         ],
         "title": "CorrectionMode",
+        "type": "string"
+      },
+      "CorrectionProfileStatus": {
+        "enum": [
+          "not-configured",
+          "available",
+          "missing",
+          "invalid"
+        ],
+        "title": "CorrectionProfileStatus",
         "type": "string"
       },
       "DeleteSessionRequest": {
@@ -1977,6 +2057,9 @@
             "title": "Capture Sources",
             "type": "array"
           },
+          "correction": {
+            "$ref": "#/components/schemas/CorrectionCapability"
+          },
           "max_event_range_samples": {
             "minimum": 1,
             "title": "Max Event Range Samples",
@@ -2024,6 +2107,7 @@
           "supported_schema_versions",
           "supported_pcm_protocol_versions",
           "capture_sources",
+          "correction",
           "score_available",
           "recoverable_delete",
           "max_pcm_block_frames",

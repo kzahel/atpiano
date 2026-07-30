@@ -1082,36 +1082,72 @@ export function App({
 
   const generateScore = useCallback(async () => {
     const target = selectedSession.data;
-    if (!target || !horizon.data || !target.current_transcription_run_id) return;
+    if (!target || !target.current_transcription_run_id) return;
     setScoreActionError(null);
-    setScoreJob({
-      schema_version: "atpiano.contract.v1",
-      workspace_id: target.workspace_id,
-      session_id: target.session_id,
-      job_id: "pending",
-      kind: "score",
-      status: "pending",
-      input_horizon_sample: horizon.data.commit_sample,
-      created_at: new Date().toISOString(),
-      started_at: null,
-      completed_at: null,
-      artifact_ids: [],
-      error: null,
-    });
     try {
-      const job = await runtime.startScoreJob(
-        {
+      const loadCurrentHorizon = async () => {
+        const current = await runtime.getHorizon(
+          target.workspace_id,
+          target.session_id,
+          { requestId: requestId("score-horizon") },
+        );
+        queryClient.setQueryData(
+          ["horizon", target.workspace_id, target.session_id],
+          current,
+        );
+        return current;
+      };
+      let currentHorizon = await loadCurrentHorizon();
+      let job: Job | null = null;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        setScoreJob({
           schema_version: "atpiano.contract.v1",
           workspace_id: target.workspace_id,
           session_id: target.session_id,
-          transcription_run_id: target.current_transcription_run_id,
-          commit_sample: horizon.data.commit_sample,
-          request_id: requestId("score"),
-        },
-        { requestId: requestId("score-start") },
-      );
+          job_id: "pending",
+          kind: "score",
+          status: "pending",
+          input_horizon_sample: currentHorizon.commit_sample,
+          created_at: new Date().toISOString(),
+          started_at: null,
+          completed_at: null,
+          artifact_ids: [],
+          error: null,
+        });
+        try {
+          job = await runtime.startScoreJob(
+            {
+              schema_version: "atpiano.contract.v1",
+              workspace_id: target.workspace_id,
+              session_id: target.session_id,
+              transcription_run_id: target.current_transcription_run_id,
+              commit_sample: currentHorizon.commit_sample,
+              request_id: requestId("score"),
+            },
+            { requestId: requestId("score-start") },
+          );
+          break;
+        } catch (error) {
+          const message = error instanceof Error
+            ? error.message
+            : String(error);
+          if (
+            attempt === 0 &&
+            /(?:horizon.*stale|stale.*horizon)/i.test(message)
+          ) {
+            currentHorizon = await loadCurrentHorizon();
+            continue;
+          }
+          throw error;
+        }
+      }
+      if (job === null) {
+        throw new Error("Score generation could not start.");
+      }
       setScoreJob(job);
-      await queryClient.invalidateQueries({ queryKey: ["artifacts"] });
+      await queryClient.invalidateQueries(
+        { queryKey: ["artifacts", target.workspace_id, target.session_id] },
+      );
     } catch (error) {
       setScoreJob(null);
       setAutoScoringSessionId((sessionId) =>
@@ -1121,15 +1157,14 @@ export function App({
         error instanceof Error ? error.message : String(error),
       );
     }
-  }, [horizon.data, queryClient, runtime, selectedSession.data]);
+  }, [queryClient, runtime, selectedSession.data]);
 
   useEffect(() => {
     const target = selectedSession.data;
     if (
       pendingAutoScoreSessionId === null ||
       target?.session_id !== pendingAutoScoreSessionId ||
-      target.status !== "complete" ||
-      !horizon.data
+      target.status !== "complete"
     ) {
       return;
     }
@@ -1142,7 +1177,6 @@ export function App({
   }, [
     capabilities.data?.score_available,
     generateScore,
-    horizon.data,
     pendingAutoScoreSessionId,
     selectedSession.data,
   ]);

@@ -4,8 +4,9 @@ Topic: home-hosted-family-sharing
 
 Status: **accepted near-term deployment direction as of 2026-07-28; family
 identity and performer profiles are implemented and live under Tacticals 033
-and 042.** The v3 application is shared on demand from the Mac through the
-home Pi and Caddy. The live launchd service uses the authenticated FastAPI
+and 042; correction-profile and auto-score recovery are implemented and live
+under Tactical 047.** The v3 application is shared on demand from the Mac through
+the home Pi and Caddy. The live launchd service uses the authenticated FastAPI
 composition backed by SQLite accounts, memberships, groups, profiles, and
 cookie sessions. Its configured local score runtime is enabled by default
 under Tactical 034 because committed scores are a core requirement of the
@@ -177,6 +178,21 @@ Password credentials were not exposed to or exercised by the automated
 operator during cutover; the owner retains the human login and artifact
 review checkpoint.
 
+### Measured correction profile
+
+On 2026-07-30, session `20260730T171231-934e654037fc` revealed that the live
+service still pointed at the absent canonical backend profile. Automatic mode
+therefore selected its conservative after-Stop fallback; this was not a
+runtime benchmark or a conclusion that the Mac was too slow. Tactical 047
+makes the launchd profile path persistent and visible in service status, adds
+its path/status/recommendation/identity to authenticated capabilities, and
+shows a capture warning when the automatic profile is unavailable.
+
+The retained M4 Pro 2.10-hour soak profile recommends delayed background
+Transkun correction. Session start continues to verify its full
+model/execution/scheduler/host identity, so merely placing a JSON file at the
+configured path cannot force a stale profile into use.
+
 The first Safari review exposed a client bootstrap defect: the authentication
 client stored `window.fetch` and invoked it with the client instance as its
 receiver, producing `TypeError: Illegal invocation` before the login view
@@ -234,6 +250,18 @@ scripts/share-atpiano-service logs
 scripts/share-atpiano-service restart
 scripts/share-atpiano-service stop
 ```
+
+`status` includes the persistent backend-profile path and summary. Select a
+measured host profile while restarting an already-active service with:
+
+```text
+ATPIANO_BACKEND_PROFILE=PATH/TO/backend-profile.json \
+  scripts/share-atpiano-service restart
+```
+
+Later lifecycle commands reuse that path until another explicit value is
+registered. A missing or invalid automatic profile remains safely after-Stop
+and is now visible to both the operator and player.
 
 Local push-triggered deployment is repository-managed build/restart
 automation, not a separate hosted deployment. The tracked helper:

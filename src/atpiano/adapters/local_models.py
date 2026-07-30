@@ -13,6 +13,11 @@ from atpiano.backend_profile import (
     read_backend_profile,
     select_profile_mode,
 )
+from atpiano.contracts.schemas import (
+    CorrectionCapability,
+    CorrectionMode,
+    CorrectionProfileStatus,
+)
 from atpiano.corrected_commit import CommitModel
 from atpiano.live import LiveWindowModel
 from atpiano.model_worker import CommitModelWorker, PreviewModelWorker
@@ -117,6 +122,68 @@ class LocalModelPool:
                 self._preview_model is not None
                 or self._commit_model is not None
             )
+
+    def correction_capability(self) -> CorrectionCapability:
+        profile_path = (
+            str(self.backend_profile_path)
+            if self.backend_profile_path is not None
+            else None
+        )
+        if self.correction_mode != "auto":
+            return CorrectionCapability(
+                configured_mode=self.correction_mode,
+                default_mode=CorrectionMode(self.correction_mode),
+                reason="selected by explicit local configuration",
+                backend_profile_path=profile_path,
+                backend_profile_status=(
+                    CorrectionProfileStatus.NOT_CONFIGURED
+                ),
+            )
+        if self.backend_profile_path is None:
+            return CorrectionCapability(
+                configured_mode="auto",
+                default_mode=CorrectionMode.AFTER_STOP,
+                reason=(
+                    "no backend profile is configured; using the "
+                    "conservative mode"
+                ),
+                backend_profile_status=(
+                    CorrectionProfileStatus.NOT_CONFIGURED
+                ),
+            )
+        try:
+            profile = read_backend_profile(self.backend_profile_path)
+        except FileNotFoundError as error:
+            return CorrectionCapability(
+                configured_mode="auto",
+                default_mode=CorrectionMode.AFTER_STOP,
+                reason=(
+                    "backend profile is unavailable: "
+                    f"{type(error).__name__}: {error}"
+                ),
+                backend_profile_path=profile_path,
+                backend_profile_status=CorrectionProfileStatus.MISSING,
+            )
+        except (OSError, TypeError, ValueError, ValidationError) as error:
+            return CorrectionCapability(
+                configured_mode="auto",
+                default_mode=CorrectionMode.AFTER_STOP,
+                reason=(
+                    "backend profile is invalid: "
+                    f"{type(error).__name__}: {error}"
+                ),
+                backend_profile_path=profile_path,
+                backend_profile_status=CorrectionProfileStatus.INVALID,
+            )
+        return CorrectionCapability(
+            configured_mode="auto",
+            default_mode=profile.recommendation,
+            reason=profile.reason,
+            backend_profile_path=profile_path,
+            backend_profile_status=CorrectionProfileStatus.AVAILABLE,
+            backend_profile_id=profile.profile_id,
+            backend_profile_recommendation=profile.recommendation,
+        )
 
     def resolve_correction_mode(
         self,

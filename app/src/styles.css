@@ -2023,6 +2023,22 @@ input:focus-visible {
   line-height: 1.65;
 }
 
+.capture-capability-warning {
+  margin: 20px 0 0;
+  padding: 11px 13px;
+  border: 1px solid #705a31;
+  border-radius: 7px;
+  color: #d8caa9;
+  background: rgba(103, 77, 28, 0.18);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.capture-capability-warning strong {
+  display: block;
+  color: #f2d991;
+}
+
 .capture-status {
   display: flex;
   align-items: center;

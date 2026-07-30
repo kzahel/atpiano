@@ -27,6 +27,15 @@ const localCapabilities: RuntimeCapabilities = {
   supported_schema_versions: ["atpiano.contract.v1"],
   supported_pcm_protocol_versions: ["atpiano.pcm.v1"],
   capture_sources: ["microphone", "upload", "replay"],
+  correction: {
+    configured_mode: "delayed",
+    default_mode: "delayed",
+    reason: "test fixture policy",
+    backend_profile_path: null,
+    backend_profile_status: "not-configured",
+    backend_profile_id: null,
+    backend_profile_recommendation: null,
+  },
   score_available: true,
   recoverable_delete: true,
   max_pcm_block_frames: 1_048_576,
@@ -88,6 +97,42 @@ describe("capture deck", () => {
       screen.getByRole("button", { name: "Run test recording" }),
     ).toBeTruthy();
     expect(screen.getByText(/deterministic test recording/)).toBeTruthy();
+  });
+
+  it("warns when automatic correction lacks a measured profile", () => {
+    render(
+      <CaptureDeck
+        capabilities={{
+          ...localCapabilities,
+          correction: {
+            configured_mode: "auto",
+            default_mode: "after-stop",
+            reason: "backend profile is missing",
+            backend_profile_path: "results/backend-profile/backend-profile.json",
+            backend_profile_status: "missing",
+            backend_profile_id: null,
+            backend_profile_recommendation: null,
+          },
+        }}
+        captureState={{
+          phase: "idle",
+          operationId: null,
+          capture: null,
+          error: null,
+        }}
+        activeSession={undefined}
+        onMicrophone={vi.fn()}
+        onImport={vi.fn()}
+        onReplay={vi.fn()}
+        onStop={vi.fn()}
+        onDismissError={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("alert").textContent,
+    ).toMatch(/Background settling profile unavailable/);
+    expect(screen.getByRole("alert").textContent).toMatch(/after Stop/);
   });
 
   it("keeps Stop visible but disabled while final notes settle", () => {

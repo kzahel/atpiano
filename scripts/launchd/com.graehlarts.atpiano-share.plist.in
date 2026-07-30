@@ -15,6 +15,8 @@
   <dict>
     <key>ATPIANO_BIND_ADDRESS</key>
     <string>__ATPIANO_BIND_ADDRESS__</string>
+    <key>ATPIANO_BACKEND_PROFILE</key>
+    <string>__ATPIANO_BACKEND_PROFILE__</string>
     <key>ATPIANO_FAMILY_AUTH</key>
     <string>__ATPIANO_FAMILY_AUTH__</string>
     <key>ATPIANO_PORT</key>

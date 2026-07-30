@@ -273,6 +273,7 @@ def check_family_workspace(
             "session_id": session_id,
             "artifact_count": len(artifacts),
             "score_available": capabilities["score_available"],
+            "correction": capabilities["correction"],
             "score": score_report,
             "audio": {
                 "artifact_id": audio["artifact_id"],

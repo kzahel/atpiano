@@ -195,6 +195,9 @@ def test_local_operator_check_reads_protected_audio_and_revokes(
     assert report["operator"] == "owner"
     assert report["audio"]["checked_range_bytes"] > 0
     assert report["score_available"] is False
+    assert report["correction"]["configured_mode"] == "auto"
+    assert report["correction"]["default_mode"] == "after-stop"
+    assert report["correction"]["backend_profile_status"] == "not-configured"
     assert report["score"] is None
     assert report["operator_session_revoked"] is True
 
@@ -317,6 +320,9 @@ def test_owner_cookie_authenticates_api_artifacts_and_websocket(
             "microphone",
             "upload",
         ]
+        assert capabilities.json()["correction"]["configured_mode"] == (
+            "unavailable"
+        )
         workspaces = client.get("/api/v1/workspaces")
         assert [item["workspace_id"] for item in workspaces.json()["items"]] == [
             "local"

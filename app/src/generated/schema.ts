@@ -568,11 +568,40 @@ export interface components {
             /** Workspace Id */
             workspace_id: string;
         };
+        /** CorrectionCapability */
+        CorrectionCapability: {
+            /**
+             * Backend Profile Id
+             * @default null
+             */
+            backend_profile_id: string | null;
+            /**
+             * Backend Profile Path
+             * @default null
+             */
+            backend_profile_path: string | null;
+            /** @default null */
+            backend_profile_recommendation: components["schemas"]["CorrectionMode"] | null;
+            backend_profile_status: components["schemas"]["CorrectionProfileStatus"];
+            /**
+             * Configured Mode
+             * @enum {string}
+             */
+            configured_mode: "auto" | "live" | "delayed" | "after-stop" | "unavailable";
+            default_mode: components["schemas"]["CorrectionMode"];
+            /** Reason */
+            reason: string;
+        };
         /**
          * CorrectionMode
          * @enum {string}
          */
         CorrectionMode: "live" | "delayed" | "after-stop" | "unavailable";
+        /**
+         * CorrectionProfileStatus
+         * @enum {string}
+         */
+        CorrectionProfileStatus: "not-configured" | "available" | "missing" | "invalid";
         /** DeleteSessionRequest */
         DeleteSessionRequest: {
             /**
@@ -1119,6 +1148,7 @@ export interface components {
         RuntimeCapabilities: {
             /** Capture Sources */
             capture_sources: components["schemas"]["SourceKind"][];
+            correction: components["schemas"]["CorrectionCapability"];
             /** Max Event Range Samples */
             max_event_range_samples: number;
             /** Max Pcm Block Frames */

@@ -20,6 +20,7 @@ runtime_directory="${ATPIANO_SERVICE_RUNTIME_DIR:-${repository_directory}/result
 generated_plist="${runtime_directory}/${service_label}.plist"
 generated_runner="${runtime_directory}/share-atpiano-service-runner"
 family_auth_mode_file="${runtime_directory}/family-auth-mode"
+backend_profile_path_file="${runtime_directory}/backend-profile-path"
 account_name="$(id -un)"
 account_directory="$(/usr/bin/dscl . -read "/Users/${account_name}" NFSHomeDirectory |
   /usr/bin/sed -n 's/^NFSHomeDirectory: //p')"
@@ -41,6 +42,13 @@ port="${ATPIANO_PORT:-8002}"
 public_origin="${ATPIANO_PUBLIC_ORIGIN:-https://atpiano.graehlarts.com}"
 score_runtime="${ATPIANO_SCORE_RUNTIME:-results/midi2score-runtime}"
 model_idle_timeout_seconds="${ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS:-600}"
+if [[ -n "${ATPIANO_BACKEND_PROFILE+x}" ]]; then
+  backend_profile="${ATPIANO_BACKEND_PROFILE}"
+elif [[ -f "${backend_profile_path_file}" ]]; then
+  backend_profile="$(/usr/bin/head -1 "${backend_profile_path_file}")"
+else
+  backend_profile="results/backend-profile/backend-profile.json"
+fi
 if [[ -n "${ATPIANO_FAMILY_AUTH+x}" ]]; then
   family_auth="${ATPIANO_FAMILY_AUTH}"
 elif [[ -f "${family_auth_mode_file}" ]]; then
@@ -63,6 +71,10 @@ if [[ ! "${model_idle_timeout_seconds}" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)$ ]]; 
 fi
 if [[ "${family_auth}" != "true" && "${family_auth}" != "false" ]]; then
   printf 'error: ATPIANO_FAMILY_AUTH must be true or false.\n' >&2
+  exit 64
+fi
+if [[ -z "${backend_profile}" || "${backend_profile}" == *$'\n'* ]]; then
+  printf 'error: ATPIANO_BACKEND_PROFILE must be one non-empty path.\n' >&2
   exit 64
 fi
 
@@ -129,6 +141,8 @@ render_plist() {
     "${repository_directory}" "${generated_plist}"
   /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_BIND_ADDRESS -string \
     "${bind_address}" "${generated_plist}"
+  /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_BACKEND_PROFILE -string \
+    "${backend_profile}" "${generated_plist}"
   /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_PORT -string \
     "${port}" "${generated_plist}"
   /usr/bin/plutil -replace EnvironmentVariables.ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS -string \
@@ -161,6 +175,34 @@ render_plist() {
   printf '%s\n' "${family_auth}" >"${family_auth_mode_temporary}"
   chmod 600 "${family_auth_mode_temporary}"
   mv "${family_auth_mode_temporary}" "${family_auth_mode_file}"
+  backend_profile_temporary="${backend_profile_path_file}.tmp.$$"
+  printf '%s\n' "${backend_profile}" >"${backend_profile_temporary}"
+  chmod 600 "${backend_profile_temporary}"
+  mv "${backend_profile_temporary}" "${backend_profile_path_file}"
+}
+
+backend_profile_summary() {
+  resolved_profile="${backend_profile}"
+  if [[ "${resolved_profile}" != /* ]]; then
+    resolved_profile="${repository_directory}/${resolved_profile}"
+  fi
+  if [[ ! -f "${resolved_profile}" ]]; then
+    printf 'missing; auto correction will use after-stop'
+    return
+  fi
+  recommendation="$(/usr/bin/sed -n \
+    's/.*"recommendation": "\([^"]*\)".*/\1/p' \
+    "${resolved_profile}" | /usr/bin/head -1)"
+  profile_id="$(/usr/bin/sed -n \
+    's/.*"profile_id": "\([0-9a-f]*\)".*/\1/p' \
+    "${resolved_profile}" | /usr/bin/head -1)"
+  if [[ "${recommendation}" =~ ^(live|delayed|after-stop|unavailable)$ ]] &&
+    [[ "${profile_id}" =~ ^[0-9a-f]{64}$ ]]; then
+    printf 'available; recommends %s; id %.12s' \
+      "${recommendation}" "${profile_id}"
+    return
+  fi
+  printf 'present but unreadable; auto correction will use after-stop'
 }
 
 print_status() {
@@ -190,6 +232,8 @@ print_status() {
   printf 'Listener: %s:%s (%s)\n' \
     "${bind_address}" "${port}" "$([[ -n "${listener}" ]] && printf 'ready' || printf 'not ready')"
   printf 'Public origin: %s\n' "${public_origin}"
+  printf 'Backend profile: %s (%s)\n' \
+    "${backend_profile}" "$(backend_profile_summary)"
   printf 'Score runtime: %s\n' "${score_runtime}"
   printf 'Model idle timeout: %s seconds\n' "${model_idle_timeout_seconds}"
   printf 'Family authentication: %s\n' "${family_auth}"
@@ -214,7 +258,7 @@ start_service() {
 
   render_plist
   record_lifecycle \
-    "event=start_requested label=${service_label} repository=${repository_directory} bind=${bind_address} port=${port} score_runtime=${score_runtime} model_idle_timeout_seconds=${model_idle_timeout_seconds} family_auth=${family_auth}"
+    "event=start_requested label=${service_label} repository=${repository_directory} bind=${bind_address} port=${port} backend_profile=${backend_profile} score_runtime=${score_runtime} model_idle_timeout_seconds=${model_idle_timeout_seconds} family_auth=${family_auth}"
   if ! /bin/launchctl bootstrap "${service_domain}" "${generated_plist}"; then
     record_lifecycle "event=start_failed label=${service_label}"
     printf 'error: launchd could not bootstrap %s; inspect %s.\n' \

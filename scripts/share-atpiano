@@ -15,6 +15,7 @@ public_origin="${ATPIANO_PUBLIC_ORIGIN:-https://atpiano.graehlarts.com}"
 model_idle_timeout_seconds="${ATPIANO_MODEL_IDLE_TIMEOUT_SECONDS:-600}"
 family_auth="${ATPIANO_FAMILY_AUTH:-false}"
 score_runtime="${ATPIANO_SCORE_RUNTIME:-${ATPIANO_PUBLIC_SCORE_RUNTIME:-results/midi2score-runtime}}"
+backend_profile="${ATPIANO_BACKEND_PROFILE:-results/backend-profile/backend-profile.json}"
 uv_path="${ATPIANO_UV:-$(command -v uv || true)}"
 
 if [[ -z "${uv_path}" || ! -x "${uv_path}" ]]; then
@@ -40,6 +41,7 @@ server_arguments=(
   --port "${port}"
   --public-origin "${public_origin}"
   --model-idle-timeout-seconds "${model_idle_timeout_seconds}"
+  --backend-profile "${backend_profile}"
   --score-runtime "${selected_score_runtime}"
   --no-open
 )

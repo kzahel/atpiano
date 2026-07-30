@@ -785,6 +785,10 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                             ),
                         )
                     ),
+                    correction=(
+                        self.server.application.capture
+                        .correction_capability()
+                    ),
                     score_available=bool(
                         self.server._runtime_state().get("available")
                     ),

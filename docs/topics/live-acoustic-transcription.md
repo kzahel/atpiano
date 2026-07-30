@@ -71,6 +71,19 @@ without losing a frame. Slow page JavaScript alone is therefore not a
 sufficient explanation for the complaint recording, although whole-device or
 Android audio-thread starvation remains possible.
 
+Later that day, public session `20260730T171231-934e654037fc` exposed an
+operational correction-profile regression. Automatic selection had not
+decided that the M4 Pro was slow; the launchd service pointed at an absent
+default profile and therefore followed the designed conservative after-Stop
+fallback. Tactical
+[`047-live-settling-and-auto-score-recovery.md`](../tactical/047-live-settling-and-auto-score-recovery.md)
+persists the selected backend-profile path, reports its recommendation and
+identity in service status and runtime capabilities, and warns in the capture
+card when automatic mode has no usable profile. The retained 2.10-hour,
+950-decode Mac profile recommends delayed background correction. Exact
+model/execution/scheduler/host matching still occurs when the commit adapter
+loads at session start.
+
 ## Scope And Relationship
 
 This topic owns the live user path:
@@ -297,6 +310,12 @@ otherwise uses after-Stop. The measured two-thread Linux profile has a 2.146
 service ratio and selects after-Stop. Its real Chrome session accepted 60.693
 source seconds in 60.687 wall seconds, acknowledged Stop in 0.257 seconds, and
 reattached after reload while seven Transkun decodes settled in the background.
+
+The on-demand Mac share service now retains the explicitly selected
+host-specific profile path across launchd restarts. Its status output and the
+authenticated capability API distinguish a missing or invalid profile from a
+valid profile recommendation, so conservative after-Stop fallback is no
+longer mistaken for an automatic speed assessment.
 
 A separate forced delayed-mode Chrome session saturated Transkun during live
 capture. Its first decode took 14.566 seconds, but the audio head continued at

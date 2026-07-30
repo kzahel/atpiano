@@ -38,6 +38,14 @@ Tactical 034 now enables the installed pinned runtime by default in the
 authenticated private Mac/Pi family service because the owner considers the
 application unusable without committed scores. This is accepted private use,
 not a model-pack or general hosted-service distribution decision.
+Tactical 047 is implemented and live. It fixes an automatic-score race
+observed in public session
+`20260730T171231-934e654037fc`. Session completion could reach React before
+the cached horizon reached its final commit sample, so the server correctly
+rejected the stale snapshot and the browser cleared its one-shot trigger.
+Score generation now reads the authoritative horizon immediately before
+submission and retries once only on the explicit stale-horizon rejection.
+The exact server check remains the score snapshot boundary.
 Tactical 035 fixes browser cursor validation for exact half-MIDI-tick source
 positions. The score producer uses Python's ties-to-even rounding when it
 orders transformer input, so the browser now reproduces that rounding with

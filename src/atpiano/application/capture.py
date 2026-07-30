@@ -13,6 +13,7 @@ from typing import Any, Protocol
 from atpiano.application.ports import SessionRepository
 from atpiano.application.storage import StorageApplicationService
 from atpiano.backend_profile import BackendSchedulerIdentity
+from atpiano.contracts.schemas import CorrectionCapability
 from atpiano.corrected import CorrectedSession
 from atpiano.corrected_commit import (
     DEFAULT_COMMIT_BUFFER_S,
@@ -78,6 +79,8 @@ class CaptureModelPool(Protocol):
         *,
         scheduler: BackendSchedulerIdentity,
     ) -> tuple[str, str, str | None]: ...
+
+    def correction_capability(self) -> CorrectionCapability: ...
 
     def close(self) -> None: ...
 
@@ -333,6 +336,9 @@ class CaptureApplicationService:
             commit_model,
             scheduler=self.correction_scheduler_identity(),
         )
+
+    def correction_capability(self) -> CorrectionCapability:
+        return self._models.correction_capability()
 
     def claim_session(self, *, source: str) -> tuple[str, Path]:
         if source not in {"microphone", "replay", "upload"}:

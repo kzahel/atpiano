@@ -238,6 +238,15 @@
           "microphone",
           "replay"
         ],
+        "correction": {
+          "backend_profile_id": null,
+          "backend_profile_path": null,
+          "backend_profile_recommendation": null,
+          "backend_profile_status": "not-configured",
+          "configured_mode": "delayed",
+          "default_mode": "delayed",
+          "reason": "selected by explicit local configuration"
+        },
         "max_event_range_samples": 5760000,
         "max_pcm_block_frames": 1048576,
         "recoverable_delete": true,

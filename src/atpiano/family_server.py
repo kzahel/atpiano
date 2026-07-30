@@ -558,6 +558,7 @@ def create_family_application(
                     ),
                 )
             ),
+            correction=runtime.application.capture.correction_capability(),
             score_available=score_available,
             recoverable_delete=True,
             max_pcm_block_frames=1_048_576,

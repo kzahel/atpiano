@@ -58,3 +58,5 @@ execution record; continuing status and direction belong in the relevant
 | [`043-browser-midi-float-parity.md`](043-browser-midi-float-parity.md) | Complete; live | Browser parity with the producer's floating-point MIDI tick conversion and Python rounding |
 | [`044-score-reliability-harness.md`](044-score-reliability-harness.md) | Complete | Slow headed Chromium/WebKit retained-score audit plus shared Python/TypeScript MIDI-tick conformance fixtures |
 | [`045-client-deployment-continuity.md`](045-client-deployment-continuity.md) | Complete; live | Exact asset routing, update polling and recovery, and bounded recent hashed-asset retention |
+| [`046-browser-capture-pop-diagnostics.md`](046-browser-capture-pop-diagnostics.md) | Complete; live | Browser, device, AudioWorklet, and delivery diagnostics for retained Android capture discontinuities |
+| [`047-live-settling-and-auto-score-recovery.md`](047-live-settling-and-auto-score-recovery.md) | Complete; live | Persistent measured correction profile, visible capability diagnostics, and one bounded final-horizon score retry |

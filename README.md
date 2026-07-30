@@ -189,6 +189,21 @@ installed as a login item, so a reboot leaves it stopped until the explicit
 `start` command is run again. Use `restart`, `logs --follow`, or `stop` for
 the corresponding lifecycle operations.
 
+`status` also reports the backend-profile path and its recommendation. The
+service persists an explicitly selected measured profile across later
+restarts:
+
+```text
+ATPIANO_BACKEND_PROFILE=results/backend-profile-phase4-soak-20260727/backend-profile.json \
+  scripts/share-atpiano-service restart
+```
+
+Automatic correction remains conservatively after-Stop when the profile is
+missing or invalid, and the capture card makes that fallback visible. The
+profile recommendation is not trusted solely because the file exists:
+session start still verifies the exact model, checkpoint, execution,
+scheduler, and host identity.
+
 To push and then redeploy the already-active service from this Mac, use:
 
 ```text
@@ -228,6 +243,8 @@ WebSockets. Override `ATPIANO_BIND_ADDRESS`, `ATPIANO_PORT`,
 `ATPIANO_PUBLIC_ORIGIN`, `ATPIANO_UV`, or `ATPIANO_SERVICE_LOG_DIR` when
 registering the service to change its generated launch configuration.
 `ATPIANO_SERVICE_LOG_SIZE` and `ATPIANO_SERVICE_LOG_COUNT` adjust rotation.
+`ATPIANO_BACKEND_PROFILE` selects the measured correction profile retained by
+the launchd service.
 
 The authenticated family composition uses FastAPI, a SQLite
 SQLAlchemy/Alembic catalog, Argon2 passwords, opaque browser sessions, and
@@ -428,6 +445,11 @@ repetitions without wall-clock delivery waits, and retains its session,
 per-decode evidence, host/model/scheduler identity, and recommendation. Pass
 `--correction-mode` to explicitly override the profile when diagnosing a
 mode; explicit live correction is not a throughput guarantee.
+
+Automatic score generation reads the final authoritative commit horizon
+immediately before submission. If settlement advances between that read and
+the exact server check, the browser refetches and retries once; unrelated
+score failures are still surfaced without retry.
 
 Only the visible 15–120 second timeline range is queried. After Stop, MIDI
 contains the latest committed notes and pedal intervals, while Event history

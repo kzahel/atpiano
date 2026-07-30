@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 
+from atpiano.adapters.local_models import LocalModelPool
 from atpiano.backend_profile import (
     BackendFixtureIdentity,
     BackendHostIdentity,
@@ -9,8 +11,12 @@ from atpiano.backend_profile import (
     build_profile,
     recommend_mode,
     select_profile_mode,
+    write_backend_profile,
 )
-from atpiano.contracts.schemas import CorrectionMode
+from atpiano.contracts.schemas import (
+    CorrectionMode,
+    CorrectionProfileStatus,
+)
 
 SCHEDULER = BackendSchedulerIdentity(
     buffer_s=28.0,
@@ -123,3 +129,58 @@ def test_backend_profile_rejects_stale_host_identity() -> None:
 
     assert selected is CorrectionMode.AFTER_STOP
     assert "host identity is stale" in reason
+
+
+def _model_pool(profile_path: Path | None) -> LocalModelPool:
+    return LocalModelPool(
+        preview_model_factory=lambda: None,
+        commit_model_factory=lambda: None,
+        isolate_models=False,
+        commit_threads=2,
+        correction_mode="auto",
+        backend_profile_path=profile_path,
+    )
+
+
+def test_correction_capability_reports_missing_automatic_profile(
+    tmp_path: Path,
+) -> None:
+    profile_path = tmp_path / "missing-profile.json"
+
+    capability = _model_pool(profile_path).correction_capability()
+
+    assert capability.configured_mode == "auto"
+    assert capability.default_mode is CorrectionMode.AFTER_STOP
+    assert (
+        capability.backend_profile_status
+        is CorrectionProfileStatus.MISSING
+    )
+    assert capability.backend_profile_path == str(profile_path.resolve())
+    assert capability.backend_profile_id is None
+
+
+def test_correction_capability_reports_measured_recommendation(
+    tmp_path: Path,
+) -> None:
+    profile = build_profile(
+        provenance=PROVENANCE,
+        thread_limit=2,
+        scheduler=SCHEDULER,
+        fixture=FIXTURE,
+        source_duration_s=42.0,
+        decode_wall_s=(3.6,) * 10,
+        host=HOST,
+    )
+    profile_path = tmp_path / "backend-profile.json"
+    write_backend_profile(profile_path, profile)
+
+    capability = _model_pool(profile_path).correction_capability()
+
+    assert capability.configured_mode == "auto"
+    assert capability.default_mode is CorrectionMode.DELAYED
+    assert (
+        capability.backend_profile_status
+        is CorrectionProfileStatus.AVAILABLE
+    )
+    assert capability.backend_profile_id == profile.profile_id
+    assert capability.backend_profile_recommendation is CorrectionMode.DELAYED
