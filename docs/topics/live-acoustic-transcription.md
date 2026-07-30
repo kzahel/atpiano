@@ -62,7 +62,14 @@ but all 49 decoded sample jumps of at least 0.08 full scale align exactly to
 records the analysis and adds capture-start browser/OS/device/audio metadata,
 worklet quantum and discontinuity aggregates, main-thread delivery evidence,
 truthful missing-input silence, and a reliability-oriented AudioContext
-latency hint. A same-device follow-up capture is pending.
+latency hint. A 2026-07-30 physical Pixel 9 follow-up then preserved full
+Chrome 150 and Android 17 identity. Its quiet controlled 440 Hz run remained
+sample-contiguous with no adjacent-sample jump of even 0.02 despite an
+intentional three-second page-main-thread stall. The stall delayed worklet
+message delivery by 3.013 seconds and raised queued socket bytes to 290,080
+without losing a frame. Slow page JavaScript alone is therefore not a
+sufficient explanation for the complaint recording, although whole-device or
+Android audio-thread starvation remains possible.
 
 ## Scope And Relationship
 

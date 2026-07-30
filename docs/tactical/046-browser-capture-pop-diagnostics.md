@@ -2,8 +2,9 @@
 
 Topic: live-acoustic-transcription
 
-Status: **complete and live on 2026-07-30.** A same-device physical microphone
-follow-up remains a human review step.
+Status: **complete, live, and physically reviewed on a Pixel 9 on
+2026-07-30.** The old reduced user agent cannot prove that this was the exact
+device that made the complaint recording.
 
 ## Motivation
 
@@ -126,12 +127,44 @@ read both the affected session's protected MP3 range and 701,346-byte
 MusicXML, observed score capability, and verified operator-session revocation.
 No microphone was activated automatically.
 
-## Live Review
+## Pixel 9 Physical Review
 
-After deployment, make a short capture on the affected Android device with
-the screen awake and no browser switching. Inspect `client.json` and
-`transport.json`, then compare audible pop times with the worklet's boundary
-jump counts. Repeat once with the device well charged and once in another
-browser or native recorder. That comparison can separate an Atpiano graph
-problem from a device-wide microphone path problem without guessing from a
-reduced user agent.
+A USB-attached Pixel 9 ran the deployed application in Chrome
+150.0.7871.186 on Android 17. User-Agent Client Hints correctly retained the
+model and real OS/browser versions that the reduced user agent hid. Chrome
+granted mono 48 kHz, 16-bit microphone input with echo cancellation, noise
+suppression, automatic gain, and voice isolation all disabled. The track
+reported 40 ms latency; the capture AudioContext reported 21.33 ms base
+latency and retained the requested `playback` hint.
+
+Three completed sessions preserve progressively cleaner evidence:
+
+- `20260730T115457-c00162908e4b` recorded 6,792,192 frames over 141.504
+  seconds while the room was uncontrolled. It had no missing input, no
+  render-clock gap, a 161 ms maximum main-thread delivery interval, and two
+  quantum-boundary jumps of at least 0.1, peaking at 0.122. The user reported
+  possibly making noise, so this is not a controlled positive reproduction.
+- `20260730T120018-5a2842a024fb` used the Pixel speaker to emit a smooth
+  440 Hz tone. It preserved all 3,229,696 frames with no missing input or
+  render-clock gap. Two candidate boundary discontinuities reached 0.053 and
+  were exactly 1,920 frames, or 40 ms, apart; no jump reached 0.06. Android
+  logged three Chrome input-FIFO underflows near startup, but none at the
+  candidate jump times. Room noise was still possible during this run.
+- `20260730T120342-b44bbdf3793c` repeated the smooth tone after the user left
+  the room and deliberately blocked the page main thread for exactly three
+  seconds during the tone. The block produced a 3.061-second chunk-delivery
+  interval, 3.013 seconds of worklet-to-main delay, and a 290,080-byte socket
+  high-water. Nevertheless all 3,124,224 frames arrived, missing-input and
+  render-clock counters remained zero, and the raw PCM had no adjacent-sample
+  jump of even 0.02. Its largest boundary and inside-quantum jumps were only
+  0.00458 and 0.00513. Settlement committed the full source horizon without
+  error.
+
+The quiet-room stall is direct evidence that slow page JavaScript alone queues
+worklet messages rather than splicing PCM. It does not prove that an
+underpowered or thermally throttled device cannot starve Chrome's audio render
+thread or Android audio service as well. The two smaller candidate
+discontinuities in the earlier tone run also leave the underlying Android
+input path intermittent rather than fully exonerated. A repeated quiet tone
+on a genuinely older device, followed by the same device's native recorder,
+would be the most useful next comparison.
