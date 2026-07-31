@@ -32,6 +32,20 @@ PROVENANCE = {
     "device": "cpu",
     "checkpoint_sha256": "a" * 64,
     "config_sha256": "b" * 64,
+    "torch_version": "2.13.0+cu132",
+    "precision": "float32",
+    "accelerator": {
+        "kind": "cuda",
+        "runtime_version": "13.2",
+        "device_index": 0,
+        "device_name": "NVIDIA GeForce RTX 4090",
+        "compute_capability": "8.9",
+        "compiled_architectures": ["sm_86", "sm_90"],
+        "total_memory_bytes": 25_756_696_576,
+        "float32_matmul_precision": "highest",
+        "matmul_allow_tf32": False,
+        "cudnn_allow_tf32": False,
+    },
     "execution": {"thread_limit": 2},
 }
 HOST = BackendHostIdentity(
@@ -106,6 +120,38 @@ def test_backend_profile_rejects_stale_execution_identity() -> None:
     assert profile.profile_id[:12] in reason
     assert stale is CorrectionMode.AFTER_STOP
     assert "stale" in stale_reason
+
+
+def test_backend_profile_rejects_stale_accelerator_runtime() -> None:
+    profile = build_profile(
+        provenance=PROVENANCE,
+        thread_limit=2,
+        scheduler=SCHEDULER,
+        fixture=FIXTURE,
+        source_duration_s=42.0,
+        decode_wall_s=(2.5, 2.8, 3.0),
+        host=HOST,
+    )
+    changed = {
+        **PROVENANCE,
+        "accelerator": {
+            **PROVENANCE["accelerator"],
+            "runtime_version": "13.0",
+        },
+    }
+
+    selected, reason = select_profile_mode(
+        profile,
+        provenance=changed,
+        thread_limit=2,
+        scheduler=SCHEDULER,
+        host=HOST,
+    )
+
+    assert profile.model.accelerator is not None
+    assert profile.model.accelerator.compute_capability == "8.9"
+    assert selected is CorrectionMode.AFTER_STOP
+    assert "stale" in reason
 
 
 def test_backend_profile_rejects_stale_host_identity() -> None:

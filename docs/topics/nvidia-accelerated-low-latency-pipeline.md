@@ -2,16 +2,18 @@
 
 Topic: nvidia-accelerated-low-latency-pipeline
 
-Status: **native Windows RTX 4090 host and CPU control established as of
-2026-07-31; CUDA is next.** Tactical 049 passed the locked CPU environment,
-fixed Basic Pitch and Transkun controls, unpackaged server replay, production
-frontend, and storage path without WSL. No Atpiano CUDA result has been
-recorded yet. Native Windows remains authoritative so the measured runtime can
-feed future Windows desktop packaging. WSL2 is a labeled Linux reference and
-fallback, not the product runtime. The internal score converter remains
-forced to CPU and its NVIDIA output is unvalidated. This topic authorizes
-research and documentation, not a public hosted product or general
-distribution of the internal score model.
+Status: **native Windows RTX 4090 CUDA baseline established on 2026-07-31;
+the hop/guard latency-quality frontier is next.** Tactical 050 locked official
+Torch 2.13.0+cu132, passed strict-FP32 Transkun note parity, retained GPU
+telemetry, and exercised live correction and recovery through the unpackaged
+server without WSL or a system CUDA toolkit. CUDA controller output is
+repeatable but not CPU-identical and remains a required sweep metric. Native
+Windows remains authoritative so the measured runtime can feed future Windows
+desktop packaging. WSL2 is a labeled Linux reference and fallback, not the
+product runtime. The internal score converter remains forced to CPU and its
+NVIDIA output is unvalidated. This topic authorizes research and
+documentation, not a public hosted product or general distribution of the
+internal score model.
 
 ## Intent
 
@@ -75,8 +77,8 @@ MIDI2ScoreTransformer.
 
 The intended host reports an Intel Core i7-13700KF, approximately 96 GiB RAM,
 an RTX 4090 with 24,564 MiB VRAM, NVIDIA driver 610.88, and a 450 W GPU power
-limit. Windows and the installed Ubuntu WSL2 distro both see the GPU, but no
-native Windows Atpiano CUDA result exists.
+limit. Windows and the installed Ubuntu WSL2 distro both see the GPU. Native
+Windows now has the authoritative Atpiano CUDA result described below.
 
 The experiment now starts with native Windows Python and model processes. The
 first application target is the unpackaged `workbench-v3` local server and a
@@ -146,6 +148,59 @@ seconds behind the capture head before the next decode publishes it. CUDA
 first establishes spare compute capacity; a later controlled scheduler sweep
 tests whether that capacity can buy lower event latency without losing model
 quality.
+
+### Validated native Windows CUDA baseline
+
+Tactical 050 adds a mutually exclusive `corrected-cu132` extra that selects
+Torch 2.13.0+cu132 from PyTorch's explicit official index. The ordinary and
+CPU corrected environments retain their previous boundaries. The CUDA wheel
+executes directly on the native RTX 4090 without WSL or a separately installed
+CUDA toolkit.
+
+The wheel reports CUDA 13.2, device 0 as the RTX 4090, compute capability 8.9,
+and compiled targets `sm_75`, `sm_80`, `sm_86`, `sm_90`, `sm_100`, and
+`sm_120`. Despite the lack of a separately listed `sm_89` target, a real CUDA
+matrix kernel and complete Transkun decode execute without an unsupported
+architecture warning. Real execution remains the compatibility gate.
+
+The accepted model path is strict float32: highest matmul precision with both
+CUDA matmul and cuDNN TF32 disabled. Backend profiles now bind Torch version,
+precision policy, CUDA runtime, device identity, compute capability, compiled
+architectures, and VRAM in addition to the checkpoint, adapter, scheduler,
+threads, and host.
+
+Two independent unchanged 84-second CUDA controls retained all 4,032,000
+source frames and no pending tail. They produced exactly the same normalized
+result, including controller intervals. Mean decode time was 1.005 and 1.068
+seconds, maxima were 1.194 and 1.228 seconds, and service ratios were 0.227
+and 0.242. Both select live correction under the existing 28/4/4 policy. The
+first mean is 13.67 times faster than the same-host CPU mean, but this is warm
+service headroom rather than capture-to-event latency.
+
+Strict CUDA produced 155/156 notes and 12/6 controller intervals across the
+two continuous fixture repetitions. Compared with the corresponding CPU
+151/157-note repetitions, CUDA onset F1 was 0.954/0.978,
+note-with-offset F1 was 0.876/0.920, and velocity MAE was 0.500/0.575. The
+note path passes the established comparison thresholds. The CPU controller
+counts were 12/10; CUDA's repeatable 12/6 result shows a deterministic device
+sensitivity at some pedal/window boundaries. CUDA is comparable, not
+CPU-identical. Every sweep must retain controller counts and timing rather
+than reporting note F1 alone.
+
+The strict profile sampled whole-device telemetry every 100 ms. GPU
+utilization reached 66%, board power reached 132.40 W, temperature reached 48
+C, and used memory rose from 539 MiB to a sampled 2,011 MiB. The complete
+locked development environment is 3.40 GiB and Torch accounts for 2.70 GiB,
+so a later NVIDIA model pack must be derived and measured instead of copying
+the development environment.
+
+The matching profile selected live correction in native `workbench-v3`.
+Accelerated replay accepted and settled all 2,016,000 frames, processed 161
+preview windows and eight commit decodes, retained no tail or stage error, and
+published verified audio, event history, MIDI, and manifest artifacts. A
+second native server process reopened the same completed session and artifact
+catalog. Wall-clock browser delivery, paint acknowledgement, and physical
+microphone review remain separate latency evidence.
 
 ### MIDI2ScoreTransformer
 
@@ -297,12 +352,14 @@ audio file for the first CPU/CUDA comparison.
 Run separate, initially empty output directories:
 
 ```text
-uv run atpiano profile-backend `
+uv sync --extra corrected --frozen
+uv run --extra corrected atpiano profile-backend `
   ..\atpiano-artifacts\musical-loop-input\input.json `
   results\backend-profile-rtx4090-windows-cpu `
   --commit-device cpu --commit-threads 2
 
-uv run atpiano profile-backend `
+uv sync --extra corrected-cu132 --frozen
+uv run --extra corrected-cu132 atpiano profile-backend `
   ..\atpiano-artifacts\musical-loop-input\input.json `
   results\backend-profile-rtx4090-windows-cuda `
   --commit-device cuda --commit-threads 2
@@ -493,6 +550,8 @@ Official starting references:
 - [Pinned MIDI2ScoreTransformer repository](https://github.com/TimFelixBeyer/MIDI2ScoreTransformer)
 - [Pinned upstream inference utilities](https://raw.githubusercontent.com/TimFelixBeyer/MIDI2ScoreTransformer/115432bda16ca16e0fec2e9465788f2ba369971f/midi2scoretransformer/utils.py)
 - [PyTorch local CUDA installation](https://pytorch.org/get-started/locally/)
+- [PyTorch release and CUDA support matrix](https://github.com/pytorch/pytorch/blob/main/RELEASE.md)
+- [uv PyTorch accelerator configuration](https://docs.astral.sh/uv/guides/integration/pytorch/)
 - [NVIDIA CUDA on WSL guide](https://docs.nvidia.com/cuda/wsl-user-guide/)
 - [RunPod RTX 4090 pricing page](https://www.runpod.io/gpu-models/rtx-4090)
 
@@ -531,40 +590,43 @@ Advance in this order:
 7. **Human review:** a real target-piano browser session feels usefully more
    interactive.
 8. **Hosted replication:** a rented device reproduces the local result with
-   transport, cold-start, privacy, reliability, and full cost included.
+transport, cold-start, privacy, reliability, and full cost included.
+
+Gates 1 through 3 passed on native Windows in Tactical 050. Gate 2 means
+declared-tolerance note parity and valid repeatable controller output; it does
+not mean CPU-identical pedal intervals. Gate 4 is the next bounded slice.
 
 Failure at one gate is useful evidence. It should update this topic and the
 owning model or notation topic rather than being hidden by proceeding to a
 more complicated deployment.
 
-## First 4090 Session Handoff
+## Next 4090 Session Handoff
 
 A new development session on the 4090 machine should:
 
 1. read this topic plus the linked Windows portability, acoustic, live,
    notation, Linux, and architecture topics;
-2. inspect the native Windows dependency and CUDA environment without changing
-   model behavior;
-3. create the next available bounded tactical for the native Windows runtime
-   and device profile;
-4. establish the native Python 3.10 environment and resolve the Basic Pitch
-   runtime gap with parity evidence;
-5. generate and hash the fixed musical fixture;
-6. run native CPU controls before the two CPU/CUDA `profile-backend` controls
-   above;
-7. compare artifacts and timing before changing any scheduler constant;
-8. validate the unpackaged native Windows local server before opening desktop
-   packaging work;
-9. update this topic and the Windows portability topic with the host identity,
-   commands, retained evidence, result, gaps, and recommended next step; and
-10. keep model checkpoints, generated audio, profiles, and benchmark outputs
-    outside Git.
+2. use the locked `corrected-cu132` environment and strict-FP32 execution
+   identity established in Tactical 050;
+3. create the next available bounded tactical for the hop/guard frontier;
+4. preserve the 28-second buffer and 16-second minimum context while sweeping
+   only the declared hop and right-edge guard matrix;
+5. retain source-sample event time, window/commit ownership, note/offset/
+   velocity metrics, and controller intervals for every candidate;
+6. compare each candidate with the ordinary 28/4/4 CUDA result before any
+   application selection;
+7. run wall-clock server replay for candidates that pass accelerated quality
+   and service gates;
+8. keep desktop packaging, score CUDA, and physical microphone review outside
+   the scheduler tactical;
+9. update this topic and the acoustic-transcription topic with the selected
+   frontier or rejection evidence; and
+10. keep model checkpoints, generated audio, profiles, telemetry, and
+    benchmark output outside Git.
 
-The first session should not begin with Tauri packaging or by converting every
-stage to CUDA. Its smallest useful outcome is a reproducible answer to: **Does
-current Transkun 2.0.1 in the native Windows server runtime on this RTX 4090
-preserve the baseline result, and how much warm decode headroom does it create
-under the existing 28/4/4 policy?**
+The next session should answer: **How much can the four-second hop and guard be
+reduced on strict-FP32 RTX 4090 CUDA while retaining note and pedal/controller
+quality, stable window reconciliation, and enough warm service headroom?**
 
 ## Open Questions
 
@@ -572,8 +634,8 @@ under the existing 28/4/4 policy?**
   device transfer, semi-CRF decoding, and Python post-processing?
 - How closely do native Windows and the optional WSL2 reference agree on model
   output and stage timing when source, model, device, and scheduler are fixed?
-- Does CUDA change note, velocity, pedal, or boundary output under the current
-  FP32 path?
+- Which window edges account for CUDA's repeatable 10-to-6 second-repetition
+  controller difference from CPU, and does any shorter guard worsen it?
 - How low can hop and guard go before window-edge quality or compute duty
   becomes unacceptable?
 - Does a persistent warm Transkun worker stay loaded without affecting the

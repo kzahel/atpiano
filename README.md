@@ -73,10 +73,13 @@ The locked environment, deterministic Basic Pitch and Transkun CPU controls,
 production frontend, migration gate, compact storage path, and unpackaged
 `workbench-v3` replay pass on the RTX 4090 host without WSL. This is a
 packaging-aligned development baseline, not yet a supported Windows desktop
-build. CUDA is the next bounded runtime slice; Tauri adaptation, physical
-microphone parity, installer, signing, and updates remain later work. WSL2
-remains a labeled Linux reference and failure-isolation option rather than a
-product dependency. Current direction and evidence are recorded in
+build. The explicit `corrected-cu132` environment now also passes strict-FP32
+Transkun parity and accelerated replay through the same native server on the
+RTX 4090. Scheduler latency/quality sweeps are next; Tauri adaptation,
+physical microphone parity, installer, signing, and updates remain later
+work. WSL2 remains a labeled Linux reference and failure-isolation option
+rather than a product dependency. Current direction and evidence are recorded
+in
 [`docs/topics/windows-native-runtime-portability.md`](docs/topics/windows-native-runtime-portability.md)
 and
 [`docs/topics/nvidia-accelerated-low-latency-pipeline.md`](docs/topics/nvidia-accelerated-low-latency-pipeline.md).
@@ -112,6 +115,27 @@ uv sync --extra corrected
 npm ci --prefix app
 uv run atpiano workbench-v3
 ```
+
+On a compatible native Windows NVIDIA host, install the explicit CUDA 13.2
+variant and retain the selected measured backend profile:
+
+```text
+uv sync --extra corrected-cu132 --frozen
+uv run --extra corrected-cu132 atpiano profile-backend `
+  ..\atpiano-artifacts\musical-loop-input\input.json `
+  results\backend-profile-cu132 `
+  --commit-device cuda --commit-threads 2
+uv run --extra corrected-cu132 atpiano workbench-v3 `
+  --commit-device cuda `
+  --backend-profile results\backend-profile-cu132\backend-profile.json
+```
+
+`corrected` and `corrected-cu132` are intentionally mutually exclusive. The
+CUDA wheel carries its user-space runtime; the validated server does not
+require a separately installed CUDA toolkit. A profile is trusted only when
+its Torch build, CUDA device/runtime, precision policy, checkpoint, scheduler,
+and host still match. Generate a new profile with `profile-backend` before
+using the example path on a different host or runtime.
 
 The command builds and opens the v3 React application, using
 `results/workbench-v3/` as its local workspace by default. Select **New

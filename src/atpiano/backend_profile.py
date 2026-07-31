@@ -26,6 +26,19 @@ class _ProfileModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
+class BackendAcceleratorIdentity(_ProfileModel):
+    kind: str
+    runtime_version: str | None = None
+    device_index: int | None = Field(default=None, ge=0)
+    device_name: str | None = None
+    compute_capability: str | None = None
+    compiled_architectures: tuple[str, ...] = ()
+    total_memory_bytes: int | None = Field(default=None, gt=0)
+    float32_matmul_precision: str | None = None
+    matmul_allow_tf32: bool | None = None
+    cudnn_allow_tf32: bool | None = None
+
+
 class BackendModelIdentity(_ProfileModel):
     name: str
     version: str | None = None
@@ -34,6 +47,9 @@ class BackendModelIdentity(_ProfileModel):
     checkpoint_sha256: str | None = None
     config_sha256: str | None = None
     thread_limit: int | None = Field(default=None, ge=1)
+    torch_version: str | None = None
+    precision: str | None = None
+    accelerator: BackendAcceleratorIdentity | None = None
 
 
 class BackendSchedulerIdentity(_ProfileModel):
@@ -100,6 +116,7 @@ def model_identity(
         if isinstance(execution, dict)
         else None
     )
+    accelerator = provenance.get("accelerator")
     return BackendModelIdentity(
         name=str(provenance.get("name", "unknown")),
         version=(
@@ -135,6 +152,21 @@ def model_identity(
                 if execution_threads is not None
                 else None
             )
+        ),
+        torch_version=(
+            str(provenance["torch_version"])
+            if provenance.get("torch_version") is not None
+            else None
+        ),
+        precision=(
+            str(provenance["precision"])
+            if provenance.get("precision") is not None
+            else None
+        ),
+        accelerator=(
+            BackendAcceleratorIdentity.model_validate(accelerator)
+            if isinstance(accelerator, dict)
+            else None
         ),
     )
 

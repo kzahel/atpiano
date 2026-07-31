@@ -4,15 +4,23 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import platform
 import shutil
 import subprocess
 import sys
+import tempfile
+import threading
+import time
 from collections.abc import Iterable, Sequence
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
+
+_ATOMIC_WRITE_LOCKS = tuple(threading.Lock() for _ in range(64))
+_WINDOWS_REPLACE_ATTEMPTS = 50
+_WINDOWS_REPLACE_RETRY_S = 0.01
 
 
 def utc_now() -> str:
@@ -39,25 +47,79 @@ def sha256_path(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _replace_atomic(temporary: Path, destination: Path) -> None:
+    attempts = _WINDOWS_REPLACE_ATTEMPTS if sys.platform == "win32" else 1
+    for attempt in range(attempts):
+        try:
+            os.replace(temporary, destination)
+            return
+        except PermissionError:
+            if attempt + 1 == attempts:
+                raise
+            time.sleep(_WINDOWS_REPLACE_RETRY_S)
+
+
+def _atomic_write_lock(path: Path) -> threading.Lock:
+    identity = os.path.normcase(str(path.absolute()))
+    return _ATOMIC_WRITE_LOCKS[hash(identity) % len(_ATOMIC_WRITE_LOCKS)]
+
+
 def write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.tmp")
-    with temporary.open("w", encoding="utf-8", newline="\n") as handle:
-        handle.write(
-            json.dumps(value, indent=2, sort_keys=True, allow_nan=False)
-        )
-        handle.write("\n")
-    temporary.replace(path)
+    temporary: Path | None = None
+    try:
+        with _atomic_write_lock(path):
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                newline="\n",
+                prefix=f".{path.name}.",
+                suffix=".tmp",
+                dir=path.parent,
+                delete=False,
+            ) as handle:
+                temporary = Path(handle.name)
+                handle.write(
+                    json.dumps(
+                        value,
+                        indent=2,
+                        sort_keys=True,
+                        allow_nan=False,
+                    )
+                )
+                handle.write("\n")
+            _replace_atomic(temporary, path)
+            temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def write_jsonl(path: Path, values: Iterable[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.tmp")
-    with temporary.open("w", encoding="utf-8", newline="\n") as handle:
-        for value in values:
-            handle.write(json.dumps(value, sort_keys=True, allow_nan=False))
-            handle.write("\n")
-    temporary.replace(path)
+    temporary: Path | None = None
+    try:
+        with _atomic_write_lock(path):
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                newline="\n",
+                prefix=f".{path.name}.",
+                suffix=".tmp",
+                dir=path.parent,
+                delete=False,
+            ) as handle:
+                temporary = Path(handle.name)
+                for value in values:
+                    handle.write(
+                        json.dumps(value, sort_keys=True, allow_nan=False)
+                    )
+                    handle.write("\n")
+            _replace_atomic(temporary, path)
+            temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def read_json(path: Path) -> dict[str, Any]:

@@ -75,7 +75,8 @@ class TranskunCommitModel:
             import transkun
         except ModuleNotFoundError as error:
             raise RuntimeError(
-                "Transkun is unavailable; run `uv sync --extra corrected`"
+                "Transkun is unavailable; run `uv sync --extra corrected` "
+                "or `uv sync --extra corrected-cu132`"
             ) from error
         if thread_limit is not None:
             if thread_limit <= 0:
@@ -108,15 +109,27 @@ class TranskunCommitModel:
             map_location=device,
             weights_only=False,
         )
-        model = model_class(conf=config).to(device)
+        torch_device = torch.device(device)
+        if torch_device.type == "cuda" and not torch.cuda.is_available():
+            raise RuntimeError(
+                f"Transkun requested {device!r}, but Torch cannot use CUDA"
+            )
+        if torch_device.type == "cuda":
+            torch.backends.cuda.matmul.allow_tf32 = False
+            torch.backends.cudnn.allow_tf32 = False
+            torch.set_float32_matmul_precision("highest")
+        model = model_class(conf=config).to(torch_device)
         state = checkpoint.get("best_state_dict", checkpoint.get("state_dict"))
         if state is None:
             raise RuntimeError("Transkun checkpoint has no model state")
         model.load_state_dict(state, strict=False)
         model.eval()
+        if torch_device.type == "cuda":
+            torch.cuda.synchronize(torch_device)
         self._torch = torch
         self._model = model
-        self.device = device
+        self._torch_device = torch_device
+        self.device = str(torch_device)
         self.thread_limit = thread_limit
         self.sample_rate_hz = int(model.fs)
         self.load_s = (
@@ -124,6 +137,40 @@ class TranskunCommitModel:
         ) / 1_000_000_000
         self.checkpoint_sha256 = sha256_file(self.checkpoint_path)
         self.config_sha256 = sha256_file(self.config_path)
+        parameter = next(model.parameters(), None)
+        self.precision = (
+            str(parameter.dtype).removeprefix("torch.")
+            if parameter is not None
+            else "unknown"
+        )
+        self.accelerator = self._accelerator_provenance()
+
+    def _accelerator_provenance(self) -> dict[str, Any]:
+        if self._torch_device.type != "cuda":
+            return {"kind": self._torch_device.type}
+        index = (
+            self._torch_device.index
+            if self._torch_device.index is not None
+            else self._torch.cuda.current_device()
+        )
+        properties = self._torch.cuda.get_device_properties(index)
+        major, minor = self._torch.cuda.get_device_capability(index)
+        return {
+            "kind": "cuda",
+            "runtime_version": self._torch.version.cuda,
+            "device_index": index,
+            "device_name": properties.name,
+            "compute_capability": f"{major}.{minor}",
+            "compiled_architectures": self._torch.cuda.get_arch_list(),
+            "total_memory_bytes": properties.total_memory,
+            "float32_matmul_precision": (
+                self._torch.get_float32_matmul_precision()
+            ),
+            "matmul_allow_tf32": (
+                self._torch.backends.cuda.matmul.allow_tf32
+            ),
+            "cudnn_allow_tf32": self._torch.backends.cudnn.allow_tf32,
+        }
 
     def transcribe(
         self,
@@ -147,7 +194,7 @@ class TranskunCommitModel:
         else:
             model_audio = source
         tensor = self._torch.from_numpy(np.ascontiguousarray(model_audio)).to(
-            self.device
+            self._torch_device
         )
         started_ns = time.perf_counter_ns()
         with self._torch.inference_mode():
@@ -158,6 +205,8 @@ class TranskunCommitModel:
                 discardSecondHalf=False,
                 mergeIncompleteEvent=True,
             )
+        if self._torch_device.type == "cuda":
+            self._torch.cuda.synchronize(self._torch_device)
         inference_s = (
             time.perf_counter_ns() - started_ns
         ) / 1_000_000_000
@@ -203,6 +252,8 @@ class TranskunCommitModel:
             "config_sha256": self.config_sha256,
             "load_s": self.load_s,
             "torch_version": version("torch"),
+            "precision": self.precision,
+            "accelerator": self.accelerator,
         }
 
 

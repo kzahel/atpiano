@@ -29,7 +29,30 @@ capture = [
 ]
 corrected = [
   "transkun==2.0.1",
+  "torch==2.13.0",
 ]
+corrected-cu132 = [
+  "transkun==2.0.1",
+  "torch==2.13.0",
+]
+
+[tool.uv]
+conflicts = [
+  [
+    { extra = "corrected" },
+    { extra = "corrected-cu132" },
+  ],
+]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu132", extra = "corrected-cu132" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu132"
+url = "https://download.pytorch.org/whl/cu132"
+explicit = true
 
 [project.scripts]
 atpiano = "atpiano.cli:main"

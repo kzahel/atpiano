@@ -8,6 +8,9 @@ ML reference, normalized revisable events, timing/quality artifacts, a local
 run reviewer, native file-producing microphone adapter, and a local browser
 live-transcription/reconciliation workbench. The live lane now uses a measured
 strict-onset decoder while the full-file reference remains untouched.
+Native Windows strict-FP32 CUDA Transkun note parity now passes on the RTX
+4090; repeatable CPU/CUDA controller differences remain explicit quality
+evidence for the next scheduler sweep.
 
 ## Scope
 
@@ -397,6 +400,30 @@ degraded mode and increases scheduling no farther than eight seconds. The real
 musical and target-piano validations did not enter degraded mode: their decode
 maxima stayed near 3.3 seconds. A fake slow-adapter test forces the transition
 without making a real-time claim from throughput alone.
+
+### Native Windows CPU/CUDA backend comparison
+
+Tacticals 049 and 050 compare the same 84-second continuous fixture,
+Transkun 2.0.1 checkpoint, adapter, float32 path, two-thread worker, and
+28/4/4 scheduler on one RTX 4090 Windows host. The CUDA control explicitly
+disables both matmul and cuDNN TF32.
+
+The CPU repetitions produced 151/157 notes and 12/10 controller intervals.
+Two independent CUDA profiles each produced the same 155/156 notes and 12/6
+controller intervals, with every interval closed and no pending tail. CUDA
+was exactly repeatable across the independent runs.
+
+Comparing corresponding CPU and CUDA repetitions, onset F1 was 0.954/0.978,
+note-with-offset F1 was 0.876/0.920, and velocity MAE was 0.500/0.575. The
+note result passes the existing same-input tolerances. It is not exact device
+parity: CUDA retained four fewer second-repetition controller intervals than
+CPU, and strict IEEE-style float32 policy did not remove the difference.
+
+This isolates a backend-sensitive pedal/window-boundary result rather than a
+flaky CUDA run. Any hop/guard candidate must publish controller counts and
+onset/offset timing beside note metrics, and a candidate that worsens this
+bounded difference is not acceptable merely because decode time is lower.
+Accelerated replay still makes no capture-to-event latency claim.
 
 ### Linux backend capability result
 

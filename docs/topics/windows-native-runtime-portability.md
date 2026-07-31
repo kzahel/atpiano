@@ -2,13 +2,14 @@
 
 Topic: windows-native-runtime-portability
 
-Status: **native Windows CPU server and model-runtime baseline established on
-2026-07-31.** The locked ordinary and corrected environments, Basic Pitch
-ONNX preview, Transkun CPU correction, production frontend, migration gate,
-one-hour storage control, and unpackaged `workbench-v3` replay all pass on the
-user-controlled RTX 4090 desktop without WSL. CUDA, physical microphone, and
-Windows desktop packaging have not passed. The accepted Tauri proof remains
-macOS arm64 only.
+Status: **native Windows CPU and RTX 4090 CUDA server baselines established on
+2026-07-31.** The locked ordinary, CPU corrected, and CUDA corrected
+environments, Basic Pitch ONNX preview, Transkun controls, production
+frontend, migration gate, one-hour storage control, and unpackaged
+`workbench-v3` replay all pass without WSL. Accelerated CUDA settlement and
+process-restart recovery pass; wall-clock browser paint, physical microphone,
+and Windows desktop packaging have not passed. The accepted Tauri proof
+remains macOS arm64 only.
 
 ## Intent
 
@@ -161,9 +162,25 @@ high-water of 196.
 The locked Windows Torch 2.13.0 wheel is CPU-only. Native CPU Transkun passed
 the two-repeat control with 151/157 notes, pairwise onset F1 0.948, offset F1
 0.753, and no open tail. Its 13.743-second mean decode cannot sustain the
-four-second scheduler and correctly selects after-Stop correction. This
-answers the CPU portability question but deliberately leaves CUDA dependency
-selection to the NVIDIA topic.
+four-second scheduler and correctly selects after-Stop correction. Tactical
+049 answered the CPU portability question; Tactical 050 made the separate
+CUDA dependency decision below.
+
+Tactical 050 now adds an explicit, mutually exclusive `corrected-cu132`
+environment. It locks official Torch 2.13.0+cu132 while preserving the
+ordinary and CPU corrected variants. The wheel carries its CUDA 13.2
+user-space runtime, executes on the RTX 4090 without WSL or a system CUDA
+toolkit, and binds the Torch build, device, compute capability, precision,
+TF32 policy, and VRAM into backend-profile compatibility.
+
+Two independent strict-FP32 CUDA profiles were semantically identical. Their
+mean decode wall times were 1.005 and 1.068 seconds with 0.227 and 0.242
+service ratios, so the unchanged 28/4/4 scheduler selects live correction.
+Corresponding CPU/CUDA repetitions pass the established note, offset, and
+velocity tolerances. CUDA controller intervals are valid and repeatable but
+not CPU-identical: the second repetition contains 6 versus the CPU control's
+10. The NVIDIA topic owns that model-quality sensitivity and the next
+hop/guard sweep.
 
 The unpackaged native server ingested and settled all 2,016,000 fixture
 frames, reattached through the session catalog, and exposed complete audio,
@@ -172,13 +189,29 @@ compact publication and an accelerated 3,612-second storage validation. The
 complete Windows-applicable migration gate and production frontend build pass.
 The implementation corrections cover `PATHEXT` subprocess launch, Windows
 peak-RSS accounting, media flushing, stable MIME types, deterministic LF JSON,
-portable artifact separators, and Mach-O inspection without Unix `file`.
+portable artifact separators, Mach-O inspection without Unix `file`, and
+unique retryable atomic state publication under concurrent Windows readers
+and writers.
+
+The matching CUDA profile also passes the same unpackaged boundary. The server
+selects live correction, settles all 2,016,000 source frames with no stage
+error or pending tail, publishes four verified artifacts, and retains full
+CUDA provenance. After the exact process tree stopped, a fresh server process
+reopened the completed 152-note session and artifact catalog from the same
+workspace. This is the packaging-aligned CUDA server baseline, not a packaged
+desktop result or an end-to-end microphone latency claim.
 
 The development environment is 1.17 GiB and is explicitly not a packaging
 proposal. The handoff identifies a 59.83 MiB managed interpreter, 1.55 MiB
 production frontend, separate ONNX preview and Torch/Transkun corrected
 components, and FFmpeg/FFprobe media tools. Tactical 049 owns the full
 measurement table and retained command evidence.
+
+The complete locked CUDA development environment is 3.40 GiB and Torch alone
+is 2.70 GiB. It is likewise not a proposed payload. A Windows packaging slice
+should retain separate CPU and NVIDIA pack identities, derive an
+inference-minimal CUDA DLL inventory, and prove every size or startup
+optimization against the frozen fixture and profile identity.
 
 The existing desktop proof is not a Windows starting artifact:
 
@@ -230,19 +263,19 @@ Before CUDA, require native Windows to:
 Platform-specific timing may differ. Unexplained note, pedal, boundary,
 coverage, or artifact differences are parity failures.
 
-### 4. Establish native CUDA evidence — next
+### 4. Establish native CUDA evidence — complete
 
 Continue with the controls and decision gates in the NVIDIA topic. Torch must
 report the Windows device, CUDA build, device name, and compute capability.
 CPU and CUDA runs must use the same source, checkpoint, adapter, precision,
 and scheduler policy before hop or guard values change.
 
-### 5. Exercise the unpackaged local server — CPU complete
+### 5. Exercise the unpackaged local server — CPU and accelerated CUDA complete
 
-The primary `workbench-v3` server now passes native accelerated CPU replay and
-an equivalent retained loopback client gate. Repeat this path with the
-matching CUDA profile, then validate wall-clock replay and only then a
-consentful physical microphone session. Retain:
+The primary `workbench-v3` server now passes native accelerated CPU and CUDA
+replay, profile selection, settlement, retained loopback client gates, and
+CUDA workspace recovery after process restart. Next validate wall-clock replay
+and only then a consentful physical microphone session. Retain:
 
 - continuous sample-indexed ingest;
 - preview and correction horizons;
@@ -279,23 +312,25 @@ build.
 
 ## Baseline Acceptance
 
-The native Windows CPU server baseline is established because:
+The native Windows CPU and accelerated CUDA server baselines are established
+because:
 
 1. all model and server processes are native Windows processes with no WSL
    dependency;
 2. the frozen fixture and its hashes identify every compared run;
-3. Basic Pitch and CPU Transkun produce valid comparable normalized output;
-4. accelerated CPU server replay preserves ingest, Stop, settlement,
-   reattachment, and artifact behavior;
+3. Basic Pitch plus CPU and strict-FP32 CUDA Transkun produce valid comparable
+   normalized output, with the controller difference explicitly retained;
+4. accelerated CPU and CUDA server replay preserve ingest, Stop, settlement,
+   reattachment, restart recovery, and artifact behavior;
 5. every result records platform, architecture, Python, package lock, model,
    checkpoint, precision, and device provenance;
 6. benchmark and model artifacts remain outside Git; and
 7. the packaging-readiness handoff identifies remaining Windows desktop work
    without claiming that work is complete.
 
-CUDA Transkun must still pass its separate parity gate before any scheduler
-sweep or CUDA server claim. Wall-clock replay, browser paint timing, and a
-physical microphone remain extensions rather than evidence already obtained.
+CUDA Transkun has passed its separate note-parity and native-server gates.
+Wall-clock replay, browser paint timing, the hop/guard frontier, and a physical
+microphone remain extensions rather than evidence already obtained.
 
 Microphone parity is a separate acceptance extension. A deterministic server
 baseline must not be delayed merely because a physical capture review has not
@@ -303,8 +338,8 @@ yet occurred, but it also must not be described as microphone-validated.
 
 ## Open Questions
 
-- Which explicit CUDA-enabled Windows Torch source and version should define
-  the NVIDIA extra while preserving the CPU environment and lock discipline?
+- What inference-minimal subset of the 3.40 GiB CUDA development environment
+  should define the future NVIDIA model pack?
 - Which native media and audio libraries are required for the server control,
   physical capture, and eventual relocatable sidecar?
 - Which remaining process-signal and privileged-symlink behaviors need a

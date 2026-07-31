@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from atpiano.util import (
@@ -8,6 +11,33 @@ from atpiano.util import (
     write_json,
     write_jsonl,
 )
+
+
+def test_atomic_replace_retries_transient_windows_access_denial(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    attempts = 0
+    original_replace = __import__("os").replace
+
+    def replace(source: Path, destination: Path) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise PermissionError("target is briefly open")
+        original_replace(source, destination)
+
+    monkeypatch.setattr("atpiano.util.sys.platform", "win32")
+    monkeypatch.setattr("atpiano.util.os.replace", replace)
+    monkeypatch.setattr("atpiano.util.time.sleep", lambda _seconds: None)
+
+    destination = tmp_path / "destination.json"
+    write_json(destination, {"value": 1})
+
+    assert attempts == 3
+    assert json.loads(destination.read_text(encoding="utf-8")) == {
+        "value": 1
+    }
 
 
 def test_resolve_command_uses_path_lookup(monkeypatch) -> None:
@@ -37,3 +67,33 @@ def test_json_writers_use_platform_independent_line_endings(
 
     assert b"\r\n" not in document.read_bytes()
     assert b"\r\n" not in rows.read_bytes()
+
+
+def test_json_writer_uses_unique_temporary_files_for_concurrent_writes(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    destination = tmp_path / "state.json"
+    original_open = Path.open
+    fixed_temporary_barrier = threading.Barrier(2)
+
+    def synchronized_open(path: Path, *args, **kwargs):
+        handle = original_open(path, *args, **kwargs)
+        if path.name == ".state.json.tmp":
+            fixed_temporary_barrier.wait(timeout=2)
+        return handle
+
+    monkeypatch.setattr(Path, "open", synchronized_open)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(write_json, destination, {"value": value})
+            for value in (1, 2)
+        ]
+        for future in futures:
+            future.result()
+
+    assert json.loads(destination.read_text(encoding="utf-8"))["value"] in {
+        1,
+        2,
+    }
+    assert list(tmp_path.glob(".state.json.*.tmp")) == []
