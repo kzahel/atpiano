@@ -43,6 +43,9 @@
   caregiver-and-toddler sound play, ear-led piano games, studio discovery,
   acoustic and MIDI interaction, notation, offline delivery, and
   child-created musical memories
-- `nvidia-accelerated-low-latency-pipeline` — RTX 4090 Transkun and score-model
-  CUDA experiments, scheduler latency sweeps, concurrent GPU behavior, and
-  hosted premium-tier cost evidence
+- `nvidia-accelerated-low-latency-pipeline` — native Windows RTX 4090 Transkun
+  and score-model CUDA experiments, scheduler latency sweeps, concurrent GPU
+  behavior, and hosted premium-tier cost evidence
+- `windows-native-runtime-portability` — native Windows dependency, model,
+  deterministic replay, and unpackaged local-server parity aligned with a
+  later Windows desktop sidecar and model-pack lane

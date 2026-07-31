@@ -2,7 +2,7 @@
 
 Topic: multi-tenant-hybrid-service-architecture
 
-Status: **deferred future architecture as of 2026-07-28.** Phases 1 through 5
+Status: **deferred future architecture as of 2026-07-31.** Phases 1 through 5
 are complete and R2 through R5 are accepted. The user does not currently plan
 to build the managed PostgreSQL, object-storage, identity, tenancy, or sync
 system. The near-term deployment is the working Mac-hosted local application
@@ -45,6 +45,17 @@ browser downloads. The webview still has no general filesystem, dialog,
 shell, or remote HTTP permission. The ordinary R5 and every public artifact
 remain score-free. Windows, Linux, final signing, updates, and microphone
 parity remain outside this bounded proof.
+
+Native Windows is now the next authoritative local execution environment, but
+the immediate target is an unpackaged Python/React server and deterministic
+model runtime rather than a Windows Tauri package. That focused bring-up is
+owned by
+[`windows-native-runtime-portability.md`](windows-native-runtime-portability.md).
+It should preserve the application-core, runtime, workspace, model-adapter,
+provenance, and frontend contracts needed by the future Windows sidecar. WSL2
+is a diagnostic Linux reference, not a desktop runtime prerequisite. This
+decision does not open the complete local desktop Phase 6, installer, signing,
+or updater work.
 
 The local Python path now composes framework-independent application services
 for sessions, capture, score jobs, storage, artifacts, and recoverable
@@ -114,6 +125,11 @@ process or release boundaries.
 [`browser-only-wasm-deployment.md`](browser-only-wasm-deployment.md) remains
 an optional client-side executor investigation, not the product architecture
 or a constraint on model quality.
+[`windows-native-runtime-portability.md`](windows-native-runtime-portability.md)
+owns the native Windows development environment and packaging-aligned local
+server baseline. It stops before Tauri packaging; this topic continues to own
+the durable desktop process, model-pack, security, compatibility, update, and
+distribution shape.
 
 This is a deferred target architecture, not evidence that hosted accounts,
 collaboration, sync, or multi-tenant behavior works and not an instruction to
@@ -627,10 +643,14 @@ should not force a complete application update, and an application update
 should not silently download every model. Manifests declare supported app,
 sidecar, adapter, platform, architecture, and device ranges.
 
-Start with macOS arm64 because it is the current measured environment. Add
-Windows next through a separately validated packaging lane. Tauri's
-cross-platform UI does not make Python wheels, model runtimes, accelerators,
-codesigning, or installers automatically portable.
+The accepted package starts with macOS arm64 because it is the current measured
+desktop environment. Windows comes next in two explicit stages: first establish
+the native unpackaged server/model runtime, then open a separately validated
+desktop packaging tactical. The first stage should make the later sidecar and
+model-pack inventory concrete without pretending that a development
+environment is relocatable. Tauri's cross-platform UI does not make Python
+wheels, model runtimes, accelerators, codesigning, or installers automatically
+portable.
 
 ### Offline promise
 
@@ -850,6 +870,14 @@ Completion of Phase 5 does not queue Phase 6 or Phase 7. Focused local work
 may proceed under its own topic without accepting the full scope of either
 phase.
 
+The native Windows server baseline is such focused local work. It may validate
+the shared application core, deterministic replay, local browser path, model
+adapters, CUDA device provenance, process behavior, and a packaging-readiness
+inventory without opening the complete desktop vertical slice. A later Windows
+Tauri tactical must still prove relocatable runtime staging, Rust supervision,
+WebView2 and microphone behavior, offline operation, installer semantics,
+signing, updates, and rollback.
+
 Phase 1 completed in
 [`014-freeze-migration-baseline.md`](../tactical/014-freeze-migration-baseline.md).
 The normalized fixture and route baseline, automated regression report, manual
@@ -923,7 +951,8 @@ These choices intentionally remain open until their implementation tactical:
   policies;
 - cloud-to-local download and multi-device mutable-metadata conflict UX;
 - desktop telemetry defaults and diagnostic consent;
-- Windows and later Linux packaging details; and
+- final Windows and later Linux packaging, installer, signing, and update
+  details after the native Windows server baseline; and
 - the licensed score converter used in public distribution.
 
 If hosted work is reopened, selecting one deferred component does not reopen

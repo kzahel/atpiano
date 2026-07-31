@@ -60,9 +60,9 @@ normally reuse the document slug in its `Topic:` trailers.
   typed, spoken, played, or direct-manipulation intent into previewed,
   versioned performance, notation, or arrangement edits.
 - [`nvidia-accelerated-low-latency-pipeline.md`](nvidia-accelerated-low-latency-pipeline.md):
-  proposed RTX 4090 ceiling experiment for CUDA Transkun correction,
-  opt-in score-model acceleration, scheduler latency sweeps, concurrent GPU
-  behavior, and hosted premium-tier cost evidence.
+  proposed native Windows RTX 4090 ceiling experiment for CUDA Transkun
+  correction, opt-in score-model acceleration, scheduler latency sweeps,
+  concurrent GPU behavior, and hosted premium-tier cost evidence.
 - [`performance-to-notation.md`](performance-to-notation.md):
   evaluated downstream conversion prototype whose artifacts are inspectable
   but whose first target-piano score failed the readability goal.
@@ -78,6 +78,10 @@ normally reuse the document slug in its `Topic:` trailers.
 - [`session-workspace-management.md`](session-workspace-management.md):
   accepted v2 foundation for explicit New, session history, separate
   active/selected identities, recoverable deletion, and future continuation.
+- [`windows-native-runtime-portability.md`](windows-native-runtime-portability.md):
+  proposed native Windows Python/model and unpackaged local-server baseline,
+  aligned with later Tauri sidecar and model-pack work without opening desktop
+  packaging yet.
 
 ## Update Policy
 

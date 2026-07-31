@@ -2,15 +2,18 @@
 
 Topic: nvidia-accelerated-low-latency-pipeline
 
-Status: **proposed reproducible RTX 4090 experiment as of 2026-07-29.**
-No Atpiano CUDA result has been recorded yet. A user-controlled desktop with
-an NVIDIA RTX 4090 is the first intended host. Transkun already exposes a
-CUDA-compatible adapter boundary in Atpiano. The internal score converter's
-upstream code appears CUDA-aware, but Atpiano deliberately forces that
-subprocess to CPU and has not validated NVIDIA output. The existing Linux
-Basic Pitch preview remains a CPU TFLite path. This topic authorizes research
-and documentation, not a public hosted product or general distribution of the
-internal score model.
+Status: **proposed reproducible native Windows RTX 4090 experiment as of
+2026-07-31.** No Atpiano CUDA result has been recorded yet. The first intended
+host is the user-controlled Windows desktop with an NVIDIA RTX 4090. Native
+Windows is now the authoritative result so the measured server and model
+runtime can feed future Windows desktop packaging. WSL2 remains a labeled
+Linux reference and fallback, not the product runtime. Transkun already
+exposes a CUDA-compatible adapter boundary in Atpiano. The internal score
+converter's upstream code appears CUDA-aware, but Atpiano deliberately forces
+that subprocess to CPU and has not validated NVIDIA output. The existing
+Linux Basic Pitch preview remains a CPU TFLite path. This topic authorizes
+research and documentation, not a public hosted product or general
+distribution of the internal score model.
 
 ## Intent
 
@@ -60,12 +63,37 @@ continues to own any eventual hosted worker, tenant, persistence, security,
 and deployment design.
 [`linux-development-portability.md`](linux-development-portability.md) owns
 ordinary Linux compatibility and retains the existing CPU evidence.
+[`windows-native-runtime-portability.md`](windows-native-runtime-portability.md)
+owns the native Windows dependency environment, unpackaged local-server
+baseline, operating-system behavior, and handoff to later desktop packaging.
 
 This topic does not select a permanent model, authorize a cloud launch, relax
 the audio sample-clock contract, or change the private-use-only status of
 MIDI2ScoreTransformer.
 
 ## Known Starting Point
+
+### Native Windows host and runtime boundary
+
+The intended host reports an Intel Core i7-13700KF, approximately 96 GiB RAM,
+an RTX 4090 with 24,564 MiB VRAM, NVIDIA driver 610.88, and a 450 W GPU power
+limit. Windows and the installed Ubuntu WSL2 distro both see the GPU, but no
+native Windows Atpiano CUDA result exists.
+
+The experiment now starts with native Windows Python and model processes. The
+first application target is the unpackaged `workbench-v3` local server and a
+normal Windows browser, not the currently macOS-only Tauri bundle. This keeps
+the server, model adapters, model/device provenance, workspace, and frontend
+contracts aligned with a future native Windows sidecar without making desktop
+packaging a prerequisite for CUDA measurement.
+
+The native environment is not ready yet. The project requires Python 3.10,
+while inspection found Python 3.13, no `uv`, and no repository environment on
+the Windows path. The current lock also has no Windows wheel for
+`tflite-runtime` 2.14.0. Resolve that Basic Pitch runtime gap through the
+bounded Windows portability work before claiming an ordinary application
+baseline. Do not substitute a different model or decoder silently. The
+Windows portability topic owns that bring-up and its parity evidence.
 
 ### Basic Pitch preview
 
@@ -209,15 +237,22 @@ note.
 
 ### 1. Record the host
 
-Prefer native x86_64 Linux for the first result because the repository already
-has a validated Linux dependency and model path. If the machine normally runs
-Windows, Ubuntu under WSL2 is the second choice: NVIDIA officially supports
-CUDA compute in WSL2, but browser microphone and host-network behavior should
-be validated separately after deterministic replay.
+Use native 64-bit Windows for the authoritative result. This is a deliberate
+change from the earlier Linux-first proposal: the immediate product-facing
+goal is a packaging-aligned Windows local-server runtime, even though the
+current accepted Tauri artifact remains macOS arm64 only. Establish native
+dependency and CPU parity before measuring CUDA.
+
+Use Ubuntu under WSL2 only as a separately labeled reference or when isolating
+a native Windows failure. A WSL result does not satisfy the Windows runtime or
+packaging-alignment gate. If a WSL comparison is needed, keep its checkout and
+benchmark outputs in the Linux filesystem rather than `/mnt/c`, and validate
+browser microphone and host-network behavior separately.
 
 Record at least:
 
-- operating system, kernel or WSL version, and filesystem location;
+- Windows edition/build and filesystem location, or the kernel, distro, and
+  filesystem location for a labeled WSL control;
 - CPU model, physical/logical core count, RAM, and power policy;
 - exact RTX model, VRAM, VBIOS if available, and power limit;
 - NVIDIA driver, reported CUDA runtime, and `nvidia-smi` output;
@@ -227,8 +262,8 @@ Record at least:
 - whether the display also loads the same GPU; and
 - background load and temperature before each measured lane.
 
-Do not install a Linux display driver inside WSL. Use the Windows NVIDIA
-driver exposed to WSL, following NVIDIA's CUDA-on-WSL guidance.
+For any WSL control, do not install a Linux display driver inside WSL. Use the
+Windows NVIDIA driver exposed to WSL, following NVIDIA's CUDA-on-WSL guidance.
 
 ### 2. Generate the fixed input
 
@@ -236,8 +271,8 @@ From the repository revision being tested:
 
 ```text
 uv sync --extra corrected --frozen
-uv run atpiano musical-fixture \
-  ../atpiano-artifacts/musical-loop-input
+uv run atpiano musical-fixture `
+  ..\atpiano-artifacts\musical-loop-input
 ```
 
 Verify the fixture hashes already recorded by the acoustic-transcription
@@ -259,14 +294,14 @@ audio file for the first CPU/CUDA comparison.
 Run separate, initially empty output directories:
 
 ```text
-uv run atpiano profile-backend \
-  ../atpiano-artifacts/musical-loop-input/input.json \
-  results/backend-profile-rtx4090-cpu \
+uv run atpiano profile-backend `
+  ..\atpiano-artifacts\musical-loop-input\input.json `
+  results\backend-profile-rtx4090-windows-cpu `
   --commit-device cpu --commit-threads 2
 
-uv run atpiano profile-backend \
-  ../atpiano-artifacts/musical-loop-input/input.json \
-  results/backend-profile-rtx4090-cuda \
+uv run atpiano profile-backend `
+  ..\atpiano-artifacts\musical-loop-input\input.json `
+  results\backend-profile-rtx4090-windows-cuda `
   --commit-device cuda --commit-threads 2
 ```
 
@@ -291,9 +326,10 @@ scheduler-optimization opportunity.
 
 ### 4. Validate The Existing Scheduler End To End
 
-Use the measured CUDA profile with the existing 28/4/4 policy before changing
-any window parameters. Exercise accelerated replay, wall-clock replay, and the
-real shared application. Confirm:
+Use the measured native Windows CUDA profile with the existing 28/4/4 policy
+before changing any window parameters. Exercise accelerated replay,
+wall-clock replay, and the unpackaged native Windows `workbench-v3` server
+through a normal Windows browser. Confirm:
 
 - continuous PCM ingest;
 - prompt Stop acknowledgement and durable settlement;
@@ -502,28 +538,37 @@ more complicated deployment.
 
 A new development session on the 4090 machine should:
 
-1. read this topic plus the linked acoustic, live, notation, Linux, and
-   architecture topics;
-2. inspect the operating system and CUDA environment without changing model
-   behavior;
-3. create the next available bounded tactical for the device profile;
-4. generate and hash the fixed musical fixture;
-5. run the two CPU/CUDA `profile-backend` controls above;
-6. compare artifacts and timing before changing any scheduler constant;
-7. update this topic with the host identity, commands, retained evidence,
-   result, gaps, and recommended next step; and
-8. keep model checkpoints, generated audio, profiles, and benchmark outputs
-   outside Git.
+1. read this topic plus the linked Windows portability, acoustic, live,
+   notation, Linux, and architecture topics;
+2. inspect the native Windows dependency and CUDA environment without changing
+   model behavior;
+3. create the next available bounded tactical for the native Windows runtime
+   and device profile;
+4. establish the native Python 3.10 environment and resolve the Basic Pitch
+   runtime gap with parity evidence;
+5. generate and hash the fixed musical fixture;
+6. run native CPU controls before the two CPU/CUDA `profile-backend` controls
+   above;
+7. compare artifacts and timing before changing any scheduler constant;
+8. validate the unpackaged native Windows local server before opening desktop
+   packaging work;
+9. update this topic and the Windows portability topic with the host identity,
+   commands, retained evidence, result, gaps, and recommended next step; and
+10. keep model checkpoints, generated audio, profiles, and benchmark outputs
+    outside Git.
 
-The first session should not begin by converting every stage to CUDA. Its
-smallest useful outcome is a reproducible answer to: **Does current Transkun
-2.0.1 on this RTX 4090 preserve the baseline result, and how much warm decode
-headroom does it create under the existing 28/4/4 policy?**
+The first session should not begin with Tauri packaging or by converting every
+stage to CUDA. Its smallest useful outcome is a reproducible answer to: **Does
+current Transkun 2.0.1 in the native Windows server runtime on this RTX 4090
+preserve the baseline result, and how much warm decode headroom does it create
+under the existing 28/4/4 policy?**
 
 ## Open Questions
 
 - What fraction of Transkun's warm wall time is GPU work versus resampling,
   device transfer, semi-CRF decoding, and Python post-processing?
+- How closely do native Windows and the optional WSL2 reference agree on model
+  output and stage timing when source, model, device, and scheduler are fixed?
 - Does CUDA change note, velocity, pedal, or boundary output under the current
   FP32 path?
 - How low can hop and guard go before window-edge quality or compute duty
