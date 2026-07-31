@@ -2,16 +2,14 @@
 
 Topic: nvidia-accelerated-low-latency-pipeline
 
-Status: **proposed reproducible native Windows RTX 4090 experiment as of
-2026-07-31.** No Atpiano CUDA result has been recorded yet. The first intended
-host is the user-controlled Windows desktop with an NVIDIA RTX 4090. Native
-Windows is now the authoritative result so the measured server and model
-runtime can feed future Windows desktop packaging. WSL2 remains a labeled
-Linux reference and fallback, not the product runtime. Transkun already
-exposes a CUDA-compatible adapter boundary in Atpiano. The internal score
-converter's upstream code appears CUDA-aware, but Atpiano deliberately forces
-that subprocess to CPU and has not validated NVIDIA output. The existing
-Linux Basic Pitch preview remains a CPU TFLite path. This topic authorizes
+Status: **native Windows RTX 4090 host and CPU control established as of
+2026-07-31; CUDA is next.** Tactical 049 passed the locked CPU environment,
+fixed Basic Pitch and Transkun controls, unpackaged server replay, production
+frontend, and storage path without WSL. No Atpiano CUDA result has been
+recorded yet. Native Windows remains authoritative so the measured runtime can
+feed future Windows desktop packaging. WSL2 is a labeled Linux reference and
+fallback, not the product runtime. The internal score converter remains
+forced to CPU and its NVIDIA output is unvalidated. This topic authorizes
 research and documentation, not a public hosted product or general
 distribution of the internal score model.
 
@@ -87,13 +85,11 @@ the server, model adapters, model/device provenance, workspace, and frontend
 contracts aligned with a future native Windows sidecar without making desktop
 packaging a prerequisite for CUDA measurement.
 
-The native environment is not ready yet. The project requires Python 3.10,
-while inspection found Python 3.13, no `uv`, and no repository environment on
-the Windows path. The current lock also has no Windows wheel for
-`tflite-runtime` 2.14.0. Resolve that Basic Pitch runtime gap through the
-bounded Windows portability work before claiming an ordinary application
-baseline. Do not substitute a different model or decoder silently. The
-Windows portability topic owns that bring-up and its parity evidence.
+The native CPU environment is ready. Official `uv` 0.11.32 manages CPython
+3.10.20, and the untouched ordinary and corrected locks install. Basic Pitch
+0.4.0 selects its existing ONNX artifact on Windows, so the missing Windows
+TFLite wheel is irrelevant to this host. The full CPU server baseline and
+packaging inventory are recorded in Tactical 049.
 
 ### Basic Pitch preview
 
@@ -129,6 +125,13 @@ two-thread Linux CPU profile used 84 seconds of source and produced ten
 decodes with 18.024 seconds mean and 19.491 seconds maximum wall time. The
 former could sustain the four-second scheduler; the latter correctly selected
 after-Stop correction.
+
+The new native Windows two-thread CPU profile used the same 84-second source,
+checkpoint, adapter, and scheduler. Its ten decodes averaged 13.743 seconds,
+reached 14.575 seconds, and produced a 1.636 service ratio, so it also selects
+after-Stop correction. Its two repetitions produced 151/157 notes and had
+pairwise onset F1 0.948 and note-with-offset F1 0.753 with no open tail. This
+is the authoritative same-host CPU control for the first CUDA profile.
 
 Atpiano's `TranskunCommitModel` already accepts a device string, loads the
 checkpoint with that device, moves the model and input tensor to it, and

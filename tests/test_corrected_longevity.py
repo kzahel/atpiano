@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import resource
 import time
 from pathlib import Path
 
@@ -16,7 +15,7 @@ from atpiano.corrected_export import query_history_index, query_materialized_ind
 from atpiano.corrected_preview import CorrectedPreviewLane
 from atpiano.live import LiveModelOutput, PcmBlock
 from atpiano.midi import MidiNote
-from atpiano.util import utc_now, write_json
+from atpiano.util import process_rss_high_water_bytes, utc_now, write_json
 
 SOURCE_DURATION_S = 30 * 60
 SAMPLE_RATE_HZ = 100
@@ -99,12 +98,6 @@ class _LongevityCommitModel:
         return {"name": "longevity-commit", "calls": self.calls}
 
 
-def _rss_bytes() -> int:
-    value = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    # macOS reports bytes; Linux reports KiB.
-    return int(value if value > 10_000_000 else value * 1024)
-
-
 def test_two_lane_state_is_bounded_over_thirty_minute_source_clock(
     tmp_path: Path,
 ) -> None:
@@ -134,7 +127,7 @@ def test_two_lane_state_is_bounded_over_thirty_minute_source_clock(
 
     started_wall = time.perf_counter()
     started_cpu = time.process_time()
-    rss_before = _rss_bytes()
+    rss_before = process_rss_high_water_bytes()
     total_frames = SOURCE_DURATION_S * SAMPLE_RATE_HZ
     for first_sample in range(0, total_frames, BLOCK_FRAMES):
         values = np.full(BLOCK_FRAMES, 12_000, dtype=np.int16)
@@ -192,7 +185,7 @@ def test_two_lane_state_is_bounded_over_thirty_minute_source_clock(
             "wall_s": time.perf_counter() - started_wall,
             "cpu_s": time.process_time() - started_cpu,
             "rss_before_bytes": rss_before,
-            "rss_high_water_bytes": _rss_bytes(),
+            "rss_high_water_bytes": process_rss_high_water_bytes(),
         },
         "storage": {
             "total_bytes": disk_bytes,

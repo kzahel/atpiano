@@ -515,13 +515,18 @@ def write_playback_audio(
             text=True,
         )
         os.replace(temporary_path, final_path)
-        with final_path.open("rb") as handle:
+        with final_path.open("rb+") as handle:
             os.fsync(handle.fileno())
-        directory_fd = os.open(playback_directory, os.O_RDONLY)
         try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
+            directory_fd = os.open(playback_directory, os.O_RDONLY)
+        except OSError:
+            if os.name != "nt":
+                raise
+        else:
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
     except (OSError, subprocess.CalledProcessError):
         temporary_path.unlink(missing_ok=True)
         return None

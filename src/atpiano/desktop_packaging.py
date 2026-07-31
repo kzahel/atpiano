@@ -824,10 +824,20 @@ def inventory(root: Path) -> dict[str, Any]:
 
 def _is_macho(path: Path) -> bool:
     try:
-        output = _run(["file", "-b", path], capture_output=True).stdout
-    except subprocess.CalledProcessError:
+        with path.open("rb") as handle:
+            magic = handle.read(4)
+    except OSError:
         return False
-    return "Mach-O" in output
+    return magic in {
+        b"\xfe\xed\xfa\xce",
+        b"\xfe\xed\xfa\xcf",
+        b"\xce\xfa\xed\xfe",
+        b"\xcf\xfa\xed\xfe",
+        b"\xca\xfe\xba\xbe",
+        b"\xbe\xba\xfe\xca",
+        b"\xca\xfe\xba\xbf",
+        b"\xbf\xba\xfe\xca",
+    }
 
 
 def _native_candidates(root: Path) -> list[Path]:

@@ -89,6 +89,7 @@ from atpiano.corrected_workbench import (
 )
 from atpiano.live import parse_pcm_block
 from atpiano.persistence import initialize_catalog
+from atpiano.util import resolve_command
 
 SECURE_SESSION_COOKIE = "__Host-atpiano_session"
 LOCAL_SESSION_COOKIE = "atpiano_session"
@@ -1382,6 +1383,11 @@ def create_family_application(
         )
         return FileResponse(
             asset,
+            media_type=(
+                "text/javascript"
+                if asset.suffix.lower() == ".js"
+                else None
+            ),
             headers={"Cache-Control": cache_control},
         )
 
@@ -1421,7 +1427,9 @@ def serve_family_application(
     repository_root = Path(__file__).resolve().parents[2]
     app_root = repository_root / "app"
     subprocess.run(
-        ["npm", "run", "build", "--prefix", str(app_root)],
+        resolve_command(
+            ["npm", "run", "build", "--prefix", str(app_root)]
+        ),
         cwd=repository_root,
         check=True,
     )

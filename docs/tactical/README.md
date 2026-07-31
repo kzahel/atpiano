@@ -60,3 +60,5 @@ execution record; continuing status and direction belong in the relevant
 | [`045-client-deployment-continuity.md`](045-client-deployment-continuity.md) | Complete; live | Exact asset routing, update polling and recovery, and bounded recent hashed-asset retention |
 | [`046-browser-capture-pop-diagnostics.md`](046-browser-capture-pop-diagnostics.md) | Complete; live | Browser, device, AudioWorklet, and delivery diagnostics for retained Android capture discontinuities |
 | [`047-live-settling-and-auto-score-recovery.md`](047-live-settling-and-auto-score-recovery.md) | Complete; live | Persistent measured correction profile, visible capability diagnostics, and one bounded final-horizon score retry |
+| [`048-overlapping-score-input-notes.md`](048-overlapping-score-input-notes.md) | Complete; live | Unambiguous overlapping same-pitch MIDI channels, bounded score errors, and restored retained-session score generation |
+| [`049-native-windows-runtime-baseline.md`](049-native-windows-runtime-baseline.md) | Complete | Native Windows dependency resolution, deterministic CPU model parity, unpackaged server replay, and packaging inventory |

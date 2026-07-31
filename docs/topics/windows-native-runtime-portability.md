@@ -2,11 +2,13 @@
 
 Topic: windows-native-runtime-portability
 
-Status: **proposed native Windows server and model-runtime baseline as of
-2026-07-31.** The first intended host is the user-controlled 64-bit Windows
-desktop with an NVIDIA RTX 4090. No native Windows Atpiano environment,
-deterministic replay, local server, microphone, CUDA model result, or desktop
-package has passed yet. The accepted Tauri proof remains macOS arm64 only.
+Status: **native Windows CPU server and model-runtime baseline established on
+2026-07-31.** The locked ordinary and corrected environments, Basic Pitch
+ONNX preview, Transkun CPU correction, production frontend, migration gate,
+one-hour storage control, and unpackaged `workbench-v3` replay all pass on the
+user-controlled RTX 4090 desktop without WSL. CUDA, physical microphone, and
+Windows desktop packaging have not passed. The accepted Tauri proof remains
+macOS arm64 only.
 
 ## Intent
 
@@ -129,7 +131,7 @@ immutable assets, or choose a smaller compatible runtime only when the frozen
 fixture and application parity gates can prove the optimization did not change
 behavior.
 
-## Known Starting Point
+## Validated Native Baseline
 
 The inspected host reported:
 
@@ -144,17 +146,39 @@ GPU power limit:      450 W
 ```
 
 The Windows driver and GPU are visible both to Windows `nvidia-smi` and Ubuntu
-WSL2. Native Windows currently has Python 3.13 on `PATH`, but the project
-requires Python 3.10; `uv` and a repository virtual environment were not
-present during inspection.
+WSL2. Native Windows initially had Python 3.13 on `PATH` and no `uv` or
+repository environment. Tactical 049 installed official `uv` 0.11.32 and a
+managed CPython 3.10.20 without replacing Python 3.13. Both frozen syncs pass
+without a lock change.
 
-The current lock contains a Windows x86_64 Torch wheel and Transkun is a pure
-Python wheel, but native CUDA execution has not been proved. The more immediate
-ordinary-environment gap is `tflite-runtime` 2.14.0: the current lock contains
-Linux wheels and no Windows wheel. Basic Pitch preview parity therefore needs
-a bounded Windows interpreter/runtime decision. Do not silently replace the
-model, decoder, or output contract merely to make dependency installation
-succeed.
+The anticipated TFLite blocker did not materialize. Basic Pitch 0.4.0 selects
+its bundled 230,444-byte ONNX model on Windows and runs through ONNX Runtime
+CPU. Full TensorFlow is unnecessary. Offline inference preserves the native
+contour, frame, and onset arrays; rolling replay matches the established 161
+windows, 32 retained windows, 129 evictions, 703 emissions, and identity
+high-water of 196.
+
+The locked Windows Torch 2.13.0 wheel is CPU-only. Native CPU Transkun passed
+the two-repeat control with 151/157 notes, pairwise onset F1 0.948, offset F1
+0.753, and no open tail. Its 13.743-second mean decode cannot sustain the
+four-second scheduler and correctly selects after-Stop correction. This
+answers the CPU portability question but deliberately leaves CUDA dependency
+selection to the NVIDIA topic.
+
+The unpackaged native server ingested and settled all 2,016,000 fixture
+frames, reattached through the session catalog, and exposed complete audio,
+event-history, MIDI, and manifest artifacts. Native FFmpeg 8.1.1 passed
+compact publication and an accelerated 3,612-second storage validation. The
+complete Windows-applicable migration gate and production frontend build pass.
+The implementation corrections cover `PATHEXT` subprocess launch, Windows
+peak-RSS accounting, media flushing, stable MIME types, deterministic LF JSON,
+portable artifact separators, and Mach-O inspection without Unix `file`.
+
+The development environment is 1.17 GiB and is explicitly not a packaging
+proposal. The handoff identifies a 59.83 MiB managed interpreter, 1.55 MiB
+production frontend, separate ONNX preview and Torch/Transkun corrected
+components, and FFmpeg/FFprobe media tools. Tactical 049 owns the full
+measurement table and retained command evidence.
 
 The existing desktop proof is not a Windows starting artifact:
 
@@ -170,7 +194,7 @@ packaging into the first native-server slice.
 
 ## Reproducible Implementation Sequence
 
-### 1. Open a bounded native-runtime tactical
+### 1. Open a bounded native-runtime tactical — complete
 
 Before changing dependencies or application behavior, create the next
 zero-padded tactical. It should record the exact host, dependency decision,
@@ -178,7 +202,7 @@ commands, frozen fixtures, retained evidence, and rollback or fallback path.
 Do not combine the native runtime, CUDA scheduler sweep, Tauri packaging,
 installer, signing, and updater into one implementation slice.
 
-### 2. Establish the native development environment
+### 2. Establish the native development environment — complete
 
 Install or select a native Windows Python 3.10 and `uv`, then attempt the
 frozen ordinary and corrected environments. Record every platform-specific
@@ -189,7 +213,7 @@ developer environment. Any Basic Pitch interpreter substitution must run the
 frozen fixture and compare native activations or normalized output against an
 existing validated result.
 
-### 3. Pass deterministic CPU controls
+### 3. Pass deterministic CPU controls — complete
 
 Before CUDA, require native Windows to:
 
@@ -206,18 +230,19 @@ Before CUDA, require native Windows to:
 Platform-specific timing may differ. Unexplained note, pedal, boundary,
 coverage, or artifact differences are parity failures.
 
-### 4. Establish native CUDA evidence
+### 4. Establish native CUDA evidence — next
 
 Continue with the controls and decision gates in the NVIDIA topic. Torch must
 report the Windows device, CUDA build, device name, and compute capability.
 CPU and CUDA runs must use the same source, checkpoint, adapter, precision,
 and scheduler policy before hop or guard values change.
 
-### 5. Exercise the unpackaged local server
+### 5. Exercise the unpackaged local server — CPU complete
 
-Run the primary `workbench-v3` server natively and connect from a normal
-Windows browser. Validate accelerated replay first, then wall-clock replay,
-and only then a consentful physical microphone session. Retain:
+The primary `workbench-v3` server now passes native accelerated CPU replay and
+an equivalent retained loopback client gate. Repeat this path with the
+matching CUDA profile, then validate wall-clock replay and only then a
+consentful physical microphone session. Retain:
 
 - continuous sample-indexed ingest;
 - preview and correction horizons;
@@ -230,10 +255,11 @@ and only then a consentful physical microphone session. Retain:
 This is the first packaging-aligned Windows application baseline. It is still
 an unpackaged development runtime.
 
-### 6. Produce a packaging-readiness handoff
+### 6. Produce a packaging-readiness handoff — baseline complete
 
-After the server passes, record exactly what a Windows desktop tactical would
-need to stage and supervise:
+Tactical 049 records the first dependency, size, model, media, native-library,
+and startup inventory. A Windows desktop tactical still needs to stage and
+supervise:
 
 - inference-minimal Python runtime and wheels;
 - CPU and CUDA model-pack variants and compatibility ranges;
@@ -253,20 +279,23 @@ build.
 
 ## Baseline Acceptance
 
-The native Windows server baseline is established only when:
+The native Windows CPU server baseline is established because:
 
 1. all model and server processes are native Windows processes with no WSL
    dependency;
 2. the frozen fixture and its hashes identify every compared run;
 3. Basic Pitch and CPU Transkun produce valid comparable normalized output;
-4. CUDA Transkun passes its separate parity gate before any scheduler sweep;
-5. accelerated and wall-clock server replay preserve ingest, Stop,
-   settlement, reload, and artifact behavior;
-6. every result records platform, architecture, Python, package lock, model,
+4. accelerated CPU server replay preserves ingest, Stop, settlement,
+   reattachment, and artifact behavior;
+5. every result records platform, architecture, Python, package lock, model,
    checkpoint, precision, and device provenance;
-7. benchmark and model artifacts remain outside Git; and
-8. the packaging-readiness handoff identifies remaining Windows desktop work
+6. benchmark and model artifacts remain outside Git; and
+7. the packaging-readiness handoff identifies remaining Windows desktop work
    without claiming that work is complete.
+
+CUDA Transkun must still pass its separate parity gate before any scheduler
+sweep or CUDA server claim. Wall-clock replay, browser paint timing, and a
+physical microphone remain extensions rather than evidence already obtained.
 
 Microphone parity is a separate acceptance extension. A deterministic server
 baseline must not be delayed merely because a physical capture review has not
@@ -274,16 +303,12 @@ yet occurred, but it also must not be described as microphone-validated.
 
 ## Open Questions
 
-- Which Windows-supported interpreter should execute the existing Basic Pitch
-  TFLite artifact without changing model semantics?
-- Does the locked Torch Windows wheel expose the required CUDA runtime on this
-  driver, or does the project need an explicit accelerator-specific source?
+- Which explicit CUDA-enabled Windows Torch source and version should define
+  the NVIDIA extra while preserving the CPU environment and lock discipline?
 - Which native media and audio libraries are required for the server control,
   physical capture, and eventual relocatable sidecar?
-- Are any process, signal, path, file-locking, or atomic-replacement assumptions
-  still POSIX-specific?
-- How closely does native Windows CPU output match the validated Linux and
-  macOS controls?
+- Which remaining process-signal and privileged-symlink behaviors need a
+  Windows-specific implementation rather than an explicit platform exclusion?
 - How much does the WSL2 reference differ from native Windows for warm Transkun
   decode, preprocessing, host-to-device transfer, and post-processing?
 - Should the future Windows desktop ship separate CPU and NVIDIA model packs,

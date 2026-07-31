@@ -307,7 +307,9 @@ def run_offline(
             "prediction_sha256": sha256_file(prediction_path),
             "reference_notes": "reference.json",
             "prediction_notes": "prediction.json",
-            "raw_model_output": str(raw_path.relative_to(run_directory)),
+            "raw_model_output": raw_path.relative_to(
+                run_directory
+            ).as_posix(),
             "raw_model_output_sha256": sha256_file(raw_path),
             "events": "events.jsonl",
             "scores": "scores.json",

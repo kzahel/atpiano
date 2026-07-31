@@ -635,9 +635,13 @@ def generate_notation_artifacts(
         "selected": asdict(options),
         "warnings": conversion_warnings,
         "artifacts": {
-            "musicxml": str(musicxml_path.relative_to(run_directory)),
+            "musicxml": musicxml_path.relative_to(
+                run_directory
+            ).as_posix(),
             "musicxml_sha256": sha256_file(musicxml_path),
-            "variant_manifest": str(variant_manifest_path.relative_to(run_directory)),
+            "variant_manifest": variant_manifest_path.relative_to(
+                run_directory
+            ).as_posix(),
         },
         "summary": summarize_musicxml(musicxml),
         "source_mapping": mappings,
@@ -694,7 +698,7 @@ def import_oracle_musicxml(
         "input_kind": "original WAV" if lane == "audio" else "atpiano prediction MIDI",
         "imported_at": utc_now(),
         "original_filename": Path(original_filename).name,
-        "artifact": str(artifact_path.relative_to(run_directory)),
+        "artifact": artifact_path.relative_to(run_directory).as_posix(),
         "sha256": digest,
         "summary": summary,
         "editing_policy": "import the first unedited MusicXML export",

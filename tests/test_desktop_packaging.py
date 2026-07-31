@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import zipfile
 from pathlib import Path
 
@@ -52,7 +53,12 @@ def test_model_pack_is_separated_and_verified(tmp_path: Path) -> None:
 def test_bundle_audit_rejects_external_symlink(tmp_path: Path) -> None:
     root = tmp_path / "bundle"
     root.mkdir()
-    (root / "escape").symlink_to(tmp_path / "outside")
+    try:
+        (root / "escape").symlink_to(tmp_path / "outside")
+    except OSError as error:
+        if os.name != "nt" or error.winerror != 1314:
+            raise
+        pytest.skip("this Windows account cannot create symbolic links")
 
     with pytest.raises(RuntimeError, match="symlink escapes"):
         _audit_symlinks(root)

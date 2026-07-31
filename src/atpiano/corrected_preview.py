@@ -195,7 +195,9 @@ class CorrectedPreviewLane:
                     "schema_version": "atpiano.corrected-preview-window.v1",
                     "action": "retained",
                     "window_index": self._window_index,
-                    "path": str(path.relative_to(self.diagnostics_directory)),
+                    "path": path.relative_to(
+                        self.diagnostics_directory
+                    ).as_posix(),
                     "sha256": sha256_file(path),
                     "source_start_sample": source_start,
                     "source_end_sample": source_end,

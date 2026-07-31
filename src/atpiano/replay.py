@@ -376,7 +376,7 @@ def run_replay(
             {
                 "schema_version": "atpiano.raw-window.v1",
                 "window_index": window.index,
-                "path": str(raw_path.relative_to(run_directory)),
+                "path": raw_path.relative_to(run_directory).as_posix(),
                 "sha256": sha256_file(raw_path),
                 "source_start_sample": window.source_start_sample,
                 "source_end_sample": window.source_end_sample,

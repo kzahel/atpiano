@@ -440,7 +440,7 @@ def _artifact_record(
     summary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     value: dict[str, Any] = {
-        "path": str(path.relative_to(session_directory)),
+        "path": path.relative_to(session_directory).as_posix(),
         "sha256": sha256_file(path),
         "bytes": path.stat().st_size,
     }
@@ -710,12 +710,14 @@ def generate_score_snapshot(
         "note_count": note_count,
         "selection": "latest committed notes with closed offsets at H_commit",
         "midi": {
-            "path": str(midi_path.relative_to(session_directory)),
+            "path": midi_path.relative_to(session_directory).as_posix(),
             "sha256": sha256_file(midi_path),
         },
         "source_notes": {
             "schema_version": SCORE_INPUT_NOTES_SCHEMA,
-            "path": str(source_notes_path.relative_to(session_directory)),
+            "path": source_notes_path.relative_to(
+                session_directory
+            ).as_posix(),
             "sha256": sha256_file(source_notes_path),
         },
         "baseline": baseline,

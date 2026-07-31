@@ -101,7 +101,7 @@ from atpiano.score_snapshot import (
     ScoreVariantRunner,
     score_snapshot_is_plausible,
 )
-from atpiano.util import read_json
+from atpiano.util import read_json, resolve_command
 from atpiano.websocket import encode_frame, encode_json, read_frame, websocket_accept
 
 CORRECTED_WORKBENCH_SCHEMA = "atpiano.corrected-workbench.v1"
@@ -2097,7 +2097,9 @@ def serve_shared_application(
     repository_root = Path(__file__).resolve().parents[2]
     app_root = repository_root / "app"
     subprocess.run(
-        ["npm", "run", "build", "--prefix", str(app_root)],
+        resolve_command(
+            ["npm", "run", "build", "--prefix", str(app_root)]
+        ),
         cwd=repository_root,
         check=True,
     )

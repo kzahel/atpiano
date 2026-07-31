@@ -54,15 +54,20 @@ def test_openapi_uses_explicit_targets_and_pydantic_components() -> None:
 
 def test_generation_check_detects_drift(tmp_path: Path) -> None:
     app = tmp_path / "app"
-    executable = app / "node_modules" / ".bin" / "openapi-typescript"
+    executable = (
+        app
+        / "node_modules"
+        / "openapi-typescript"
+        / "bin"
+        / "cli.js"
+    )
     executable.parent.mkdir(parents=True)
     executable.write_text(
-        "#!/bin/sh\n"
-        "while [ \"$1\" != \"-o\" ]; do shift; done\n"
-        "printf 'generated\\n' > \"$2\"\n",
+        'const fs = require("node:fs");\n'
+        'const output = process.argv[process.argv.indexOf("-o") + 1];\n'
+        'fs.writeFileSync(output, "generated\\n");\n',
         encoding="utf-8",
     )
-    executable.chmod(0o755)
 
     openapi, typescript, midi_ticks = generate_contracts(root=tmp_path)
 

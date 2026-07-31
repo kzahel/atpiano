@@ -17,7 +17,7 @@ from atpiano.corrected_export import (
     midi_tick_at_sample,
 )
 from atpiano.score_alignment import score_input_notes_document
-from atpiano.util import write_json
+from atpiano.util import resolve_command, write_json
 
 OPENAPI_RELATIVE_PATH = Path("contracts/openapi/atpiano-api-v1.json")
 TYPESCRIPT_RELATIVE_PATH = Path("app/src/generated/schema.ts")
@@ -486,13 +486,28 @@ def _generate_typescript(
     openapi_path: Path,
     output_path: Path,
 ) -> None:
-    executable = root / "app" / "node_modules" / ".bin" / "openapi-typescript"
+    executable = (
+        root
+        / "app"
+        / "node_modules"
+        / "openapi-typescript"
+        / "bin"
+        / "cli.js"
+    )
     if not executable.is_file():
         raise RuntimeError(
             "TypeScript dependencies are missing; run `npm ci --prefix app`"
         )
     subprocess.run(
-        [str(executable), str(openapi_path), "-o", str(output_path)],
+        resolve_command(
+            [
+                "node",
+                str(executable),
+                str(openapi_path),
+                "-o",
+                str(output_path),
+            ]
+        ),
         cwd=root,
         check=True,
     )
@@ -539,7 +554,9 @@ def generate_contracts(
                 if not path.is_file() or path.read_bytes() != expected.read_bytes()
             ]
             if drifted:
-                names = ", ".join(str(path.relative_to(root)) for path in drifted)
+                names = ", ".join(
+                    path.relative_to(root).as_posix() for path in drifted
+                )
                 raise RuntimeError(
                     f"generated contracts have drifted: {names}"
                 )

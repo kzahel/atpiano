@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import math
-import resource
 import subprocess
-import sys
 import time
 import wave
 from pathlib import Path
@@ -16,7 +14,12 @@ import numpy as np
 from atpiano.corrected_commit import CommitModelOutput
 from atpiano.corrected_workbench import create_corrected_workbench_server
 from atpiano.live import LiveModelOutput
-from atpiano.util import read_json, utc_now, write_json
+from atpiano.util import (
+    process_rss_high_water_bytes,
+    read_json,
+    utc_now,
+    write_json,
+)
 
 STORAGE_VALIDATION_SCHEMA = "atpiano.storage-validation.v1"
 
@@ -72,12 +75,7 @@ class StorageValidationCommitModel:
 
 
 def _rss_high_water_bytes() -> int:
-    value = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    return int(
-        value
-        if sys.platform == "darwin"
-        else value * 1024
-    )
+    return process_rss_high_water_bytes()
 
 
 def _open_file_count() -> int | None:

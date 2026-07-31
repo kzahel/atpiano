@@ -9,6 +9,11 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.skipif(
+    os.name == "nt",
+    reason="the macOS sharing service uses POSIX executable-script semantics",
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = (
     ROOT / "scripts" / "share-atpiano",

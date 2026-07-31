@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from atpiano.util import runtime_provenance, utc_now, write_json
+from atpiano.util import resolve_command, runtime_provenance, utc_now, write_json
 
 MIGRATION_REGRESSION_SCHEMA = "atpiano.migration-regression.v1"
 
@@ -73,7 +73,7 @@ def default_lanes(root: Path | None = None) -> tuple[RegressionLane, ...]:
         ),
         RegressionLane(
             "javascript-syntax",
-            tuple(("node", "--check", str(path)) for path in javascript),
+            tuple(("node", "--check", path.as_posix()) for path in javascript),
         ),
         RegressionLane(
             "git-whitespace",
@@ -92,7 +92,7 @@ def _run_command(
     environment["PYTHONHASHSEED"] = "0"
     try:
         completed = subprocess.run(
-            list(command),
+            resolve_command(command),
             cwd=root,
             env=environment,
             capture_output=True,

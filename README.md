@@ -68,13 +68,15 @@ preserves overlapping instances of the same pitch on separate melodic
 channels; the retained public session that exposed same-channel note-off
 ambiguity now generates and renders a current score.
 
-Native Windows is the next authoritative local runtime lane. Its first target
-is an unpackaged `workbench-v3` server plus deterministic CPU/CUDA model
-evidence on the RTX 4090, preserving the application-core and runtime contracts
-needed by future Windows desktop packaging. It is not yet a supported Windows
-environment or desktop build. WSL2 remains a labeled Linux reference and
-failure-isolation option rather than a product dependency. Current direction
-and entry gates are recorded in
+Native Windows is now an authoritative CPU development and local-server lane.
+The locked environment, deterministic Basic Pitch and Transkun CPU controls,
+production frontend, migration gate, compact storage path, and unpackaged
+`workbench-v3` replay pass on the RTX 4090 host without WSL. This is a
+packaging-aligned development baseline, not yet a supported Windows desktop
+build. CUDA is the next bounded runtime slice; Tauri adaptation, physical
+microphone parity, installer, signing, and updates remain later work. WSL2
+remains a labeled Linux reference and failure-isolation option rather than a
+product dependency. Current direction and evidence are recorded in
 [`docs/topics/windows-native-runtime-portability.md`](docs/topics/windows-native-runtime-portability.md)
 and
 [`docs/topics/nvidia-accelerated-low-latency-pipeline.md`](docs/topics/nvidia-accelerated-low-latency-pipeline.md).

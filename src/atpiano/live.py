@@ -442,7 +442,9 @@ class LiveRecognitionProcessor:
                 {
                     "schema_version": "atpiano.raw-window.v1",
                     "window_index": self._window_index,
-                    "path": str(raw_path.relative_to(self.artifact_directory)),
+                    "path": raw_path.relative_to(
+                        self.artifact_directory
+                    ).as_posix(),
                     "sha256": sha256_file(raw_path),
                     "source_start_sample": source_start,
                     "source_end_sample": source_end,
