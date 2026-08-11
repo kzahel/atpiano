@@ -16,8 +16,7 @@ import tempfile
 import urllib.error
 import urllib.request
 import zipfile
-from collections import deque
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -26,6 +25,10 @@ from atpiano.desktop import (
     ModelPack,
     desktop_runtime_environment,
 )
+from atpiano.desktop_media import (
+    default_runtime_root as default_media_runtime_root,
+)
+from atpiano.desktop_media import validate_runtime as validate_media_runtime
 from atpiano.musical_fixture import generate_musical_fixture
 from atpiano.score_snapshot import (
     MIDI2SCORE_CHECKPOINT_SHA256,
@@ -324,168 +327,38 @@ def _is_system_load_path(path: str) -> bool:
     return path.startswith(SYSTEM_LOAD_PREFIXES)
 
 
-def _homebrew_formula(path: Path) -> str | None:
-    parts = path.resolve().parts
-    if "Cellar" in parts:
-        index = parts.index("Cellar")
-        return parts[index + 1] if index + 1 < len(parts) else None
-    opt_indices = [
-        index for index, part in enumerate(parts) if part == "opt" and index + 1 < len(parts)
-    ]
-    if opt_indices:
-        return parts[opt_indices[-1] + 1]
-    return None
-
-
-def _copy_external_dependency(
-    source: Path,
-    libraries: Path,
-    copied: dict[str, Path],
-    origins: dict[str, Path],
-) -> Path:
-    name = source.name
-    destination = libraries / name
-    resolved = source.resolve()
-    if name in copied:
-        if sha256_file(copied[name]) != sha256_file(resolved):
-            raise RuntimeError(f"media dependency basename collision: {name}")
-        return copied[name]
-    shutil.copy2(resolved, destination)
-    destination.chmod(destination.stat().st_mode | stat.S_IWUSR | stat.S_IXUSR)
-    copied[name] = destination
-    origins[name] = resolved
-    return destination
-
-
-def bundle_media_tools(runtime_root: Path) -> dict[str, Any]:
-    ffmpeg = shutil.which("ffmpeg")
-    ffprobe = shutil.which("ffprobe")
-    if ffmpeg is None or ffprobe is None:
-        raise RuntimeError("FFmpeg and FFprobe are required for staging")
+def bundle_media_tools(
+    runtime_root: Path,
+    *,
+    media_runtime_root: Path | None = None,
+) -> dict[str, Any]:
+    media_root = (media_runtime_root or default_media_runtime_root()).resolve()
+    manifest = validate_media_runtime(media_root, exercise=False)
     binaries = runtime_root / "bin"
     libraries = runtime_root / "lib" / "media"
-    libraries.mkdir(parents=True)
-    sources = {
-        "ffmpeg": Path(ffmpeg).resolve(),
-        "ffprobe": Path(ffprobe).resolve(),
-    }
-    staged = {}
-    for name, source in sources.items():
+    libraries.mkdir(parents=True, exist_ok=True)
+    for name in ("ffmpeg", "ffprobe"):
+        source = media_root / "bin" / name
         destination = binaries / name
         shutil.copy2(source, destination)
         destination.chmod(destination.stat().st_mode | stat.S_IWUSR | stat.S_IXUSR)
-        staged[name] = destination
-
-    copied: dict[str, Path] = {}
-    origins: dict[str, Path] = {}
-    dependency_sources: dict[Path, list[tuple[str, Path]]] = {}
-    queue = deque(staged.values())
-    visited: set[Path] = set()
-    while queue:
-        binary = queue.popleft()
-        if binary in visited:
-            continue
-        visited.add(binary)
-        replacements: list[tuple[str, Path]] = []
-        for load_path in _otool_dependencies(binary):
-            if _is_system_load_path(load_path) or load_path.startswith(
-                ("@loader_path/", "@rpath/")
-            ):
-                continue
-            source = Path(load_path)
-            if not source.is_file():
-                raise RuntimeError(f"media dependency is unresolved: {load_path}")
-            destination = _copy_external_dependency(
-                source,
-                libraries,
-                copied,
-                origins,
-            )
-            replacements.append((load_path, destination))
-            queue.append(destination)
-        dependency_sources[binary] = replacements
-
-    for binary, replacements in dependency_sources.items():
-        in_library = binary.parent == libraries
-        for original, destination in replacements:
-            relative = (
-                f"@loader_path/{destination.name}"
-                if in_library
-                else f"@loader_path/../lib/media/{destination.name}"
-            )
-            _run(
-                [
-                    "install_name_tool",
-                    "-change",
-                    original,
-                    relative,
-                    binary,
-                ],
-                capture_output=True,
-            )
-        if in_library:
-            _run(
-                [
-                    "install_name_tool",
-                    "-id",
-                    f"@loader_path/{binary.name}",
-                    binary,
-                ],
-                capture_output=True,
-            )
-    for binary in dependency_sources:
-        _run(
-            ["codesign", "--force", "--sign", "-", binary],
-            capture_output=True,
-        )
-
-    version = _run(
-        [staged["ffmpeg"], "-version"],
-        capture_output=True,
-    ).stdout.splitlines()
-    formulae = sorted(
-        {
-            formula
-            for source in sources.values()
-            for formula in [_homebrew_formula(source)]
-            if formula is not None
-        }
-        | {
-            formula
-            for path in origins.values()
-            for formula in [_homebrew_formula(path)]
-            if formula is not None
-        }
+    for source in sorted((media_root / "lib" / "media").glob("*.dylib")):
+        shutil.copy2(source, libraries / source.name)
+    licenses = runtime_root / "share" / "licenses" / "media"
+    shutil.copytree(media_root / "share" / "licenses" / "media", licenses)
+    shutil.copy2(
+        media_root / "build-manifest.json",
+        runtime_root / "media-build-manifest.json",
     )
-    formula_inventory = []
-    for formula in formulae:
-        document = json.loads(
-            _run(
-                ["brew", "info", "--json=v2", formula],
-                capture_output=True,
-            ).stdout
-        )
-        value = document["formulae"][0]
-        formula_inventory.append(
-            {
-                "name": value["name"],
-                "license": value.get("license"),
-                "installed_versions": [item["version"] for item in value.get("installed", [])],
-            }
-        )
     return {
-        "ffmpeg_version": version[0] if version else "unknown",
-        "configuration": next(
-            (
-                line.removeprefix("configuration: ")
-                for line in version
-                if line.startswith("configuration: ")
-            ),
-            None,
-        ),
-        "bundled_library_count": len(copied),
-        "homebrew_formulae": formula_inventory,
-        "license": "GPL-3.0-or-later (installed Homebrew formula)",
+        "build_identity": manifest["build_identity"],
+        "ffmpeg_version": manifest["ffmpeg_version"],
+        "configuration": manifest["configuration"],
+        "bundled_library_count": len(list(libraries.glob("*.dylib"))),
+        "sources": manifest["sources"],
+        "license": manifest["license"],
+        "notices": "share/licenses/media/THIRD_PARTY_NOTICES.md",
+        "build_manifest": "media-build-manifest.json",
     }
 
 
@@ -1176,9 +1049,14 @@ def _runtime_component_category(parts: tuple[str, ...]) -> str:
         "site-packages",
     ):
         return "python_packages"
-    if parts[:2] == ("lib", "media") or parts in {
+    if parts[:2] == ("lib", "media") or parts[:3] == (
+        "share",
+        "licenses",
+        "media",
+    ) or parts in {
         ("bin", "ffmpeg"),
         ("bin", "ffprobe"),
+        ("media-build-manifest.json",),
     }:
         return "media_tools"
     return "python_runtime_and_manifest"
@@ -1253,6 +1131,48 @@ def _audit_anonymous_caches(root: Path) -> list[str]:
     return found
 
 
+def _audit_media_runtime(
+    runtime_root: Path,
+    bundle_manifest: Mapping[str, Any],
+) -> dict[str, Any]:
+    media = bundle_manifest.get("media")
+    if not isinstance(media, dict) or media.get("license") != "LGPL-only":
+        raise RuntimeError("desktop media bundle is not marked LGPL-only")
+    configuration = str(media.get("configuration") or "")
+    if "--enable-gpl" in configuration or "--enable-nonfree" in configuration:
+        raise RuntimeError("desktop media bundle enables GPL/nonfree FFmpeg mode")
+    for key in ("build_manifest", "notices"):
+        relative = Path(str(media.get(key) or ""))
+        if relative.is_absolute() or ".." in relative.parts:
+            raise RuntimeError(f"desktop media {key} path is unsafe")
+        if not (runtime_root / relative).is_file():
+            raise RuntimeError(f"desktop media {key} is missing")
+    build_manifest = json.loads(
+        (runtime_root / str(media["build_manifest"])).read_text(encoding="utf-8")
+    )
+    for key in ("build_identity", "configuration", "license", "sources"):
+        if build_manifest.get(key) != media.get(key):
+            raise RuntimeError(f"desktop media {key} does not match its build manifest")
+    if build_manifest.get("file_hash_scope") != (
+        "relocated ad-hoc media output before product distribution signing"
+    ):
+        raise RuntimeError("desktop media file-hash scope is missing")
+    if not (runtime_root / "bin" / "ffmpeg").is_file() or not (
+        runtime_root / "bin" / "ffprobe"
+    ).is_file():
+        raise RuntimeError("desktop media binaries are missing")
+    library_count = len(list((runtime_root / "lib" / "media").glob("*.dylib")))
+    if library_count != media.get("bundled_library_count") or library_count != 6:
+        raise RuntimeError("desktop media shared-library inventory changed")
+    return {
+        "build_identity": media["build_identity"],
+        "ffmpeg_version": media["ffmpeg_version"],
+        "license": media["license"],
+        "bundled_library_count": library_count,
+        "notices": media["notices"],
+    }
+
+
 def audit_root(
     root: Path,
     archive: Path | None = None,
@@ -1283,6 +1203,7 @@ def audit_root(
     symlinks = _audit_symlinks(root)
     anonymous_caches = _audit_anonymous_caches(root)
     native = _audit_native(root)
+    media = _audit_media_runtime(runtime_root, bundle_manifest)
     complete_inventory = inventory(root)
     components = component_inventory(root)
     if components["installed_bytes"] != complete_inventory["total_bytes"]:
@@ -1312,6 +1233,7 @@ def audit_root(
         "largest_packages": largest_packages,
         "symlinks": symlinks,
         "native_files": native,
+        "media": media,
         "forbidden_accelerator_packages": [],
         "forbidden_development_packages": [],
         "forbidden_score_runtime_assets": [],

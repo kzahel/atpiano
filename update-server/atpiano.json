@@ -1,0 +1,9 @@
+{
+  "id": "atpiano",
+  "displayName": "Atpiano",
+  "hostnames": ["updates.graehlarts.com"],
+  "pathPrefix": "/atpiano",
+  "githubRepo": "kzahel/atpiano",
+  "tagPrefix": "desktop-v",
+  "tauriUpdates": true
+}

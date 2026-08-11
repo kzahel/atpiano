@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repository_root="$(cd "${script_directory}/.." && pwd)"
+
+cd "${repository_root}"
+if [[ "${#}" -eq 0 ]]; then
+  set -- ensure
+fi
+exec uv run python -m atpiano.desktop_media "$@"

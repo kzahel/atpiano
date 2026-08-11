@@ -72,7 +72,7 @@ function Root({
   return (
     <QueryClientProvider client={queryClient}>
       <RuntimeProvider runtime={runtime}>
-        <App viewer={viewer} />
+        <App desktopReleaseInfo={desktop?.releaseInfo} viewer={viewer} />
       </RuntimeProvider>
     </QueryClientProvider>
   );
@@ -84,7 +84,7 @@ function render(
 ) {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
-      <ClientUpdateNotice />
+      {desktop === undefined && <ClientUpdateNotice />}
       <Root runtime={runtime} desktop={desktop} />
     </StrictMode>,
   );

@@ -13,6 +13,7 @@ import {
 
 import { ArtifactPanel } from "./components/artifact-panel.js";
 import { CaptureDeck } from "./components/capture-deck.js";
+import { DesktopUpdatePanel } from "./components/desktop-update-panel.js";
 import { PerformanceViews } from "./components/performance-views.js";
 import {
   AccountMenu,
@@ -27,6 +28,7 @@ import { SessionRail } from "./components/session-rail.js";
 import { SessionTitleEditor } from "./components/session-title-editor.js";
 import { SessionsHome } from "./components/sessions-home.js";
 import { useMicrophone } from "./hooks/use-microphone.js";
+import { updateInstallBlocker } from "./desktop-update/install-blocker.js";
 import { artifactText } from "./lib/artifact-content.js";
 import { eventWindow, liveFrameCount } from "./lib/event-window.js";
 import {
@@ -56,6 +58,7 @@ import type {
   Session,
   SessionPage,
 } from "./runtime/atpiano-runtime.js";
+import type { DesktopReleaseInfo } from "./runtime/desktop-runtime.js";
 import { useRuntime } from "./runtime/runtime-context.js";
 import { useWorkspaceStore } from "./state/workspace-store.js";
 
@@ -103,8 +106,10 @@ export interface AppViewer {
 }
 
 export function App({
+  desktopReleaseInfo,
   viewer,
 }: {
+  readonly desktopReleaseInfo?: DesktopReleaseInfo;
   readonly viewer?: AppViewer;
 } = {}) {
   const runtime = useRuntime();
@@ -1332,10 +1337,54 @@ export function App({
   const scoreStatus = selectedScoreJob?.status ?? (
     selected?.available_artifact_kinds.includes("musicxml") ? "complete" : null
   );
+  const installBlocker = updateInstallBlocker({
+    capturePhase: captureState.phase,
+    sessionStatuses: sessionItems.map((session) => session.status),
+    scoreJobStatus: scoreJob?.status,
+  });
+  const desktopUpdateControl = desktopReleaseInfo
+    ? (
+      <DesktopUpdatePanel
+        releaseInfo={desktopReleaseInfo}
+        installBlocker={installBlocker}
+      />
+    )
+    : null;
 
   if (scoreReaderRoute !== null) {
     if (!selected) {
       return (
+        <>
+          {desktopUpdateControl}
+          <PlaybackProvider
+            sessionId={playbackSession?.session_id ?? null}
+            sources={audioPlayback.data ?? []}
+            totalSamples={playbackSession?.source_frame_count ?? 0}
+            sampleRateHz={playbackSession?.sample_rate_hz ?? 48_000}
+            cueSample={playbackCueSample}
+            cueReady={playbackCueReady}
+            sourceError={playbackSourceError}
+            selectedSessionId={selectedSessionId}
+            onSessionRequest={setPlaybackSessionId}
+          >
+            <div className="score-reader reader-boot" role="status">
+              <strong>Opening pinned score…</strong>
+              <span>
+                Loading its session and exact MusicXML snapshot.
+              </span>
+              {(selectedSession.isError || workspaces.isError) && (
+                <button type="button" onClick={closeScoreReader}>
+                  Return to workspace
+                </button>
+              )}
+            </div>
+          </PlaybackProvider>
+        </>
+      );
+    }
+    return (
+      <>
+        {desktopUpdateControl}
         <PlaybackProvider
           sessionId={playbackSession?.session_id ?? null}
           sources={audioPlayback.data ?? []}
@@ -1347,49 +1396,26 @@ export function App({
           selectedSessionId={selectedSessionId}
           onSessionRequest={setPlaybackSessionId}
         >
-          <div className="score-reader reader-boot" role="status">
-            <strong>Opening pinned score…</strong>
-            <span>
-              Loading its session and exact MusicXML snapshot.
-            </span>
-            {(selectedSession.isError || workspaces.isError) && (
-              <button type="button" onClick={closeScoreReader}>
-                Return to workspace
-              </button>
-            )}
-          </div>
+          <ScoreReader
+            route={scoreReaderRoute}
+            session={selected}
+            xml={readerScoreXml.data}
+            xmlError={readerScoreXml.error}
+            alignment={readerScoreAlignment.data}
+            alignmentError={readerScoreAlignment.error}
+            currentArtifactId={scoreArtifact?.artifact_id}
+            onClose={closeScoreReader}
+            onUseCurrent={useCurrentScore}
+            onDownload={() => void exportPinnedScore()}
+          />
         </PlaybackProvider>
-      );
-    }
-    return (
-      <PlaybackProvider
-        sessionId={playbackSession?.session_id ?? null}
-        sources={audioPlayback.data ?? []}
-        totalSamples={playbackSession?.source_frame_count ?? 0}
-        sampleRateHz={playbackSession?.sample_rate_hz ?? 48_000}
-        cueSample={playbackCueSample}
-        cueReady={playbackCueReady}
-        sourceError={playbackSourceError}
-        selectedSessionId={selectedSessionId}
-        onSessionRequest={setPlaybackSessionId}
-      >
-        <ScoreReader
-          route={scoreReaderRoute}
-          session={selected}
-          xml={readerScoreXml.data}
-          xmlError={readerScoreXml.error}
-          alignment={readerScoreAlignment.data}
-          alignmentError={readerScoreAlignment.error}
-          currentArtifactId={scoreArtifact?.artifact_id}
-          onClose={closeScoreReader}
-          onUseCurrent={useCurrentScore}
-          onDownload={() => void exportPinnedScore()}
-        />
-      </PlaybackProvider>
+      </>
     );
   }
 
   return (
+    <>
+    {desktopUpdateControl}
     <PlaybackProvider
       sessionId={playbackSession?.session_id ?? null}
       sources={audioPlayback.data ?? []}
@@ -1775,5 +1801,6 @@ export function App({
       </main>
       </div>
     </PlaybackProvider>
+    </>
   );
 }

@@ -1,0 +1,69 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  UPDATE_ENDPOINT,
+  validateDesktopReleaseConfiguration,
+} from "./validate-desktop-release.mjs";
+
+const publicKey = Buffer.from(
+  "untrusted comment: minisign public key 0123456789ABCDEF\nRWQatpiano\n",
+).toString("base64");
+
+function fixture() {
+  return {
+    appPackage: { version: "1.2.3" },
+    cargo: '[package]\nname = "atpiano-desktop"\nversion = "1.2.3"\n',
+    pyproject: '[project]\nname = "atpiano"\nversion = "1.2.3"\n',
+    tauri: {
+      version: "1.2.3",
+      identifier: "com.atpiano.desktop",
+      bundle: { targets: ["app", "dmg"], createUpdaterArtifacts: true },
+      plugins: { updater: { endpoints: [UPDATE_ENDPOINT], pubkey: publicKey } },
+    },
+    product: {
+      id: "atpiano",
+      displayName: "Atpiano",
+      hostnames: ["updates.graehlarts.com"],
+      pathPrefix: "/atpiano",
+      githubRepo: "kzahel/atpiano",
+      tagPrefix: "desktop-v",
+      tauriUpdates: true,
+    },
+    capabilities: { permissions: ["process:default", "updater:default"] },
+  };
+}
+
+test("accepts Atpiano's exact one-target release contract", () => {
+  assert.equal(validateDesktopReleaseConfiguration(fixture()).version, "1.2.3");
+});
+
+test("rejects version drift", () => {
+  const data = fixture();
+  data.tauri.version = "1.2.4";
+  assert.throws(() => validateDesktopReleaseConfiguration(data), /version drift/);
+});
+
+test("rejects accidental target expansion", () => {
+  const data = fixture();
+  data.tauri.bundle.targets.push("nsis");
+  assert.throws(() => validateDesktopReleaseConfiguration(data), /bundle targets/);
+});
+
+test("rejects an unresolved or reused updater key", () => {
+  const data = fixture();
+  data.tauri.plugins.updater.pubkey = "__ATPIANO_TAURI_UPDATER_PUBLIC_KEY__";
+  assert.throws(
+    () => validateDesktopReleaseConfiguration(data),
+    /public-key placeholder/,
+  );
+  data.tauri.plugins.updater.pubkey =
+    "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM4NUNFMEMxOUY4NDgzQkIKUldTN2c0U2Z3ZUJjeUQzQjlTZmhMUXE1bXVJajVLZXlLQzJPZzZLTElUU1lzcE5OVURyOXVWN3kK";
+  assert.throws(() => validateDesktopReleaseConfiguration(data), /reuse the canary/);
+});
+
+test("rejects product route drift", () => {
+  const data = fixture();
+  data.product.pathPrefix = "/different";
+  assert.throws(() => validateDesktopReleaseConfiguration(data), /product config/);
+});

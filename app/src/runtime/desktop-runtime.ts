@@ -12,6 +12,7 @@ const contractSchema = "atpiano.contract.v1";
 const tokenPattern = /^[0-9a-f]{64}$/;
 
 interface DesktopRuntimeInfo {
+  readonly appVersion: string;
   readonly baseUrl: string;
   readonly bearerToken: string;
   readonly webSocketProtocol: string;
@@ -24,10 +25,27 @@ interface DesktopRuntimeInfo {
   readonly modelPackId: string;
   readonly modelPackSha256: string;
   readonly scoreAvailable: boolean;
+  readonly installationId: string;
+  readonly packageType: string;
+  readonly updateEndpoint: string;
+}
+
+export interface DesktopReleaseInfo {
+  readonly appVersion: string;
+  readonly webClientBuildId: string;
+  readonly sidecarVersion: string;
+  readonly modelPackId: string;
+  readonly modelPackSha256: string;
+  readonly installationId: string;
+  readonly packageType: "app";
+  readonly updateEndpoint: string;
+  readonly platform: string;
+  readonly architecture: string;
 }
 
 export interface DesktopRuntimeBootstrap {
   readonly runtime: DesktopRuntime;
+  readonly releaseInfo: DesktopReleaseInfo;
   monitor(onFailure: (message: string) => void): Promise<UnlistenFn>;
 }
 
@@ -61,6 +79,13 @@ function validateRuntimeInfo(value: DesktopRuntimeInfo): DesktopRuntimeInfo {
     value.webSocketProtocol !== `${desktopProtocol}.${value.bearerToken}` ||
     !tokenPattern.test(value.modelPackSha256) ||
     typeof value.scoreAvailable !== "boolean" ||
+    !/^\d+\.\d+\.\d+$/.test(value.appVersion) ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value.installationId,
+    ) ||
+    value.updateEndpoint !==
+      "https://updates.graehlarts.com/atpiano/tauri/{{target}}/{{arch}}/{{current_version}}" ||
+    value.packageType !== "app" ||
     !value.sidecarVersion ||
     !value.modelPackId
   ) {
@@ -106,6 +131,18 @@ export async function createDesktopRuntime(): Promise<DesktopRuntimeBootstrap> {
       bearerToken: info.bearerToken,
       webSocketProtocol: info.webSocketProtocol,
     }),
+    releaseInfo: {
+      appVersion: info.appVersion,
+      webClientBuildId: __ATPIANO_BUILD_ID__,
+      sidecarVersion: info.sidecarVersion,
+      modelPackId: info.modelPackId,
+      modelPackSha256: info.modelPackSha256,
+      installationId: info.installationId,
+      packageType: "app",
+      updateEndpoint: info.updateEndpoint,
+      platform: info.platform,
+      architecture: info.architecture,
+    },
     monitor: (onFailure) =>
       listen<string>("desktop-runtime-failed", (event) => {
         onFailure(event.payload);

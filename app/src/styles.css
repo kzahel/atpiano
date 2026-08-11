@@ -80,6 +80,147 @@ button {
   font-weight: 750;
 }
 
+.desktop-update-control {
+  position: fixed;
+  z-index: 1100;
+  top: 15px;
+  right: 20px;
+}
+
+.desktop-update-trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid #30463d;
+  border-radius: 8px;
+  color: #c7d2cd;
+  background: rgba(12, 26, 22, 0.94);
+  cursor: pointer;
+  font: 650 11px/1.2 "DM Mono", monospace;
+}
+
+.desktop-update-trigger span {
+  color: #739387;
+}
+
+.desktop-update-trigger.attention {
+  border-color: #5fa889;
+  color: #effbf6;
+}
+
+.desktop-update-trigger.attention span {
+  color: var(--mint);
+}
+
+.desktop-update-panel {
+  width: min(430px, calc(100vw - 28px));
+  margin-top: 9px;
+  padding: 20px;
+  border: 1px solid #39564b;
+  border-radius: 13px;
+  background: #10201b;
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.55);
+}
+
+.desktop-update-heading,
+.desktop-update-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.desktop-update-heading {
+  justify-content: space-between;
+}
+
+.desktop-update-heading h2 {
+  margin: 3px 0 0;
+  font-size: 19px;
+  letter-spacing: -0.025em;
+}
+
+.desktop-update-heading > button {
+  align-self: flex-start;
+  padding: 0 5px;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 23px;
+}
+
+.desktop-update-copy,
+.desktop-update-notes,
+.desktop-update-blocker {
+  margin: 14px 0;
+  color: #b8c8c1;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.desktop-update-notes,
+.desktop-update-blocker {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #142b23;
+}
+
+.desktop-update-blocker {
+  border: 1px solid #725938;
+  color: #f2c891;
+  background: #2c2418;
+}
+
+.desktop-update-panel > progress {
+  width: 100%;
+  margin: 2px 0 13px;
+  accent-color: var(--mint);
+}
+
+.desktop-update-actions .button {
+  min-height: 36px;
+  padding: 8px 12px;
+}
+
+.desktop-release-identities {
+  margin-top: 17px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.desktop-release-identities summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.desktop-release-identities dl {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0 0;
+}
+
+.desktop-release-identities dl > div {
+  display: grid;
+  grid-template-columns: 105px 1fr;
+  gap: 10px;
+}
+
+.desktop-release-identities dt,
+.desktop-release-identities dd {
+  margin: 0;
+}
+
+.desktop-release-identities dd {
+  overflow: hidden;
+  color: #c8d6d0;
+  font-family: "DM Mono", monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 button:focus-visible,
 input:focus-visible {
   outline: 2px solid var(--mint);

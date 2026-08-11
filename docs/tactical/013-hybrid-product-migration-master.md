@@ -5,8 +5,10 @@ Topic: multi-tenant-hybrid-service-architecture
 Status: Phases 1 through 5 are complete; R2, R3, R4, and R5 are accepted.
 On 2026-07-28 the user confirmed the revised export flow and accepted the
 working local desktop boundary. The user also deferred Phases 6 through 8:
-the signed desktop-distribution program, managed hosted service, and
-collaboration/sync program have no active implementation schedule. The
+the managed hosted service and collaboration/sync program have no active
+implementation schedule. On 2026-08-10 the user resumed the focused signed
+macOS release/update portion of Phase 6 under Tactical 049; the rest of the
+complete desktop program remains deferred. The
 near-term deployment is the on-demand Mac-hosted application behind the home
 Pi/Caddy, recorded in
 [`home-hosted-family-sharing.md`](../topics/home-hosted-family-sharing.md).
@@ -76,7 +78,7 @@ result, and commit range.
 | 3. Shared React application | Complete | [`016`](016-shared-react-application.md) | R3 accepted 2026-07-26 |
 | 4. Python application core | Complete | [`022`](022-durable-capture-worker-isolation.md), [`023`](023-backend-capability-degradation.md), then [`017`](017-python-application-core.md) | R4 accepted 2026-07-27 |
 | 5. Early Tauri skeleton | Complete | [`030`](030-early-tauri-sidecar-boundary.md), [`031`](031-internal-desktop-score-runtime.md), [`032`](032-cross-platform-artifact-export.md) | R5 accepted 2026-07-28 |
-| 6. Complete packaged local desktop | Deferred; no active tactical | Not created | Review only if resumed |
+| 6. Complete packaged local desktop | Partially resumed; release/update slice active | [`051`](051-signed-macos-update-lane.md) | Publication hold, then installed update evidence |
 | 7. Managed hosted service | Deferred; no active tactical | Not created | Review only if resumed |
 | 8. Collaboration, distribution, and limited sync | Deferred; no active tactical | Not created | Review only if resumed |
 
@@ -570,8 +572,9 @@ and selected home-hosted family sharing as the near-term deployment.
 
 ## Phase 6 — Complete The Local Desktop Vertical Slice
 
-Status: **deferred with no active tactical.** Local improvements may be
-opened independently without adopting this entire distribution scope.
+Status: **partially resumed on 2026-08-10.** Tactical 049 owns only the signed
+macOS arm64 release and update vertical slice. SQLite migration, broad model
+acquisition, telemetry, and the rest of this phase remain deferred.
 
 ### Purpose
 

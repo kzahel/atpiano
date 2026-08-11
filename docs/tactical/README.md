@@ -63,3 +63,4 @@ execution record; continuing status and direction belong in the relevant
 | [`048-overlapping-score-input-notes.md`](048-overlapping-score-input-notes.md) | Complete; live | Unambiguous overlapping same-pitch MIDI channels, bounded score errors, and restored retained-session score generation |
 | [`049-native-windows-runtime-baseline.md`](049-native-windows-runtime-baseline.md) | Complete | Native Windows dependency resolution, deterministic CPU model parity, unpackaged server replay, and packaging inventory |
 | [`050-native-windows-cuda-parity.md`](050-native-windows-cuda-parity.md) | Complete | Explicit Windows CUDA runtime, fixed Transkun CPU/CUDA parity, and unpackaged CUDA server replay |
+| [`051-signed-macos-update-lane.md`](051-signed-macos-update-lane.md) | Active at publication hold | Signed and notarized macOS arm64 baseline, draft-first release lane, desktop updater, and real installed old-to-new acceptance |

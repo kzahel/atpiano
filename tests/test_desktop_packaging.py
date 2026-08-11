@@ -11,6 +11,7 @@ from atpiano.desktop import load_model_pack
 from atpiano.desktop_packaging import (
     _audit_anonymous_caches,
     _audit_distributions,
+    _audit_media_runtime,
     _audit_symlinks,
     _internal_score_policy,
     _prune_distribution_test_material,
@@ -192,6 +193,63 @@ def test_bundle_audit_rejects_anonymous_cache(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="anonymous cache"):
         _audit_anonymous_caches(tmp_path)
+
+
+def test_media_audit_accepts_exact_lgpl_build_identity(tmp_path: Path) -> None:
+    media = {
+        "build_identity": "a" * 64,
+        "ffmpeg_version": "ffmpeg version 8.1.2",
+        "configuration": "--enable-shared --disable-static --enable-libmp3lame",
+        "license": "LGPL-only",
+        "sources": [
+            {"name": "ffmpeg", "license": "LGPL-2.1-or-later"},
+            {"name": "lame", "license": "LGPL-2.0-or-later"},
+        ],
+        "bundled_library_count": 6,
+        "notices": "share/licenses/media/THIRD_PARTY_NOTICES.md",
+        "build_manifest": "media-build-manifest.json",
+    }
+    for relative in (
+        "bin/ffmpeg",
+        "bin/ffprobe",
+        media["notices"],
+    ):
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"fixture")
+    library_root = tmp_path / "lib" / "media"
+    library_root.mkdir(parents=True)
+    for index in range(6):
+        (library_root / f"library-{index}.dylib").write_bytes(b"fixture")
+    (tmp_path / "media-build-manifest.json").write_text(
+        json.dumps(
+            {
+                **media,
+                "file_hash_scope": (
+                    "relocated ad-hoc media output before product distribution signing"
+                ),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = _audit_media_runtime(tmp_path, {"media": media})
+
+    assert result["license"] == "LGPL-only"
+    assert result["bundled_library_count"] == 6
+
+
+def test_media_audit_rejects_gpl_configuration(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="GPL/nonfree"):
+        _audit_media_runtime(
+            tmp_path,
+            {
+                "media": {
+                    "license": "LGPL-only",
+                    "configuration": "--enable-gpl",
+                }
+            },
+        )
 
 
 def test_distribution_test_namespaces_are_pruned(

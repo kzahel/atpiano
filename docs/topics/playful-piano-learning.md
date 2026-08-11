@@ -86,8 +86,8 @@ The product should protect the desire to explore while gradually adding
 control and vocabulary. A game should not convert an emerging musical
 relationship into a sequence of compulsory note-identification tests.
 
-The same family also includes a two-year-old. The lowest experience should
-therefore not be a simplified six-year-old lesson. It should make one
+The target age range also includes two-year-olds. The earliest experience
+should therefore not be a simplified six-year-old lesson. It should make one
 intentional or accidental key press produce a satisfying musical and visual
 response, invite a caregiver to answer, and remain enjoyable without concepts
 such as correctness, levels, written instructions, or delayed rewards.

@@ -22,6 +22,9 @@ const DESKTOP_PROTOCOL: &str = "atpiano.desktop.v1";
 const CONTRACT_SCHEMA: &str = "atpiano.contract.v1";
 const MODEL_PACK_ID: &str = "atpiano-cpu-models-2026.07";
 const DESKTOP_ORIGIN: &str = "tauri://localhost";
+const UPDATE_ENDPOINT: &str =
+    "https://updates.graehlarts.com/atpiano/tauri/{{target}}/{{arch}}/{{current_version}}";
+const INSTALL_ID_FILE: &str = "cfu-id";
 const MAX_READY_BYTES: usize = 64 * 1024;
 const MAX_HANDSHAKE_BYTES: u64 = 1024 * 1024;
 const MAX_ARTIFACT_HEADER_BYTES: usize = 64 * 1024;
@@ -31,6 +34,7 @@ const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopRuntimeInfo {
+    app_version: String,
     base_url: String,
     bearer_token: String,
     web_socket_protocol: String,
@@ -43,6 +47,9 @@ struct DesktopRuntimeInfo {
     model_pack_id: String,
     model_pack_sha256: String,
     score_available: bool,
+    installation_id: String,
+    package_type: String,
+    update_endpoint: String,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -114,6 +121,61 @@ impl DesktopState {
             }
         }
     }
+
+    fn prepare_update_install(&self) -> Result<(), String> {
+        if !matches!(
+            &*self
+                .status
+                .read()
+                .map_err(|_| "desktop runtime state is unavailable".to_string())?,
+            RuntimeStatus::Ready(_)
+        ) {
+            return Err("The local engine is not ready for an update.".to_string());
+        }
+        let process = self
+            .process
+            .lock()
+            .map_err(|_| "desktop process state is unavailable".to_string())?
+            .take()
+            .ok_or_else(|| "The local engine is already stopped.".to_string())?;
+        process.shutdown();
+        if let Ok(mut status) = self.status.write() {
+            *status = RuntimeStatus::Initializing;
+        }
+        Ok(())
+    }
+
+    fn resume_after_update_failure(
+        &self,
+        app: &tauri::AppHandle,
+        installation_id: &str,
+    ) -> Result<(), String> {
+        let mut slot = self
+            .process
+            .lock()
+            .map_err(|_| "desktop process state is unavailable".to_string())?;
+        if slot.is_some() {
+            return Ok(());
+        }
+        if let Ok(mut status) = self.status.write() {
+            *status = RuntimeStatus::Initializing;
+        }
+        match start_sidecar(app, Arc::clone(&self.status), installation_id) {
+            Ok((process, info)) => {
+                if let Ok(mut status) = self.status.write() {
+                    *status = RuntimeStatus::Ready(Box::new(info));
+                }
+                *slot = Some(process);
+                Ok(())
+            }
+            Err(error) => {
+                if let Ok(mut status) = self.status.write() {
+                    *status = RuntimeStatus::Failed(error.clone());
+                }
+                Err(error)
+            }
+        }
+    }
 }
 
 impl Drop for DesktopState {
@@ -156,6 +218,29 @@ fn token() -> Result<String, String> {
             .map_err(|_| "could not encode desktop credentials".to_string())?;
     }
     Ok(encoded)
+}
+
+fn read_valid_installation_id(path: &Path) -> Option<String> {
+    let value = fs::read_to_string(path).ok()?;
+    let value = value.trim();
+    uuid::Uuid::parse_str(value).ok()?;
+    Some(value.to_owned())
+}
+
+fn get_or_create_installation_id(config_dir: &Path) -> Result<String, String> {
+    let path = config_dir.join(INSTALL_ID_FILE);
+    if let Some(id) = read_valid_installation_id(&path) {
+        return Ok(id);
+    }
+    fs::create_dir_all(config_dir)
+        .map_err(|error| format!("could not create desktop config directory: {error}"))?;
+    let id = uuid::Uuid::new_v4().to_string();
+    let temporary = config_dir.join(format!("{INSTALL_ID_FILE}.tmp"));
+    fs::write(&temporary, format!("{id}\n"))
+        .map_err(|error| format!("could not write installation identity: {error}"))?;
+    fs::rename(&temporary, &path)
+        .map_err(|error| format!("could not publish installation identity: {error}"))?;
+    Ok(id)
 }
 
 fn resource_dir_for_executable(executable: &Path) -> Option<PathBuf> {
@@ -596,6 +681,7 @@ fn configure_sidecar_environment(
 fn start_sidecar(
     app: &tauri::AppHandle,
     status: Arc<RwLock<RuntimeStatus>>,
+    installation_id: &str,
 ) -> Result<(DesktopProcess, DesktopRuntimeInfo), String> {
     #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
     return Err("Phase 5 desktop builds require macOS arm64".to_string());
@@ -724,6 +810,7 @@ fn start_sidecar(
         }
 
         let info = DesktopRuntimeInfo {
+            app_version: env!("CARGO_PKG_VERSION").to_string(),
             base_url: format!("http://127.0.0.1:{}", ready.port),
             bearer_token: credential.clone(),
             web_socket_protocol: format!("{DESKTOP_PROTOCOL}.{credential}"),
@@ -736,6 +823,9 @@ fn start_sidecar(
             model_pack_id: ready.model_pack_id,
             model_pack_sha256: ready.model_pack_sha256,
             score_available: handshake.score_available,
+            installation_id: installation_id.to_string(),
+            package_type: "app".to_string(),
+            update_endpoint: UPDATE_ENDPOINT.to_string(),
         };
         let expected_shutdown = Arc::new(AtomicBool::new(false));
         monitor_child(
@@ -771,6 +861,29 @@ fn current_runtime_info(status: &RwLock<RuntimeStatus>) -> Result<DesktopRuntime
 #[tauri::command]
 fn desktop_runtime(state: tauri::State<'_, DesktopState>) -> Result<DesktopRuntimeInfo, String> {
     current_runtime_info(&state.status)
+}
+
+#[tauri::command(async)]
+fn desktop_prepare_update_install(state: tauri::State<'_, DesktopState>) -> Result<(), String> {
+    state.prepare_update_install()
+}
+
+#[tauri::command(async)]
+fn desktop_resume_after_update_failure(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, DesktopState>,
+) -> Result<(), String> {
+    let info = current_runtime_info(&state.status).ok();
+    let installation_id =
+        info.as_ref()
+            .map(|value| value.installation_id.clone())
+            .or_else(|| {
+                app.path().app_config_dir().ok().and_then(|directory| {
+                    read_valid_installation_id(&directory.join(INSTALL_ID_FILE))
+                })
+            })
+            .ok_or_else(|| "The installation identity is unavailable.".to_string())?;
+    state.resume_after_update_failure(&app, &installation_id)
 }
 
 #[tauri::command(async)]
@@ -813,9 +926,19 @@ fn desktop_export_artifact(
 pub fn run() {
     let application = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            let config_dir = app
+                .path()
+                .app_config_dir()
+                .map_err(|error| format!("could not locate desktop config: {error}"))?;
+            let installation_id = get_or_create_installation_id(&config_dir)?;
+            let updater = tauri_plugin_updater::Builder::new()
+                .header("X-CFU-Id", &installation_id)?
+                .build();
+            app.handle().plugin(updater)?;
             let status = Arc::new(RwLock::new(RuntimeStatus::Initializing));
-            let result = start_sidecar(app.handle(), Arc::clone(&status));
+            let result = start_sidecar(app.handle(), Arc::clone(&status), &installation_id);
             let process = match result {
                 Ok((process, info)) => {
                     if let Ok(mut current) = status.write() {
@@ -838,7 +961,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             desktop_runtime,
-            desktop_export_artifact
+            desktop_export_artifact,
+            desktop_prepare_update_install,
+            desktop_resume_after_update_failure
         ])
         .build(tauri::generate_context!())
         .expect("error while building Atpiano");
@@ -896,6 +1021,7 @@ mod tests {
 
     fn runtime_info_fixture() -> DesktopRuntimeInfo {
         DesktopRuntimeInfo {
+            app_version: "0.1.0".to_string(),
             base_url: "http://127.0.0.1:49152".to_string(),
             bearer_token: "a".repeat(64),
             web_socket_protocol: format!("{DESKTOP_PROTOCOL}.{}", "a".repeat(64)),
@@ -908,7 +1034,28 @@ mod tests {
             model_pack_id: MODEL_PACK_ID.to_string(),
             model_pack_sha256: "b".repeat(64),
             score_available: false,
+            installation_id: "0198be8e-ebcf-7f2a-8dc0-7d54cbf49621".to_string(),
+            package_type: "app".to_string(),
+            update_endpoint: UPDATE_ENDPOINT.to_string(),
         }
+    }
+
+    #[test]
+    fn installation_id_is_stable_and_valid() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let first = get_or_create_installation_id(directory.path()).expect("create ID");
+        let second = get_or_create_installation_id(directory.path()).expect("read ID");
+        assert_eq!(first, second);
+        assert!(uuid::Uuid::parse_str(&first).is_ok());
+    }
+
+    #[test]
+    fn malformed_installation_id_is_replaced() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        fs::write(directory.path().join(INSTALL_ID_FILE), "invalid\n").expect("malformed ID");
+        let replacement = get_or_create_installation_id(directory.path()).expect("replacement ID");
+        assert!(uuid::Uuid::parse_str(&replacement).is_ok());
+        assert_ne!(replacement, "invalid");
     }
 
     #[test]

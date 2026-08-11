@@ -75,6 +75,9 @@ normally reuse the document slug in its `Topic:` trailers.
   proposed musical-notebook direction joining quiet practice capture,
   moment-centered reflection, readable engraving, cautious tool-backed
   analysis, trusted collaboration, and teacher review.
+- [`public-desktop-release.md`](public-desktop-release.md):
+  active macOS arm64 signing, notarization, public-release, and installed
+  desktop-update contract, with explicit score-runtime and publication gates.
 - [`session-workspace-management.md`](session-workspace-management.md):
   accepted v2 foundation for explicit New, session history, separate
   active/selected identities, recoverable deletion, and future continuation.

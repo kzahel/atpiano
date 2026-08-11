@@ -239,13 +239,20 @@ def test_desktop_http_requires_bearer_and_exact_origin(tmp_path: Path) -> None:
             method="OPTIONS",
             headers={
                 "Origin": DESKTOP_ORIGIN,
-                "Access-Control-Request-Method": "GET",
-                "Access-Control-Request-Headers": "Authorization",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": (
+                    "Authorization, Content-Type, X-Atpiano-Filename, "
+                    "X-Atpiano-Performer-Profile, X-Atpiano-Request-Id"
+                ),
             },
         )
         with urllib.request.urlopen(preflight, timeout=2) as response:
             assert response.status == 204
             assert response.headers["Access-Control-Allow-Origin"] == DESKTOP_ORIGIN
+            assert (
+                "X-Atpiano-Performer-Profile"
+                in response.headers["Access-Control-Allow-Headers"]
+            )
 
         foreign = _request(
             f"{base_url}/api/config",

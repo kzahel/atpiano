@@ -42,9 +42,12 @@ original model MusicXML into the shared Exports panel and adding one bounded
 native Save As path. Large desktop artifacts stream from the authenticated
 sidecar without crossing IPC as bytes, while the web adapter retains normal
 browser downloads. The webview still has no general filesystem, dialog,
-shell, or remote HTTP permission. The ordinary R5 and every public artifact
-remain score-free. Windows, Linux, final signing, updates, and microphone
-parity remain outside this bounded proof.
+shell, or remote HTTP permission. The ordinary R5 remains score-free. On
+2026-08-10 the user separately resumed a score-free, macOS-arm64-only signed
+release and update slice under
+[`public-desktop-release.md`](public-desktop-release.md) and Tactical 049.
+Windows, Linux, the optional score-runtime acquisition flow, and the remaining
+Phase 6 program remain outside that bounded slice.
 
 Native Windows is now the next authoritative local execution environment, but
 the immediate target is an unpackaged Python/React server and deterministic

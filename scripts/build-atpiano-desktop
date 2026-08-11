@@ -6,10 +6,280 @@ repository_root="$(cd "${script_directory}/.." && pwd)"
 runtime_root="${repository_root}/app/src-tauri/resources/desktop-runtime"
 report_root="${repository_root}/results/desktop-phase5"
 internal_report_root="${repository_root}/results/desktop-internal-score"
+release_report_root="${repository_root}/results/desktop-release-rehearsal"
 app_bundle="${repository_root}/app/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Atpiano.app"
 internal_app_bundle="${internal_report_root}/Atpiano-Internal-Score.app"
 tauri_target="${repository_root}/app/src-tauri/target"
 review_archive="${report_root}/Atpiano-R5-macos-arm64-unsigned.zip"
+apple_development_identity="Apple Development: Kyle Graehl (22WW382YN8)"
+developer_id_identity="Developer ID Application: Kyle Graehl (VD7BYQ6ABM)"
+python_entitlements="${repository_root}/app/src-tauri/entitlements/python.plist"
+desktop_version="$(
+  node -e \
+    'process.stdout.write(require(process.argv[1]).version)' \
+    "${repository_root}/app/src-tauri/tauri.conf.json"
+)"
+media_source_archive="${repository_root}/results/desktop-media/Atpiano_${desktop_version}_media-sources.tar.gz"
+
+sign_staged_native_code() {
+  local identity="${1}"
+  local timestamp_option="${2:---timestamp}"
+  local candidate
+  local -a codesign_arguments
+  local signing_output
+  local signed_count=0
+  while IFS= read -r -d '' candidate; do
+    if ! file -b "${candidate}" | grep -q 'Mach-O'; then
+      continue
+    fi
+    codesign_arguments=(
+      --force
+      --options runtime
+      "${timestamp_option}"
+    )
+    if [[ "${candidate}" == "${runtime_root}/bin/python3."* ]]; then
+      codesign_arguments+=(--entitlements "${python_entitlements}")
+    fi
+    if ! signing_output="$(
+      codesign \
+        "${codesign_arguments[@]}" \
+        --sign "${identity}" \
+        "${candidate}" \
+        2>&1
+    )"; then
+      printf '%s\n' "${signing_output}" >&2
+      return 1
+    fi
+    signed_count=$((signed_count + 1))
+  done < <(
+    find "${runtime_root}" -type f \
+      \( -perm -111 -o -name '*.dylib' -o -name '*.so' \) \
+      -print0
+  )
+  if [[ "${signed_count}" -eq 0 ]]; then
+    printf '%s\n' "no staged native code was found for signing" >&2
+    return 1
+  fi
+  printf '%s\n' "Signed ${signed_count} staged native files"
+}
+
+require_signing_identity() {
+  local identity="${1}"
+  if ! security find-identity -v -p codesigning | grep -Fq "${identity}"; then
+    printf '%s\n' "code-signing identity is not available: ${identity}" >&2
+    return 1
+  fi
+}
+
+verify_hardened_signature() {
+  local expected_authority="${1}"
+  local details
+  local python_details
+  local candidate
+  local native_count=0
+  codesign --verify --deep --strict --verbose=2 "${app_bundle}"
+  details="$(codesign --display --verbose=4 "${app_bundle}" 2>&1)"
+  if [[ "${details}" != *"runtime"* ]]; then
+    printf '%s\n' "Atpiano.app does not have the hardened-runtime flag" >&2
+    return 1
+  fi
+  if [[ -n "${expected_authority}" ]] &&
+    [[ "${details}" != *"Authority=${expected_authority}"* ]]
+  then
+    printf '%s\n' "Atpiano.app has an unexpected signing authority" >&2
+    return 1
+  fi
+  while IFS= read -r -d '' candidate; do
+    if ! file -b "${candidate}" | grep -q 'Mach-O'; then
+      continue
+    fi
+    codesign --verify --strict "${candidate}"
+    details="$(codesign --display --verbose=4 "${candidate}" 2>&1)"
+    if [[ "${details}" != *"runtime"* ]]; then
+      printf '%s\n' "nested native code lacks hardened runtime: ${candidate}" >&2
+      return 1
+    fi
+    if [[ -n "${expected_authority}" ]]; then
+      if [[ "${details}" != *"Authority=${expected_authority}"* ]]; then
+        printf '%s\n' "nested native code has an unexpected authority: ${candidate}" >&2
+        return 1
+      fi
+    elif [[ "${details}" != *"Signature=adhoc"* ]]; then
+      printf '%s\n' "nested rehearsal code is not ad-hoc signed: ${candidate}" >&2
+      return 1
+    fi
+    native_count=$((native_count + 1))
+  done < <(
+    find "${app_bundle}" -type f \
+      \( -perm -111 -o -name '*.dylib' -o -name '*.so' \) \
+      -print0
+  )
+  if [[ "${native_count}" -eq 0 ]]; then
+    printf '%s\n' "no bundled native code was found for verification" >&2
+    return 1
+  fi
+  python_details="$(
+    codesign --display --entitlements - \
+      "${app_bundle}/Contents/Resources/desktop-runtime/bin/python3" \
+      2>&1
+  )"
+  if [[ "${python_details}" != \
+    *"com.apple.security.cs.allow-unsigned-executable-memory"* \
+  ]]; then
+    printf '%s\n' "bundled Python lacks its required JIT entitlement" >&2
+    return 1
+  fi
+  if [[ "${python_details}" == *"com.apple.security.cs.disable-library-validation"* ]]; then
+    printf '%s\n' "bundled Python unexpectedly disables library validation" >&2
+    return 1
+  fi
+  printf '%s\n' "Verified ${native_count} hardened native signatures"
+}
+
+audit_release_app() {
+  mkdir -p "${release_report_root}"
+  (
+    cd "${repository_root}"
+    uv run python -m atpiano.desktop_packaging audit \
+      --root "${app_bundle}" \
+      --report "${release_report_root}/bundle-audit.json"
+  )
+}
+
+validate_release_replay() {
+  local label="${1}"
+  (
+    cd "${repository_root}"
+    uv run python -m atpiano.desktop_validation packaged-replay \
+      --app "${app_bundle}" \
+      --workspace "${release_report_root}/packaged-workspace-${label}" \
+      --report "${release_report_root}/packaged-replay-${label}.json"
+  )
+}
+
+verify_release_dmg() {
+  local dmg_path="${1}"
+  local mounted_app
+  local mount_directory
+  local result=0
+  codesign --verify --verbose=2 "${dmg_path}"
+  mount_directory="$(mktemp -d -t atpiano-dmg-validation)"
+  if ! hdiutil attach \
+    -readonly \
+    -nobrowse \
+    -mountpoint "${mount_directory}" \
+    "${dmg_path}" \
+    >/dev/null
+  then
+    rmdir "${mount_directory}"
+    return 1
+  fi
+  mounted_app="${mount_directory}/Atpiano.app"
+  if ! (
+    test -d "${mounted_app}"
+    codesign --verify --deep --strict --verbose=2 "${mounted_app}"
+    spctl --assess --type execute --verbose=2 "${mounted_app}"
+    xcrun stapler validate "${mounted_app}"
+  ); then
+    result=1
+  fi
+  if ! hdiutil detach "${mount_directory}" >/dev/null; then
+    result=1
+  fi
+  if [[ -d "${mount_directory}" ]]; then
+    rmdir "${mount_directory}"
+  fi
+  return "${result}"
+}
+
+prepare_developer_id_release() {
+  require_signing_identity "${developer_id_identity}"
+  stage_runtime
+  "${repository_root}/scripts/build-atpiano-media-runtime" source-archive \
+    --version "${desktop_version}" \
+    --output "${media_source_archive}"
+  sign_staged_native_code \
+    "${developer_id_identity}" \
+    "--timestamp"
+  unlock_generated_outputs
+  mkdir -p "${release_report_root}"
+}
+
+verify_developer_id_release() {
+  local updater_directory
+  local updater_archive_count
+  local updater_signature_count
+  local updater_archive
+  local updater_signature
+  "${repository_root}/scripts/build-atpiano-media-runtime" validate-source-archive \
+    --version "${desktop_version}" \
+    --archive "${media_source_archive}"
+  verify_hardened_signature "${developer_id_identity}"
+  audit_release_app
+  validate_release_replay developer-id
+  spctl --assess --type execute --verbose=2 "${app_bundle}"
+  xcrun stapler validate "${app_bundle}"
+  local dmg_directory
+  local dmg_count
+  local dmg_path
+  dmg_directory="${repository_root}/app/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg"
+  dmg_count="$(find "${dmg_directory}" -maxdepth 1 -type f -name '*.dmg' | wc -l | tr -d ' ')"
+  if [[ "${dmg_count}" != "1" ]]; then
+    printf '%s\n' "expected exactly one DMG, found ${dmg_count}" >&2
+    return 1
+  fi
+  dmg_path="$(find "${dmg_directory}" -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+  verify_release_dmg "${dmg_path}"
+  updater_directory="${repository_root}/app/src-tauri/target/aarch64-apple-darwin/release/bundle/macos"
+  updater_archive_count="$(
+    find "${updater_directory}" -maxdepth 1 -type f -name '*.app.tar.gz' |
+      wc -l | tr -d ' '
+  )"
+  updater_signature_count="$(
+    find "${updater_directory}" -maxdepth 1 -type f -name '*.app.tar.gz.sig' |
+      wc -l | tr -d ' '
+  )"
+  if [[ "${updater_archive_count}" != "1" ]] ||
+    [[ "${updater_signature_count}" != "1" ]]
+  then
+    printf '%s\n' \
+      "expected one updater archive and signature; found ${updater_archive_count} archives and ${updater_signature_count} signatures" \
+      >&2
+    return 1
+  fi
+  updater_archive="$(
+    find "${updater_directory}" -maxdepth 1 -type f -name '*.app.tar.gz' -print -quit
+  )"
+  updater_signature="${updater_archive}.sig"
+  if [[ ! -f "${updater_signature}" ]]; then
+    printf '%s\n' "updater signature does not match archive: ${updater_archive}" >&2
+    return 1
+  fi
+  cargo run \
+    --quiet \
+    --manifest-path "${repository_root}/app/src-tauri/Cargo.toml" \
+    --example verify_updater_signature \
+    -- \
+    "${repository_root}/app/src-tauri/tauri.conf.json" \
+    "${updater_archive}" \
+    "${updater_signature}"
+  printf '%s\n' \
+    "${app_bundle}" \
+    "${dmg_path}" \
+    "${updater_archive}" \
+    "${updater_signature}" \
+    "${media_source_archive}"
+}
+
+require_environment() {
+  local name
+  for name in "$@"; do
+    if [[ -z "${!name:-}" ]]; then
+      printf '%s\n' "required environment variable is missing: ${name}" >&2
+      return 1
+    fi
+  done
+}
 
 stage_runtime() {
   local mode="${1:-ordinary}"
@@ -26,6 +296,7 @@ stage_runtime() {
   else
     mkdir -p "${report_root}"
   fi
+  "${repository_root}/scripts/build-atpiano-media-runtime" ensure
   (
     cd "${repository_root}"
     uv run python -m atpiano.desktop_packaging stage \
@@ -121,6 +392,49 @@ case "${1:-}" in
     )
     printf '%s\n' "${internal_app_bundle}"
     ;;
+  rehearse-development)
+    require_signing_identity "${apple_development_identity}"
+    stage_runtime
+    sign_staged_native_code \
+      "${apple_development_identity}" \
+      "--timestamp=none"
+    unlock_generated_outputs
+    mkdir -p "${release_report_root}"
+    (
+      cd "${repository_root}/app"
+      npx tauri build \
+        --target aarch64-apple-darwin \
+        --bundles app \
+        --config \
+        '{"bundle":{"macOS":{"signingIdentity":"Apple Development: Kyle Graehl (22WW382YN8)"}}}'
+    )
+    verify_hardened_signature "${apple_development_identity}"
+    audit_release_app
+    validate_release_replay development
+    printf '%s\n' "${app_bundle}"
+    ;;
+  rehearse-developer-id)
+    require_environment APPLE_API_KEY APPLE_API_ISSUER APPLE_API_KEY_PATH
+    if [[ ! -f "${APPLE_API_KEY_PATH}" ]]; then
+      printf '%s\n' "APPLE_API_KEY_PATH is not a file" >&2
+      exit 1
+    fi
+    prepare_developer_id_release
+    (
+      cd "${repository_root}/app"
+      npx tauri build \
+        --target aarch64-apple-darwin \
+        --bundles app,dmg
+    )
+    verify_developer_id_release
+    ;;
+  prepare-developer-id-release)
+    prepare_developer_id_release
+    ;;
+  verify-developer-id-release)
+    require_signing_identity "${developer_id_identity}"
+    verify_developer_id_release
+    ;;
   audit)
     (
       cd "${repository_root}"
@@ -139,7 +453,9 @@ case "${1:-}" in
     ;;
   *)
     printf '%s\n' \
-      "usage: $0 {stage|dev|build|audit|stage-internal-score|" \
+      "usage: $0 {stage|dev|build|audit|rehearse-development|" \
+      "rehearse-developer-id|prepare-developer-id-release|" \
+      "verify-developer-id-release|stage-internal-score|" \
       "dev-internal-score|build-internal-score|" \
       "audit-internal-score}" >&2
     exit 2

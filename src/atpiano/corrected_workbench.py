@@ -1581,6 +1581,7 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
                 "content-type",
                 "range",
                 "x-atpiano-filename",
+                "x-atpiano-performer-profile",
                 "x-atpiano-request-id",
             }
         ):
@@ -1599,7 +1600,8 @@ class CorrectedWorkbenchHandler(BaseHTTPRequestHandler):
             "Access-Control-Allow-Headers",
             (
                 "Authorization, Content-Type, Range, "
-                "X-Atpiano-Filename, X-Atpiano-Request-Id"
+                "X-Atpiano-Filename, X-Atpiano-Performer-Profile, "
+                "X-Atpiano-Request-Id"
             ),
         )
         self.send_header("Access-Control-Max-Age", "600")

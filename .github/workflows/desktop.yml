@@ -1,0 +1,314 @@
+name: Atpiano Desktop
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "desktop-v*"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  attestations: write
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  source-checks:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Python and uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.10.19"
+          enable-cache: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+
+      - name: Install locked dependencies
+        run: |
+          uv sync --frozen --extra corrected
+          npm ci --prefix app
+
+      - name: Check source and release contracts
+        run: |
+          uv run ruff check
+          uv run pytest
+          npm run typecheck --prefix app
+          npm test --prefix app
+          node --test .github/scripts/*.test.mjs scripts/validate-desktop-release.test.mjs
+          node scripts/validate-desktop-release.mjs
+
+      - name: Check Rust formatting and lint
+        run: |
+          cargo fmt --manifest-path app/src-tauri/Cargo.toml --all -- --check
+          cargo clippy --manifest-path app/src-tauri/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path app/src-tauri/Cargo.toml
+
+  build-desktop:
+    if: startsWith(github.ref, 'refs/tags/desktop-v') || github.event_name == 'workflow_dispatch'
+    needs: source-checks
+    runs-on: macos-26
+    env:
+      HAS_UPDATER_SIGNING: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD != '' }}
+      HAS_MACOS_SIGNING: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 != '' && secrets.MACOS_CERTIFICATE_PASSWORD != '' && secrets.MACOS_KEYCHAIN_PASSWORD != '' }}
+      HAS_MACOS_NOTARIZATION: ${{ secrets.ASC_API_KEY_P8_BASE64 != '' && secrets.ASC_API_KEY_ID != '' && secrets.ASC_API_ISSUER_ID != '' }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Require complete release credentials
+        shell: bash
+        run: |
+          if [ "$HAS_UPDATER_SIGNING" != "true" ]; then
+            echo "::error::Desktop builds require both Atpiano updater signing secrets"
+            exit 1
+          fi
+          if [ "$HAS_MACOS_SIGNING" != "true" ] || [ "$HAS_MACOS_NOTARIZATION" != "true" ]; then
+            echo "::error::Desktop builds require Developer ID and notarization credentials"
+            exit 1
+          fi
+
+      - name: Setup Python and uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.10.19"
+          enable-cache: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Cache Rust builds
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+          key: macos-26-aarch64-apple-darwin
+
+      - name: Install build dependencies
+        run: |
+          uv sync --frozen --extra corrected
+          npm ci --prefix app
+
+      - name: Verify release identity
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: bash
+        run: |
+          node scripts/validate-desktop-release.mjs
+          VERSION="${GITHUB_REF_NAME#desktop-v}"
+          node -e 'const fs=require("fs"); const version=JSON.parse(fs.readFileSync("app/src-tauri/tauri.conf.json")).version; if (version !== process.argv[1]) throw new Error(`tag ${process.argv[1]} does not match ${version}`)' "$VERSION"
+
+      - name: Set up macOS code-signing keychain
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        shell: bash
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/atpiano-certificate.p12"
+          echo "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+          security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security import "$CERTIFICATE_PATH" -k build.keychain \
+            -P "$MACOS_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/productsign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$MACOS_KEYCHAIN_PASSWORD" build.keychain
+          security find-identity -v -p codesigning build.keychain
+          find "$CERTIFICATE_PATH" -type f -delete
+
+      - name: Set up notarization environment
+        env:
+          ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+        shell: bash
+        run: |
+          KEY_DIRECTORY="$RUNNER_TEMP/atpiano-private-keys"
+          KEY_PATH="$KEY_DIRECTORY/AuthKey_${ASC_API_KEY_ID}.p8"
+          mkdir -p "$KEY_DIRECTORY"
+          echo "$ASC_API_KEY_P8_BASE64" | base64 --decode > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          {
+            echo "APPLE_API_KEY=$ASC_API_KEY_ID"
+            echo "APPLE_API_ISSUER=$ASC_API_ISSUER_ID"
+            echo "APPLE_API_KEY_PATH=$KEY_PATH"
+            echo "APPLE_SIGNING_IDENTITY=Developer ID Application: Kyle Graehl (VD7BYQ6ABM)"
+          } >> "$GITHUB_ENV"
+
+      - name: Stage and sign the complete nested runtime
+        run: scripts/build-atpiano-desktop prepare-developer-id-release
+
+      - name: Extract release notes
+        id: changelog
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#desktop-v}"
+          NOTES=$(awk "/^## \[$VERSION\]/{found=1; next} /^## \[/{found=0} found" CHANGELOG.md)
+          echo "notes<<__ATPIANO_NOTES__" >> "$GITHUB_OUTPUT"
+          echo "$NOTES" >> "$GITHUB_OUTPUT"
+          echo "__ATPIANO_NOTES__" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed Atpiano desktop artifacts
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: app
+          tauriScript: npx tauri
+          tagName: ${{ startsWith(github.ref, 'refs/tags/') && 'desktop-v__VERSION__' || '' }}
+          releaseName: "Atpiano v__VERSION__"
+          releaseBody: ${{ steps.changelog.outputs.notes || 'Signed Atpiano desktop proof of concept.' }}
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: ${{ startsWith(github.ref, 'refs/tags/') }}
+          retryAttempts: "1"
+          args: "--target aarch64-apple-darwin"
+
+      - name: Verify notarized bundle and packaged scoring flow
+        run: scripts/build-atpiano-desktop verify-developer-id-release
+
+      - name: Attach corresponding media sources to the draft
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#desktop-v}"
+          gh release upload "$GITHUB_REF_NAME" \
+            "results/desktop-media/Atpiano_${VERSION}_media-sources.tar.gz" \
+            --clobber
+
+      - name: Attest local release artifacts
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            app/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+            app/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz
+            app/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz.sig
+            results/desktop-media/Atpiano_*_media-sources.tar.gz
+
+      - name: Clean up signing material
+        if: always()
+        shell: bash
+        run: |
+          security delete-keychain build.keychain 2>/dev/null || true
+          if [ -d "$RUNNER_TEMP/atpiano-private-keys" ]; then
+            find "$RUNNER_TEMP/atpiano-private-keys" -type f -delete
+            rmdir "$RUNNER_TEMP/atpiano-private-keys"
+          fi
+
+  finalize-release:
+    if: always() && startsWith(github.ref, 'refs/tags/desktop-v')
+    needs: [source-checks, build-desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Keep failed builds private
+        if: needs.source-checks.result != 'success' || needs.build-desktop.result != 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --draft
+            echo "::error::Required jobs failed; $GITHUB_REF_NAME remains a draft"
+          else
+            echo "::error::Required jobs failed; no release was created"
+          fi
+          exit 1
+
+      - name: Download and validate the complete draft
+        if: needs.source-checks.result == 'success' && needs.build-desktop.result == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          RELEASE_DIRECTORY="$RUNNER_TEMP/atpiano-release"
+          mkdir -p "$RELEASE_DIRECTORY"
+          gh release view "$GITHUB_REF_NAME" --json tagName,isDraft,assets > "$RELEASE_DIRECTORY/release.json"
+          gh release download "$GITHUB_REF_NAME" --dir "$RELEASE_DIRECTORY"
+          node .github/scripts/validate-release.mjs \
+            --release "$RELEASE_DIRECTORY/release.json" \
+            --latest "$RELEASE_DIRECTORY/latest.json" \
+            --tag "$GITHUB_REF_NAME" \
+            --repository "$GITHUB_REPOSITORY"
+          node .github/scripts/write-release-checksums.mjs \
+            "$RELEASE_DIRECTORY/release.json" "$RELEASE_DIRECTORY/SHA256SUMS"
+          gh release upload "$GITHUB_REF_NAME" "$RELEASE_DIRECTORY/SHA256SUMS" --clobber
+
+      - name: Attest release metadata
+        if: needs.source-checks.result == 'success' && needs.build-desktop.result == 'success'
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: ${{ runner.temp }}/atpiano-release/SHA256SUMS
+
+      - name: Write release evidence
+        if: needs.source-checks.result == 'success' && needs.build-desktop.result == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#desktop-v}"
+          CHANGELOG=$(awk "/^## \[$VERSION\]/{found=1; next} /^## \[/{found=0} found" CHANGELOG.md)
+          {
+            echo "$CHANGELOG"
+            echo
+            echo "## Automated release evidence"
+            echo
+            echo "- The single supported updater target \`darwin-aarch64\` was validated."
+            echo "- Developer ID signing, hardened runtime, notarization, and stapling were validated."
+            echo "- The complete nested Python/model/media bundle passed its audit and packaged replay."
+            echo "- The media runtime is the pinned LGPL-only FFmpeg/LAME build, with exact corresponding sources attached."
+            echo "- Build provenance attestations were issued by GitHub Actions."
+            echo "- Workflow: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Exact hashes: https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/SHA256SUMS"
+            echo
+            echo "Installed old-to-new acceptance evidence is recorded separately and is not implied by CI."
+          } > "$RUNNER_TEMP/atpiano-release-notes.md"
+          gh release edit "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/atpiano-release-notes.md"
+
+      - name: Publish validated release
+        if: needs.source-checks.result == 'success' && needs.build-desktop.result == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false --latest

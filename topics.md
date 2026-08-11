@@ -49,3 +49,5 @@
 - `windows-native-runtime-portability` — native Windows dependency, model,
   deterministic replay, and unpackaged local-server parity aligned with a
   later Windows desktop sidecar and model-pack lane
+- `public-desktop-release` — public-repository preflight, signed and notarized
+  macOS distribution, desktop updates, and installed release evidence

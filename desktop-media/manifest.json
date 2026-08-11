@@ -1,0 +1,61 @@
+{
+  "schema_version": "atpiano.desktop-media-build.v1",
+  "target": "macos-arm64",
+  "install_prefix": "/atpiano-media-runtime",
+  "runtime_library_directory": "lib/media",
+  "sources": [
+    {
+      "name": "ffmpeg",
+      "version": "8.1.2",
+      "archive": "ffmpeg-8.1.2.tar.xz",
+      "url": "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+      "sha256": "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c",
+      "license": "LGPL-2.1-or-later",
+      "license_files": [
+        "COPYING.LGPLv2.1",
+        "COPYING.LGPLv3"
+      ]
+    },
+    {
+      "name": "lame",
+      "version": "4.0",
+      "archive": "lame-4.0.tar.gz",
+      "url": "https://downloads.sourceforge.net/project/lame/lame/4.0/lame-4.0.tar.gz",
+      "sha256": "3df5124d5ad3a98312ffd7ba6a9b36230e4f8a3e66d3ce0f425e336c32d216eb",
+      "license": "LGPL-2.0-or-later",
+      "license_files": [
+        "COPYING",
+        "LICENSE"
+      ]
+    }
+  ],
+  "lame_configure": [
+    "--enable-shared",
+    "--disable-static",
+    "--disable-frontend",
+    "--disable-decoder"
+  ],
+  "ffmpeg_configure": [
+    "--enable-shared",
+    "--disable-static",
+    "--disable-doc",
+    "--disable-debug",
+    "--disable-autodetect",
+    "--disable-network",
+    "--disable-everything",
+    "--disable-avdevice",
+    "--disable-swscale",
+    "--enable-avfilter",
+    "--enable-swresample",
+    "--enable-ffmpeg",
+    "--enable-ffprobe",
+    "--enable-protocol=file,pipe",
+    "--enable-demuxer=concat,mp3,wav",
+    "--enable-muxer=mp3,null,pcm_s16le",
+    "--enable-decoder=mp3,mp3float,pcm_f32le,pcm_f64le,pcm_s16le,pcm_s24le,pcm_s32le,pcm_u8",
+    "--enable-encoder=libmp3lame,pcm_s16le",
+    "--enable-parser=mpegaudio",
+    "--enable-filter=aformat,anull,aresample",
+    "--enable-libmp3lame"
+  ]
+}
