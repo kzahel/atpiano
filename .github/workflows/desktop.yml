@@ -36,15 +36,10 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Install Linux desktop dependencies
+      - name: Install FFmpeg for source tests
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+          sudo apt-get install -y ffmpeg
 
       - name: Install locked dependencies
         run: |
@@ -60,7 +55,27 @@ jobs:
           node --test .github/scripts/*.test.mjs scripts/validate-desktop-release.test.mjs
           node scripts/validate-desktop-release.mjs
 
-      - name: Check Rust formatting and lint
+  rust-macos-checks:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install locked frontend dependencies
+        run: npm ci --prefix app
+
+      - name: Check macOS Rust formatting, lint, and tests
         run: |
           npm run build --prefix app
           cargo fmt --manifest-path app/src-tauri/Cargo.toml --all -- --check
@@ -69,7 +84,7 @@ jobs:
 
   build-desktop:
     if: startsWith(github.ref, 'refs/tags/desktop-v') || github.event_name == 'workflow_dispatch'
-    needs: source-checks
+    needs: [source-checks, rust-macos-checks]
     runs-on: macos-26
     env:
       HAS_UPDATER_SIGNING: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD != '' }}
