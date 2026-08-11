@@ -62,6 +62,7 @@ jobs:
 
       - name: Check Rust formatting and lint
         run: |
+          npm run build --prefix app
           cargo fmt --manifest-path app/src-tauri/Cargo.toml --all -- --check
           cargo clippy --manifest-path app/src-tauri/Cargo.toml --all-targets -- -D warnings
           cargo test --manifest-path app/src-tauri/Cargo.toml

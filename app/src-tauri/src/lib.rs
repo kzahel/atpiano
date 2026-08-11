@@ -7,14 +7,16 @@ use std::{
     io::{self, BufRead, BufReader, Read, Write},
     net::{SocketAddr, TcpStream},
     path::{Path, PathBuf},
-    process::{Child, Command, Stdio},
+    process::{Child, Command},
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc, Arc, Mutex, RwLock,
+        Arc, Mutex, RwLock,
     },
     thread,
     time::{Duration, Instant},
 };
+#[cfg(any(test, all(target_os = "macos", target_arch = "aarch64")))]
+use std::{process::Stdio, sync::mpsc};
 use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
 
@@ -684,7 +686,10 @@ fn start_sidecar(
     installation_id: &str,
 ) -> Result<(DesktopProcess, DesktopRuntimeInfo), String> {
     #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
-    return Err("Phase 5 desktop builds require macOS arm64".to_string());
+    {
+        let _ = (app, status, installation_id);
+        return Err("Phase 5 desktop builds require macOS arm64".to_string());
+    }
 
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
     {
