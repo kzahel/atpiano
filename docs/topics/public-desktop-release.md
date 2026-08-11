@@ -2,15 +2,16 @@
 
 Topic: public-desktop-release
 
-Status: **at publication hold as of 2026-08-11, with the complete LGPL media
-release candidate signed, notarized, installed, and locally accepted.**
+Status: **the source repository is public with no declared Atpiano source
+license as of 2026-08-11; binary publication remains on hold.**
 Atpiano has implemented the accepted Desktop Update Contract v1 for a first
 public proof-of-concept release, with macOS Apple silicon as its only supported
 target. Tactical
 [`051-signed-macos-update-lane.md`](../tactical/051-signed-macos-update-lane.md)
 owns the first signed baseline, successor update, and acceptance campaign.
-No release has been published, the GitHub repository remains private, and no
-production update-server configuration has been changed.
+The complete LGPL media release candidate is signed, notarized, installed,
+and locally accepted. No release has been published and no production
+update-server configuration has been changed.
 
 ## Scope
 
@@ -40,10 +41,10 @@ Atpiano is a public proof of concept intended for interested people to try and
 review. The same application and feature set are available to everyone. There
 is no payment or eligibility tier in this phase.
 
-The repository may become public without choosing an Atpiano source license
-yet. In that state the source is visible but ordinary copyright restrictions
-remain; public visibility must not be described as open-source licensing.
-The maintainer's email address is acceptable public information.
+The repository became public on 2026-08-11 without choosing an Atpiano source
+license. The source is visible but ordinary copyright restrictions remain;
+public visibility must not be described as open-source licensing. The
+maintainer's email address is acceptable public information.
 
 The ordinary application release must not contain MIDI2ScoreTransformer
 source or its checkpoint. A later optional score-generator acquisition flow
@@ -90,7 +91,7 @@ five-target contract. It does not claim Windows, Linux, or Intel macOS support.
 | Corresponding media sources | `Atpiano_0.1.0_media-sources.tar.gz` |
 | Product proposal | `update-server/atpiano.json` |
 | Exact route | `https://updates.graehlarts.com/atpiano/tauri/...` |
-| Repository state | private `kzahel/atpiano`, default branch `main` |
+| Repository state | public `kzahel/atpiano`, default branch `main`, no declared Atpiano license |
 | Actions secrets | none configured |
 | Production route | inactive; current concrete target request returns HTTP 404 JSON |
 
@@ -126,10 +127,11 @@ validates them against the tagged GitHub release.
 
 A 2026-08-11 read-only inspection found no key/certificate files or
 high-confidence credential patterns in the working tree or reachable Git
-history. The per-product updater private key is outside the repository, and
-only its public key is tracked. The maintainer-approved email address is
-present in history. Before changing repository visibility, re-run the scan at
-the exact candidate commit and consciously review:
+history. The scan was repeated at the exact publication candidate before the
+repository became public, with the same result. The per-product updater
+private key is outside the repository, and only its public key is tracked.
+The maintainer-approved email address is present in history. The preflight
+consciously reviewed:
 
 - the tracked 34.7-second piano recording and its named reference image under
   `oracle/`;
@@ -185,10 +187,15 @@ has no EULA restricting LGPL debugging or modification.
    stable installation identity, and clean shutdown. The sealed App contains
    14,327 files, 1,035,469,721 bytes, and 381 individually verified arm64
    native signatures.
-2. **Release lane: implemented locally.** The product JSON, macOS-26 arm64
-   workflow, draft validator/finalizer, checksums, and attestations are present
-   and tested. No GitHub workflow has run and no Actions secrets have been
-   uploaded.
+2. **Release lane: public CI contract accepted.** The product JSON, macOS-26
+   arm64 workflow, draft validator/finalizer, checksums, and attestations are
+   present and tested. The ordinary public
+   [source run](https://github.com/kzahel/atpiano/actions/runs/31516122672)
+   passed its Ubuntu source and macOS Rust jobs. A subsequent
+   [manual rehearsal](https://github.com/kzahel/atpiano/actions/runs/31516446700)
+   passed both prerequisite jobs, then failed closed before signing setup with
+   `Desktop builds require both Atpiano updater signing secrets`. No Actions
+   secrets have been uploaded.
 3. **Desktop updater: implemented and locally accepted.** The installed
    notarized App exposes manual and scheduled checks, stable installation and
    component identities, install blockers, download/install states, and
@@ -201,18 +208,20 @@ has no EULA restricting LGPL debugging or modification.
    The unsigned full stage passed with 14,321 files, 1,015,793,592 bytes and
    378 arm64 native files. The signed App reconciles a 14-file/2,871,458-byte
    media category and passed Gate 1.
-5. **Publication hold:** review the proposed tag, artifact set, exact route,
-   rehearsal evidence, public-repository preflight, and remaining risks before
-   changing repository visibility, uploading Actions secrets, activating the
-   production product config, pushing a release tag, or publishing a release.
+5. **Binary-publication hold:** repository visibility and public CI rehearsal
+   are complete. Review the proposed tag, artifact set, exact route, rehearsal
+   evidence, and remaining risks before uploading Actions secrets, activating
+   the production product config, pushing a release tag, or publishing a
+   release.
 6. **Installed update campaign:** after approval, prove the exact signed
    `0.1.0 -> 0.1.1` path through production and retain redacted evidence.
 
 ## Recommended Direction
 
-Review the exact publication candidate and then deliberately authorize the
-external mutations as one bounded release operation. The local implementation
-and accepted installed-DMG rehearsal are not authorization to make the
-repository public, upload secrets, activate production routing, push a tag, or
-publish a release. Only a later signed `0.1.0 -> 0.1.1` campaign through
+The repository is now public with no declared Atpiano source license. Review
+the exact binary publication candidate and then deliberately authorize the
+remaining external mutations as one bounded release operation. The local
+implementation, public CI rehearsal, and accepted installed-DMG rehearsal are
+not authorization to upload secrets, activate production routing, push a tag,
+or publish a release. Only a later signed `0.1.0 -> 0.1.1` campaign through
 production can close the update contract.

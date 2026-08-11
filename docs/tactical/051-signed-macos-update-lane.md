@@ -2,10 +2,11 @@
 
 Topic: public-desktop-release
 
-Status: **active at publication hold. The release lane, desktop updater, and
-complete LGPL media candidate passed signed/notarized installed acceptance on
-2026-08-11. The published `0.1.0 -> 0.1.1` campaign requires explicit
-approval.**
+Status: **active at binary-publication hold. The source repository and CI lane
+are public with no declared Atpiano source license. The release lane, desktop
+updater, and complete LGPL media candidate passed signed/notarized installed
+acceptance on 2026-08-11. The published `0.1.0 -> 0.1.1` campaign requires
+explicit approval.**
 
 ## Outcome
 
@@ -43,8 +44,9 @@ generic release framework.
 - Keep the ordinary release score-free. Do not stage, archive, attest, or
   publish MIDI2ScoreTransformer source or checkpoint.
 - Preserve hosted-web asset-update behavior as a separate composition.
-- Do not publish a release, change repository visibility, or activate the
-  production update-server product before the explicit publication hold.
+- Do not publish a release or activate the production update-server product
+  before the explicit binary-publication hold. Repository visibility may
+  change only after its separate public-tree/history preflight and approval.
 
 ## Stage 1 — Signing And Notarization Gate
 
@@ -139,9 +141,9 @@ After the publication hold is approved:
 
 ## Publication Hold
 
-Stop before changing GitHub repository visibility, activating the product
-configuration on the shared production server, pushing the first release tag,
-or publishing the first release. Present:
+Stop before activating the product configuration on the shared production
+server, pushing the first release tag, or publishing the first release.
+Repository visibility has a separate preflight and approval boundary. Present:
 
 - proposed version and tag;
 - complete public artifact set;
@@ -311,9 +313,10 @@ configuration validation, clean diff whitespace, and `npm audit` with zero
 known vulnerabilities. The shared live service was stopped, so it was not
 started or restarted.
 
-No public release, production server activation, GitHub Actions secret upload,
-tag push, repository visibility change, or installed old-to-new update has
-been made. Stage 4 remains subject to explicit publication approval.
+At that point, no public release, production server activation, GitHub Actions
+secret upload, tag push, repository visibility change, or installed old-to-new
+update had been made. Stage 4 remained subject to explicit publication
+approval.
 
 The Homebrew FFmpeg rehearsal then exposed a needlessly broad GPL surface:
 `--enable-gpl --enable-version3`, x264/x265, and 18 media libraries even though
@@ -377,7 +380,44 @@ generation unavailable. The new session and installation UUID
 normal menu quits reaped the Tauri shell, Python sidecar, FFmpeg, and FFprobe;
 post-use strict signature, Gatekeeper, and stapler validation still passed.
 
-Stage 1 is current for the LGPL release candidate. No publication or
-production mutation was performed; the next gate is the explicit
-publication-hold review, followed by the real installed `0.1.0 -> 0.1.1`
-campaign if approved.
+Stage 1 is current for the LGPL release candidate.
+
+The maintainer then approved the separate source-publication and public-CI
+rehearsal boundary. The release-lane work was rebased without force over the
+new native Windows runtime commits on `main`, and this tactical moved from
+number 049 to 051 to preserve their accepted numbering. The exact candidate
+tree and reachable history were scanned again before publication. They had no
+high-confidence credential or private-key findings, no sensitive
+key/certificate filenames, and no tracked model checkpoint. The only reviewed
+personal data was the approved maintainer identity and previously documented
+historical private-LAN address.
+
+`kzahel/atpiano` became public on 2026-08-11. It has no root license file and
+GitHub detects no repository license, so this is public source under ordinary
+copyright restrictions rather than an open-source license grant. It still has
+zero Actions secrets, zero GitHub releases, and no release tag or active
+production product route.
+
+The first public workflow executions exposed two source-lane assumptions:
+Ubuntu needed FFmpeg for existing recording-import tests, and the macOS-only
+Tauri crate should not be compiled as a Linux desktop application. The final
+workflow installs FFmpeg only for Ubuntu source tests and runs Rust checks on
+macOS 26. An ordinary
+[public push run](https://github.com/kzahel/atpiano/actions/runs/31516122672)
+then passed the complete Ubuntu source and macOS Rust jobs, with release jobs
+skipped as designed.
+
+The final
+[manual rehearsal](https://github.com/kzahel/atpiano/actions/runs/31516446700)
+passed both prerequisite jobs on attempt 2. Its signed build job stopped in 19
+seconds at `Require complete release credentials` with the exact annotation
+`Desktop builds require both Atpiano updater signing secrets`. All keychain,
+certificate, notarization, packaging, and artifact steps were skipped, and the
+release finalizer did not run. This proves that the public lane fails closed
+before signing when credentials are absent without invoking the maintainer's
+local Keychain.
+
+Source visibility and the fail-closed CI rehearsal are complete. The remaining
+gate is approval to upload the eight macOS/updater Actions secrets, activate
+the production product configuration, push the first release tag, publish the
+binary release, and run the real installed `0.1.0 -> 0.1.1` campaign.
