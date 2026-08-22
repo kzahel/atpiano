@@ -31,3 +31,14 @@ uuid = { version = "1.18.1", features = ["v4"] }
 base64 = "0.22.1"
 minisign-verify = "0.2.5"
 tempfile = "3.21.0"
+
+# Keep routine dev and test builds small while retaining file/line backtraces.
+[profile.dev]
+debug = "line-tables-only"
+incremental = false
+
+# Opt into full source-level debugger data in an isolated output directory.
+[profile.debugging]
+inherits = "dev"
+opt-level = 0
+debug = "full"
