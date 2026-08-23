@@ -488,7 +488,7 @@ jobs:
             CHANGELOG.md > "$NOTES_FILE"
           mapfile -t MACOS_UPDATERS < <(
             find "$RELEASE_DIRECTORY" -maxdepth 1 -type f \
-              -name 'Atpiano*_aarch64.app.tar.gz' -print
+              -name 'Atpiano.app.tar.gz' -print
           )
           mapfile -t WINDOWS_UPDATERS < <(
             find "$RELEASE_DIRECTORY" -maxdepth 1 -type f \

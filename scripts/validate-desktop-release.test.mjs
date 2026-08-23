@@ -89,7 +89,10 @@ test("rejects product route drift", () => {
 });
 
 test("requires notarization, stapling, and Gatekeeper assessment for the DMG", () => {
-  const workflow = "scripts/build-atpiano-desktop notarize-release-dmg";
+  const workflow = [
+    "scripts/build-atpiano-desktop notarize-release-dmg",
+    "-name 'Atpiano.app.tar.gz'",
+  ].join("\n");
   const buildScript = [
     "xcrun notarytool submit",
     "xcrun stapler staple",
@@ -103,6 +106,14 @@ test("requires notarization, stapling, and Gatekeeper assessment for the DMG", (
   assert.throws(
     () => validateMacosDmgReleaseContract({ workflow: "", buildScript }),
     /does not notarize/,
+  );
+  assert.throws(
+    () =>
+      validateMacosDmgReleaseContract({
+        workflow: "scripts/build-atpiano-desktop notarize-release-dmg",
+        buildScript,
+      }),
+    /does not select the Tauri v2 updater artifact/,
   );
   assert.throws(
     () => validateMacosDmgReleaseContract({ workflow, buildScript: "" }),

@@ -42,7 +42,7 @@ export function validateRelease({ release, latest, tag, repository }) {
   );
   const updater = matchingAsset(
     assetNames,
-    /^Atpiano(?:_[0-9.]+)?_aarch64\.app\.tar\.gz$/,
+    /^Atpiano\.app\.tar\.gz$/,
     "macOS Apple-silicon updater archive",
   );
   const signature = `${updater}.sig`;

@@ -35,7 +35,7 @@ export function updaterManifest({
   const version = tag.slice("desktop-v".length);
   const macosAsset = path.basename(macosUpdaterPath);
   const windowsAsset = path.basename(windowsUpdaterPath);
-  if (!/^Atpiano(?:_[0-9.]+)?_aarch64\.app\.tar\.gz$/.test(macosAsset)) {
+  if (macosAsset !== "Atpiano.app.tar.gz") {
     fail(`unexpected macOS updater asset: ${macosAsset}`);
   }
   if (windowsAsset !== `Atpiano_${version}_x64-setup.exe`) {

@@ -9,7 +9,7 @@ const repository = "kzahel/atpiano";
 const digest = `sha256:${"a".repeat(64)}`;
 
 function fixture() {
-  const updater = "Atpiano_aarch64.app.tar.gz";
+  const updater = "Atpiano.app.tar.gz";
   const windowsUpdater = `Atpiano_${version}_x64-setup.exe`;
   const names = [
     `Atpiano_${version}_aarch64.dmg`,
@@ -67,7 +67,7 @@ test("rejects updater URLs outside the exact tagged release", () => {
   data.latest.platforms["darwin-aarch64"].url = "https://example.test/Atpiano.app.tar.gz";
   assert.throws(() => validateRelease({ ...data, tag, repository }), /unexpected URL/);
   data.latest.platforms["darwin-aarch64"].url =
-    `https://github.com/${repository}/releases/download/${tag}/Atpiano_aarch64.app.tar.gz`;
+    `https://github.com/${repository}/releases/download/${tag}/Atpiano.app.tar.gz`;
   data.latest.platforms["windows-x86_64"].url = "https://example.test/setup.exe";
   assert.throws(() => validateRelease({ ...data, tag, repository }), /unexpected URL/);
 });

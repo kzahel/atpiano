@@ -149,6 +149,9 @@ export function validateMacosDmgReleaseContract({ workflow, buildScript }) {
   if (!workflow.includes("scripts/build-atpiano-desktop notarize-release-dmg")) {
     fail("macOS release workflow does not notarize the DMG");
   }
+  if (!workflow.includes("-name 'Atpiano.app.tar.gz'")) {
+    fail("macOS release workflow does not select the Tauri v2 updater artifact");
+  }
   for (const command of [
     "xcrun notarytool submit",
     "xcrun stapler staple",
