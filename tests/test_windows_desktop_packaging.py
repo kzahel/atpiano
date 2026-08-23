@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from atpiano import windows_desktop_packaging
 
@@ -63,12 +64,27 @@ def test_score_support_uses_a_short_independent_workspace(tmp_path: Path) -> Non
         output.mkdir(parents=True)
         (output / "support-manifest.json").write_text("{}", encoding="utf-8")
 
-    with patch(
-        "atpiano.windows_desktop_packaging.stage_windows_score_support",
-        side_effect=stage,
-    ) as mocked:
+    build_root = tmp_path / "short"
+    build_root.mkdir()
+    with (
+        patch(
+            "atpiano.windows_desktop_packaging._score_build_root",
+            return_value=build_root,
+        ),
+        patch(
+            "atpiano.windows_desktop_packaging.stage_windows_score_support",
+            side_effect=stage,
+        ) as mocked,
+    ):
         windows_desktop_packaging._stage_score_support(destination, repository)
 
     working_output = mocked.call_args.args[0]
     assert destination.is_dir()
-    assert working_output.parent == Path(tempfile.gettempdir()).resolve()
+    assert working_output.parent == build_root.resolve()
+
+
+def test_score_build_root_fails_with_actionable_long_path(tmp_path: Path) -> None:
+    long_root = Path("C:/") / ("a" * 61)
+
+    with pytest.raises(RuntimeError, match="ATPIANO_WINDOWS_BUILD_ROOT"):
+        windows_desktop_packaging._validate_score_build_root(long_root)

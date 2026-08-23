@@ -300,8 +300,30 @@ def _score_support_record(root: Path) -> dict[str, Any]:
     }
 
 
+def _validate_score_build_root(root: Path) -> None:
+    if len(str(root)) > 60:
+        raise RuntimeError(
+            "Windows score build root is too long; set ATPIANO_WINDOWS_BUILD_ROOT "
+            "to a short workspace path"
+        )
+
+
+def _score_build_root(repository: Path) -> Path:
+    configured = os.environ.get("ATPIANO_WINDOWS_BUILD_ROOT")
+    root = (
+        Path(configured).expanduser().resolve()
+        if configured
+        else (repository.parent / ".atpiano-build").resolve()
+    )
+    _validate_score_build_root(root)
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
 def _stage_score_support(root: Path, repository: Path) -> None:
-    staged = Path(tempfile.mkdtemp(prefix="atps-")).resolve()
+    staged = Path(
+        tempfile.mkdtemp(prefix="atps-", dir=_score_build_root(repository))
+    ).resolve()
     staged.rmdir()
     try:
         stage_windows_score_support(staged, repository)
