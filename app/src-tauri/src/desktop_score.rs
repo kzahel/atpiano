@@ -929,8 +929,8 @@ pub(crate) fn acquire(
     fs::create_dir_all(&staging_parent)
         .map_err(|error| format!("could not create score model staging: {error}"))?;
     let staging = staging_parent.join(uuid::Uuid::new_v4().to_string());
-    fs::create_dir(&staging)
-        .map_err(|error| format!("could not create score model staging: {error}"))?;
+    // copy_tree owns creation of the unique destination so it can reject a
+    // pre-existing path instead of merging into untrusted staged contents.
     let mut published_runtime = false;
     let mut published_acknowledgement = false;
     let result = (|| {
@@ -1165,6 +1165,27 @@ mod tests {
                 .expect("support payload hash"),
             initial
         );
+    }
+
+    #[test]
+    fn support_copy_owns_destination_creation() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let source = directory.path().join("support");
+        let destination = directory.path().join("staging");
+        fs::create_dir(&source).expect("support directory");
+        fs::write(source.join("payload"), b"score support").expect("support payload");
+
+        assert_eq!(
+            copy_tree(&source, &destination).expect("staged support"),
+            13
+        );
+        assert_eq!(
+            fs::read(destination.join("payload")).expect("copied payload"),
+            b"score support"
+        );
+        assert!(copy_tree(&source, &destination)
+            .expect_err("existing staging destination")
+            .contains("could not create the score runtime"));
     }
 
     #[test]
