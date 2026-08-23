@@ -280,7 +280,7 @@ jobs:
     timeout-minutes: 240
     env:
       HAS_UPDATER_SIGNING: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD != '' }}
-      HAS_WINDOWS_SIGNING: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 != '' && secrets.WINDOWS_CERTIFICATE_PASSWORD != '' }}
+      HAS_WINDOWS_SIGNING: ${{ secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_TENANT_ID != '' && secrets.AZURE_CLIENT_SECRET != '' }}
 
     steps:
       - uses: actions/checkout@v6
@@ -294,7 +294,7 @@ jobs:
             throw 'Windows builds require both Atpiano updater signing secrets'
           }
           if ($env:HAS_WINDOWS_SIGNING -ne 'true') {
-            throw 'Windows builds require the Authenticode PFX and password secrets'
+            throw 'Windows builds require complete Azure Trusted Signing credentials'
           }
 
       - name: Setup Python and uv
@@ -318,6 +318,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
+
+      - name: Install Azure Trusted Signing client
+        shell: pwsh
+        run: cargo install trusted-signing-cli
 
       - name: Cache Rust builds
         uses: swatinem/rust-cache@v2
@@ -363,36 +367,27 @@ jobs:
             --root app/src-tauri/resources/desktop-runtime `
             --report results/windows-desktop-runtime-reaudit.json
 
-      - name: Import the temporary Authenticode certificate
-        shell: pwsh
-        env:
-          WINDOWS_CERTIFICATE_PFX_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-        run: |
-          .github/scripts/windows-signing.ps1 `
-            -Action Import `
-            -ConfigPath "$env:GITHUB_WORKSPACE\windows-signing.json" `
-            -ReceiptPath "$env:RUNNER_TEMP\atpiano-windows-signing.json" `
-            -PfxPath "$env:RUNNER_TEMP\atpiano-certificate.pfx"
-
       - name: Build signed Windows desktop artifacts
         uses: tauri-apps/tauri-action@v0
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         with:
           projectPath: app
           tauriScript: npx tauri
           includeUpdaterJson: false
           retryAttempts: "1"
-          args: "--target x86_64-pc-windows-msvc --config ../windows-signing.json"
+          args: >-
+            --target x86_64-pc-windows-msvc
+            --config '{"bundle":{"windows":{"signCommand":"trusted-signing-cli -e https://eus.codesigning.azure.net -a kylegraehl -c jstorrent-profile %1"}}}'
 
       - name: Verify signed Windows package and updater artifacts
         shell: pwsh
         run: |
           .github/scripts/windows-signing.ps1 `
-            -Action Verify `
-            -ReceiptPath "$env:RUNNER_TEMP\atpiano-windows-signing.json" `
             -ReleaseRoot "$env:GITHUB_WORKSPACE\app\src-tauri\target\x86_64-pc-windows-msvc\release" `
             -ReportPath "$env:GITHUB_WORKSPACE\results\windows-package-signing-audit.json"
 
@@ -426,16 +421,6 @@ jobs:
             app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
             app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip
             app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip.sig
-
-      - name: Clean up Windows signing material
-        if: always()
-        shell: pwsh
-        run: |
-          .github/scripts/windows-signing.ps1 `
-            -Action Cleanup `
-            -ConfigPath "$env:GITHUB_WORKSPACE\windows-signing.json" `
-            -ReceiptPath "$env:RUNNER_TEMP\atpiano-windows-signing.json" `
-            -PfxPath "$env:RUNNER_TEMP\atpiano-certificate.pfx"
 
   finalize-release:
     if: always() && startsWith(github.ref, 'refs/tags/desktop-v')
