@@ -454,6 +454,29 @@ score-capable public release.
   macOS notarization, updater, recorded-provenance, and
   forbidden-model-content gates.
 
+## Execution Record
+
+Implementation began on 2026-08-23 with the signed-input contract. The tracked
+`desktop-score/acquisition.json` fixes notice v1, both exact release targets,
+the CPU policy, upstream links, bounded ZIP extraction, and the following
+external asset facts:
+
+- commit ZIP: 187,103 bytes, 21 entries, 332,507 expanded bytes, SHA-256
+  `42953b3d184807b9e4d18f2b9280e8e7593d5b74890f8d9755187f0e27537cb7`;
+- checkpoint: 389,829,880 bytes and the already retained SHA-256
+  `7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d43cb2011245db638`;
+  and
+- combined download copy: 390,016,983 bytes with an intentionally
+  conservative 1.5 GB installed estimate and 2.5 GB free-space gate.
+
+The exact commit ZIP was downloaded from GitHub over HTTPS for this
+measurement. The checkpoint was not downloaded again; GitHub's release server
+confirmed its retained byte count. Strict Pydantic contracts now reject
+unknown fields, non-HTTPS or unlisted hosts, inconsistent byte totals,
+unsupported target pairs, receipt identity creep, and unsafe active-runtime
+paths. The three focused contract tests pass. The platform support-layer
+inventory/hash, native transactional downloader, and UI remain active work.
+
 ## Later Todo — Remove Evaluation Helpers
 
 After the proof-of-concept release, stop importing the upstream evaluation

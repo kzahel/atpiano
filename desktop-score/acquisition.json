@@ -1,0 +1,49 @@
+{
+  "schema_version": "atpiano.score-acquisition.v1",
+  "contract_id": "midi2score-research-2026.08",
+  "notice_version": "midi2score-research-notice-v1",
+  "model_name": "MIDI2ScoreTransformer",
+  "purpose": "Optional local sheet-music generation from committed MIDI",
+  "notice": "MIDI2ScoreTransformer is an optional research model. Its upstream source and checkpoint do not currently include an explicit license. Atpiano does not include or license those assets. If you have the right to use them, Atpiano can download the exact upstream files for education or research use only and run them locally on this device. Do not use them commercially or redistribute them.",
+  "acknowledgement": "I understand this notice and want to download the optional research model.",
+  "source": {
+    "repository_url": "https://github.com/TimFelixBeyer/MIDI2ScoreTransformer",
+    "commit": "115432bda16ca16e0fec2e9465788f2ba369971f",
+    "archive_url": "https://github.com/TimFelixBeyer/MIDI2ScoreTransformer/archive/115432bda16ca16e0fec2e9465788f2ba369971f.zip",
+    "archive_sha256": "42953b3d184807b9e4d18f2b9280e8e7593d5b74890f8d9755187f0e27537cb7",
+    "archive_bytes": 187103,
+    "archive_root": "MIDI2ScoreTransformer-115432bda16ca16e0fec2e9465788f2ba369971f",
+    "maximum_entry_count": 128,
+    "maximum_expanded_bytes": 5000000
+  },
+  "checkpoint": {
+    "release_url": "https://github.com/TimFelixBeyer/MIDI2ScoreTransformer/releases/tag/v0.0.1",
+    "download_url": "https://github.com/TimFelixBeyer/MIDI2ScoreTransformer/releases/download/v0.0.1/MIDI2ScoreTF.ckpt",
+    "sha256": "7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d43cb2011245db638",
+    "bytes": 389829880
+  },
+  "paper_url": "https://zenodo.org/records/14877339",
+  "allowed_https_hosts": [
+    "github.com",
+    "codeload.github.com",
+    "release-assets.githubusercontent.com",
+    "zenodo.org"
+  ],
+  "support_layer_id": "atpiano-midi2score-support-py311-2026.08",
+  "supported_targets": [
+    {
+      "platform": "macos",
+      "architecture": "arm64"
+    },
+    {
+      "platform": "windows",
+      "architecture": "x86_64"
+    }
+  ],
+  "score_runtime_schema": "atpiano.midi2score-runtime.v2",
+  "score_pipeline_revision": 4,
+  "execution_backend": "cpu",
+  "download_bytes": 390016983,
+  "installed_space_estimate_bytes": 1500000000,
+  "minimum_free_bytes": 2500000000
+}
