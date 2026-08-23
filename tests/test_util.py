@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -8,9 +9,30 @@ from pathlib import Path
 from atpiano.util import (
     process_rss_high_water_bytes,
     resolve_command,
+    sha256_file,
+    sha256_path,
     write_json,
     write_jsonl,
 )
+
+
+def test_tree_hash_uses_case_sensitive_relative_path_order(tmp_path: Path) -> None:
+    files = {
+        "README.md": b"upper",
+        "midi/model.py": b"lower",
+        "Tokenization.pdf": b"mixed",
+    }
+    for relative, content in files.items():
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(content)
+    expected = hashlib.sha256()
+    for relative in sorted(files):
+        expected.update(relative.encode("utf-8"))
+        expected.update(b"\0")
+        expected.update(bytes.fromhex(sha256_file(tmp_path / relative)))
+
+    assert sha256_path(tmp_path) == expected.hexdigest()
 
 
 def test_atomic_replace_retries_transient_windows_access_denial(

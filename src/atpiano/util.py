@@ -40,7 +40,10 @@ def sha256_path(path: Path) -> str:
     if path.is_file():
         return sha256_file(path)
     digest = hashlib.sha256()
-    for child in sorted(item for item in path.rglob("*") if item.is_file()):
+    for child in sorted(
+        (item for item in path.rglob("*") if item.is_file()),
+        key=lambda item: item.relative_to(path).as_posix(),
+    ):
         digest.update(child.relative_to(path).as_posix().encode("utf-8"))
         digest.update(b"\0")
         digest.update(bytes.fromhex(sha256_file(child)))
