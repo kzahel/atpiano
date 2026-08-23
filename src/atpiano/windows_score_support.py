@@ -23,6 +23,7 @@ from atpiano.util import sha256_file, utc_now, write_json
 SUPPORT_SCHEMA = "atpiano.score-support.v1"
 SUPPORT_AUDIT_SCHEMA = "atpiano.score-support-audit.v1"
 SUPPORT_PACKAGES_SCHEMA = "atpiano.score-support-packages.v1"
+SUPPORT_LICENSES_SCHEMA = "atpiano.score-support-licenses.v1"
 SUPPORT_LAYER_ID = "atpiano-midi2score-support-py311-2026.08"
 PYTHON_VERSION = "3.11.14"
 PYTHON_KEY = "cpython-3.11.14-windows-x86_64-none"
@@ -465,6 +466,90 @@ def _prune_distribution_test_material(site_packages: Path) -> None:
             _remove_tree(candidate)
 
 
+def _walk_files(root: Path) -> list[tuple[Path, Path]]:
+    candidate = root
+    if os.name == "nt":
+        candidate = Path(f"\\\\?\\{root.resolve()}")
+    files = []
+    for directory, directories, names in os.walk(candidate):
+        directories.sort()
+        for name in sorted(names):
+            path = Path(directory) / name
+            relative = Path(os.path.relpath(path, candidate))
+            files.append((path, relative))
+    return files
+
+
+def _flatten_distribution_licenses(site_packages: Path, python_root: Path) -> None:
+    destination = python_root / "share" / "licenses" / "python"
+    records = []
+    for distribution in sorted(site_packages.glob("*.dist-info"), key=lambda path: path.name):
+        licenses = distribution / "licenses"
+        if not licenses.is_dir():
+            continue
+        distribution_destination = destination / distribution.name
+        for source, relative in _walk_files(licenses):
+            digest = sha256_file(source)
+            target_name = f"{digest[:16]}-{relative.name}"
+            target = distribution_destination / target_name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.exists() and sha256_file(target) != digest:
+                raise RuntimeError("flattened score-support license name collided")
+            if not target.exists():
+                shutil.copy2(source, target)
+            records.append(
+                {
+                    "distribution": distribution.name,
+                    "original_path": relative.as_posix(),
+                    "path": target.relative_to(python_root).as_posix(),
+                    "sha256": digest,
+                }
+            )
+        _remove_tree(licenses)
+    if not records:
+        raise RuntimeError("score support has no distribution license material")
+    write_json(
+        destination / "license-material.json",
+        {
+            "schema_version": SUPPORT_LICENSES_SCHEMA,
+            "files": records,
+        },
+    )
+
+
+def _audit_flattened_licenses(python_root: Path) -> dict[str, Any]:
+    manifest_path = python_root / "share" / "licenses" / "python" / "license-material.json"
+    document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    records = document.get("files")
+    if (
+        document.get("schema_version") != SUPPORT_LICENSES_SCHEMA
+        or not isinstance(records, list)
+        or not records
+    ):
+        raise RuntimeError("score-support license inventory is invalid")
+    for record in records:
+        if not isinstance(record, dict):
+            raise RuntimeError("score-support license record is invalid")
+        relative = Path(str(record.get("path") or ""))
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or relative.parts[:3] != ("share", "licenses", "python")
+        ):
+            raise RuntimeError("score-support license path is unsafe")
+        path = python_root / relative
+        if not path.is_file() or sha256_file(path) != record.get("sha256"):
+            raise RuntimeError("score-support flattened license changed")
+        if not record.get("distribution") or not record.get("original_path"):
+            raise RuntimeError("score-support license provenance is incomplete")
+    if list(_site_packages(python_root).glob("*.dist-info/licenses")):
+        raise RuntimeError("nested score-support distribution licenses remain")
+    return {
+        "manifest_sha256": sha256_file(manifest_path),
+        "file_count": len(records),
+    }
+
+
 def _prune_python(python_root: Path) -> None:
     site_packages = _site_packages(python_root)
     for relative in (
@@ -484,6 +569,7 @@ def _prune_python(python_root: Path) -> None:
         target = site_packages / relative
         if target.is_dir():
             _remove_tree(target)
+    _flatten_distribution_licenses(site_packages, python_root)
     _prune_distribution_test_material(site_packages)
     setuptools = site_packages / "setuptools"
     if setuptools.is_dir():
@@ -676,6 +762,7 @@ def audit_windows_score_support(root: Path, repository: Path) -> dict[str, Any]:
     _validate_vcs_sources(vcs_sources)
     _run_import_smoke(python)
     native = _audit_native(root)
+    licenses = _audit_flattened_licenses(root / ".venv")
     return {
         "schema_version": SUPPORT_AUDIT_SCHEMA,
         "created_at": utc_now(),
@@ -689,6 +776,7 @@ def audit_windows_score_support(root: Path, repository: Path) -> dict[str, Any]:
         "package_count": len(packages),
         "native_file_count": len(native),
         "native_files": native,
+        "licenses": licenses,
         "inventory": _inventory(root),
     }
 

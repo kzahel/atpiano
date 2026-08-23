@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import stat
 import struct
 from pathlib import Path
@@ -130,8 +131,56 @@ def test_pruning_removes_build_only_windows_launchers(tmp_path: Path) -> None:
     venv = python_root / "Lib" / "venv" / "scripts" / "nt"
     venv.mkdir(parents=True)
     (venv / "redirector.exe").write_bytes(b"launcher")
+    license_file = (
+        python_root
+        / "Lib"
+        / "site-packages"
+        / "setuptools-80.dist-info"
+        / "licenses"
+        / "LICENSE"
+    )
+    license_file.parent.mkdir(parents=True)
+    license_file.write_bytes(b"license")
 
     windows_score_support._prune_python(python_root)
 
     assert not launcher.exists()
     assert not venv.exists()
+
+
+def test_distribution_licenses_are_flattened_with_provenance(tmp_path: Path) -> None:
+    python_root = tmp_path / ".venv"
+    license_file = (
+        python_root
+        / "Lib"
+        / "site-packages"
+        / "torch-2.13.0.dist-info"
+        / "licenses"
+        / "third_party"
+        / "deep"
+        / "testing"
+        / "LICENSE"
+    )
+    license_file.parent.mkdir(parents=True)
+    license_file.write_bytes(b"retained license")
+
+    windows_score_support._flatten_distribution_licenses(
+        python_root / "Lib" / "site-packages",
+        python_root,
+    )
+
+    assert not license_file.exists()
+    result = windows_score_support._audit_flattened_licenses(python_root)
+    assert result["file_count"] == 1
+    manifest = json.loads(
+        (
+            python_root
+            / "share"
+            / "licenses"
+            / "python"
+            / "license-material.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert manifest["files"][0]["original_path"] == (
+        "third_party/deep/testing/LICENSE"
+    )
