@@ -568,6 +568,7 @@ def _prune_python(python_root: Path) -> None:
         Path("DLLs/tcl86t.dll"),
         Path("DLLs/tk86t.dll"),
         Path("tcl"),
+        Path("vcruntime140_threads.dll"),
     ):
         target = python_root / relative
         if target.is_dir():
