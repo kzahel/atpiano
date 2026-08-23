@@ -82,7 +82,44 @@ jobs:
           cargo clippy --manifest-path app/src-tauri/Cargo.toml --all-targets -- -D warnings
           cargo test --manifest-path app/src-tauri/Cargo.toml
 
-  build-desktop:
+  rust-windows-checks:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+          components: rustfmt, clippy
+
+      - name: Cache Rust builds
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+          key: windows-2025-x86_64-pc-windows-msvc-checks
+
+      - name: Install locked frontend dependencies
+        run: npm ci --prefix app
+
+      - name: Check Windows Rust formatting, lint, and tests
+        shell: pwsh
+        run: |
+          npm run build --prefix app
+          cargo fmt --manifest-path app/src-tauri/Cargo.toml --all -- --check
+          cargo clippy --manifest-path app/src-tauri/Cargo.toml `
+            --target x86_64-pc-windows-msvc --all-targets -- -D warnings
+          cargo test --manifest-path app/src-tauri/Cargo.toml `
+            --target x86_64-pc-windows-msvc
+
+  build-macos:
     if: startsWith(github.ref, 'refs/tags/desktop-v') || github.event_name == 'workflow_dispatch'
     needs: [source-checks, rust-macos-checks]
     runs-on: macos-26
@@ -189,48 +226,32 @@ jobs:
       - name: Stage and sign the complete nested runtime
         run: scripts/build-atpiano-desktop prepare-developer-id-release
 
-      - name: Extract release notes
-        id: changelog
-        if: startsWith(github.ref, 'refs/tags/desktop-v')
-        shell: bash
-        run: |
-          VERSION="${GITHUB_REF_NAME#desktop-v}"
-          NOTES=$(awk "/^## \[$VERSION\]/{found=1; next} /^## \[/{found=0} found" CHANGELOG.md)
-          echo "notes<<__ATPIANO_NOTES__" >> "$GITHUB_OUTPUT"
-          echo "$NOTES" >> "$GITHUB_OUTPUT"
-          echo "__ATPIANO_NOTES__" >> "$GITHUB_OUTPUT"
-
       - name: Build signed Atpiano desktop artifacts
         uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: app
           tauriScript: npx tauri
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && 'desktop-v__VERSION__' || '' }}
-          releaseName: "Atpiano v__VERSION__"
-          releaseBody: ${{ steps.changelog.outputs.notes || 'Signed Atpiano desktop proof of concept.' }}
-          releaseDraft: true
-          prerelease: false
-          includeUpdaterJson: ${{ startsWith(github.ref, 'refs/tags/') }}
+          includeUpdaterJson: false
           retryAttempts: "1"
           args: "--target aarch64-apple-darwin"
 
       - name: Verify notarized bundle and packaged scoring flow
         run: scripts/build-atpiano-desktop verify-developer-id-release
 
-      - name: Attach corresponding media sources to the draft
-        if: startsWith(github.ref, 'refs/tags/desktop-v')
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          VERSION="${GITHUB_REF_NAME#desktop-v}"
-          gh release upload "$GITHUB_REF_NAME" \
-            "results/desktop-media/Atpiano_${VERSION}_media-sources.tar.gz" \
-            --clobber
+      - name: Retain validated macOS release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: atpiano-macos-release
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            app/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+            app/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz
+            app/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz.sig
+            results/desktop-media/Atpiano_*_media-sources.tar.gz
 
       - name: Attest local release artifacts
         if: startsWith(github.ref, 'refs/tags/desktop-v')
@@ -252,15 +273,179 @@ jobs:
             rmdir "$RUNNER_TEMP/atpiano-private-keys"
           fi
 
+  build-windows:
+    if: startsWith(github.ref, 'refs/tags/desktop-v') || github.event_name == 'workflow_dispatch'
+    needs: [source-checks, rust-windows-checks]
+    runs-on: windows-2025
+    timeout-minutes: 240
+    env:
+      HAS_UPDATER_SIGNING: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD != '' }}
+      HAS_WINDOWS_SIGNING: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 != '' && secrets.WINDOWS_CERTIFICATE_PASSWORD != '' }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Require complete Windows release credentials
+        shell: pwsh
+        run: |
+          if ($env:HAS_UPDATER_SIGNING -ne 'true') {
+            throw 'Windows builds require both Atpiano updater signing secrets'
+          }
+          if ($env:HAS_WINDOWS_SIGNING -ne 'true') {
+            throw 'Windows builds require the Authenticode PFX and password secrets'
+          }
+
+      - name: Setup Python and uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.10.19"
+          enable-cache: true
+
+      - name: Install exact managed Python runtimes
+        shell: pwsh
+        run: uv python install 3.10.19 3.11.14
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust builds
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+          key: windows-2025-x86_64-pc-windows-msvc-release
+
+      - name: Install locked build dependencies
+        shell: pwsh
+        run: |
+          uv sync --frozen --extra corrected
+          npm ci --prefix app
+
+      - name: Verify release identity
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: pwsh
+        run: |
+          node scripts/validate-desktop-release.mjs
+          $expected = $env:GITHUB_REF_NAME.Substring('desktop-v'.Length)
+          $actual = (Get-Content app/src-tauri/tauri.conf.json -Raw |
+            ConvertFrom-Json).version
+          if ($actual -ne $expected) {
+            throw "tag $expected does not match $actual"
+          }
+
+      - name: Select the short Windows build root
+        shell: pwsh
+        run: |
+          $root = Join-Path (Split-Path $env:GITHUB_WORKSPACE -Parent) `
+            '.atpiano-build'
+          "ATPIANO_WINDOWS_BUILD_ROOT=$root" | Out-File `
+            -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Stage and independently audit the Windows runtime
+        shell: pwsh
+        env:
+          UV_LINK_MODE: copy
+        run: |
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+          uv run python -m atpiano.windows_desktop_packaging stage `
+            --report results/windows-desktop-runtime-audit.json
+          uv run python -m atpiano.windows_desktop_packaging audit `
+            --root app/src-tauri/resources/desktop-runtime `
+            --report results/windows-desktop-runtime-reaudit.json
+
+      - name: Import the temporary Authenticode certificate
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_PFX_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          .github/scripts/windows-signing.ps1 `
+            -Action Import `
+            -ConfigPath "$env:GITHUB_WORKSPACE\windows-signing.json" `
+            -ReceiptPath "$env:RUNNER_TEMP\atpiano-windows-signing.json" `
+            -PfxPath "$env:RUNNER_TEMP\atpiano-certificate.pfx"
+
+      - name: Build signed Windows desktop artifacts
+        uses: tauri-apps/tauri-action@v0
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: app
+          tauriScript: npx tauri
+          includeUpdaterJson: false
+          retryAttempts: "1"
+          args: "--target x86_64-pc-windows-msvc --config ../windows-signing.json"
+
+      - name: Verify signed Windows package and updater artifacts
+        shell: pwsh
+        run: |
+          .github/scripts/windows-signing.ps1 `
+            -Action Verify `
+            -ReceiptPath "$env:RUNNER_TEMP\atpiano-windows-signing.json" `
+            -ReleaseRoot "$env:GITHUB_WORKSPACE\app\src-tauri\target\x86_64-pc-windows-msvc\release" `
+            -ReportPath "$env:GITHUB_WORKSPACE\results\windows-package-signing-audit.json"
+
+      - name: Retain validated Windows release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: atpiano-windows-release
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip
+            app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip.sig
+
+      - name: Retain redacted Windows build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: atpiano-windows-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            results/windows-desktop-runtime-audit.json
+            results/windows-desktop-runtime-reaudit.json
+            results/windows-package-signing-audit.json
+
+      - name: Attest Windows release artifacts
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip
+            app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip.sig
+
+      - name: Clean up Windows signing material
+        if: always()
+        shell: pwsh
+        run: |
+          .github/scripts/windows-signing.ps1 `
+            -Action Cleanup `
+            -ConfigPath "$env:GITHUB_WORKSPACE\windows-signing.json" `
+            -ReceiptPath "$env:RUNNER_TEMP\atpiano-windows-signing.json" `
+            -PfxPath "$env:RUNNER_TEMP\atpiano-certificate.pfx"
+
   finalize-release:
     if: always() && startsWith(github.ref, 'refs/tags/desktop-v')
-    needs: [source-checks, build-desktop]
+    needs: [source-checks, build-macos, build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
       - name: Keep failed builds private
-        if: needs.source-checks.result != 'success' || needs.build-desktop.result != 'success'
+        if: needs.source-checks.result != 'success' || needs.build-macos.result != 'success' || needs.build-windows.result != 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -272,33 +457,98 @@ jobs:
           fi
           exit 1
 
-      - name: Download and validate the complete draft
-        if: needs.source-checks.result == 'success' && needs.build-desktop.result == 'success'
+      - name: Download validated platform artifacts
+        if: needs.source-checks.result == 'success' && needs.build-macos.result == 'success' && needs.build-windows.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: atpiano-*-release
+          merge-multiple: true
+          path: ${{ runner.temp }}/atpiano-build-assets
+
+      - name: Assemble and validate the exact draft release
+        if: needs.source-checks.result == 'success' && needs.build-macos.result == 'success' && needs.build-windows.result == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
+          BUILD_ASSETS="$RUNNER_TEMP/atpiano-build-assets"
           RELEASE_DIRECTORY="$RUNNER_TEMP/atpiano-release"
+          NOTES_FILE="$RUNNER_TEMP/atpiano-release-notes.md"
           mkdir -p "$RELEASE_DIRECTORY"
-          gh release view "$GITHUB_REF_NAME" --json tagName,isDraft,assets > "$RELEASE_DIRECTORY/release.json"
-          gh release download "$GITHUB_REF_NAME" --dir "$RELEASE_DIRECTORY"
+          while IFS= read -r -d '' source; do
+            name="$(basename "$source")"
+            if [ -e "$RELEASE_DIRECTORY/$name" ]; then
+              echo "::error::Duplicate release filename: $name"
+              exit 1
+            fi
+            cp "$source" "$RELEASE_DIRECTORY/$name"
+          done < <(find "$BUILD_ASSETS" -type f -print0)
+
+          VERSION="${GITHUB_REF_NAME#desktop-v}"
+          awk "/^## \[$VERSION\]/{found=1; next} /^## \[/{found=0} found" \
+            CHANGELOG.md > "$NOTES_FILE"
+          mapfile -t MACOS_UPDATERS < <(
+            find "$RELEASE_DIRECTORY" -maxdepth 1 -type f \
+              -name 'Atpiano*_aarch64.app.tar.gz' -print
+          )
+          mapfile -t WINDOWS_UPDATERS < <(
+            find "$RELEASE_DIRECTORY" -maxdepth 1 -type f \
+              -name "Atpiano_${VERSION}_x64-setup.nsis.zip" -print
+          )
+          if [ "${#MACOS_UPDATERS[@]}" -ne 1 ] || \
+             [ "${#WINDOWS_UPDATERS[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one updater archive for each platform"
+            exit 1
+          fi
+          node .github/scripts/write-updater-manifest.mjs \
+            --tag "$GITHUB_REF_NAME" \
+            --repository "$GITHUB_REPOSITORY" \
+            --macos-updater "${MACOS_UPDATERS[0]}" \
+            --windows-updater "${WINDOWS_UPDATERS[0]}" \
+            --notes-file "$NOTES_FILE" \
+            --output "$RELEASE_DIRECTORY/latest.json"
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            IS_DRAFT=$(gh release view "$GITHUB_REF_NAME" --json isDraft \
+              --jq '.isDraft')
+            if [ "$IS_DRAFT" != "true" ]; then
+              echo "::error::Refusing to replace an already-published release"
+              exit 1
+            fi
+            gh release edit "$GITHUB_REF_NAME" \
+              --title "Atpiano Desktop $VERSION" \
+              --notes-file "$NOTES_FILE"
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --draft \
+              --title "Atpiano Desktop $VERSION" \
+              --notes-file "$NOTES_FILE"
+          fi
+          gh release upload "$GITHUB_REF_NAME" "$RELEASE_DIRECTORY"/* --clobber
+
+          gh release view "$GITHUB_REF_NAME" \
+            --json tagName,isDraft,assets > "$RUNNER_TEMP/release-before-sha.json"
+          node .github/scripts/write-release-checksums.mjs \
+            "$RUNNER_TEMP/release-before-sha.json" \
+            "$RELEASE_DIRECTORY/SHA256SUMS"
+          gh release upload "$GITHUB_REF_NAME" \
+            "$RELEASE_DIRECTORY/SHA256SUMS" --clobber
+          gh release view "$GITHUB_REF_NAME" \
+            --json tagName,isDraft,assets > "$RUNNER_TEMP/release.json"
           node .github/scripts/validate-release.mjs \
-            --release "$RELEASE_DIRECTORY/release.json" \
+            --release "$RUNNER_TEMP/release.json" \
             --latest "$RELEASE_DIRECTORY/latest.json" \
             --tag "$GITHUB_REF_NAME" \
             --repository "$GITHUB_REPOSITORY"
-          node .github/scripts/write-release-checksums.mjs \
-            "$RELEASE_DIRECTORY/release.json" "$RELEASE_DIRECTORY/SHA256SUMS"
-          gh release upload "$GITHUB_REF_NAME" "$RELEASE_DIRECTORY/SHA256SUMS" --clobber
 
       - name: Attest release metadata
-        if: needs.source-checks.result == 'success' && needs.build-desktop.result == 'success'
+        if: needs.source-checks.result == 'success' && needs.build-macos.result == 'success' && needs.build-windows.result == 'success'
         uses: actions/attest-build-provenance@v3
         with:
           subject-path: ${{ runner.temp }}/atpiano-release/SHA256SUMS
 
       - name: Write release evidence
-        if: needs.source-checks.result == 'success' && needs.build-desktop.result == 'success'
+        if: needs.source-checks.result == 'success' && needs.build-macos.result == 'success' && needs.build-windows.result == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
@@ -310,9 +560,10 @@ jobs:
             echo
             echo "## Automated release evidence"
             echo
-            echo "- The single supported updater target \`darwin-aarch64\` was validated."
+            echo "- The exact updater targets \`darwin-aarch64\` and \`windows-x86_64\` were validated."
             echo "- Developer ID signing, hardened runtime, notarization, and stapling were validated."
-            echo "- The complete nested Python/model/media bundle passed its audit and packaged replay."
+            echo "- Windows Authenticode signing and trusted timestamping were validated."
+            echo "- Both nested CPU runtimes passed independent audits; the macOS package passed its packaged replay."
             echo "- The media runtime is the pinned LGPL-only FFmpeg/LAME build, with exact corresponding sources attached."
             echo "- Build provenance attestations were issued by GitHub Actions."
             echo "- Workflow: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
@@ -324,7 +575,7 @@ jobs:
           gh release edit "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/atpiano-release-notes.md"
 
       - name: Publish validated release
-        if: needs.source-checks.result == 'success' && needs.build-desktop.result == 'success'
+        if: needs.source-checks.result == 'success' && needs.build-macos.result == 'success' && needs.build-windows.result == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release edit "$GITHUB_REF_NAME" --draft=false --latest
