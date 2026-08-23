@@ -8,9 +8,10 @@ release.** The Python desktop identity/model-pack contracts now accept exactly
 macOS arm64 and Windows x86_64 CPU pairings. The Tauri launcher and frontend
 now carry exact resource, origin, package, and updater variants for both
 targets. The native Windows x64 application core is established and the
-universal score-support registry lock resolves for Windows x64, but no
-relocatable Windows runtime, package, signed installer, packaged MIDI2Score
-result, or updater campaign exists.
+universal score-support registry lock resolves for Windows x64. A tracked
+Windows support builder is implemented but not yet accepted on the testbed;
+no complete relocatable Windows runtime, package, signed installer, packaged
+MIDI2Score result, or updater campaign exists.
 
 ## Goal
 
@@ -332,6 +333,17 @@ and resolves the full 61-package registry inventory without an unsupported
 dependency. This is a package-resolution preflight only. The Windows x64
 standalone interpreter, PE/DLL audit, imports, external model composition,
 retained score output, and installed package remain the next work.
+
+A Windows-only score-support builder now stages the same inputs into a
+relocatable `.venv/python.exe` layout without requiring Python, uv, Git, or a
+compiler on the user's machine. It accepts either an AMD64 build host or the
+ARM64 testbed, but selects and executes exact x64 CPython 3.11.14. Staging is
+transactional and audits package/VCS identities, canonical payload hashes,
+symbolic links, forbidden model and accelerator content, x64 PE headers, and
+both retained import groups. Unit tests cover relative managed-Python paths,
+cross-platform hash ordering, PE rejection, and acquisition-input identity.
+The builder itself must now run on the claimed Windows testbed; this paragraph
+does not claim a successful Windows package.
 
 ## Rollback
 
