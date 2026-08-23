@@ -17,9 +17,24 @@ from atpiano.live import LiveModelOutput
 
 MODEL_WORKER_SCHEMA = "atpiano.model-worker.v1"
 DEFAULT_WORKER_START_TIMEOUT_S = 120.0
+MAXIMUM_WORKER_START_TIMEOUT_S = 15 * 60.0
+WORKER_START_TIMEOUT_ENV = "ATPIANO_MODEL_WORKER_START_TIMEOUT_S"
 
 ModelKind = Literal["preview", "commit"]
 ModelFactory = Callable[[], Any]
+
+
+def configured_worker_start_timeout_s() -> float:
+    raw = os.environ.get(WORKER_START_TIMEOUT_ENV)
+    if raw is None:
+        return DEFAULT_WORKER_START_TIMEOUT_S
+    try:
+        timeout = float(raw)
+    except ValueError as error:
+        raise ValueError("model worker start timeout must be numeric") from error
+    if not 0 < timeout <= MAXIMUM_WORKER_START_TIMEOUT_S:
+        raise ValueError("model worker start timeout is outside its bound")
+    return timeout
 
 
 def _apply_thread_limit(thread_limit: int | None) -> None:
@@ -144,8 +159,10 @@ class _ModelProcess:
         *,
         kind: ModelKind,
         thread_limit: int | None = None,
-        start_timeout_s: float = DEFAULT_WORKER_START_TIMEOUT_S,
+        start_timeout_s: float | None = None,
     ) -> None:
+        if start_timeout_s is None:
+            start_timeout_s = configured_worker_start_timeout_s()
         if start_timeout_s <= 0:
             raise ValueError("model worker start timeout must be positive")
         context = multiprocessing.get_context("spawn")

@@ -293,6 +293,8 @@ def run_packaged_replay(
             **desktop_runtime_environment(workspace),
         }
     )
+    if desktop_origin == "http://tauri.localhost":
+        environment["ATPIANO_MODEL_WORKER_START_TIMEOUT_S"] = "600"
     for name in ("PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"):
         environment.pop(name, None)
     started = time.monotonic()

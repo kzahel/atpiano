@@ -10,7 +10,11 @@ import pytest
 from atpiano.adapters.local_models import LocalModelPool
 from atpiano.corrected_commit import CommitModelOutput
 from atpiano.live import LiveModelOutput
-from atpiano.model_worker import CommitModelWorker, PreviewModelWorker
+from atpiano.model_worker import (
+    CommitModelWorker,
+    PreviewModelWorker,
+    configured_worker_start_timeout_s,
+)
 
 
 class _PreviewModel:
@@ -71,6 +75,17 @@ class _MalformedCommitModel(_CommitModel):
     ) -> object:
         del pcm_s16le, source_sample_rate_hz
         return {"not": "a native commit result"}
+
+
+def test_worker_start_timeout_override_is_bounded(monkeypatch) -> None:
+    monkeypatch.delenv("ATPIANO_MODEL_WORKER_START_TIMEOUT_S", raising=False)
+    assert configured_worker_start_timeout_s() == 120.0
+    monkeypatch.setenv("ATPIANO_MODEL_WORKER_START_TIMEOUT_S", "600")
+    assert configured_worker_start_timeout_s() == 600.0
+    for invalid in ("0", "901", "not-a-number"):
+        monkeypatch.setenv("ATPIANO_MODEL_WORKER_START_TIMEOUT_S", invalid)
+        with pytest.raises(ValueError, match="model worker start timeout"):
+            configured_worker_start_timeout_s()
 
 
 def test_preview_worker_spawns_and_returns_native_output() -> None:
