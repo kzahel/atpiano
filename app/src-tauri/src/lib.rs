@@ -70,6 +70,17 @@ fn current_desktop_target() -> Result<DesktopTarget, String> {
     desktop_target_for(env::consts::OS, env::consts::ARCH)
 }
 
+#[cfg(target_os = "windows")]
+fn suppress_console_window(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(target_os = "windows"))]
+fn suppress_console_window(_command: &mut Command) {}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopRuntimeInfo {
@@ -786,6 +797,7 @@ fn start_sidecar(
         command.arg("--score-runtime").arg(score_runtime);
     }
     configure_sidecar_environment(&mut command, target, &runtime, &workspace, &credential)?;
+    suppress_console_window(&mut command);
     let mut child = command
         .spawn()
         .map_err(|error| format!("could not start the local engine: {error}"))?;
