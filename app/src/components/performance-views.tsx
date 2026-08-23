@@ -193,6 +193,7 @@ function ScorePreview({
   scoreVariantBusy,
   inspectionSample,
   onGenerate,
+  onEnableScoreGeneration,
   onOpenReader,
   onSelectScoreVariant,
   onCreateAutomaticVariant,
@@ -214,6 +215,7 @@ function ScorePreview({
   readonly scoreVariantBusy: boolean;
   readonly inspectionSample: number | null;
   readonly onGenerate: () => void;
+  readonly onEnableScoreGeneration?: () => void;
   readonly onOpenReader: () => void;
   readonly onSelectScoreVariant: (variant: ScoreVariant) => void;
   readonly onCreateAutomaticVariant: () => void;
@@ -279,14 +281,26 @@ function ScorePreview({
               Open score reader
             </button>
           )}
-          <button
-            className="button small"
-            type="button"
-            disabled={!scoreAvailable || scoreStatus === "running"}
-            onClick={onGenerate}
-          >
-            {scoreXml ? "Refresh score" : "Render committed score"}
-          </button>
+          {!scoreAvailable && onEnableScoreGeneration
+            ? (
+              <button
+                className="button small"
+                type="button"
+                onClick={onEnableScoreGeneration}
+              >
+                Enable score generation
+              </button>
+            )
+            : (
+              <button
+                className="button small"
+                type="button"
+                disabled={!scoreAvailable || scoreStatus === "running"}
+                onClick={onGenerate}
+              >
+                {scoreXml ? "Refresh score" : "Render committed score"}
+              </button>
+            )}
         </div>
       </div>
       <p className={`score-state ${scoreStatus ?? "idle"}`}>
@@ -450,6 +464,7 @@ export function PerformanceViews({
   scoreVariantBusy,
   audioUnavailableReason,
   onGenerateScore,
+  onEnableScoreGeneration,
   onOpenScoreReader,
   onSelectScoreVariant,
   onCreateAutomaticVariant,
@@ -476,6 +491,7 @@ export function PerformanceViews({
   readonly scoreVariantBusy: boolean;
   readonly audioUnavailableReason: string;
   readonly onGenerateScore: () => void;
+  readonly onEnableScoreGeneration?: () => void;
   readonly onOpenScoreReader: () => void;
   readonly onSelectScoreVariant: (variant: ScoreVariant) => void;
   readonly onCreateAutomaticVariant: () => void;
@@ -506,6 +522,7 @@ export function PerformanceViews({
           scoreVariantBusy={scoreVariantBusy}
           inspectionSample={inspectionSample}
           onGenerate={onGenerateScore}
+          onEnableScoreGeneration={onEnableScoreGeneration}
           onOpenReader={onOpenScoreReader}
           onSelectScoreVariant={onSelectScoreVariant}
           onCreateAutomaticVariant={onCreateAutomaticVariant}

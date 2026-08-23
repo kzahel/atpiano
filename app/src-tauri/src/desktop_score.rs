@@ -122,6 +122,10 @@ pub(crate) struct ScoreRuntimeStatus {
     contract_id: String,
     notice_version: String,
     model_name: String,
+    source_commit: String,
+    checkpoint_sha256: String,
+    support_layer_id: String,
+    execution_backend: String,
     purpose: String,
     notice: String,
     acknowledgement: String,
@@ -179,6 +183,10 @@ impl ScoreAcquisitionState {
         }
         self.cancelled.store(true, Ordering::SeqCst);
         true
+    }
+
+    pub(crate) fn is_running(&self) -> bool {
+        self.running.load(Ordering::SeqCst)
     }
 }
 
@@ -379,6 +387,20 @@ pub(crate) fn active_runtime(
     .ok()
 }
 
+pub(crate) fn link_url(link_id: &str) -> Result<String, String> {
+    let contract = contract()?;
+    match link_id {
+        "repository" => Ok(contract.source.repository_url),
+        "checkpoint" => Ok(contract.checkpoint.release_url),
+        "paper" => Ok(contract.paper_url),
+        "acquisition-record" => Ok(
+            "https://github.com/kzahel/atpiano/blob/main/desktop-score/acquisition.json"
+                .to_string(),
+        ),
+        _ => Err("score model link is invalid".to_string()),
+    }
+}
+
 pub(crate) fn status(
     app: &tauri::AppHandle,
     operation: &ScoreAcquisitionState,
@@ -410,6 +432,10 @@ pub(crate) fn status(
         contract_id: contract.contract_id,
         notice_version: contract.notice_version,
         model_name: contract.model_name,
+        source_commit: contract.source.commit,
+        checkpoint_sha256: contract.checkpoint.sha256,
+        support_layer_id: contract.support_layer_id,
+        execution_backend: contract.execution_backend,
         purpose: contract.purpose,
         notice: contract.notice,
         acknowledgement: contract.acknowledgement,
@@ -812,13 +838,18 @@ pub(crate) fn acquire(
     if active.exists() {
         return Err("A score model installation already exists.".to_string());
     }
+    let final_runtime = runtime_parent.join(&contract.contract_id);
+    if final_runtime.exists() {
+        return Err("An inactive score model installation already exists.".to_string());
+    }
     let staging_parent = runtime_parent.join(".staging");
     fs::create_dir_all(&staging_parent)
         .map_err(|error| format!("could not create score model staging: {error}"))?;
     let staging = staging_parent.join(uuid::Uuid::new_v4().to_string());
-    let final_runtime = runtime_parent.join(&contract.contract_id);
     fs::create_dir(&staging)
         .map_err(|error| format!("could not create score model staging: {error}"))?;
+    let mut published_runtime = false;
+    let mut published_acknowledgement = false;
     let result = (|| {
         emit_progress(app, "preparing", 0, contract.download_bytes);
         copy_tree(&support, &staging)?;
@@ -895,11 +926,9 @@ pub(crate) fn acquire(
         });
         write_json_atomic(&staging.join(RUNTIME_MANIFEST_FILE), &runtime_manifest)?;
         let installed_bytes = directory_bytes(&staging)?;
-        if final_runtime.exists() {
-            return Err("An inactive score model installation already exists.".to_string());
-        }
         fs::rename(&staging, &final_runtime)
             .map_err(|error| format!("could not publish the score model: {error}"))?;
+        published_runtime = true;
         let validated_at = unix_time()?;
         let installation = InstallationRecord {
             schema_version: "atpiano.score-runtime-installation.v1".to_string(),
@@ -924,6 +953,7 @@ pub(crate) fn acquire(
             checkpoint_sha256: &contract.checkpoint.sha256,
         };
         write_json_atomic(&acknowledgement, &receipt)?;
+        published_acknowledgement = true;
         write_json_atomic(&active, &installation)?;
         emit_progress(
             app,
@@ -936,7 +966,10 @@ pub(crate) fn acquire(
     if result.is_err() && staging.exists() {
         let _ = fs::remove_dir_all(&staging);
     }
-    if result.is_err() && !active.exists() && final_runtime.exists() {
+    if result.is_err() && published_acknowledgement && !active.exists() {
+        let _ = fs::remove_file(&acknowledgement);
+    }
+    if result.is_err() && published_runtime && !active.exists() && final_runtime.exists() {
         let _ = fs::remove_dir_all(&final_runtime);
     }
     result?;
@@ -991,6 +1024,21 @@ mod tests {
         assert!(target_supported(&contract, "windows", "x86_64"));
         assert!(!target_supported(&contract, "windows", "arm64"));
         assert_eq!(contract.download_bytes, 390_016_983);
+    }
+
+    #[test]
+    fn model_links_are_bounded_to_the_embedded_contract() {
+        let contract = contract().expect("embedded acquisition contract");
+        assert_eq!(
+            link_url("repository").expect("repository link"),
+            contract.source.repository_url
+        );
+        assert_eq!(
+            link_url("checkpoint").expect("checkpoint link"),
+            contract.checkpoint.release_url
+        );
+        assert_eq!(link_url("paper").expect("paper link"), contract.paper_url);
+        assert!(link_url("arbitrary-url").is_err());
     }
 
     #[test]

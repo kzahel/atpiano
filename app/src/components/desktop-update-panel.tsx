@@ -65,9 +65,11 @@ function statusCopy(state: UpdaterState): { title: string; body: string } {
 export function DesktopUpdatePanel({
   releaseInfo,
   installBlocker,
+  onManageScoreModel,
 }: {
   readonly releaseInfo: DesktopReleaseInfo;
   readonly installBlocker: string | null;
+  readonly onManageScoreModel?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const prepareInstall = useCallback(
@@ -150,6 +152,18 @@ export function DesktopUpdatePanel({
               </button>
             )}
           </div>
+          {onManageScoreModel && (
+            <button
+              className="desktop-score-manage"
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onManageScoreModel();
+              }}
+            >
+              Manage research score model
+            </button>
+          )}
           <details className="desktop-release-identities">
             <summary>Installed build details</summary>
             <dl>

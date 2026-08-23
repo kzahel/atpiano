@@ -72,7 +72,11 @@ function Root({
   return (
     <QueryClientProvider client={queryClient}>
       <RuntimeProvider runtime={runtime}>
-        <App desktopReleaseInfo={desktop?.releaseInfo} viewer={viewer} />
+        <App
+          desktopReleaseInfo={desktop?.releaseInfo}
+          desktopScoreRuntime={desktop?.scoreRuntime}
+          viewer={viewer}
+        />
       </RuntimeProvider>
     </QueryClientProvider>
   );

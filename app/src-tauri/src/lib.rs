@@ -17,6 +17,7 @@ use std::{
 };
 use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_opener::OpenerExt;
 
 mod desktop_score;
 
@@ -966,8 +967,22 @@ fn desktop_score_cancel(state: tauri::State<'_, desktop_score::ScoreAcquisitionS
     state.cancel()
 }
 
+#[tauri::command]
+fn desktop_score_open_link(app: tauri::AppHandle, link_id: String) -> Result<(), String> {
+    let url = desktop_score::link_url(&link_id)?;
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|error| format!("could not open the score model link: {error}"))
+}
+
 #[tauri::command(async)]
-fn desktop_prepare_update_install(state: tauri::State<'_, DesktopState>) -> Result<(), String> {
+fn desktop_prepare_update_install(
+    state: tauri::State<'_, DesktopState>,
+    score_state: tauri::State<'_, desktop_score::ScoreAcquisitionState>,
+) -> Result<(), String> {
+    if score_state.is_running() {
+        return Err("Wait for the research model operation to finish.".to_string());
+    }
     state.prepare_update_install()
 }
 
@@ -1036,6 +1051,7 @@ fn desktop_export_artifact(
 pub fn run() {
     let application = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let config_dir = app
@@ -1076,6 +1092,7 @@ pub fn run() {
             desktop_score_acquire,
             desktop_score_cancel,
             desktop_score_remove,
+            desktop_score_open_link,
             desktop_export_artifact,
             desktop_prepare_update_install,
             desktop_resume_after_update_failure

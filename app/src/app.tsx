@@ -14,6 +14,7 @@ import {
 import { ArtifactPanel } from "./components/artifact-panel.js";
 import { CaptureDeck } from "./components/capture-deck.js";
 import { DesktopUpdatePanel } from "./components/desktop-update-panel.js";
+import { DesktopScoreRuntimeDialog } from "./components/desktop-score-runtime-dialog.js";
 import { PerformanceViews } from "./components/performance-views.js";
 import {
   AccountMenu,
@@ -58,7 +59,10 @@ import type {
   Session,
   SessionPage,
 } from "./runtime/atpiano-runtime.js";
-import type { DesktopReleaseInfo } from "./runtime/desktop-runtime.js";
+import type {
+  DesktopReleaseInfo,
+  DesktopScoreRuntimeClient,
+} from "./runtime/desktop-runtime.js";
 import { useRuntime } from "./runtime/runtime-context.js";
 import { useWorkspaceStore } from "./state/workspace-store.js";
 
@@ -107,9 +111,11 @@ export interface AppViewer {
 
 export function App({
   desktopReleaseInfo,
+  desktopScoreRuntime,
   viewer,
 }: {
   readonly desktopReleaseInfo?: DesktopReleaseInfo;
+  readonly desktopScoreRuntime?: DesktopScoreRuntimeClient;
   readonly viewer?: AppViewer;
 } = {}) {
   const runtime = useRuntime();
@@ -140,6 +146,7 @@ export function App({
   const [sessionActionError, setSessionActionError] =
     useState<string | null>(null);
   const [scoreActionError, setScoreActionError] = useState<string | null>(null);
+  const [scoreRuntimeOpen, setScoreRuntimeOpen] = useState(false);
   const [routeReady, setRouteReady] = useState(false);
   const [scoreReaderRoute, setScoreReaderRoute] =
     useState<ScoreReaderRoute | null>(() =>
@@ -1347,6 +1354,9 @@ export function App({
       <DesktopUpdatePanel
         releaseInfo={desktopReleaseInfo}
         installBlocker={installBlocker}
+        onManageScoreModel={
+          desktopScoreRuntime ? () => setScoreRuntimeOpen(true) : undefined
+        }
       />
     )
     : null;
@@ -1761,6 +1771,11 @@ export function App({
               scoreVariants={scoreVariants.data?.items ?? []}
               selectedScoreVariant={selectedScoreVariant}
               scoreVariantBusy={scoreVariantMutation.isPending}
+              onEnableScoreGeneration={
+                desktopScoreRuntime
+                  ? () => setScoreRuntimeOpen(true)
+                  : undefined
+              }
               audioUnavailableReason={
                 selected.status === "active"
                   ? "Playback available after Stop"
@@ -1797,6 +1812,14 @@ export function App({
           <div className="toast" role="status" aria-live="polite">
             {toast}
           </div>
+        )}
+        {desktopScoreRuntime && (
+          <DesktopScoreRuntimeDialog
+            open={scoreRuntimeOpen}
+            manager={desktopScoreRuntime}
+            operationBlocker={installBlocker}
+            onClose={() => setScoreRuntimeOpen(false)}
+          />
         )}
       </main>
       </div>

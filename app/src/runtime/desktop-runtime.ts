@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { relaunch } from "@tauri-apps/plugin-process";
 
 import { LocalRuntime } from "./local-runtime.js";
 import type {
@@ -46,7 +47,63 @@ export interface DesktopReleaseInfo {
 export interface DesktopRuntimeBootstrap {
   readonly runtime: DesktopRuntime;
   readonly releaseInfo: DesktopReleaseInfo;
+  readonly scoreRuntime: DesktopScoreRuntimeManager;
   monitor(onFailure: (message: string) => void): Promise<UnlistenFn>;
+}
+
+export interface DesktopScoreRuntimeStatus {
+  readonly state: "not-installed" | "installing" | "available" | "invalid";
+  readonly contractId: string;
+  readonly noticeVersion: string;
+  readonly modelName: string;
+  readonly sourceCommit: string;
+  readonly checkpointSha256: string;
+  readonly supportLayerId: string;
+  readonly executionBackend: "cpu";
+  readonly purpose: string;
+  readonly notice: string;
+  readonly acknowledgement: string;
+  readonly repositoryUrl: string;
+  readonly checkpointReleaseUrl: string;
+  readonly paperUrl: string;
+  readonly sourceBytes: number;
+  readonly checkpointBytes: number;
+  readonly downloadBytes: number;
+  readonly installedSpaceEstimateBytes: number;
+  readonly minimumFreeBytes: number;
+  readonly supportAvailable: boolean;
+  readonly installedBytes: number | null;
+  readonly error: string | null;
+}
+
+export interface DesktopScoreAcquisitionProgress {
+  readonly phase:
+    | "preparing"
+    | "source"
+    | "verifying-source"
+    | "checkpoint"
+    | "installing"
+    | "complete";
+  readonly completedBytes: number;
+  readonly totalBytes: number;
+}
+
+export type DesktopScoreLinkId =
+  | "repository"
+  | "checkpoint"
+  | "paper"
+  | "acquisition-record";
+
+export interface DesktopScoreRuntimeClient {
+  status(): Promise<DesktopScoreRuntimeStatus>;
+  acquire(): Promise<DesktopScoreRuntimeStatus>;
+  cancel(): Promise<boolean>;
+  remove(): Promise<DesktopScoreRuntimeStatus>;
+  openLink(linkId: DesktopScoreLinkId): Promise<void>;
+  monitor(
+    onProgress: (progress: DesktopScoreAcquisitionProgress) => void,
+  ): Promise<UnlistenFn>;
+  relaunch(): Promise<void>;
 }
 
 interface DesktopArtifactExportResult {
@@ -137,6 +194,44 @@ export class DesktopRuntime extends LocalRuntime {
   }
 }
 
+export class DesktopScoreRuntimeManager implements DesktopScoreRuntimeClient {
+  status(): Promise<DesktopScoreRuntimeStatus> {
+    return invoke<DesktopScoreRuntimeStatus>("desktop_score_runtime_status");
+  }
+
+  acquire(): Promise<DesktopScoreRuntimeStatus> {
+    return invoke<DesktopScoreRuntimeStatus>("desktop_score_acquire", {
+      acknowledged: true,
+    });
+  }
+
+  cancel(): Promise<boolean> {
+    return invoke<boolean>("desktop_score_cancel");
+  }
+
+  remove(): Promise<DesktopScoreRuntimeStatus> {
+    return invoke<DesktopScoreRuntimeStatus>("desktop_score_remove");
+  }
+
+  openLink(linkId: DesktopScoreLinkId): Promise<void> {
+    return invoke<void>("desktop_score_open_link", { linkId });
+  }
+
+  monitor(
+    onProgress: (progress: DesktopScoreAcquisitionProgress) => void,
+  ): Promise<UnlistenFn> {
+    return listen<DesktopScoreAcquisitionProgress>(
+      "desktop-score-acquisition-progress",
+      (event) => onProgress(event.payload),
+    );
+  }
+
+  async relaunch(): Promise<void> {
+    await invoke<void>("desktop_prepare_update_install");
+    await relaunch();
+  }
+}
+
 export async function createDesktopRuntime(): Promise<DesktopRuntimeBootstrap> {
   const info = validateRuntimeInfo(
     await invoke<DesktopRuntimeInfo>("desktop_runtime"),
@@ -147,6 +242,7 @@ export async function createDesktopRuntime(): Promise<DesktopRuntimeBootstrap> {
       bearerToken: info.bearerToken,
       webSocketProtocol: info.webSocketProtocol,
     }),
+    scoreRuntime: new DesktopScoreRuntimeManager(),
     releaseInfo: {
       appVersion: info.appVersion,
       webClientBuildId: __ATPIANO_BUILD_ID__,

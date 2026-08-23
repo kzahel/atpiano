@@ -4,9 +4,10 @@ Topics: `desktop-score-runtime-footprint`, `public-desktop-release`,
 `performance-to-notation`
 
 Status: **implementation active as a proof-of-concept prerequisite for the
-first public desktop tag.** The external asset contract and transactional
-native controller are implemented; support-layer staging, the dialog, and
-installed validation remain. Dependency cleanup is explicitly deferred.
+first public desktop tag.** The external asset contract, transactional native
+controller, and shared consent/management dialog are implemented;
+support-layer staging and installed validation remain. Dependency cleanup is
+explicitly deferred.
 
 ## Goal
 
@@ -464,7 +465,9 @@ the CPU policy, upstream links, bounded ZIP extraction, and the following
 external asset facts:
 
 - commit ZIP: 187,103 bytes, 21 entries, 332,507 expanded bytes, SHA-256
-  `42953b3d184807b9e4d18f2b9280e8e7593d5b74890f8d9755187f0e27537cb7`;
+  `42953b3d184807b9e4d18f2b9280e8e7593d5b74890f8d9755187f0e27537cb7`
+  and normalized extracted-tree SHA-256
+  `86274feed5a9d28c41a314d1ea435fc84e67a053293b281d7b1e9b86da431516`;
 - checkpoint: 389,829,880 bytes and the already retained SHA-256
   `7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d43cb2011245db638`;
   and
@@ -493,10 +496,28 @@ the exact contract-relative target and never follows a runtime-root symlink.
 
 Desktop startup now selects only a valid external active record and otherwise
 starts score-free. The Python boundary independently rehashes acquired source
-and checkpoint assets before exposing score capability. Eighteen Rust tests,
-Rust Clippy with warnings denied, and 28 focused Python desktop/score tests
-pass on macOS. The real 390 MB download and support layer have not yet been
-exercised; no network test ran merely from status or test execution.
+and checkpoint assets before exposing score capability. Publication rollback
+tracks only the directory and receipt created by the current operation; an
+inactive pre-existing runtime is rejected before any download. Desktop update
+installation is also rejected while acquisition or removal is active.
+
+The shared React dialog now appears only through the Tauri desktop manager. It
+renders the exact notice, unchecked acknowledgement, byte counts, bounded
+upstream links, progress/cancel/error states, relaunch, pinned provenance, and
+confirmed removal copy. Opening the dialog performs only a native status read.
+Download remains disabled without acknowledgement, the signed support layer,
+or while capture, settlement, scoring, or update blockers are active. The
+score card supplies the unavailable-runtime call to action, while the desktop
+release panel retains a persistent management entry after activation.
+
+Nineteen Rust tests, Rust Clippy with warnings denied, 17 frontend contract
+tests, 109 React/browser tests, 11 focused Python desktop/score tests, frontend
+typecheck, and a production web build pass on macOS. Four focused dialog tests
+prove no implicit acquisition, the acknowledgement gate, missing-support
+failure, bounded link selection, provenance/removal copy, and initial-status
+errors. The real 390 MB download, signed support layer, rendered candidate,
+and installed relaunch have not yet been exercised; no network test ran merely
+from status or test execution.
 
 ## Later Todo — Remove Evaluation Helpers
 
