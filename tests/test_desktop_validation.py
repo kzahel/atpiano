@@ -9,6 +9,7 @@ import pytest
 from atpiano.desktop_validation import (
     compare_replays,
     normalized_event_digest,
+    packaged_runtime_paths,
 )
 
 
@@ -49,6 +50,32 @@ def test_normalized_event_digest_ignores_delivery_timing(
     _write_events(second, 9_000)
 
     assert normalized_event_digest(first) == normalized_event_digest(second)
+
+
+def test_packaged_runtime_paths_cover_published_desktops(tmp_path: Path) -> None:
+    mac_app = tmp_path / "Atpiano.app"
+    mac_runtime = mac_app / "Contents" / "Resources" / "desktop-runtime"
+    mac_python = mac_runtime / "bin" / "python3"
+    mac_python.parent.mkdir(parents=True)
+    mac_python.touch()
+    assert packaged_runtime_paths(mac_app) == (
+        mac_runtime,
+        mac_python,
+        "tauri://localhost",
+    )
+
+    windows_root = tmp_path / "windows"
+    windows_app = windows_root / "atpiano-desktop.exe"
+    windows_runtime = windows_root / "desktop-runtime"
+    windows_python = windows_runtime / "python.exe"
+    windows_runtime.mkdir(parents=True)
+    windows_app.touch()
+    windows_python.touch()
+    assert packaged_runtime_paths(windows_app) == (
+        windows_runtime,
+        windows_python,
+        "http://tauri.localhost",
+    )
 
 
 def test_replay_comparison_requires_product_parity() -> None:

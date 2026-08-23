@@ -6,9 +6,11 @@ import argparse
 import hashlib
 import json
 import os
+import queue
 import secrets
-import select
 import subprocess
+import tempfile
+import threading
 import time
 import urllib.request
 from collections.abc import Sequence
@@ -50,6 +52,49 @@ VOLATILE_EVENT_FIELDS = {
     "session_id",
     "source_to_emission_latency_s",
 }
+
+
+def packaged_runtime_paths(app_path: Path) -> tuple[Path, Path, str]:
+    """Resolve the packaged runtime boundary for either published desktop."""
+    app = app_path.resolve()
+    macos_runtime = app / "Contents" / "Resources" / "desktop-runtime"
+    if macos_runtime.is_dir():
+        runtime = macos_runtime
+        python = runtime / "bin" / "python3"
+        origin = "tauri://localhost"
+    elif app.suffix.lower() == ".exe":
+        runtime = app.parent / "desktop-runtime"
+        python = runtime / "python.exe"
+        origin = "http://tauri.localhost"
+    else:
+        raise ValueError("packaged replay requires a macOS app or Windows executable")
+    if not python.is_file():
+        raise ValueError("packaged desktop Python runtime is missing")
+    return runtime, python, origin
+
+
+def _read_ready_line(process: subprocess.Popen[str], timeout: float) -> str:
+    if process.stdout is None:
+        raise RuntimeError("packaged sidecar stdout is unavailable")
+    lines: queue.Queue[str | BaseException] = queue.Queue(maxsize=1)
+
+    def read() -> None:
+        try:
+            lines.put(process.stdout.readline())
+        except BaseException as error:  # pragma: no cover - subprocess boundary
+            lines.put(error)
+
+    threading.Thread(target=read, daemon=True).start()
+    try:
+        result = lines.get(timeout=timeout)
+    except queue.Empty as error:
+        raise RuntimeError("packaged sidecar ready timeout") from error
+    if isinstance(result, BaseException):
+        raise RuntimeError("packaged sidecar ready read failed") from result
+    if not result:
+        stderr = process.stderr.read() if process.stderr is not None else ""
+        raise RuntimeError(f"packaged sidecar exited before ready: {stderr[-1000:]}")
+    return result
 
 
 def normalized_event_digest(session_directory: Path) -> tuple[int, str]:
@@ -228,24 +273,31 @@ def run_packaged_replay(
     workspace: Path,
     *,
     render_score: bool = False,
+    score_runtime: Path | None = None,
 ) -> dict[str, Any]:
     workspace = workspace.resolve()
-    runtime = app_bundle.resolve() / "Contents" / "Resources" / "desktop-runtime"
+    runtime, python, desktop_origin = packaged_runtime_paths(app_bundle)
+    selected_score_runtime = (
+        score_runtime.resolve() if score_runtime is not None else runtime / "score-runtime"
+    )
     token = secrets.token_hex(32)
-    environment = {
-        "HOME": str(Path.home()),
-        "PATH": f"{runtime / 'bin'}:/usr/bin:/bin",
-        "TMPDIR": os.environ.get("TMPDIR", "/tmp"),
-        "LANG": os.environ.get("LANG", "en_US.UTF-8"),
-        "ATPIANO_DESKTOP_TOKEN": token,
-        "ATPIANO_EXECUTION_BACKEND": "cpu",
-        "CUDA_VISIBLE_DEVICES": "",
-        **desktop_runtime_environment(workspace),
-    }
+    environment = dict(os.environ)
+    environment.update(
+        {
+            "PATH": f"{runtime / 'bin'}{os.pathsep}{environment.get('PATH', '')}",
+            "LANG": os.environ.get("LANG", "en_US.UTF-8"),
+            "ATPIANO_DESKTOP_TOKEN": token,
+            "ATPIANO_EXECUTION_BACKEND": "cpu",
+            "CUDA_VISIBLE_DEVICES": "",
+            **desktop_runtime_environment(workspace),
+        }
+    )
+    for name in ("PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"):
+        environment.pop(name, None)
     started = time.monotonic()
     process = subprocess.Popen(
         [
-            runtime / "bin" / "python3",
+            python,
             "-I",
             "-B",
             "-m",
@@ -261,9 +313,11 @@ def run_packaged_replay(
             "--minimum-free-gib",
             "0",
             "--score-runtime",
-            runtime / "score-runtime",
+            selected_score_runtime,
+            "--desktop-origin",
+            desktop_origin,
         ],
-        cwd="/tmp",
+        cwd=tempfile.gettempdir(),
         env=environment,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
@@ -274,15 +328,12 @@ def run_packaged_replay(
         process.terminate()
         raise RuntimeError("packaged sidecar pipes are unavailable")
     try:
-        readable, _, _ = select.select([process.stdout], [], [], 30)
-        if not readable:
-            raise RuntimeError("packaged sidecar ready timeout")
-        ready = json.loads(process.stdout.readline())
+        ready = json.loads(_read_ready_line(process, 180 if render_score else 30))
         sidecar_ready_s = time.monotonic() - started
         base_url = f"http://127.0.0.1:{ready['port']}"
         headers = {
             "Authorization": f"Bearer {token}",
-            "Origin": "tauri://localhost",
+            "Origin": desktop_origin,
             "Content-Type": "application/json",
         }
         handshake_request = urllib.request.Request(
@@ -541,6 +592,7 @@ def build_parser() -> argparse.ArgumentParser:
     packaged.add_argument("--report", type=Path, required=True)
     packaged_score = commands.add_parser("packaged-score")
     packaged_score.add_argument("--app", type=Path, required=True)
+    packaged_score.add_argument("--score-runtime", type=Path)
     packaged_score.add_argument("--workspace", type=Path, required=True)
     packaged_score.add_argument("--report", type=Path, required=True)
     direct = commands.add_parser("direct-replay")
@@ -563,6 +615,7 @@ def run(arguments: Sequence[str] | None = None) -> int:
             args.app,
             args.workspace,
             render_score=True,
+            score_runtime=args.score_runtime,
         )
     elif args.command == "direct-replay":
         report = run_direct_replay(args.runtime_root, args.workspace)
