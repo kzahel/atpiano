@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -129,3 +130,77 @@ def test_acquired_runtime_assets_are_independently_rehashed(
     state = score_snapshot.inspect_score_runtime(tmp_path)
     assert state["available"] is False
     assert "assets do not match" in state["error"]
+
+
+def test_acquired_support_is_independently_rehashed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = tmp_path / "MIDI2ScoreTransformer"
+    repository.mkdir()
+    (repository / "model.py").write_bytes(b"model source")
+    checkpoint = tmp_path / "MIDI2ScoreTF.ckpt"
+    checkpoint.write_bytes(b"checkpoint")
+    python = tmp_path / ".venv" / ("python.exe" if os.name == "nt" else "bin/python")
+    python.parent.mkdir(parents=True)
+    python.write_bytes(b"python")
+    packages = tmp_path / "packages.json"
+    packages.write_bytes(b"packages")
+    tree_hash = sha256_path(repository)
+    checkpoint_hash = sha256_file(checkpoint)
+    monkeypatch.setattr(score_snapshot, "MIDI2SCORE_TREE_SHA256", tree_hash)
+    monkeypatch.setattr(
+        score_snapshot,
+        "MIDI2SCORE_CHECKPOINT_SHA256",
+        checkpoint_hash,
+    )
+    payload_hash = score_snapshot._acquired_support_sha256(tmp_path)
+    write_json(
+        tmp_path / "support-manifest.json",
+        {
+            "schema_version": "atpiano.score-support.v1",
+            "support_layer_id": score_snapshot.MIDI2SCORE_SUPPORT_LAYER_ID,
+            "payload_sha256": payload_hash,
+        },
+    )
+    write_json(
+        tmp_path / "runtime.json",
+        {
+            "schema_version": score_snapshot.SCORE_RUNTIME_SCHEMA,
+            "acquisition_contract_id": "midi2score-research-2026.08",
+            "repository": {
+                "commit": score_snapshot.MIDI2SCORE_COMMIT,
+                "tree_sha256": tree_hash,
+            },
+            "checkpoint": {"sha256": checkpoint_hash},
+            "support": {
+                "id": score_snapshot.MIDI2SCORE_SUPPORT_LAYER_ID,
+                "payload_sha256": payload_hash,
+            },
+        },
+    )
+
+    assert score_snapshot.inspect_score_runtime(tmp_path)["available"] is True
+    packages.write_bytes(b"changed")
+    state = score_snapshot.inspect_score_runtime(tmp_path)
+    assert state["available"] is False
+    assert "support does not match" in state["error"]
+
+
+def test_acquired_support_hash_uses_canonical_path_order(tmp_path: Path) -> None:
+    first = tmp_path / "package-1.dist-info" / "METADATA"
+    second = tmp_path / "package" / "module.py"
+    first.parent.mkdir()
+    second.parent.mkdir()
+    first.write_bytes(b"metadata")
+    second.write_bytes(b"module")
+    expected = hashlib.sha256()
+    for relative, path in (
+        ("package-1.dist-info/METADATA", first),
+        ("package/module.py", second),
+    ):
+        expected.update(relative.encode("utf-8"))
+        expected.update(b"\0")
+        expected.update(bytes.fromhex(sha256_file(path)))
+
+    assert score_snapshot._acquired_support_sha256(tmp_path) == expected.hexdigest()

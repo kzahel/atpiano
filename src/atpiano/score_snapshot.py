@@ -52,6 +52,7 @@ MIDI2SCORE_CHECKPOINT_URL = (
 )
 MIDI2SCORE_CHECKPOINT_SHA256 = "7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d43cb2011245db638"
 MIDI2SCORE_TREE_SHA256 = "86274feed5a9d28c41a314d1ea435fc84e67a053293b281d7b1e9b86da431516"
+MIDI2SCORE_SUPPORT_LAYER_ID = "atpiano-midi2score-support-py311-2026.08"
 MAX_SCORE_NOTES = 4096
 MAX_SCORE_SOURCE_S = 15 * 60
 SCORE_TIMEOUT_S = 180
@@ -167,7 +168,9 @@ def _validate_score_output(note_count: int, summary: dict[str, Any]) -> None:
 def _runtime_paths(runtime_directory: Path) -> dict[str, Path]:
     runtime = runtime_directory.resolve()
     python_name = "python.exe" if os.name == "nt" else "python"
-    python_path = runtime / ".venv" / ("Scripts" if os.name == "nt" else "bin") / python_name
+    python_path = runtime / ".venv" / (python_name if os.name == "nt" else f"bin/{python_name}")
+    if os.name == "nt" and not python_path.exists():
+        python_path = runtime / ".venv" / "Scripts" / python_name
     return {
         "root": runtime,
         "repository": runtime / "MIDI2ScoreTransformer",
@@ -175,6 +178,33 @@ def _runtime_paths(runtime_directory: Path) -> dict[str, Path]:
         "python": python_path,
         "manifest": runtime / "runtime.json",
     }
+
+
+def _acquired_support_sha256(runtime: Path) -> str:
+    excluded_roots = {"MIDI2ScoreTransformer"}
+    excluded_files = {
+        "MIDI2ScoreTF.ckpt",
+        "runtime.json",
+        "support-manifest.json",
+    }
+    digest = hashlib.sha256()
+    for child in sorted(
+        runtime.rglob("*"),
+        key=lambda item: item.relative_to(runtime).as_posix(),
+    ):
+        relative = child.relative_to(runtime)
+        if relative.parts[:1] and relative.parts[0] in excluded_roots:
+            continue
+        if relative.as_posix() in excluded_files:
+            continue
+        if child.is_symlink():
+            raise ValueError("acquired score support contains a symbolic link")
+        if not child.is_file():
+            continue
+        digest.update(relative.as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(bytes.fromhex(sha256_file(child)))
+    return digest.hexdigest()
 
 
 def inspect_score_runtime(runtime_directory: Path) -> dict[str, Any]:
@@ -220,6 +250,30 @@ def inspect_score_runtime(runtime_directory: Path) -> dict[str, Any]:
             "directory": str(paths["root"]),
             "error": "score runtime assets do not match the pinned contract",
         }
+    if manifest.get("acquisition_contract_id") is not None:
+        try:
+            support_manifest = read_json(paths["root"] / "support-manifest.json")
+            support = manifest.get("support", {})
+            if not isinstance(support, dict):
+                raise ValueError("score support identity is invalid")
+            expected_support_hash = support_manifest.get("payload_sha256")
+            support_valid = (
+                support_manifest.get("schema_version") == "atpiano.score-support.v1"
+                and support_manifest.get("support_layer_id")
+                == MIDI2SCORE_SUPPORT_LAYER_ID
+                and support.get("id") == MIDI2SCORE_SUPPORT_LAYER_ID
+                and support.get("payload_sha256") == expected_support_hash
+                and _acquired_support_sha256(paths["root"])
+                == expected_support_hash
+            )
+        except (OSError, TypeError, ValueError):
+            support_valid = False
+        if not support_valid:
+            return {
+                "available": False,
+                "directory": str(paths["root"]),
+                "error": "score support does not match the pinned contract",
+            }
     return {
         "available": True,
         "directory": str(paths["root"]),

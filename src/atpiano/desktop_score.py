@@ -67,6 +67,9 @@ class ScoreAcquisitionContract(BaseModel):
     paper_url: str
     allowed_https_hosts: tuple[str, ...]
     support_layer_id: str
+    support_python_version: Literal["3.11.14"]
+    support_requirements_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    support_vcs_requirements_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     supported_targets: tuple[ScoreTarget, ...]
     score_runtime_schema: Literal["atpiano.midi2score-runtime.v2"]
     score_pipeline_revision: Literal[4]

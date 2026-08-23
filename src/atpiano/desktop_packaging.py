@@ -48,6 +48,9 @@ MODEL_PACK_ID = "atpiano-cpu-models-2026.07"
 BUNDLE_MANIFEST_SCHEMA = "atpiano.desktop-bundle.v1"
 BUNDLE_AUDIT_SCHEMA = "atpiano.desktop-bundle-audit.v2"
 INTERNAL_SCORE_RUNTIME_NAME = "score-runtime"
+SCORE_SUPPORT_RUNTIME_NAME = "score-support"
+SCORE_SUPPORT_LAYER_ID = "atpiano-midi2score-support-py311-2026.08"
+SCORE_SUPPORT_SCHEMA = "atpiano.score-support.v1"
 INTERNAL_SCORE_PAPER_URL = "https://zenodo.org/records/14877339"
 SYSTEM_LOAD_PREFIXES = ("/System/Library/", "/usr/lib/")
 FORBIDDEN_DISTRIBUTION_PREFIXES = (
@@ -528,6 +531,169 @@ def _prune_internal_score_python(python_root: Path) -> None:
                 entry.unlink()
 
 
+def _materialize_runtime_symlinks(root: Path) -> None:
+    resolved_root = root.resolve()
+    for path in sorted(root.rglob("*"), key=lambda item: len(item.parts), reverse=True):
+        if not path.is_symlink():
+            continue
+        target = path.resolve()
+        if target != resolved_root and resolved_root not in target.parents:
+            raise RuntimeError(f"score support symlink escapes its root: {path}")
+        if not target.is_file():
+            raise RuntimeError(f"score support symlink is not a regular file: {path}")
+        materialized = path.with_name(f".{path.name}.materialized")
+        shutil.copy2(target, materialized)
+        path.unlink()
+        materialized.replace(path)
+
+
+def _support_vcs_inventory(site_packages: Path) -> list[dict[str, Any]]:
+    sources = _direct_url_inventory(site_packages)
+    expected = {
+        "https://github.com/TimFelixBeyer/music21": (
+            "0ed70bb38f2017dc04cb19aada24e88a141517e2"
+        ),
+        "https://github.com/TimFelixBeyer/amtevaluation.github.io": (
+            "4ef1165edda1f719068c4c699bd8ab2076e4d7ec"
+        ),
+        "https://github.com/TimFelixBeyer/ScoreTransformer": (
+            "934a228ee33e5731dde6c7b22a2cf13a0825b18f"
+        ),
+    }
+    observed: dict[str, str] = {}
+    for source in sources:
+        document = source.get("source")
+        if not isinstance(document, dict):
+            continue
+        vcs = document.get("vcs_info")
+        if isinstance(vcs, dict) and vcs.get("vcs") == "git":
+            observed[str(document.get("url"))] = str(vcs.get("commit_id"))
+    if observed != expected:
+        raise RuntimeError("score support VCS provenance differs from its pinned inputs")
+    return sources
+
+
+def _sha256_tree_without(root: Path, excluded: set[str]) -> str:
+    digest = hashlib.sha256()
+    files = (item for item in root.rglob("*") if item.is_file())
+    for child in sorted(files, key=lambda item: item.relative_to(root).as_posix()):
+        relative = child.relative_to(root).as_posix()
+        if relative in excluded:
+            continue
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(bytes.fromhex(sha256_file(child)))
+    return digest.hexdigest()
+
+
+def stage_score_support(runtime_root: Path, repository: Path) -> dict[str, Any]:
+    score_root = runtime_root / SCORE_SUPPORT_RUNTIME_NAME
+    registry_lock = repository / "desktop-score" / "support-requirements.lock"
+    vcs_requirements = repository / "desktop-score" / "support-vcs-requirements.txt"
+    python_source, python_provenance = _managed_python(
+        key=SCORE_PYTHON_KEY,
+        version=SCORE_PYTHON_VERSION,
+    )
+    python_root = score_root / ".venv"
+    shutil.copytree(python_source, python_root, symlinks=True)
+    site_packages = _site_packages(python_root, python_version="3.11")
+    if site_packages.exists():
+        shutil.rmtree(site_packages)
+    externally_managed = python_root / "lib" / "python3.11" / "EXTERNALLY-MANAGED"
+    externally_managed.unlink(missing_ok=True)
+    python = python_root / "bin" / "python3.11"
+    _run(
+        [
+            "uv",
+            "pip",
+            "install",
+            "--python",
+            python,
+            "--requirements",
+            registry_lock,
+            "--require-hashes",
+            "--exact",
+            "--strict",
+            "--link-mode",
+            "copy",
+        ],
+        cwd=repository,
+    )
+    _run(
+        [
+            "uv",
+            "pip",
+            "install",
+            "--python",
+            python,
+            "--requirements",
+            vcs_requirements,
+            "--no-deps",
+            "--strict",
+            "--link-mode",
+            "copy",
+        ],
+        cwd=repository,
+    )
+    vcs_sources = _support_vcs_inventory(site_packages)
+    _prune_internal_score_python(python_root)
+    relocated_native = relocate_runtime_native(python_root, python_source)
+    _materialize_runtime_symlinks(score_root)
+    packages = _package_inventory(python_root, python=python_root / "bin" / "python")
+    _audit_distributions(score_root, packages)
+    _audit_symlinks(score_root)
+    _audit_native(score_root)
+    for imports in (
+        "import torch, transformers, lightning, music21",
+        "import numba, pretty_midi, score_transformer, muster",
+    ):
+        _run([python_root / "bin" / "python", "-I", "-B", "-c", imports])
+    python_version = _run(
+        [python_root / "bin" / "python", "--version"],
+        capture_output=True,
+    ).stdout.strip()
+    packages_document = {
+        "schema_version": "atpiano.score-support-packages.v1",
+        "support_layer_id": SCORE_SUPPORT_LAYER_ID,
+        "python": python_version,
+        "python_provenance": python_provenance,
+        "registry_requirements": {
+            "path": "desktop-score/support-requirements.lock",
+            "sha256": sha256_file(registry_lock),
+        },
+        "vcs_requirements": {
+            "path": "desktop-score/support-vcs-requirements.txt",
+            "sha256": sha256_file(vcs_requirements),
+        },
+        "vcs_sources": vcs_sources,
+        "relocated_native_files": relocated_native,
+        "packages": packages,
+    }
+    packages_path = score_root / "packages.json"
+    write_json(packages_path, packages_document)
+    manifest = {
+        "schema_version": SCORE_SUPPORT_SCHEMA,
+        "support_layer_id": SCORE_SUPPORT_LAYER_ID,
+        "platform": "macos",
+        "architecture": "arm64",
+        "execution_backend": "cpu",
+        "python_version": SCORE_PYTHON_VERSION,
+        "requirements_sha256": sha256_file(registry_lock),
+        "vcs_requirements_sha256": sha256_file(vcs_requirements),
+        "packages_sha256": sha256_file(packages_path),
+        "payload_sha256": _sha256_tree_without(score_root, {"support-manifest.json"}),
+        "package_count": len(packages),
+        "payload_bytes": _path_size(score_root),
+    }
+    write_json(score_root / "support-manifest.json", manifest)
+    return {
+        "enabled": True,
+        "relative_path": SCORE_SUPPORT_RUNTIME_NAME,
+        "manifest_sha256": sha256_file(score_root / "support-manifest.json"),
+        **manifest,
+    }
+
+
 def stage_internal_score_runtime(
     runtime_root: Path,
     source_runtime: Path,
@@ -919,6 +1085,125 @@ def _audit_internal_score_runtime(
     }
 
 
+def _score_support_payload_bytes(score_root: Path) -> int:
+    return sum(
+        path.lstat().st_size
+        for path in score_root.rglob("*")
+        if (path.is_file() or path.is_symlink())
+        and path.relative_to(score_root).as_posix() != "support-manifest.json"
+    )
+
+
+def refresh_score_support_manifest(runtime_root: Path) -> dict[str, Any]:
+    score_root = runtime_root / SCORE_SUPPORT_RUNTIME_NAME
+    manifest_path = score_root / "support-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["packages_sha256"] = sha256_file(score_root / "packages.json")
+    manifest["payload_sha256"] = _sha256_tree_without(
+        score_root,
+        {"support-manifest.json"},
+    )
+    manifest["payload_bytes"] = _score_support_payload_bytes(score_root)
+    write_json(manifest_path, manifest)
+    bundle_manifest_path = runtime_root / "bundle-manifest.json"
+    if bundle_manifest_path.is_file():
+        bundle_manifest = json.loads(bundle_manifest_path.read_text(encoding="utf-8"))
+        score_support = bundle_manifest.get("score_support")
+        if not isinstance(score_support, dict):
+            raise RuntimeError("desktop bundle score support record is missing")
+        bundle_manifest["score_support"] = {
+            **score_support,
+            **manifest,
+            "manifest_sha256": sha256_file(manifest_path),
+        }
+        write_json(bundle_manifest_path, bundle_manifest)
+    return manifest
+
+
+def _audit_score_support(runtime_root: Path) -> dict[str, Any]:
+    repository = _repository_root()
+    score_root = runtime_root / SCORE_SUPPORT_RUNTIME_NAME
+    manifest_path = score_root / "support-manifest.json"
+    packages_path = score_root / "packages.json"
+    if not manifest_path.is_file() or not packages_path.is_file():
+        raise RuntimeError("desktop score support manifests are missing")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    bundle_manifest = json.loads(
+        (runtime_root / "bundle-manifest.json").read_text(encoding="utf-8")
+    )
+    bundle_score_support = bundle_manifest.get("score_support")
+    if not isinstance(bundle_score_support, dict):
+        raise RuntimeError("desktop bundle score support record is missing")
+    expected = {
+        "schema_version": SCORE_SUPPORT_SCHEMA,
+        "support_layer_id": SCORE_SUPPORT_LAYER_ID,
+        "platform": "macos",
+        "architecture": "arm64",
+        "execution_backend": "cpu",
+        "python_version": SCORE_PYTHON_VERSION,
+        "requirements_sha256": sha256_file(
+            repository / "desktop-score" / "support-requirements.lock"
+        ),
+        "vcs_requirements_sha256": sha256_file(
+            repository / "desktop-score" / "support-vcs-requirements.txt"
+        ),
+    }
+    if any(manifest.get(key) != value for key, value in expected.items()):
+        raise RuntimeError("desktop score support identity differs from its contract")
+    if any(bundle_score_support.get(key) != value for key, value in manifest.items()):
+        raise RuntimeError("desktop bundle score support record changed")
+    if bundle_score_support.get("manifest_sha256") != sha256_file(manifest_path):
+        raise RuntimeError("desktop bundle score support manifest hash changed")
+    if manifest.get("packages_sha256") != sha256_file(packages_path):
+        raise RuntimeError("desktop score support package inventory changed")
+    if manifest.get("payload_sha256") != _sha256_tree_without(
+        score_root,
+        {"support-manifest.json"},
+    ):
+        raise RuntimeError("desktop score support payload changed")
+    if manifest.get("payload_bytes") != _score_support_payload_bytes(score_root):
+        raise RuntimeError("desktop score support byte count changed")
+    if _audit_symlinks(score_root):
+        raise RuntimeError("desktop score support contains a symbolic link")
+    python = score_root / ".venv" / "bin" / "python"
+    packages = _package_inventory(score_root / ".venv", python=python)
+    _audit_distributions(score_root, packages)
+    packages_document = json.loads(packages_path.read_text(encoding="utf-8"))
+    recorded = packages_document.get("packages")
+    recorded_identities = {
+        (str(package.get("name")), str(package.get("version")))
+        for package in recorded
+        if isinstance(package, dict)
+    } if isinstance(recorded, list) else set()
+    actual_identities = {
+        (str(package["name"]), str(package["version"])) for package in packages
+    }
+    if recorded_identities != actual_identities:
+        raise RuntimeError("desktop score support package identities changed")
+    if manifest.get("package_count") != len(packages):
+        raise RuntimeError("desktop score support package count changed")
+    return {
+        "status": "passed",
+        "relative_path": SCORE_SUPPORT_RUNTIME_NAME,
+        "manifest_sha256": sha256_file(manifest_path),
+        "payload_sha256": manifest["payload_sha256"],
+        "installed_bytes": _path_size(score_root),
+        "package_count": len(packages),
+        "largest_packages": sorted(
+            (
+                {
+                    "name": package["name"],
+                    "version": package["version"],
+                    "installed_bytes": package["installed_bytes"],
+                }
+                for package in packages
+            ),
+            key=lambda item: item["installed_bytes"],
+            reverse=True,
+        )[:10],
+    }
+
+
 def _audit_native(root: Path) -> list[dict[str, Any]]:
     native = []
     for path in _native_candidates(root):
@@ -1039,6 +1324,8 @@ def component_inventory(root: Path) -> dict[str, Any]:
 def _runtime_component_category(parts: tuple[str, ...]) -> str:
     if parts[:1] == (INTERNAL_SCORE_RUNTIME_NAME,):
         return "internal_score_runtime"
+    if parts[:1] == (SCORE_SUPPORT_RUNTIME_NAME,):
+        return "score_support"
     if parts[:1] == ("model-pack",):
         return "model_pack"
     if parts[:1] == ("fixture",):
@@ -1200,6 +1487,7 @@ def audit_root(
     internal_score_audit = (
         _audit_internal_score_runtime(runtime_root) if score_policy["enabled"] else None
     )
+    score_support_audit = _audit_score_support(runtime_root)
     symlinks = _audit_symlinks(root)
     anonymous_caches = _audit_anonymous_caches(root)
     native = _audit_native(root)
@@ -1242,6 +1530,7 @@ def audit_root(
             "status": "not-included",
             "public_distribution": False,
         },
+        "score_support": score_support_audit,
         "anonymous_cache_directories": anonymous_caches,
         "status": "passed",
     }
@@ -1385,6 +1674,7 @@ def stage_runtime(
             staged,
             python_source,
         )
+        score_support = stage_score_support(staged, repository)
         internal_score_runtime = (
             stage_internal_score_runtime(
                 staged,
@@ -1441,6 +1731,7 @@ def stage_runtime(
             "media": media,
             "sidecar_smoke": sidecar_smoke,
             "relocated_native_files": relocated_native,
+            "score_support": score_support,
             "internal_score_runtime": internal_score_runtime,
             "packages": packages,
             "inventory_before_manifest": inventory(staged),
@@ -1472,6 +1763,8 @@ def build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--root", type=Path, required=True)
     audit.add_argument("--report", type=Path, required=True)
     audit.add_argument("--archive", type=Path)
+    refresh_support = commands.add_parser("refresh-score-support-manifest")
+    refresh_support.add_argument("--root", type=Path, required=True)
     return parser
 
 
@@ -1484,10 +1777,12 @@ def run(arguments: Sequence[str] | None = None) -> int:
             include_internal_score_runtime=(args.include_internal_score_runtime),
             score_runtime_source=args.score_runtime_source,
         )
-    else:
+    elif args.command == "audit":
         result = audit_root(args.root, args.archive)
         write_json(args.report, result)
-    print(json.dumps(result["inventory"], sort_keys=True))
+    else:
+        result = refresh_score_support_manifest(args.root)
+    print(json.dumps(result.get("inventory", result), sort_keys=True))
     return 0
 
 

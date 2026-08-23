@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import zipfile
@@ -14,7 +15,9 @@ from atpiano.desktop_packaging import (
     _audit_media_runtime,
     _audit_symlinks,
     _internal_score_policy,
+    _materialize_runtime_symlinks,
     _prune_distribution_test_material,
+    _sha256_tree_without,
     _stage_fixture,
     archive_component_inventory,
     component_inventory,
@@ -63,6 +66,48 @@ def test_bundle_audit_rejects_external_symlink(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="symlink escapes"):
         _audit_symlinks(root)
+
+
+def test_score_support_materializes_only_internal_file_links(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "support"
+    target = root / "bin" / "python3.11"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"interpreter")
+    link = target.with_name("python")
+    try:
+        link.symlink_to(target.name)
+    except OSError as error:
+        if os.name != "nt" or error.winerror != 1314:
+            raise
+        pytest.skip("this Windows account cannot create symbolic links")
+
+    before = _sha256_tree_without(root, set())
+    _materialize_runtime_symlinks(root)
+
+    assert not link.is_symlink()
+    assert link.read_bytes() == b"interpreter"
+    assert _sha256_tree_without(root, set()) == before
+
+
+def test_score_support_hash_uses_canonical_path_order(tmp_path: Path) -> None:
+    first = tmp_path / "package-1.dist-info" / "METADATA"
+    second = tmp_path / "package" / "module.py"
+    first.parent.mkdir()
+    second.parent.mkdir()
+    first.write_bytes(b"metadata")
+    second.write_bytes(b"module")
+    expected = hashlib.sha256()
+    for relative, contents in (
+        ("package-1.dist-info/METADATA", b"metadata"),
+        ("package/module.py", b"module"),
+    ):
+        expected.update(relative.encode("utf-8"))
+        expected.update(b"\0")
+        expected.update(hashlib.sha256(contents).digest())
+
+    assert _sha256_tree_without(tmp_path, set()) == expected.hexdigest()
 
 
 def test_bundle_audit_rejects_accelerator_and_score_assets(
@@ -169,6 +214,7 @@ def test_component_inventory_reconciles_staged_runtime(
         "lib/python3.10/site-packages/example/module.py",
         "model-pack/model-pack.json",
         "score-runtime/runtime.json",
+        "score-support/support-manifest.json",
     )
     for relative in paths:
         target = tmp_path / relative
@@ -185,6 +231,7 @@ def test_component_inventory_reconciles_staged_runtime(
         "model_pack",
         "python_packages",
         "python_runtime_and_manifest",
+        "score_support",
     }
 
 

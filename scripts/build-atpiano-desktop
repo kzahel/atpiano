@@ -37,7 +37,9 @@ sign_staged_native_code() {
       --options runtime
       "${timestamp_option}"
     )
-    if [[ "${candidate}" == "${runtime_root}/bin/python3."* ]]; then
+    if [[ "${candidate}" == "${runtime_root}/bin/python3."* ]] ||
+      [[ "${candidate}" == "${runtime_root}/score-support/.venv/bin/python"* ]]
+    then
       codesign_arguments+=(--entitlements "${python_entitlements}")
     fi
     if ! signing_output="$(
@@ -60,6 +62,12 @@ sign_staged_native_code() {
     printf '%s\n' "no staged native code was found for signing" >&2
     return 1
   fi
+  (
+    cd "${repository_root}"
+    uv run python -m atpiano.desktop_packaging \
+      refresh-score-support-manifest \
+      --root "${runtime_root}"
+  )
   printf '%s\n' "Signed ${signed_count} staged native files"
 }
 
@@ -131,6 +139,21 @@ verify_hardened_signature() {
   fi
   if [[ "${python_details}" == *"com.apple.security.cs.disable-library-validation"* ]]; then
     printf '%s\n' "bundled Python unexpectedly disables library validation" >&2
+    return 1
+  fi
+  python_details="$(
+    codesign --display --entitlements - \
+      "${app_bundle}/Contents/Resources/desktop-runtime/score-support/.venv/bin/python" \
+      2>&1
+  )"
+  if [[ "${python_details}" != \
+    *"com.apple.security.cs.allow-unsigned-executable-memory"* \
+  ]]; then
+    printf '%s\n' "score-support Python lacks its required JIT entitlement" >&2
+    return 1
+  fi
+  if [[ "${python_details}" == *"com.apple.security.cs.disable-library-validation"* ]]; then
+    printf '%s\n' "score-support Python disables library validation" >&2
     return 1
   fi
   printf '%s\n' "Verified ${native_count} hardened native signatures"

@@ -1,0 +1,5 @@
+# Provisional proof-of-concept dependencies. These remain a documented later
+# cleanup item; exact commits prevent branch drift during signed builds.
+music21 @ git+https://github.com/TimFelixBeyer/music21@0ed70bb38f2017dc04cb19aada24e88a141517e2
+muster @ git+https://github.com/TimFelixBeyer/amtevaluation.github.io@4ef1165edda1f719068c4c699bd8ab2076e4d7ec
+score-transformer @ git+https://github.com/TimFelixBeyer/ScoreTransformer@934a228ee33e5731dde6c7b22a2cf13a0825b18f

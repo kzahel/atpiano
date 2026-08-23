@@ -31,6 +31,9 @@
     "zenodo.org"
   ],
   "support_layer_id": "atpiano-midi2score-support-py311-2026.08",
+  "support_python_version": "3.11.14",
+  "support_requirements_sha256": "d44d38ee28af3c4fe2d5f817273f476415ad4947176f8c57a1935816453e68b2",
+  "support_vcs_requirements_sha256": "2e1b05480dd32dbc63d379cf10d77ab3724bc8fb5621b73e171614079cd012ff",
   "supported_targets": [
     {
       "platform": "macos",

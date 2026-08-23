@@ -7,7 +7,8 @@ Status: **implementation active as a prerequisite of the first binary
 release.** The Python desktop identity/model-pack contracts now accept exactly
 macOS arm64 and Windows x86_64 CPU pairings. The Tauri launcher and frontend
 now carry exact resource, origin, package, and updater variants for both
-targets. The native Windows x64 application core is established, but no
+targets. The native Windows x64 application core is established and the
+universal score-support registry lock resolves for Windows x64, but no
 relocatable Windows runtime, package, signed installer, packaged MIDI2Score
 result, or updater campaign exists.
 
@@ -323,6 +324,14 @@ pass on both macOS arm64 and Windows x64-on-ARM64 emulation; macOS Clippy also
 passes with warnings denied. This is the first native Windows shell compile
 and execution evidence, but remains deliberately labeled emulated and does not
 include the staged Python/model/media runtime.
+
+The score-support slice now freezes standalone CPython 3.11.14, 61 exact
+hash-pinned registry packages, and three exact VCS commits in shared tracked
+inputs. A universal `uv` dry run for Windows x64 selects 25 Windows artifacts
+and resolves the full 61-package registry inventory without an unsupported
+dependency. This is a package-resolution preflight only. The Windows x64
+standalone interpreter, PE/DLL audit, imports, external model composition,
+retained score output, and installed package remain the next work.
 
 ## Rollback
 

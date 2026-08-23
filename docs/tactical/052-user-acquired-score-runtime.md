@@ -5,9 +5,10 @@ Topics: `desktop-score-runtime-footprint`, `public-desktop-release`,
 
 Status: **implementation active as a proof-of-concept prerequisite for the
 first public desktop tag.** The external asset contract, transactional native
-controller, and shared consent/management dialog are implemented;
-support-layer staging and installed validation remain. Dependency cleanup is
-explicitly deferred.
+controller, shared consent/management dialog, and macOS arm64 score-support
+package are implemented. Windows x64 support staging, a real acknowledged
+model acquisition, installed score validation, and both signed update
+campaigns remain. Dependency cleanup is explicitly deferred.
 
 ## Goal
 
@@ -510,14 +511,40 @@ or while capture, settlement, scoring, or update blockers are active. The
 score card supplies the unavailable-runtime call to action, while the desktop
 release panel retains a persistent management entry after activation.
 
-Nineteen Rust tests, Rust Clippy with warnings denied, 17 frontend contract
-tests, 109 React/browser tests, 11 focused Python desktop/score tests, frontend
+Twenty-one Rust tests, Rust Clippy with warnings denied, 17 frontend contract
+tests, 109 React/browser tests, 29 focused Python packaging/score tests, frontend
 typecheck, and a production web build pass on macOS. Four focused dialog tests
 prove no implicit acquisition, the acknowledgement gate, missing-support
 failure, bounded link selection, provenance/removal copy, and initial-status
-errors. The real 390 MB download, signed support layer, rendered candidate,
-and installed relaunch have not yet been exercised; no network test ran merely
-from status or test execution.
+errors.
+
+The macOS arm64 reference support package is now constructed from standalone
+CPython 3.11.14, 61 exact registry distributions, and the three commit-pinned
+music21, ScoreTransformer, and MUSTER repositories. The universal registry
+lock is exact and hash-required; the VCS inventory rejects any commit drift.
+`pretty-midi` 0.2.11 has no wheel for this target, so the build host constructs
+that exact hash-pinned source distribution. No compiler, package manager, Git,
+or network dependency is left for the user's machine. The same registry lock
+resolves to Windows x64 artifacts in a `uv` target dry run; that is resolver
+evidence, not a built Windows support package.
+
+The staged macOS support package contains 64 distributions, no symbolic links,
+and 926,843,098 bytes. Its canonical payload is 926,842,450 bytes with SHA-256
+`8f25d0131cfc7b76e8efde1c19f2b8f255823b263003c187bf46b69b560e5bce`.
+The complete staged desktop runtime is 1,942,674,133 bytes. An unsigned Tauri
+application assembled from that stage is 1,959,847,221 bytes; its updater
+archive is 586,901,211 bytes. The package audit finds 34,074 files and no
+forbidden model repository, checkpoint, accelerator package, development
+package, cache, or internal-score runtime.
+
+Real macOS app inspection found and corrected a manifest-ordering mismatch
+between Python staging and Rust validation. After the fix, the packaged dialog
+renders the exact education/research-only notice, recognizes the support
+package, begins with acknowledgement unchecked and download disabled, and
+enables download only after the checkbox is selected. The dialog was cancelled
+without starting acquisition and the application quit without an orphan. The
+real 390 MB model download, bounded import/model smoke, installed relaunch,
+signed/notarized package, and Windows path have not yet been exercised.
 
 ## Later Todo — Remove Evaluation Helpers
 

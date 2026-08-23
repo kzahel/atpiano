@@ -2,13 +2,14 @@
 
 Topic: desktop-score-runtime-footprint
 
-Status: **a user-acquired score runtime is now planned for the first public
-macOS arm64 and Windows x86_64 desktop builds as of 2026-08-23.** The published
-applications and GitHub Release must still exclude the MIDI2ScoreTransformer
-repository and checkpoint. Each application may include a pinned
-platform-specific support environment with best-effort dependency provenance,
-plus a shared acquisition controller that downloads the exact model source and
-checkpoint only after an explicit education/research-use acknowledgement.
+Status: **a user-acquired score runtime is now implemented through the packaged
+macOS consent gate and remains in progress for Windows x64 as of 2026-08-23.**
+The published applications and GitHub Release must still exclude the
+MIDI2ScoreTransformer repository and checkpoint. Each application may include
+a pinned platform-specific support environment with best-effort dependency
+provenance, plus a shared acquisition controller that downloads the exact
+model source and checkpoint only after an explicit education/research-use
+acknowledgement.
 Tactical
 [`052-user-acquired-score-runtime.md`](../tactical/052-user-acquired-score-runtime.md)
 owns that implementation, and tactical
@@ -73,6 +74,24 @@ A read-only file-by-file gzip level-6 simulation measured 949,554,141 bytes
 for the internal application payload. That is a useful download-size estimate,
 not a created or approved distribution archive. ZIP or DMG metadata and
 compression details would move the final value.
+
+The first public-layout macOS build provides a measured replacement for the
+earlier projection while keeping the main model external:
+
+| Item | Bytes | Approximate size |
+|---|---:|---:|
+| Pinned Python 3.11 score-support package | 926,843,098 | 926.8 MB |
+| Complete staged desktop runtime | 1,942,674,133 | 1.94 GB |
+| Unsigned packaged Atpiano application | 1,959,847,221 | 1.96 GB |
+| Generated updater archive | 586,901,211 | 586.9 MB |
+| Later user-acquired source plus checkpoint | 390,016,983 | 390.0 MB |
+
+The support package has 64 distributions and excludes the
+MIDI2ScoreTransformer repository and checkpoint. Its 926,842,450-byte
+canonical payload hashes to
+`8f25d0131cfc7b76e8efde1c19f2b8f255823b263003c187bf46b69b560e5bce`.
+The unsigned packaged-App audit found no forbidden score assets. Signed DMG,
+Windows package, and post-acquisition installed sizes remain unmeasured.
 
 The score runtime is large primarily because it is a second standalone Python
 environment. Package-name intersection with the normal desktop runtime totals
@@ -369,10 +388,9 @@ checkpoint derivation, broader dependency pruning, and quantization remain
 later optimizations. The first public flow must acquire the exact released
 checkpoint rather than an Atpiano-derived weight artifact.
 
-The preliminary, non-accepted projection is approximately 1.25–1.4 GB
-installed for the complete application and roughly 500–650 MB compressed
-without quantization. A bounded tactical must replace that estimate with
-measured artifacts.
+The macOS reference now measures 1.96 GB installed and 586.9 MB in Tauri's
+generated updater archive before model acquisition. These are unsigned local
+artifact measurements, not final DMG or Windows evidence.
 
 ## Validation Contract
 

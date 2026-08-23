@@ -40,6 +40,9 @@ struct AcquisitionContract {
     paper_url: String,
     allowed_https_hosts: Vec<String>,
     support_layer_id: String,
+    support_python_version: String,
+    support_requirements_sha256: String,
+    support_vcs_requirements_sha256: String,
     supported_targets: Vec<SupportedTarget>,
     score_runtime_schema: String,
     score_pipeline_revision: u32,
@@ -86,6 +89,14 @@ struct SupportManifest {
     support_layer_id: String,
     platform: String,
     architecture: String,
+    execution_backend: String,
+    python_version: String,
+    requirements_sha256: String,
+    vcs_requirements_sha256: String,
+    packages_sha256: String,
+    payload_sha256: String,
+    package_count: usize,
+    payload_bytes: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -226,6 +237,12 @@ fn contract() -> Result<AcquisitionContract, String> {
         || contract.score_runtime_schema != "atpiano.midi2score-runtime.v2"
         || contract.score_pipeline_revision != 4
         || contract.execution_backend != "cpu"
+        || contract.support_python_version != "3.11.14"
+        || !is_sha256(&contract.support_requirements_sha256)
+        || !is_sha256(&contract.support_vcs_requirements_sha256)
+        || !is_sha256(&contract.source.archive_sha256)
+        || !is_sha256(&contract.source.tree_sha256)
+        || !is_sha256(&contract.checkpoint.sha256)
         || contract.download_bytes != contract.source.archive_bytes + contract.checkpoint.bytes
         || contract.minimum_free_bytes <= contract.installed_space_estimate_bytes
         || allowed_hosts.len() != contract.allowed_https_hosts.len()
@@ -236,6 +253,14 @@ fn contract() -> Result<AcquisitionContract, String> {
         return Err("score acquisition contract is incompatible".to_string());
     }
     Ok(contract)
+}
+
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .as_bytes()
+            .iter()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte))
 }
 
 fn target_supported(contract: &AcquisitionContract, platform: &str, architecture: &str) -> bool {
@@ -263,6 +288,16 @@ fn support_manifest(
     architecture: &str,
 ) -> Result<(PathBuf, SupportManifest), String> {
     let root = support_root(app)?;
+    let manifest = validate_support_root(&root, contract, platform, architecture)?;
+    Ok((root, manifest))
+}
+
+fn validate_support_root(
+    root: &Path,
+    contract: &AcquisitionContract,
+    platform: &str,
+    architecture: &str,
+) -> Result<SupportManifest, String> {
     let document = fs::read(root.join(SUPPORT_MANIFEST_FILE))
         .map_err(|_| "This build does not contain score model support.".to_string())?;
     let manifest: SupportManifest = serde_json::from_slice(&document)
@@ -271,18 +306,44 @@ fn support_manifest(
         || manifest.support_layer_id != contract.support_layer_id
         || manifest.platform != platform
         || manifest.architecture != architecture
+        || manifest.execution_backend != contract.execution_backend
+        || manifest.python_version != contract.support_python_version
+        || manifest.requirements_sha256 != contract.support_requirements_sha256
+        || manifest.vcs_requirements_sha256 != contract.support_vcs_requirements_sha256
+        || !is_sha256(&manifest.packages_sha256)
+        || !is_sha256(&manifest.payload_sha256)
+        || manifest.package_count == 0
+        || manifest.payload_bytes == 0
     {
         return Err("The bundled score support does not match this application.".to_string());
     }
     let python = if platform == "windows" {
-        root.join(".venv/Scripts/python.exe")
+        root.join(".venv/python.exe")
     } else {
         root.join(".venv/bin/python")
     };
     if !python.is_file() {
         return Err("The bundled score support Python runtime is missing.".to_string());
     }
-    Ok((root, manifest))
+    let packages = root.join("packages.json");
+    if file_sha256(&packages)? != manifest.packages_sha256 {
+        return Err("The bundled score support package inventory changed.".to_string());
+    }
+    if tree_sha256_without(root, Some(Path::new(SUPPORT_MANIFEST_FILE)))? != manifest.payload_sha256
+    {
+        return Err("The bundled score support payload changed.".to_string());
+    }
+    let manifest_bytes = fs::metadata(root.join(SUPPORT_MANIFEST_FILE))
+        .map_err(|_| "The bundled score support manifest is missing.".to_string())?
+        .len();
+    if directory_bytes(root)?
+        .checked_sub(manifest_bytes)
+        .ok_or_else(|| "The bundled score support size is invalid.".to_string())?
+        != manifest.payload_bytes
+    {
+        return Err("The bundled score support size changed.".to_string());
+    }
+    Ok(manifest)
 }
 
 fn config_paths(app: &tauri::AppHandle) -> Result<(PathBuf, PathBuf, PathBuf), String> {
@@ -322,7 +383,7 @@ fn validate_installation(
         return Err("The installed score model directory is unsafe.".to_string());
     }
     let python = if platform == "windows" {
-        runtime.join(".venv/Scripts/python.exe")
+        runtime.join(".venv/python.exe")
     } else {
         runtime.join(".venv/bin/python")
     };
@@ -709,11 +770,28 @@ fn directory_bytes(root: &Path) -> Result<u64, String> {
     Ok(total)
 }
 
-fn tree_sha256(root: &Path) -> Result<String, String> {
+fn file_sha256(path: &Path) -> Result<String, String> {
+    let mut file = File::open(path).map_err(|error| format!("could not hash file: {error}"))?;
+    let mut digest = Sha256::new();
+    let mut block = [0_u8; 1024 * 1024];
+    loop {
+        let count = file
+            .read(&mut block)
+            .map_err(|error| format!("could not hash file: {error}"))?;
+        if count == 0 {
+            break;
+        }
+        digest.update(&block[..count]);
+    }
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+fn tree_sha256_without(root: &Path, excluded: Option<&Path>) -> Result<String, String> {
     fn collect_files(
         root: &Path,
         directory: &Path,
         files: &mut Vec<PathBuf>,
+        excluded: Option<&Path>,
     ) -> Result<(), String> {
         for entry in fs::read_dir(directory)
             .map_err(|error| format!("could not inspect score source: {error}"))?
@@ -727,13 +805,14 @@ fn tree_sha256(root: &Path) -> Result<String, String> {
                 return Err("score source contains a symbolic link".to_string());
             }
             if metadata.is_dir() {
-                collect_files(root, &path, files)?;
+                collect_files(root, &path, files, excluded)?;
             } else if metadata.is_file() {
-                files.push(
-                    path.strip_prefix(root)
-                        .map_err(|_| "score source path escaped its root".to_string())?
-                        .to_path_buf(),
-                );
+                let relative = path
+                    .strip_prefix(root)
+                    .map_err(|_| "score source path escaped its root".to_string())?;
+                if excluded != Some(relative) {
+                    files.push(relative.to_path_buf());
+                }
             } else {
                 return Err("score source contains an unsupported file".to_string());
             }
@@ -742,7 +821,7 @@ fn tree_sha256(root: &Path) -> Result<String, String> {
     }
 
     let mut files = Vec::new();
-    collect_files(root, root, &mut files)?;
+    collect_files(root, root, &mut files, excluded)?;
     files.sort_by_key(|path| {
         path.components()
             .map(|component| component.as_os_str().to_string_lossy().into_owned())
@@ -774,6 +853,10 @@ fn tree_sha256(root: &Path) -> Result<String, String> {
         tree.update(digest.finalize());
     }
     Ok(format!("{:x}", tree.finalize()))
+}
+
+fn tree_sha256(root: &Path) -> Result<String, String> {
+    tree_sha256_without(root, None)
 }
 
 fn unix_time() -> Result<u64, String> {
@@ -826,7 +909,7 @@ pub(crate) fn acquire(
     if !target_supported(&contract, platform, architecture) {
         return Err("score acquisition is unsupported on this target".to_string());
     }
-    let (support, _) = support_manifest(app, &contract, platform, architecture)?;
+    let (support, support_identity) = support_manifest(app, &contract, platform, architecture)?;
     let (active, acknowledgement, runtime_parent) = config_paths(app)?;
     fs::create_dir_all(&runtime_parent)
         .map_err(|error| format!("could not create score runtime storage: {error}"))?;
@@ -923,6 +1006,10 @@ pub(crate) fn acquire(
                 "bytes": contract.checkpoint.bytes,
             },
             "execution": { "device": "cpu" },
+            "support": {
+                "id": contract.support_layer_id,
+                "payload_sha256": support_identity.payload_sha256,
+            },
         });
         write_json_atomic(&staging.join(RUNTIME_MANIFEST_FILE), &runtime_manifest)?;
         let installed_bytes = directory_bytes(&staging)?;
@@ -1051,6 +1138,64 @@ mod tests {
         for unsafe_path in ["other/file", "../escape", "/absolute"] {
             assert!(safe_archive_relative(Path::new(unsafe_path), root).is_none());
         }
+    }
+
+    #[test]
+    fn support_payload_hash_excludes_only_its_manifest() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        fs::write(directory.path().join(SUPPORT_MANIFEST_FILE), b"first")
+            .expect("support manifest");
+        fs::write(directory.path().join("packages.json"), b"packages").expect("packages");
+        let initial = tree_sha256_without(directory.path(), Some(Path::new(SUPPORT_MANIFEST_FILE)))
+            .expect("support payload hash");
+        assert_eq!(
+            initial,
+            "1b8005b8d47f361861b1b9371a55dc388a4ad43b06ef42b08a68a1c6714c97eb"
+        );
+        fs::write(directory.path().join(SUPPORT_MANIFEST_FILE), b"second")
+            .expect("changed support manifest");
+        assert_eq!(
+            tree_sha256_without(directory.path(), Some(Path::new(SUPPORT_MANIFEST_FILE)),)
+                .expect("support payload hash"),
+            initial
+        );
+        fs::write(directory.path().join("packages.json"), b"changed").expect("changed packages");
+        assert_ne!(
+            tree_sha256_without(directory.path(), Some(Path::new(SUPPORT_MANIFEST_FILE)),)
+                .expect("support payload hash"),
+            initial
+        );
+    }
+
+    #[test]
+    fn accepts_support_root_matching_its_manifest() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let root = directory.path();
+        fs::create_dir_all(root.join(".venv/bin")).expect("Python directory");
+        fs::write(root.join(".venv/bin/python"), b"python").expect("Python runtime");
+        fs::write(root.join("packages.json"), b"packages").expect("package inventory");
+        let contract = contract().expect("embedded acquisition contract");
+        let manifest = serde_json::json!({
+            "schema_version": "atpiano.score-support.v1",
+            "support_layer_id": contract.support_layer_id,
+            "platform": "macos",
+            "architecture": "arm64",
+            "execution_backend": contract.execution_backend,
+            "python_version": contract.support_python_version,
+            "requirements_sha256": contract.support_requirements_sha256,
+            "vcs_requirements_sha256": contract.support_vcs_requirements_sha256,
+            "packages_sha256": file_sha256(&root.join("packages.json")).expect("inventory hash"),
+            "payload_sha256": tree_sha256_without(root, None).expect("support hash"),
+            "package_count": 1,
+            "payload_bytes": directory_bytes(root).expect("support bytes"),
+        });
+        fs::write(
+            root.join(SUPPORT_MANIFEST_FILE),
+            serde_json::to_vec(&manifest).expect("manifest JSON"),
+        )
+        .expect("support manifest");
+
+        validate_support_root(root, &contract, "macos", "arm64").expect("matching support root");
     }
 
     #[test]
