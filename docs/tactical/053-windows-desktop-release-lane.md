@@ -313,6 +313,17 @@ TypeScript compilation, and 17 Node contract/updater tests. These injected
 Windows cases establish portable contracts; they are not Windows compilation,
 staging, installation, or UI evidence. Phase 2 runtime staging is next.
 
+The exact `b250cac` archive then compiled for
+`x86_64-pc-windows-msvc` on the Windows 11 ARM64 testbed after building the
+production frontend. Running the x64 Rust tests under Windows emulation found
+two harness-only POSIX assumptions: a literal `sh` helper and expected cache
+paths with POSIX separators. The helper now uses `cmd.exe` on Windows and the
+cache assertions compare native `Path` values. All 15 Rust tests subsequently
+pass on both macOS arm64 and Windows x64-on-ARM64 emulation; macOS Clippy also
+passes with warnings denied. This is the first native Windows shell compile
+and execution evidence, but remains deliberately labeled emulated and does not
+include the staged Python/model/media runtime.
+
 ## Rollback
 
 Before publication, a Windows packaging/signing failure keeps the entire binary

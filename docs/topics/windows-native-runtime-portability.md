@@ -105,6 +105,13 @@ the matching `.app` and NSIS identity triples. The Windows runtime still needs
 to be staged, compiled, packaged, installed, and exercised on Windows, so
 these portable contracts alone are not a Windows desktop build.
 
+The Tauri shell now also compiles as `x86_64-pc-windows-msvc`, and all 15 Rust
+tests execute successfully as x64 processes on the ARM64 Windows testbed. The
+test harness uses native path comparisons and a Windows `cmd.exe` stdin helper
+instead of assuming POSIX separators or `sh`. This proves the native shell
+boundary can be built and run for the intended target; it does not yet prove a
+relocatable Python/model/media stage or installed application.
+
 ## Direction
 
 ### Native Windows is authoritative

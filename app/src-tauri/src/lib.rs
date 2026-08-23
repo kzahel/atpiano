@@ -1160,25 +1160,31 @@ mod tests {
     #[test]
     fn redirects_runtime_caches_outside_the_bundle() {
         let mut command = Command::new("/bundle/runtime/bin/python3");
+        let workspace = Path::new("/data/workspace");
         configure_sidecar_environment(
             &mut command,
             MACOS_ARM64_TARGET,
             Path::new("/bundle/runtime"),
-            Path::new("/data/workspace"),
+            workspace,
             "credential",
         )
         .expect("desktop environment");
         let environment = command.get_envs().collect::<Vec<_>>();
 
-        for (key, expected) in [
-            ("NUMBA_CACHE_DIR", "/data/workspace/.runtime-cache/numba"),
-            ("MPLCONFIGDIR", "/data/workspace/.runtime-cache/matplotlib"),
-            ("XDG_CACHE_HOME", "/data/workspace/.runtime-cache"),
-            ("HF_HOME", "/data/workspace/.runtime-cache/huggingface"),
+        for (key, relative) in [
+            ("NUMBA_CACHE_DIR", Some("numba")),
+            ("MPLCONFIGDIR", Some("matplotlib")),
+            ("XDG_CACHE_HOME", None),
+            ("HF_HOME", Some("huggingface")),
         ] {
-            assert!(environment
-                .iter()
-                .any(|(name, value)| *name == key && value.is_some_and(|value| value == expected)));
+            let cache_root = workspace.join(".runtime-cache");
+            let expected =
+                relative.map_or_else(|| cache_root.clone(), |value| cache_root.join(value));
+            assert!(
+                environment.iter().any(|(name, value)| *name == key
+                    && value.is_some_and(|value| value == expected.as_os_str())),
+                "{key} did not equal {expected:?}: {environment:?}"
+            );
         }
     }
 
@@ -1248,8 +1254,19 @@ mod tests {
 
     #[test]
     fn cleanup_closes_stdin_and_reaps_child() {
-        let child = Command::new("sh")
-            .args(["-c", "read line"])
+        #[cfg(not(target_os = "windows"))]
+        let mut command = {
+            let mut command = Command::new("sh");
+            command.args(["-c", "read line"]);
+            command
+        };
+        #[cfg(target_os = "windows")]
+        let mut command = {
+            let mut command = Command::new("cmd.exe");
+            command.args(["/d", "/s", "/c", "set /p line="]);
+            command
+        };
+        let child = command
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
