@@ -186,6 +186,13 @@ verify_release_dmg() {
   local mount_directory
   local result=0
   codesign --verify --verbose=2 "${dmg_path}"
+  xcrun stapler validate "${dmg_path}"
+  spctl \
+    --assess \
+    --type open \
+    --context context:primary-signature \
+    --verbose=2 \
+    "${dmg_path}"
   mount_directory="$(mktemp -d -t atpiano-dmg-validation)"
   if ! hdiutil attach \
     -readonly \
@@ -215,6 +222,37 @@ verify_release_dmg() {
   return "${result}"
 }
 
+release_dmg_path() {
+  local dmg_count
+  local dmg_directory
+  dmg_directory="${repository_root}/app/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg"
+  dmg_count="$(find "${dmg_directory}" -maxdepth 1 -type f -name '*.dmg' | wc -l | tr -d ' ')"
+  if [[ "${dmg_count}" != "1" ]]; then
+    printf '%s\n' "expected exactly one DMG, found ${dmg_count}" >&2
+    return 1
+  fi
+  find "${dmg_directory}" -maxdepth 1 -type f -name '*.dmg' -print -quit
+}
+
+notarize_release_dmg() {
+  local dmg_path
+  require_environment APPLE_API_KEY APPLE_API_ISSUER APPLE_API_KEY_PATH
+  dmg_path="$(release_dmg_path)"
+  xcrun notarytool submit "${dmg_path}" \
+    --key "${APPLE_API_KEY_PATH}" \
+    --key-id "${APPLE_API_KEY}" \
+    --issuer "${APPLE_API_ISSUER}" \
+    --wait
+  xcrun stapler staple "${dmg_path}"
+  xcrun stapler validate "${dmg_path}"
+  spctl \
+    --assess \
+    --type open \
+    --context context:primary-signature \
+    --verbose=2 \
+    "${dmg_path}"
+}
+
 prepare_developer_id_release() {
   require_signing_identity "${developer_id_identity}"
   stage_runtime
@@ -242,16 +280,8 @@ verify_developer_id_release() {
   validate_release_replay developer-id
   spctl --assess --type execute --verbose=2 "${app_bundle}"
   xcrun stapler validate "${app_bundle}"
-  local dmg_directory
-  local dmg_count
   local dmg_path
-  dmg_directory="${repository_root}/app/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg"
-  dmg_count="$(find "${dmg_directory}" -maxdepth 1 -type f -name '*.dmg' | wc -l | tr -d ' ')"
-  if [[ "${dmg_count}" != "1" ]]; then
-    printf '%s\n' "expected exactly one DMG, found ${dmg_count}" >&2
-    return 1
-  fi
-  dmg_path="$(find "${dmg_directory}" -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+  dmg_path="$(release_dmg_path)"
   verify_release_dmg "${dmg_path}"
   updater_directory="${repository_root}/app/src-tauri/target/aarch64-apple-darwin/release/bundle/macos"
   updater_archive_count="$(
@@ -457,6 +487,7 @@ case "${1:-}" in
         --target aarch64-apple-darwin \
         --bundles app,dmg
     )
+    notarize_release_dmg
     verify_developer_id_release
     ;;
   prepare-developer-id-release)
@@ -465,6 +496,9 @@ case "${1:-}" in
   verify-developer-id-release)
     require_signing_identity "${developer_id_identity}"
     verify_developer_id_release
+    ;;
+  notarize-release-dmg)
+    notarize_release_dmg
     ;;
   audit)
     (
@@ -486,7 +520,8 @@ case "${1:-}" in
     printf '%s\n' \
       "usage: $0 {stage|dev|build|audit|rehearse-development|" \
       "rehearse-developer-id|prepare-developer-id-release|" \
-      "verify-developer-id-release|stage-internal-score|" \
+      "verify-developer-id-release|notarize-release-dmg|" \
+      "stage-internal-score|" \
       "dev-internal-score|build-internal-score|" \
       "audit-internal-score}" >&2
     exit 2

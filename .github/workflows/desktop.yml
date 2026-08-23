@@ -244,6 +244,9 @@ jobs:
           retryAttempts: "1"
           args: "--target aarch64-apple-darwin"
 
+      - name: Notarize and staple release DMG
+        run: scripts/build-atpiano-desktop notarize-release-dmg
+
       - name: Verify notarized bundle and packaged scoring flow
         run: scripts/build-atpiano-desktop verify-developer-id-release
 

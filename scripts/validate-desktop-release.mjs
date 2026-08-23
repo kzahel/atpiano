@@ -132,7 +132,34 @@ export function validateDesktopReleaseRepository(root) {
   if (!changelog.includes(`## [${result.version}]`)) {
     fail(`CHANGELOG.md has no ${result.version} entry`);
   }
+  validateMacosDmgReleaseContract({
+    workflow: fs.readFileSync(
+      path.join(root, ".github", "workflows", "desktop.yml"),
+      "utf8",
+    ),
+    buildScript: fs.readFileSync(
+      path.join(root, "scripts", "build-atpiano-desktop"),
+      "utf8",
+    ),
+  });
   return result;
+}
+
+export function validateMacosDmgReleaseContract({ workflow, buildScript }) {
+  if (!workflow.includes("scripts/build-atpiano-desktop notarize-release-dmg")) {
+    fail("macOS release workflow does not notarize the DMG");
+  }
+  for (const command of [
+    "xcrun notarytool submit",
+    "xcrun stapler staple",
+    "xcrun stapler validate",
+    "--type open",
+    "--context context:primary-signature",
+  ]) {
+    if (!buildScript.includes(command)) {
+      fail(`macOS DMG release contract is missing: ${command}`);
+    }
+  }
 }
 
 if (fileURLToPath(import.meta.url) === process.argv[1]) {

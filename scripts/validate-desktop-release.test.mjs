@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   UPDATE_ENDPOINT,
   validateDesktopReleaseConfiguration,
+  validateMacosDmgReleaseContract,
 } from "./validate-desktop-release.mjs";
 
 const publicKey = Buffer.from(
@@ -85,4 +86,26 @@ test("rejects product route drift", () => {
   const data = fixture();
   data.product.pathPrefix = "/different";
   assert.throws(() => validateDesktopReleaseConfiguration(data), /product config/);
+});
+
+test("requires notarization, stapling, and Gatekeeper assessment for the DMG", () => {
+  const workflow = "scripts/build-atpiano-desktop notarize-release-dmg";
+  const buildScript = [
+    "xcrun notarytool submit",
+    "xcrun stapler staple",
+    "xcrun stapler validate",
+    "--type open",
+    "--context context:primary-signature",
+  ].join("\n");
+  assert.doesNotThrow(() =>
+    validateMacosDmgReleaseContract({ workflow, buildScript }),
+  );
+  assert.throws(
+    () => validateMacosDmgReleaseContract({ workflow: "", buildScript }),
+    /does not notarize/,
+  );
+  assert.throws(
+    () => validateMacosDmgReleaseContract({ workflow, buildScript: "" }),
+    /missing: xcrun notarytool submit/,
+  );
 });
