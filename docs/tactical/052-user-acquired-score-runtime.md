@@ -7,9 +7,11 @@ Status: **implementation active as a proof-of-concept prerequisite for the
 first public desktop tag.** The external asset contract, transactional native
 controller, shared consent/management dialog, and macOS arm64 score-support
 package are implemented. The Windows x64 score-support package is also built
-and audited under x64-on-ARM64 emulation. A real acknowledged model
-acquisition, installed score validation, complete Windows application, and
-both signed update campaigns remain. Dependency cleanup is explicitly
+and audited under x64-on-ARM64 emulation. Its installed Tauri dialog passes the
+no-request acknowledgement/cancel gate and a real acknowledged acquisition,
+relaunch, CPU adapter smoke, and reinstall-preservation check. The equivalent
+macOS acquisition, complete packaged score flow, removal, both signed exact
+candidates, and both update campaigns remain. Dependency cleanup is explicitly
 deferred.
 
 ## Goal
@@ -60,8 +62,9 @@ parity. The public-release topic coordinates one two-platform tag.
   `license.status=provisional-unconfirmed`.
 - The adapter itself is deliberately CPU-only: it loads the checkpoint with
   `map_location="cpu"`, moves the model to CPU, and records `device=cpu`.
-  Windows x64 dependency resolution and packaged output parity remain to be
-  proven; GPU support is not required.
+  Windows x64 dependency resolution and a direct acquired-runtime output pass;
+  complete packaged output parity remains to be proven. GPU support is not
+  required.
 - The native Windows x64 application core, Basic Pitch ONNX CPU path, Transkun
   CPU path, production frontend, storage, and unpackaged server already pass.
   The configured Windows 11 ARM64 `machine-control` testbed is ready and can run
@@ -483,15 +486,17 @@ confirmed its retained byte count. Strict Pydantic contracts now reject
 unknown fields, non-HTTPS or unlisted hosts, inconsistent byte totals,
 unsupported target pairs, receipt identity creep, and unsafe active-runtime
 paths. The three focused contract tests pass. The platform support-layer
-inventory/hash, native transactional downloader, and UI remain active work.
+inventory/hash, native transactional downloader, and UI are now implemented;
+the measurements remain the pinned acquisition contract.
 
 The first native controller now embeds and independently validates that
 contract, reports score-runtime status without making a request, and exposes
 acknowledged acquire, cancel, and remove commands only to the Tauri
 composition. Acquisition uses fixed URLs, HTTPS-only bounded redirects,
-content lengths, streaming SHA-256, cancellation, free-space checks, exact ZIP
-root/path/type/count/expanded-byte limits, a cross-platform normalized tree
-hash, and private same-filesystem staging. It copies only the signed target
+reported content lengths when present, exact streamed byte limits and SHA-256,
+cancellation, free-space checks, exact ZIP root/path/type/count/expanded-byte
+limits, a cross-platform normalized tree hash, and private same-filesystem
+staging. It copies only the signed target
 support layer, writes the existing score-runtime manifest, publishes the
 complete directory before atomically activating its relative pointer, and
 rolls back unpublished staging/final data on failure. Removal first validates
@@ -513,8 +518,8 @@ or while capture, settlement, scoring, or update blockers are active. The
 score card supplies the unavailable-runtime call to action, while the desktop
 release panel retains a persistent management entry after activation.
 
-Twenty-one Rust tests, Rust Clippy with warnings denied, 17 frontend contract
-tests, 109 React/browser tests, 29 focused Python packaging/score tests, frontend
+Twenty-three Rust tests, Rust Clippy with warnings denied, 17 frontend contract
+tests, 109 React/browser tests, 31 focused Python packaging/score tests, frontend
 typecheck, and a production web build pass on macOS. Four focused dialog tests
 prove no implicit acquisition, the acknowledgement gate, missing-support
 failure, bounded link selection, provenance/removal copy, and initial-status
@@ -548,14 +553,49 @@ real 390 MB model download, bounded import/model smoke, installed relaunch,
 and signed/notarized package have not yet been exercised.
 
 The Windows testbed subsequently built the same support contract with exact
-x64 CPython 3.11.14 under Windows 11 ARM64 emulation. The output contains 64
-distributions, 196 x64 PE files, 20,621 files total, and 920,228,180 bytes. Its
-920,227,529-byte canonical payload hashes to
-`4b9c41b350978164a97070bad4d894982b2d454b7ea1d628cabffef4c6461bd1`.
+x64 CPython 3.11.14 under Windows 11 ARM64 emulation. The current output
+contains 64 distributions, 196 x64 PE files, 20,577 files total, and
+920,111,485 bytes. Its canonical payload hashes to
+`2c16307fd59a85479d55fffeb2d8674f4ac4014430dcb4d6eb074f12ec619106`.
 Both import groups and a complete independent repeat audit pass, no temporary
 stage remains, and the output contains no main model source or checkpoint.
-This validates only the support layer; acquired-model inference and notation
-parity remain unproven on Windows.
+
+The first installed Windows x64-on-ARM64 package now passes the same visible
+disclosure boundary as macOS. It displays the exact education/research-only,
+no-commercial-use, non-redistribution, absent-license, local-code-execution,
+and size statements. Native UI Automation found the acknowledgement initially
+unchecked and **Download research model** disabled, then found the button
+enabled only after checking the acknowledgement. Cancelling produced no
+source tree, checkpoint, acknowledgement receipt, or network acquisition. A
+Windows stack overflow found during the initial status hash was corrected by
+moving three 1 MiB hashing buffers to the heap; the final dialog remained
+responsive.
+
+The same installed Windows application then completed a real acknowledged
+acquisition from the pinned upstream URLs. Testing found and corrected three
+cross-platform acquisition defects: the support-copy caller pre-created its
+private destination, GitHub's final archive response did not provide a usable
+`Content-Length`, and Python's `WindowsPath` ordering made mixed-case tree
+hashes case-insensitive. Acquisition now owns destination creation, permits a
+missing response length while retaining the exact size/hash bound, and sorts
+explicit relative POSIX paths for portable tree hashes. The active record
+contains 1,310,274,855 installed bytes, source archive SHA-256
+`42953b3d184807b9e4d18f2b9280e8e7593d5b74890f8d9755187f0e27537cb7`,
+and checkpoint SHA-256
+`7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d43cb2011245db638`.
+
+Relaunch selected that external runtime and reported score capability. A
+direct acquired-runtime adapter smoke generated well-formed MusicXML and a
+validated alignment on CPU in 14.22 seconds for an eight-note input. All eight
+source notes mapped with none unmatched; the output had two parts and 512
+pitched MusicXML elements. The complete report is 6,943 bytes with SHA-256
+`f04e1d2d45293ef15a6963f9edbfcf0ff6e8bc7d1d3692de6bac8ce2600dd8b1`.
+The exact acquired runtime and acknowledgement also survived uninstall and
+reinstall of the final unsigned package. This is proof of acquisition,
+external activation, CPU inference, artifact validation, and package
+preservation under x64-on-ARM64 emulation; the full frontend score request,
+macOS acquisition, explicit removal, signed candidates, and signed update
+campaigns remain.
 
 ## Later Todo — Remove Evaluation Helpers
 

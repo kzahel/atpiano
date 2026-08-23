@@ -11,13 +11,24 @@ As of 2026-08-23, `kzahel/atpiano` is public and has no GitHub Release. The
 source tree contains the score-model notice and acquisition capability, but no
 MIDI2ScoreTransformer source or checkpoint. GitHub Actions has none of the 11
 required secret names configured. The production updater product remains
-inactive.
+inactive: both the macOS arm64 and Windows x64 concrete `0.1.0` routes return
+HTTP 404 `Unknown product for this hostname`.
+
+The local Developer ID identity is valid and App Store Connect notarization
+authentication succeeds. The Atpiano updater keypair is present and its public
+half matches the application configuration. Private key/certificate files are
+owner-readable only. The certificate/updater passwords and Azure client secret
+still require attended validation before the 11 values can be uploaded.
 
 The Windows package built and installed successfully on the Windows 11 ARM64
-testbed as an x64-emulated, unsigned development package. The macOS package has
-an earlier signed/notarized baseline, but the exact acquisition-capable build
-still needs its credentialed CI rehearsal. Neither local artifact is a public
-release candidate.
+testbed as an x64-emulated, unsigned development package. Its real acknowledged
+model acquisition, CPU MusicXML/alignment smoke, relaunch, and package
+reinstall preservation pass. The exact unsigned installer is 433,446,738 bytes
+with SHA-256
+`a6c9fb9edc469bd6ab9cf9711f32b1e7f9a9fec181bb063f9e6f348abbef43df`.
+The macOS package has an earlier signed/notarized baseline, but the exact
+acquisition-capable build still needs its credentialed CI rehearsal. Neither
+local artifact is a public release candidate.
 
 ## Required Actions Secrets
 
@@ -83,6 +94,12 @@ artifacts and redacted audits. It does not create a GitHub Release. Require:
 Download and inspect the rehearsal artifacts before authorizing a tag. A
 successful rehearsal proves build/signing readiness, not the production
 updater or a public release.
+
+Before treating the rehearsal as the exact candidate, repeat the real model
+acquisition and score check on macOS, exercise the complete packaged score
+request and removal paths on both systems, and run the ordinary Windows
+import/replay/export matrix on a native x64 host. The Windows x64-on-ARM64
+testbed proves correctness boundaries but is not native x64 timing evidence.
 
 ## Tag And Draft-First Publication
 

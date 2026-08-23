@@ -3,13 +3,17 @@
 Topic: windows-native-runtime-portability
 
 Status: **native Windows CPU/CUDA server baselines and the complete relocatable
-Windows x64 CPU desktop resource stage are established as of 2026-08-23.** The
+Windows x64 CPU desktop package are established as of 2026-08-23.** The
 locked ordinary and corrected environments, Basic Pitch ONNX model pack,
 Transkun CPU assets, pinned FFmpeg/FFprobe, publication-safe score support,
 authenticated sidecar startup, and repeat package/PE/hash audits pass without
-WSL. The 2.12 GB stage is validated under x64-on-ARM64 emulation; Tauri/NSIS,
-installation, wall-clock browser paint, physical microphone, actual acquired
-score inference, signing, and updates have not passed. The product decision on
+WSL. The 2.12 GB stage and an unsigned 433 MB per-user NSIS setup executable
+are built and installed under x64-on-ARM64 emulation. The production window,
+hidden sidecar, score-model disclosure/acknowledgement gate, and cancellation
+without acquisition pass. A real acquisition, relaunch, isolated CPU
+MusicXML/alignment result, and reinstall preservation also pass. Full packaged
+replay/export and frontend score flows, physical microphone, model removal,
+Authenticode signing, and updates have not passed. The product decision on
 2026-08-23 made a Windows x86_64 CPU package a prerequisite of the first binary
 proof-of-concept release; tactical
 [`053-windows-desktop-release-lane.md`](../tactical/053-windows-desktop-release-lane.md)
@@ -80,8 +84,9 @@ score features. A successful macOS artifact alone is not publication-ready.
 CUDA is useful measured acceleration but is not required for Windows feature
 parity: Basic Pitch uses ONNX Runtime CPU, Transkun supports CPU with the
 measured conservative after-Stop profile, and Atpiano's MIDI2Score adapter
-loads and executes its checkpoint on CPU. MIDI2Score still needs a packaged
-Windows x64 dependency and output-parity proof.
+loads and executes its checkpoint on CPU. MIDI2Score now has a real acquired-
+model CPU adapter result on Windows; the full installed frontend request and
+cross-platform retained-output parity still need proof.
 
 The configured `~/code/machine-control` Windows testbed was ready on
 2026-08-23 with target-native administration, UI Automation, capture, and input.
@@ -102,16 +107,18 @@ macOS arm64 and Windows x86_64 Python, resource, origin, package, and updater
 variants; its Windows local origin is passed through the authenticated
 sidecar, handshake, and artifact paths. The frontend likewise accepts only
 the matching `.app` and NSIS identity triples. The complete Windows resource
-runtime is now staged and audited; the Tauri shell still needs to be composed
-with it, packaged as NSIS, installed, and exercised before this becomes
-Windows desktop acceptance.
+runtime is staged and audited, and the Tauri shell is composed with it in an
+installed current-user NSIS development package. The application and notice
+gate pass; complete packaged feature and signing acceptance remain.
 
 The Tauri shell now also compiles as `x86_64-pc-windows-msvc`, and all 15 Rust
 tests execute successfully as x64 processes on the ARM64 Windows testbed. The
 test harness uses native path comparisons and a Windows `cmd.exe` stdin helper
 instead of assuming POSIX separators or `sh`. This proves the native shell
-boundary can be built and run for the intended target; it does not yet prove a
-relocatable Python/model/media stage or installed application.
+boundary can be built and run for the intended target. The subsequent
+relocatable stage and installed application extend that evidence, while the
+full packaged replay/frontend score path, model removal, and signed update
+remain separate gates.
 
 ## Direction
 
@@ -258,17 +265,13 @@ should retain separate CPU and NVIDIA pack identities, derive an
 inference-minimal CUDA DLL inventory, and prove every size or startup
 optimization against the frozen fixture and profile identity.
 
-The existing desktop proof is not yet a Windows artifact:
-
-- the Tauri launcher accepts only `macos` / `arm64` / `cpu` sidecar identity;
-- runtime resource discovery assumes a macOS `.app` layout;
-- the staged Python runtime, model pack, and media tools are macOS arm64;
-- the build helper targets `aarch64-apple-darwin` and produces an `.app`; and
-- the accepted review explicitly excludes Windows packaging and microphone
-  parity.
-
-Those are the concrete adaptation points for tactical 053. They no longer
-justify deferring Windows until after the first binary release.
+The Windows artifact now exists as an unsigned development package. It is not
+the public candidate because GitHub Actions has not rebuilt it on native x64,
+Azure Trusted Signing has not authenticated it, its actual user-acquired
+MIDI2Score flow has only an isolated adapter result, its full ordinary
+replay/export path has not completed, and no installed Windows update has
+occurred. Those are acceptance gaps, not reasons to revert the two-platform
+product decision.
 
 ## Reproducible Implementation Sequence
 
@@ -352,8 +355,10 @@ supervise:
 - installer, signing, update, and rollback work that remains deliberately
   unimplemented.
 
-Tactical 053 now consumes this handoff to produce the first Windows Tauri
-development build, signed installer, and installed updater evidence.
+Tactical 053 has consumed this handoff for the first Windows Tauri development
+build, installed dialog, real acquisition, CPU adapter result, and reinstall
+preservation. Signed CI artifacts, full installed runtime behavior, removal,
+and updater evidence remain.
 
 ## Baseline Acceptance
 

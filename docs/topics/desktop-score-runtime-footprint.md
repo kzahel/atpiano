@@ -3,10 +3,13 @@
 Topic: desktop-score-runtime-footprint
 
 Status: **a user-acquired score runtime is now implemented through the packaged
-macOS consent gate, with platform support layers built for macOS arm64 and
-Windows x64 as of 2026-08-23.** The complete 2.12 GB Windows desktop resource
-tree also passes its staged audit; the Windows Tauri/NSIS package and actual
-acquired-model run remain in progress.
+macOS and Windows consent gates, with platform support layers built for macOS
+arm64 and Windows x64 as of 2026-08-23.** The complete 2.12 GB Windows desktop
+resource tree passes its staged audit, and its unsigned per-user NSIS package
+passes installed notice/acknowledgement/cancel acceptance under x64-on-ARM64
+emulation. A real Windows acquisition, relaunch, CPU adapter result, and
+reinstall-preservation check also pass. Equivalent macOS acquisition, the full
+packaged score flow, removal, signed candidates, and update campaigns remain.
 The published applications and GitHub Release must still exclude the
 MIDI2ScoreTransformer repository and checkpoint. Each application may include
 a pinned platform-specific support environment with best-effort dependency
@@ -89,23 +92,30 @@ earlier projection while keeping the main model external:
 | Generated updater archive | 586,901,211 | 586.9 MB |
 | Later user-acquired source plus checkpoint | 390,016,983 | 390.0 MB |
 | Windows x64 score-support package | 920,111,485 | 920.1 MB |
-| Complete staged Windows desktop runtime | 2,123,359,429 | 2.12 GB |
+| Complete staged Windows desktop runtime | 2,123,362,588 | 2.12 GB |
+| Unsigned corrected Windows NSIS installer | 433,446,738 | 433.4 MB |
+| Acquired Windows score runtime | 1,310,274,855 | 1.31 GB |
 
 The support package has 64 distributions and excludes the
 MIDI2ScoreTransformer repository and checkpoint. Its 926,842,450-byte
 canonical payload hashes to
 `8f25d0131cfc7b76e8efde1c19f2b8f255823b263003c187bf46b69b560e5bce`.
 The Windows support package has the same 64 distributions, 196 x64 PE files,
-165 flattened and hash-inventoried distribution-license files, and a
-920,110,834-byte canonical payload with SHA-256
-`1f5ba6c1987e48781b115593c1e92940fff9074a02d34e22c9dc15dbb4008c4b`.
+165 flattened and hash-inventoried distribution-license files, and a current
+canonical payload with SHA-256
+`2c16307fd59a85479d55fffeb2d8674f4ac4014430dcb4d6eb074f12ec619106`.
 The complete Windows stage has 102 ordinary distributions, 583 x64 PE files,
 35,364 files, and canonical SHA-256
-`c07b13bac776fcb51fda4389d3be3470ce1a0aa589bb5bf64670f46b9103544d`.
+`d07f00487568801960ace389dea79464a7d5800b50582a8c1d1f828759ff37d8`.
 Its build and independent repeat audit passed under Windows x64-on-ARM64
-emulation. The unsigned packaged-macOS-App audit and Windows staged-runtime
-audit find no forbidden score assets. Signed DMG, Windows NSIS package, and
-post-acquisition installed sizes remain unmeasured.
+emulation. The unsigned packaged-macOS-App audit, Windows staged-runtime audit,
+and installed Windows dialog cancellation find no forbidden score assets.
+The real Windows acquisition installed 1,310,274,855 bytes outside the App and
+preserved them through uninstall/reinstall. A direct eight-note CPU adapter
+smoke completed in 14.22 seconds and produced validated MusicXML/alignment; its
+6,943-byte report has SHA-256
+`f04e1d2d45293ef15a6963f9edbfcf0ff6e8bc7d1d3692de6bac8ce2600dd8b1`.
+Signed exact package sizes remain unmeasured.
 
 The score runtime is large primarily because it is a second standalone Python
 environment. Package-name intersection with the normal desktop runtime totals

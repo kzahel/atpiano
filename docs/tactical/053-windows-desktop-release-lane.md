@@ -11,8 +11,11 @@ targets. The native Windows x64 application core is established and the
 universal score-support registry lock resolves for Windows x64. A complete
 2.12 GB relocatable Windows x64 runtime, including the ordinary model pack,
 pinned media payload, and publication-safe score support, now passes twice on
-the testbed under x64-on-ARM64 emulation. No Tauri application package, signed
-installer, packaged MIDI2Score result, or updater campaign exists.
+the testbed under x64-on-ARM64 emulation. An unsigned per-user NSIS package is
+now built and installed; it passes the shared model-download dialog, real
+acknowledged acquisition, CPU adapter output, relaunch, and reinstall
+preservation. The credentialed Authenticode build, full packaged replay/score
+flows, removal, and updater campaign remain.
 
 ## Goal
 
@@ -36,8 +39,9 @@ CPU. CUDA and native Windows ARM64 are later optional lanes.
   settlement, restart recovery, and artifact publication without WSL.
 - Basic Pitch uses ONNX Runtime CPU on Windows. Transkun accepts CPU and already
   has a conservative after-Stop profile for slower hosts. MIDI2Score is
-  explicitly CPU-only in Atpiano's adapter, but its Windows x64 support
-  environment and retained score parity are not yet validated.
+  explicitly CPU-only in Atpiano's adapter. Its Windows x64 support environment
+  and a direct acquired-runtime MusicXML/alignment result now pass; broader
+  retained-score parity remains.
 - The current desktop contract accepts only `macos`, `arm64`, and `cpu`.
   Resource discovery assumes an `.app`, staging includes macOS arm64 Python and
   media binaries, CI builds only `aarch64-apple-darwin`, and release validation
@@ -202,22 +206,22 @@ emulated timing to the physical x64 baseline as though they were the same host.
 ## Phase 4 — Signing And GitHub Release Matrix
 
 Extend `.github/workflows/desktop.yml` with a `windows-2025` x64 job. Keep the
-existing two updater-signing secrets shared by both operating systems. For the
-minimal exportable-certificate path, add exactly:
+existing two updater-signing secrets shared by both operating systems. Reuse
+the maintainer's established Azure Trusted Signing identity with exactly:
 
 | Secret | Purpose |
 | --- | --- |
-| `WINDOWS_CERTIFICATE_PFX_BASE64` | Base64-encoded Authenticode certificate and private key |
-| `WINDOWS_CERTIFICATE_PASSWORD` | PFX import password |
+| `AZURE_CLIENT_ID` | Trusted Signing application ID |
+| `AZURE_TENANT_ID` | Azure tenant ID |
+| `AZURE_CLIENT_SECRET` | Trusted Signing application secret value |
 
-Import the certificate into a temporary current-user certificate store from a
-permission-bounded runner-temp file, verify only subject/thumbprint metadata,
-sign and timestamp the executable/installer, and delete the decoded certificate
-on every exit path. Never echo, pass secret values as command arguments, retain
-base64 output, or upload the certificate. If the available certificate cannot
-be exported, replace this mechanism with a reviewed external signing provider
-and its minimum secret set; do not use a self-signed certificate for the public
-release.
+The workflow installs `trusted-signing-cli`, supplies credentials only through
+the signing step's environment, and uses the established public-trust account
+and certificate profile. It verifies a valid `Kyle Graehl` Authenticode signer,
+one publisher identity across the application and installer, and a trusted
+timestamp.
+Never echo or pass secret values as command arguments. Do not use a self-signed
+certificate or retain a decoded exportable certificate for the public release.
 
 The Windows release job must fail before staging/signing when its credentials
 are absent. A non-tagged `workflow_dispatch` rehearsal must prove certificate
@@ -400,22 +404,22 @@ license files were too deeply nested for a real Tauri resource path. The
 builder now preserves those files under a flat, hashed
 `share/licenses/python` inventory with their distribution, original path, and
 digest. The final score-support layer retains 165 such files, has 20,577 total
-files and 920,111,485 installed bytes, and its 920,110,834-byte canonical
-payload hashes to
-`1f5ba6c1987e48781b115593c1e92940fff9074a02d34e22c9dc15dbb4008c4b`.
+files and 920,111,485 installed bytes, and its current canonical payload hashes
+to `2c16307fd59a85479d55fffeb2d8674f4ac4014430dcb4d6eb074f12ec619106`.
 
-Exact commit `c753038` then produced the complete resource tree at the path
-Tauri will consume. The builder's acceptance audit and a second independent
-in-place audit both passed on the Windows 11 ARM64 testbed as x64 processes:
+The implementation sequence through `867266e` produced the complete resource
+tree at the path Tauri consumes. The builder's acceptance audit and a second
+independent in-place audit both passed on the Windows 11 ARM64 testbed as x64
+processes:
 
 | Evidence | Value |
 | --- | ---: |
 | Ordinary distributions | 102 |
 | x64 PE files, complete tree | 583 |
 | Files, complete tree | 35,364 |
-| Installed bytes | 2,123,359,429 |
-| Canonical payload SHA-256 | `c07b13bac776fcb51fda4389d3be3470ce1a0aa589bb5bf64670f46b9103544d` |
-| Bundle-manifest SHA-256 | `e16526415e23367f64da41cd872177be469b5c0522bb327a5b3a4212ff40a771` |
+| Installed bytes | 2,123,362,588 |
+| Canonical payload SHA-256 | `d07f00487568801960ace389dea79464a7d5800b50582a8c1d1f828759ff37d8` |
+| Bundle-manifest SHA-256 | `474a68e97c49ee11bb0c85dd17142f0292ef3ea5f35e82f43eef4dd3fdba1ebf` |
 | Model-pack SHA-256 | `9d1dfeaa8de67145e8fb0866e578228092afe6ced55e280e434c7841de95227f` |
 
 The packaged-layout sidecar smoke returned the Windows x86_64 identity,
@@ -423,9 +427,86 @@ rejected the unauthenticated handshake with HTTP 401, accepted the exact Tauri
 Windows origin and bearer token, reported score unavailable before user
 acquisition, and stopped cleanly on parent EOF. The complete stage contains no
 MIDI2ScoreTransformer source or checkpoint. This completes the deterministic
-runtime-staging portion of Phase 2; Basic Pitch/Transkun fixture replay,
-external acquired-score inference, Tauri/NSIS packaging, installation, UI,
-signing, and update acceptance remain.
+runtime-staging portion of Phase 2. Full packaged Basic Pitch/Transkun fixture
+replay, signing, and update acceptance remain; Tauri/NSIS installation,
+dialog, and acquired-score evidence follows.
+
+The first exact Tauri/NSIS development package then built from the complete
+stage. Windows applies the current-user NSIS contract and needs no elevation.
+The final corrected unsigned setup executable is 433,446,738 bytes with
+SHA-256
+`a6c9fb9edc469bd6ab9cf9711f32b1e7f9a9fec181bb063f9e6f348abbef43df`.
+It installs a 15,412,224-byte Tauri bundle-patched executable with SHA-256
+`2c9f50e20a13c13b2180557d2aa59c154d4f80b61f831e90cbed482ed7a6fa76`
+and the exact bundle-manifest hash above. It is development evidence only;
+GitHub Actions must rebuild and sign the public artifact.
+
+Local packaging also exposed why a Tauri build must generate the NSIS recipe
+and package in one pass. Re-running `makensis` against an older generated
+recipe took the new Rust executable but retained absolute resource paths to an
+older checkout. The installed manifest-hash guard caught the stale runtime.
+Regenerating the recipe from the audited resource root removed every stale
+path, and the final uninstall/install assertion matched the executable and
+runtime hashes above. The tracked GitHub job already follows the correct
+one-pass Tauri build path.
+
+Installed testing found two real Windows-specific defects. First, the Python
+sidecar inherited a visible console; the launcher now uses
+`CREATE_NO_WINDOW`. Second, opening the score-runtime dialog overflowed the
+GUI thread's default Windows stack while hashing three 1 MiB buffers; those
+buffers now live on the heap. The corrected application launches without a
+Python or Terminal window and remains responsive through score-support status
+hashing.
+
+The installed dialog visibly renders MIDI2ScoreTransformer, the explicit
+education/research-only and no-commercial-use boundary, the absent upstream
+license warning, exact source/checkpoint/download sizes, installed-space
+estimate, and bounded upstream links. Native UI Automation proved that
+**Download research model** begins disabled and becomes enabled only after the
+unchecked acknowledgement is selected. Cancelling removed the dialog, made no
+model request, and left zero source trees, checkpoints, or acknowledgement
+records.
+
+A subsequent acknowledged acquisition downloaded and validated the exact
+187,103-byte source archive and 389,829,880-byte checkpoint. The installed
+external runtime is 1,310,274,855 bytes. Its source archive SHA-256 is
+`42953b3d184807b9e4d18f2b9280e8e7593d5b74890f8d9755187f0e27537cb7`;
+its checkpoint SHA-256 is
+`7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d43cb2011245db638`.
+This run exposed and fixed destination-creation, absent-response-length, and
+case-insensitive Windows path-ordering defects in the acquisition boundary.
+Relaunch selected the runtime and exposed score capability.
+
+A direct acquired-runtime adapter smoke then ran on CPU in 14.22 seconds,
+mapped all eight source notes with none unmatched, and produced well-formed
+two-part MusicXML plus a validated alignment. Its 6,943-byte report has
+SHA-256
+`f04e1d2d45293ef15a6963f9edbfcf0ff6e8bc7d1d3692de6bac8ce2600dd8b1`.
+The final exact uninstall/install check preserved the acknowledgement,
+runtime, and checkpoint hash, and the installed application relaunched as a
+visible Tauri window with a hidden Python sidecar pointed at that external
+runtime. Full packaged Basic Pitch/Transkun replay exceeded five minutes under
+x64-on-ARM64 emulation, so the ordinary import/replay/export matrix, complete
+frontend score request, explicit model removal, Authenticode signature, and
+old-to-new updater remain unaccepted. The replay timeout is not native x64
+performance evidence or a failure of the isolated MIDI2Score capability.
+
+The Windows CI lane and coordinated finalizer are implemented. A native x64
+`windows-2025` job stages and independently audits the runtime, signs through
+Azure Trusted Signing, verifies application/installer signatures and trusted
+timestamps, retains updater artifacts, and emits redacted evidence. The tag
+finalizer accepts exactly the macOS arm64 and Windows x64 artifact pairs,
+creates one two-target updater manifest, adds final GitHub asset checksums,
+validates the private draft, and publishes only after both jobs succeed. The
+workflow parses and passes `actionlint`, but it has not run with credentials;
+all 11 required Actions secret names are absent as of 2026-08-23.
+
+The post-integration local gate passes Ruff, all 305 Python tests, frontend
+typecheck, 17 Node contract tests, 109 React/browser tests, all 23 Rust tests,
+Rust formatting and Clippy with warnings denied, all 15 release/configuration
+tests, repository release validation, workflow YAML parsing, and `actionlint`.
+The Windows PowerShell signing verifier also parses on the testbed and rejects
+the unsigned development output at its expected missing signed-updater gate.
 
 ## Rollback
 
