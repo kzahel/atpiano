@@ -60,7 +60,7 @@ export function validateRelease({ release, latest, tag, repository }) {
   const mediaSources = matchingAsset(
     assetNames,
     new RegExp(`^Atpiano_${version.replaceAll(".", "\\.")}_media-sources\\.tar\\.gz$`),
-    "corresponding media source archive",
+    "macOS corresponding media source archive",
   );
   for (const required of ["latest.json", "SHA256SUMS", signature, windowsSignature]) {
     if (!assetNames.has(required)) fail(`missing required release asset: ${required}`);

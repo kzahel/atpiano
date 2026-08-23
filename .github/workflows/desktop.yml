@@ -189,8 +189,10 @@ jobs:
           MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
         shell: bash
         run: |
+          umask 077
           CERTIFICATE_PATH="$RUNNER_TEMP/atpiano-certificate.p12"
-          echo "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+          printf '%s' "$MACOS_CERTIFICATE_P12_BASE64" | \
+            base64 --decode > "$CERTIFICATE_PATH"
           security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" build.keychain
@@ -211,6 +213,7 @@ jobs:
           ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
         shell: bash
         run: |
+          umask 077
           KEY_DIRECTORY="$RUNNER_TEMP/atpiano-private-keys"
           KEY_PATH="$KEY_DIRECTORY/AuthKey_${ASC_API_KEY_ID}.p8"
           mkdir -p "$KEY_DIRECTORY"
@@ -268,6 +271,8 @@ jobs:
         shell: bash
         run: |
           security delete-keychain build.keychain 2>/dev/null || true
+          find "$RUNNER_TEMP/atpiano-certificate.p12" \
+            -type f -delete 2>/dev/null || true
           if [ -d "$RUNNER_TEMP/atpiano-private-keys" ]; then
             find "$RUNNER_TEMP/atpiano-private-keys" -type f -delete
             rmdir "$RUNNER_TEMP/atpiano-private-keys"
@@ -549,7 +554,8 @@ jobs:
             echo "- Developer ID signing, hardened runtime, notarization, and stapling were validated."
             echo "- Windows Authenticode signing and trusted timestamping were validated."
             echo "- Both nested CPU runtimes passed independent audits; the macOS package passed its packaged replay."
-            echo "- The media runtime is the pinned LGPL-only FFmpeg/LAME build, with exact corresponding sources attached."
+            echo "- The macOS media runtime is the pinned LGPL-only FFmpeg/LAME build, with exact corresponding sources attached."
+            echo "- The Windows media runtime is the pinned BtbN shared-LGPL build; its exact builder and FFmpeg commits are recorded in the package."
             echo "- Build provenance attestations were issued by GitHub Actions."
             echo "- Workflow: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo "- Commit: \`${GITHUB_SHA}\`"
