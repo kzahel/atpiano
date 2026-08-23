@@ -24,6 +24,38 @@ DESKTOP_TOKEN_ENV = "ATPIANO_DESKTOP_TOKEN"
 DESKTOP_TOKEN_PATTERN = re.compile(r"[0-9a-f]{64}")
 DESKTOP_WEBSOCKET_PREFIX = f"{DESKTOP_PROTOCOL_VERSION}."
 MAX_DESKTOP_READY_BYTES = 64 * 1024
+DesktopPlatform = Literal["macos", "windows"]
+DesktopArchitecture = Literal["arm64", "x86_64"]
+SUPPORTED_DESKTOP_IDENTITIES = frozenset(
+    {
+        ("macos", "arm64"),
+        ("windows", "x86_64"),
+    }
+)
+
+
+def require_supported_desktop_identity(
+    platform_name: str,
+    architecture: str,
+) -> tuple[DesktopPlatform, DesktopArchitecture]:
+    identity = (platform_name, architecture)
+    if identity not in SUPPORTED_DESKTOP_IDENTITIES:
+        raise ValueError(
+            "desktop runtime requires macOS arm64 or Windows x86_64"
+        )
+    return identity  # type: ignore[return-value]
+
+
+def normalize_desktop_identity(
+    system_name: str,
+    machine_name: str,
+) -> tuple[DesktopPlatform, DesktopArchitecture]:
+    normalized_machine = machine_name.strip().lower()
+    if system_name == "Darwin" and normalized_machine in {"arm64", "aarch64"}:
+        return "macos", "arm64"
+    if system_name == "Windows" and normalized_machine in {"amd64", "x86_64"}:
+        return "windows", "x86_64"
+    return require_supported_desktop_identity(system_name.lower(), normalized_machine)
 
 
 def desktop_runtime_environment(workspace: Path) -> dict[str, str]:
@@ -56,13 +88,14 @@ class ModelPack(BaseModel):
 
     schema_version: Literal["atpiano.model-pack.v1"] = MODEL_PACK_SCHEMA
     model_pack_id: str
-    platform: Literal["macos"]
-    architecture: Literal["arm64"]
+    platform: DesktopPlatform
+    architecture: DesktopArchitecture
     execution_backend: Literal["cpu"]
     assets: tuple[ModelAsset, ...]
 
     @model_validator(mode="after")
     def require_runtime_models(self) -> ModelPack:
+        require_supported_desktop_identity(self.platform, self.architecture)
         asset_ids = {asset.asset_id for asset in self.assets}
         required = {"basic-pitch-icassp-2022", "transkun-2.0"}
         if not required.issubset(asset_ids):
@@ -80,11 +113,16 @@ class DesktopReady(BaseModel):
     sidecar_version: str
     host: Literal["127.0.0.1"] = "127.0.0.1"
     port: int = Field(gt=0, le=65535)
-    platform: Literal["macos"]
-    architecture: Literal["arm64"]
+    platform: DesktopPlatform
+    architecture: DesktopArchitecture
     execution_backend: Literal["cpu"]
     model_pack_id: str
     model_pack_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def require_supported_identity(self) -> DesktopReady:
+        require_supported_desktop_identity(self.platform, self.architecture)
+        return self
 
 
 class DesktopHandshake(BaseModel):
@@ -97,13 +135,25 @@ class DesktopHandshake(BaseModel):
     pcm_protocol_version: str = PCM_PROTOCOL_VERSION
     sidecar_version: str
     python_version: str
-    platform: Literal["macos"]
-    architecture: Literal["arm64"]
+    platform: DesktopPlatform
+    architecture: DesktopArchitecture
     execution_backend: Literal["cpu"]
     model_pack: ModelPack
     model_pack_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     storage_policy: Literal["verified-mp3-default"] = "verified-mp3-default"
     score_available: bool = False
+
+    @model_validator(mode="after")
+    def require_matching_model_pack(self) -> DesktopHandshake:
+        identity = require_supported_desktop_identity(
+            self.platform,
+            self.architecture,
+        )
+        if identity != (self.model_pack.platform, self.model_pack.architecture):
+            raise ValueError("desktop model pack does not match the host identity")
+        if self.execution_backend != self.model_pack.execution_backend:
+            raise ValueError("desktop model pack does not match the execution backend")
+        return self
 
 
 def validate_desktop_token(raw_token: str) -> str:
@@ -152,10 +202,8 @@ def apply_model_pack(pack: ModelPack, manifest_path: Path) -> None:
     os.environ["ATPIANO_TRANSKUN_CONFIG"] = str(config)
 
 
-def host_identity() -> tuple[str, str]:
-    if platform.system() != "Darwin" or platform.machine() != "arm64":
-        raise ValueError("Phase 5 desktop sidecar requires macOS arm64")
-    return "macos", "arm64"
+def host_identity() -> tuple[DesktopPlatform, DesktopArchitecture]:
+    return normalize_desktop_identity(platform.system(), platform.machine())
 
 
 def create_handshake(
@@ -164,6 +212,8 @@ def create_handshake(
     score_available: bool = False,
 ) -> DesktopHandshake:
     platform_name, architecture = host_identity()
+    if (pack.platform, pack.architecture) != (platform_name, architecture):
+        raise ValueError("desktop model pack does not match the host identity")
     return DesktopHandshake(
         sidecar_version=__version__,
         python_version=platform.python_version(),

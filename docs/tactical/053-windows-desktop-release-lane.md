@@ -3,9 +3,12 @@
 Topics: `public-desktop-release`, `windows-native-runtime-portability`,
 `desktop-score-runtime-footprint`
 
-Status: **planned as a prerequisite of the first binary release.** The native
-Windows x64 application core is established, but no Tauri package, signed
-installer, packaged MIDI2Score result, or Windows updater campaign exists.
+Status: **implementation active as a prerequisite of the first binary
+release.** The Python desktop identity/model-pack contracts now accept exactly
+macOS arm64 and Windows x86_64 CPU pairings. The native Windows x64 application
+core is established, but the Tauri launcher remains macOS-only and no Windows
+package, signed installer, packaged MIDI2Score result, or updater campaign
+exists.
 
 ## Goal
 
@@ -280,6 +283,18 @@ and before/after process inventories for each operating system.
 - Optional NVIDIA/CUDA model pack, scheduler tuning, and native x64 performance
   work beyond the CPU feature baseline.
 - MSI, Microsoft Store, machine-wide installation, or enterprise deployment.
+
+## Execution Record
+
+Implementation began on 2026-08-23 with the fail-closed Python contract slice.
+`ModelPack`, `DesktopReady`, and `DesktopHandshake` accept the two exact release
+identities, reject cross-platform pairs, and require the handshake's model pack
+to match its platform, architecture, and CPU backend. Host normalization maps
+Darwin arm64/aarch64 to `macos/arm64` and Windows AMD64/x86_64 to
+`windows/x86_64`; Windows ARM64 remains rejected because it is not a published
+native target. Focused Ruff and `tests/test_desktop.py` validation pass with 16
+tests. This is contract evidence only and does not yet make the Rust launcher
+or package Windows-compatible.
 
 ## Rollback
 

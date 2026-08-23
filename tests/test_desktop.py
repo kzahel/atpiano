@@ -19,12 +19,15 @@ from atpiano.corrected_workbench import create_corrected_workbench_server
 from atpiano.desktop import (
     DESKTOP_PROTOCOL_VERSION,
     DESKTOP_TOKEN_ENV,
+    DesktopHandshake,
+    DesktopReady,
     apply_model_pack,
     create_handshake,
     create_ready,
     desktop_runtime_environment,
     load_model_pack,
     model_pack_sha256,
+    normalize_desktop_identity,
     validate_desktop_token,
 )
 from atpiano.fixture import generate_fixture
@@ -54,7 +57,12 @@ def test_desktop_runtime_environment_redirects_library_caches(
     assert environment["HF_HOME"] == str(cache_root / "huggingface")
 
 
-def _write_model_pack(root: Path) -> Path:
+def _write_model_pack(
+    root: Path,
+    *,
+    platform_name: str = "macos",
+    architecture: str = "arm64",
+) -> Path:
     basic_pitch = root / "models" / "basic-pitch"
     basic_pitch.mkdir(parents=True)
     (basic_pitch / "model.mlmodel").write_bytes(b"basic-pitch-model")
@@ -69,8 +77,8 @@ def _write_model_pack(root: Path) -> Path:
         {
             "schema_version": "atpiano.model-pack.v1",
             "model_pack_id": "atpiano-cpu-models-2026.07",
-            "platform": "macos",
-            "architecture": "arm64",
+            "platform": platform_name,
+            "architecture": architecture,
             "execution_backend": "cpu",
             "assets": [
                 {
@@ -161,6 +169,36 @@ def test_desktop_token_is_exact_lowercase_hex() -> None:
             validate_desktop_token(value)
 
 
+def test_desktop_identity_accepts_release_targets() -> None:
+    assert normalize_desktop_identity("Darwin", "arm64") == ("macos", "arm64")
+    assert normalize_desktop_identity("Darwin", "aarch64") == ("macos", "arm64")
+    assert normalize_desktop_identity("Windows", "AMD64") == (
+        "windows",
+        "x86_64",
+    )
+    assert normalize_desktop_identity("Windows", "x86_64") == (
+        "windows",
+        "x86_64",
+    )
+
+
+@pytest.mark.parametrize(
+    ("system_name", "machine_name"),
+    [
+        ("Darwin", "x86_64"),
+        ("Windows", "ARM64"),
+        ("Linux", "x86_64"),
+        ("Windows", "i686"),
+    ],
+)
+def test_desktop_identity_rejects_unsupported_targets(
+    system_name: str,
+    machine_name: str,
+) -> None:
+    with pytest.raises(ValueError, match="macOS arm64 or Windows x86_64"):
+        normalize_desktop_identity(system_name, machine_name)
+
+
 def test_model_pack_verifies_assets_and_applies_paths(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -182,6 +220,58 @@ def test_model_pack_verifies_assets_and_applies_paths(
     checkpoint.write_bytes(b"tampered")
     with pytest.raises(ValueError, match="hash mismatch"):
         load_model_pack(manifest)
+
+
+def test_windows_x64_desktop_contracts_are_supported(tmp_path: Path) -> None:
+    pack = load_model_pack(
+        _write_model_pack(
+            tmp_path,
+            platform_name="windows",
+            architecture="x86_64",
+        )
+    )
+    handshake = DesktopHandshake(
+        sidecar_version="0.1.0",
+        python_version="3.10.19",
+        platform="windows",
+        architecture="x86_64",
+        execution_backend="cpu",
+        model_pack=pack,
+        model_pack_sha256=model_pack_sha256(pack),
+    )
+    ready = DesktopReady(
+        sidecar_version=handshake.sidecar_version,
+        port=49152,
+        platform=handshake.platform,
+        architecture=handshake.architecture,
+        execution_backend=handshake.execution_backend,
+        model_pack_id=pack.model_pack_id,
+        model_pack_sha256=handshake.model_pack_sha256,
+    )
+
+    assert ready.platform == "windows"
+    assert ready.architecture == "x86_64"
+
+
+def test_desktop_contracts_reject_cross_platform_pairs(tmp_path: Path) -> None:
+    manifest = _write_model_pack(tmp_path)
+    document = json.loads(manifest.read_text(encoding="utf-8"))
+    document["architecture"] = "x86_64"
+    write_json(manifest, document)
+    with pytest.raises(ValueError, match="macOS arm64 or Windows x86_64"):
+        load_model_pack(manifest)
+
+    pack = load_model_pack(_write_model_pack(tmp_path / "valid"))
+    with pytest.raises(ValueError, match="does not match the host identity"):
+        DesktopHandshake(
+            sidecar_version="0.1.0",
+            python_version="3.10.19",
+            platform="windows",
+            architecture="x86_64",
+            execution_backend="cpu",
+            model_pack=pack,
+            model_pack_sha256=model_pack_sha256(pack),
+        )
 
 
 def test_model_pack_rejects_path_escape(tmp_path: Path) -> None:
