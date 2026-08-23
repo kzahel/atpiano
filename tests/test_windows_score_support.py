@@ -104,3 +104,18 @@ def test_cleanup_handles_read_only_build_files(tmp_path: Path) -> None:
     windows_score_support._remove_tree(root)
 
     assert not root.exists()
+
+
+def test_pruning_preserves_license_material_named_testing(tmp_path: Path) -> None:
+    site_packages = tmp_path / "site-packages"
+    package_tests = site_packages / "example" / "tests"
+    license_tests = (
+        site_packages / "example-1.0.dist-info" / "licenses" / "vendor" / "testing"
+    )
+    package_tests.mkdir(parents=True)
+    license_tests.mkdir(parents=True)
+
+    windows_score_support._prune_distribution_test_material(site_packages)
+
+    assert not package_tests.exists()
+    assert license_tests.is_dir()

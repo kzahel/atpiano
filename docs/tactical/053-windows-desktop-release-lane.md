@@ -348,6 +348,10 @@ records a narrow packaging override: it checks out the exact pinned commit and
 installs its importable Python wrapper without `compile.sh`, C++ sources,
 evaluation programs, or demo data. Atpiano does not call the omitted evaluation
 path; removing this eager dependency remains tactical 052's later cleanup.
+Pruning deliberately skips `*.dist-info`/`*.egg-info` license trees even when
+an upstream notice directory is named `testing`. All transactional cleanup uses
+Windows extended-length paths so deeply nested Torch notices and read-only
+standalone-Python files cannot strand a failed stage.
 The builder itself must now run on the claimed Windows testbed; this paragraph
 does not claim a successful Windows package.
 

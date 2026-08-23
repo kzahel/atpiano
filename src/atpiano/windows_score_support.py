@@ -326,8 +326,11 @@ def _remove_tree(path: Path) -> None:
         os.chmod(value, stat.S_IWRITE)
         function(value)
 
-    if path.exists():
-        shutil.rmtree(path, onerror=make_writable_and_retry)
+    candidate = path
+    if os.name == "nt":
+        candidate = Path(f"\\\\?\\{path.resolve()}")
+    if candidate.exists():
+        shutil.rmtree(candidate, onerror=make_writable_and_retry)
 
 
 def _install_windows_vcs_dependencies(
@@ -437,7 +440,7 @@ def _remove_runtime_caches(root: Path) -> None:
         reverse=True,
     ):
         if cache.is_dir():
-            shutil.rmtree(cache)
+            _remove_tree(cache)
     for bytecode in root.rglob("*.py[co]"):
         bytecode.unlink()
 
@@ -453,10 +456,13 @@ def _prune_distribution_test_material(site_packages: Path) -> None:
         reverse=True,
     )
     for candidate in candidates:
-        if candidate.relative_to(site_packages).parts in REQUIRED_SCORE_TEST_NAMESPACES:
+        relative = candidate.relative_to(site_packages)
+        if any(part.endswith((".dist-info", ".egg-info")) for part in relative.parts):
+            continue
+        if relative.parts in REQUIRED_SCORE_TEST_NAMESPACES:
             continue
         if candidate.is_dir():
-            shutil.rmtree(candidate)
+            _remove_tree(candidate)
 
 
 def _prune_python(python_root: Path) -> None:
@@ -471,17 +477,17 @@ def _prune_python(python_root: Path) -> None:
     ):
         target = python_root / relative
         if target.is_dir():
-            shutil.rmtree(target)
+            _remove_tree(target)
     for relative in PRUNABLE_PACKAGE_DIRECTORIES:
         target = site_packages / relative
         if target.is_dir():
-            shutil.rmtree(target)
+            _remove_tree(target)
     _prune_distribution_test_material(site_packages)
     for direct_url in site_packages.rglob("direct_url.json"):
         direct_url.unlink()
     scripts = python_root / "Scripts"
     if scripts.is_dir():
-        shutil.rmtree(scripts)
+        _remove_tree(scripts)
     (python_root / "pythonw.exe").unlink(missing_ok=True)
     _remove_runtime_caches(python_root)
 
@@ -700,7 +706,7 @@ def stage_windows_score_support(output: Path, repository: Path) -> dict[str, Any
         shutil.copytree(python_source, python_root, symlinks=True)
         site_packages = _site_packages(python_root)
         if site_packages.exists():
-            shutil.rmtree(site_packages)
+            _remove_tree(site_packages)
         (python_root / "Lib" / "EXTERNALLY-MANAGED").unlink(missing_ok=True)
         python = python_root / "python.exe"
         registry_lock = repository / "desktop-score" / "support-requirements.lock"
