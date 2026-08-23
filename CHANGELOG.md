@@ -2,6 +2,12 @@
 
 ## [0.1.0]
 
-- First macOS Apple-silicon proof-of-concept release.
-- Local recording and import flow with the score generator intentionally absent.
-- Signed desktop update client with external workspace persistence.
+- First public proof-of-concept release for macOS Apple silicon and Windows
+  x86_64.
+- Local recording and import with CPU transcription, playback, export, and
+  score generation.
+- Optional MIDI-to-score support acquired directly from its upstream project
+  only after acknowledging the education/research-only notice; the upstream
+  repository and model checkpoint are not bundled in Atpiano.
+- Signed desktop installers and update client with external workspace and
+  acquired-model persistence.
