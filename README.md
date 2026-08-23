@@ -75,11 +75,17 @@ production frontend, migration gate, compact storage path, and unpackaged
 packaging-aligned development baseline, not yet a supported Windows desktop
 build. The explicit `corrected-cu132` environment now also passes strict-FP32
 Transkun parity and accelerated replay through the same native server on the
-RTX 4090. Scheduler latency/quality sweeps are next; Tauri adaptation,
-physical microphone parity, installer, signing, and updates remain later
-work. WSL2 remains a labeled Linux reference and failure-isolation option
-rather than a product dependency. Current direction and evidence are recorded
-in
+RTX 4090. The first binary proof of concept is now intended to publish both
+macOS arm64 and Windows x86_64 CPU builds with the same user-acquired score
+capability; CUDA remains optional later acceleration. The configured Windows
+11 ARM64 `machine-control` VM is the primary interactive development and UI
+testbed for the x64 package under supported Windows emulation, while native x64
+CI and the established x64 server baseline own architecture-specific build and
+runtime evidence. Tauri adaptation, Windows packaging/signing, WebView2 and
+microphone acceptance, and updater proof are active release prerequisites, not
+post-release expansion. WSL2 remains a labeled Linux reference and
+failure-isolation option rather than a product dependency. Current direction
+and evidence are recorded in
 [`docs/topics/windows-native-runtime-portability.md`](docs/topics/windows-native-runtime-portability.md)
 and
 [`docs/topics/nvidia-accelerated-low-latency-pipeline.md`](docs/topics/nvidia-accelerated-low-latency-pipeline.md).
@@ -102,8 +108,21 @@ private review path. It is not a distribution artifact and does not change the
 ordinary score-free R5 archive. The reviewed score now keeps its original
 model MusicXML with the other session exports, and artifact export uses
 ordinary browser downloads on the web or a native Save As dialog on desktop.
-The larger signed, installer-complete desktop program is deferred rather than
-started automatically by this acceptance.
+The later score-assets-free macOS arm64 candidate has passed Developer ID
+signing, notarization, installed-App review, and local updater checks. The
+source repository and CI lane are public, but no binary release exists and the
+production updater route is inactive. The first intended public release now
+adds an explicit user-acquired score-runtime flow and requires coordinated
+macOS arm64 and Windows x86_64 CPU artifacts while continuing to exclude the
+MIDI2ScoreTransformer repository and checkpoint from every release artifact.
+The pinned ScoreTransformer/MUSTER evaluation helpers may remain in the first
+proof-of-concept support environments; removing their eager inference imports
+is recorded as later cleanup. Current status and plans live in
+[`docs/topics/public-desktop-release.md`](docs/topics/public-desktop-release.md)
+and tacticals
+[`052-user-acquired-score-runtime.md`](docs/tactical/052-user-acquired-score-runtime.md)
+and
+[`053-windows-desktop-release-lane.md`](docs/tactical/053-windows-desktop-release-lane.md).
 
 ## Authoritative Performance Workspace (v3)
 
@@ -158,9 +177,11 @@ current internal score experiment, install its runtime once:
 uv run atpiano setup-midi2score
 ```
 
-That integration has no confirmed upstream license and is for private internal
-experimentation only. Capture, playback, the piano roll, keyboard, and exports
-remain usable without it. See
+That developer command downloads immediately without an education/research
+acknowledgement. Its upstream source and checkpoint have no confirmed license,
+so it remains for private internal experimentation and is not the planned
+public desktop acquisition path. Capture, playback, the piano roll, keyboard,
+and exports remain usable without it. See
 [`docs/r3-interaction-review.md`](docs/r3-interaction-review.md) for the
 accepted v3 interaction contract and deterministic replay command.
 
@@ -436,8 +457,10 @@ uv run atpiano workbench-v2 \
 `setup-midi2score` downloads the pinned upstream source, Python 3.11
 dependencies, and 389,829,880-byte checkpoint into the ignored
 `results/midi2score-runtime/` directory. This integration is for private
-internal experimentation: the upstream repository has no confirmed license.
-Skip that setup if only the roll and keyboard are needed.
+internal experimentation: the upstream repository has no confirmed license,
+and this command does not display or record an acknowledgement before
+downloading. It is not the supported public desktop acquisition flow. Skip
+that setup if only the roll and keyboard are needed.
 
 The page starts the WAV without microphone permission and exercises the same
 session, recognition, correction, review, and export paths used by capture.

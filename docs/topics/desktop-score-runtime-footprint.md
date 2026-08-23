@@ -2,17 +2,19 @@
 
 Topic: desktop-score-runtime-footprint
 
-Status: **measured optimization opportunity as of 2026-07-27.** The current
-internal macOS arm64 score build is correct and reviewable, but deliberately
-packages the complete proven research environment rather than an
-inference-minimal runtime. R5 was accepted on 2026-07-28, but no reduction
-tactical is open yet. The build remains internal-only under the provisional
-MIDI2ScoreTransformer licensing assumption. The broader packaged-desktop and
-managed-hosted programs are deferred; this optimization may proceed as an
-independent local tactical when authorized. Tactical 034 now reuses the same
-ignored installed runtime for the authenticated private family service; that
-does not change the measured desktop bundle, distribution status, or
-reduction sequence.
+Status: **a user-acquired score runtime is now planned for the first public
+macOS arm64 and Windows x86_64 desktop builds as of 2026-08-23.** The published
+applications and GitHub Release must still exclude the MIDI2ScoreTransformer
+repository and checkpoint. Each application may include a pinned
+platform-specific support environment with best-effort dependency provenance,
+plus a shared acquisition controller that downloads the exact model source and
+checkpoint only after an explicit education/research-use acknowledgement.
+Tactical
+[`052-user-acquired-score-runtime.md`](../tactical/052-user-acquired-score-runtime.md)
+owns that implementation, and tactical
+[`053-windows-desktop-release-lane.md`](../tactical/053-windows-desktop-release-lane.md)
+owns Windows staging and installed acceptance. The complete ignored internal
+runtime remains the behavioral baseline, not a distributable artifact.
 
 ## Scope And Relationship
 
@@ -23,7 +25,9 @@ This topic owns:
   examples, corpora, download clients, and duplicated packages;
 - dependency consolidation between the ordinary desktop runtime and the
   isolated score subprocess;
-- inference-checkpoint reduction that preserves the exact FP32 weights; and
+- inference-checkpoint reduction that preserves the exact FP32 weights;
+- user-initiated acquisition, installation, compatibility, provenance, and
+  removal of score assets outside the signed App; and
 - validation gates for proving that size work does not change score behavior,
   source alignment, failure isolation, or bundle immutability.
 
@@ -33,10 +37,19 @@ score quality, semantics, MusicXML, and source alignment.
 continues to own the desktop process boundary, model-pack architecture,
 distribution, and license gates. Tactical
 [`031-internal-desktop-score-runtime.md`](../tactical/031-internal-desktop-score-runtime.md)
-is the implemented baseline and execution record.
+is the implemented baseline and execution record. The public release boundary
+and installed update campaign remain owned by
+[`public-desktop-release.md`](public-desktop-release.md) and tactical
+[`051-signed-macos-update-lane.md`](../tactical/051-signed-macos-update-lane.md),
+with the Windows half in tactical 053.
 
-This topic does not authorize public distribution, quantization, a model
-change, or resumption of the deferred packaged-desktop program.
+This direction authorizes planning and implementation of acquisition support;
+it does not authorize Atpiano to distribute or mirror the
+MIDI2ScoreTransformer repository or checkpoint, claim upstream permission,
+quantize or derive a new model artifact, or publish a desktop binary before the
+separate release hold is approved. For this noncommercial proof of concept,
+removing evaluation-only `ScoreTransformer` and MUSTER dependencies is a later
+optimization rather than a publication prerequisite.
 
 ## Measured Baseline
 
@@ -211,11 +224,12 @@ responsibility and should follow, not precede, the simpler reductions.
 
 ### 6. Keep the model outside the initial installer
 
-An explicitly acquired, checksummed model pack could leave the base desktop
-download near its score-free size and fetch the score artifact only when the
-user enables scoring. This improves initial download size but does not reduce
-total installed bytes. It also requires the model-pack acquisition, license
-notice, recovery, update, and offline policies planned for later desktop work.
+This is now the accepted first-public-release direction. The base desktop
+download remains free of MIDI2ScoreTransformer source and weights. It offers
+an explicitly acquired, checksummed runtime only when a person enables score
+generation. This improves initial download size but does not by itself reduce
+total installed bytes. The exact support-layer footprint remains subject to
+the dependency preflight and measurement in tactical 052.
 
 ### 7. Treat quantization as a separate model experiment
 
@@ -224,18 +238,136 @@ state, but they may change CPU support, speed, and notation output. They
 require a new model identity and quality evidence across the transcription
 research guardrail cases. Quantization is not packaging cleanup.
 
+## Public User-Acquired Runtime Contract
+
+The acquisition feature is desktop-only and must ship in both macOS arm64 and
+Windows x86_64 CPU applications for the first release. Hosted web compositions
+continue to report only the server's operator-installed score capability and
+must not expose the desktop download dialog.
+
+### Disclosure And Acknowledgement
+
+The unavailable score view offers **Enable score generation**. It opens a
+modal dialog before any network request or directory creation. The release
+candidate should use this substance, with final copy reviewed in the rendered
+application:
+
+> MIDI2ScoreTransformer is an optional research model. Its upstream source and
+> checkpoint do not currently include an explicit license. Atpiano does not
+> include or license those assets. If you have the right to use them, Atpiano
+> can download the exact upstream files for education or research use only and
+> run them locally on this device. Do not use them commercially or redistribute
+> them. The download is about 390 MB before supporting files and needs
+> additional installed space.
+
+The dialog links to the user-acquired MIDI2ScoreTransformer repository, the
+checkpoint release, paper record, and Atpiano's tracked acquisition contract.
+It states that downloaded Python source will execute locally. The primary
+action remains disabled until the person checks **I understand this notice and
+want to download the optional research model**. Cancel performs no network or
+filesystem mutation.
+
+The acknowledgement is an informed-use record, not an upstream license grant.
+It is retained only on the device and is never attached to update checks or
+other requests. Its receipt records the notice version, acquisition-contract
+ID, App version, accepted UTC time, exact upstream URLs, and expected hashes;
+it contains no user, document, hostname, or installation identity. Any change
+to the notice or asset contract requires acknowledgement again.
+
+### Asset And Storage Boundary
+
+One tracked `atpiano.score-acquisition.v1` document in each signed App owns:
+
+- an immutable acquisition-contract ID and notice version;
+- the exact HTTPS MIDI2ScoreTransformer repository, commit, source-archive URL,
+  SHA-256, byte expectation, checkpoint release, and allowed redirect hosts;
+- archive entry, extracted-tree, symlink, file-count, and expanded-byte bounds;
+- the compatible Atpiano score-pipeline revision and signed support-layer ID;
+- the minimum free-space requirement; and
+- the manifest fields required before the sidecar may report score capability.
+
+GitHub-generated source archives must be downloaded and hashed during the
+implementation preflight. If the same commit URL later yields different bytes,
+installation fails closed until a signed Atpiano release deliberately updates
+the contract. Atpiano does not proxy the source or checkpoint through
+`graehlarts.com`, GitHub Releases, or the updater service.
+
+Mutable score assets live outside `Atpiano.app` under:
+
+```text
+app_data_dir()/score-runtimes/
+  .staging/<operation-id>/
+  <acquisition-contract-id>/
+app_config_dir()/score-runtime.json
+```
+
+The active manifest is published only after complete download, bounded
+extraction, checksum, structure, import, and score-smoke validation. A failed,
+cancelled, or interrupted acquisition leaves no active pointer and cannot make
+the ordinary application unavailable. Stale staging data is recoverably
+cleaned on the next launch.
+
+Each signed application may contain a platform-specific pinned Python 3.11
+score-support environment after removing the MIDI2ScoreTransformer repository
+and checkpoint and recording exact package provenance and known license status.
+The already-proven macOS environment is the first reference; the Windows x64
+environment must independently prove dependency resolution and identical
+retained outputs. This is a deliberate, limited proof-of-concept risk
+acceptance for the currently unlicensed `ScoreTransformer` and MUSTER helper
+packages; Atpiano makes no license claim for them. The App must not run `uv`,
+`pip`, or `git` on the user's machine. The published package audit continues to
+reject the main model repository, checkpoint, and internal manifests that
+would imply the model itself was bundled.
+
+### Lifecycle And Updates
+
+Acquisition has explicit `unavailable`, `disclosure`, `checking-space`,
+`downloading`, `verifying`, `installing`, `ready`, `error`, and `removing`
+states. Progress distinguishes source, checkpoint, and local validation.
+Errors are bounded, credential-free, and actionable; retry reuses only fully
+verified immutable inputs.
+
+Download, activation, and removal use the desktop composition rather than the
+authenticated Python API. The sidecar receives no general network-acquisition
+authority. Acquisition cannot begin while capture is requesting, warming,
+recording, or stopping, while settlement/import is active, while a score job
+is active, or while a desktop update is installing.
+
+Because the current desktop runtime fixes its loopback address, credential,
+and score capability at launch, successful installation does not hot-swap the
+sidecar. The UI offers **Relaunch to enable scores** after validation. Relaunch
+uses the existing install blockers and graceful sidecar shutdown. Startup
+selects only a compatible external runtime and otherwise degrades to
+`score_available=false` with an explanation and recovery action.
+
+Signed App updates never silently acquire, modify, or delete the external
+runtime. A compatible `0.1.0 -> 0.1.1` update preserves its active manifest and
+acknowledgement. An incompatible update leaves the application usable, disables
+score generation, and offers a deliberate reacquisition or removal path.
+Removal stops using the runtime before deleting its versioned directory and
+does not delete sessions, source MIDI, MusicXML, alignments, or exports.
+
 ## Recommended Sequence
 
-1. Re-export the exact FP32 inference state and prove tensor/output identity.
-2. Prove the score adapter under the existing bundled Python 3.10 and Torch
-   stack while retaining a separate process.
-3. Remove eager evaluation imports and build a minimal package overlay.
-4. Prune music21 corpus data and unrelated Transformers payloads one group at
-   a time.
-5. Replace Lightning checkpoint loading only if the earlier steps leave
-   meaningful residual cost.
-6. Reconsider optional model acquisition and quantization as separate product
-   decisions.
+1. Record a time-boxed exact inventory of the already-proven Python 3.11 score
+   environment, including known absent licenses, without making cleanup a
+   publication blocker.
+2. Stage that support environment without the MIDI2ScoreTransformer repository
+   or checkpoint and prove it can consume those assets from an external root.
+3. Freeze the acquisition document, disclosure version, exact source archive,
+   hashes, redirect policy, size bounds, and external-runtime manifest.
+4. Implement transactional desktop acquisition, on-device acknowledgement,
+   validation, relaunch activation, removal, and safe degradation.
+5. Add the rendered dialog and stateful score-unavailable/ready management UI.
+6. Build and audit the exact signed macOS arm64 and Windows x86_64 applications,
+   then prove clean acquisition and matching score output on both.
+7. Prove external-runtime preservation through the real signed
+   `0.1.0 -> 0.1.1` updater campaign on both operating systems.
+
+Python 3.10 consolidation, removal of eager ScoreTransformer/MUSTER imports,
+checkpoint derivation, broader dependency pruning, and quantization remain
+later optimizations. The first public flow must acquire the exact released
+checkpoint rather than an Atpiano-derived weight artifact.
 
 The preliminary, non-accepted projection is approximately 1.25–1.4 GB
 installed for the complete application and roughly 500–650 MB compressed
@@ -264,6 +396,24 @@ Every reduction step must:
 - leave the ordinary score-free build and archive independently
   reproducible.
 
+The public acquisition slice additionally must:
+
+- prove from clean macOS and Windows application data that no upstream request
+  occurs before acknowledgement;
+- capture request destinations showing direct upstream acquisition only;
+- reject corrupt bytes, oversized or traversal archives, unexpected redirects,
+  stale manifests, incompatible pipelines, concurrent acquisition, and
+  insufficient disk;
+- survive cancellation, process termination, network loss, and App relaunch
+  without selecting a partial runtime;
+- prove the published DMG, Windows installer, both updater artifacts,
+  corresponding-source archives, checksums, and attestations contain no
+  MIDI2ScoreTransformer source or checkpoint;
+- produce equivalent model tokens, MusicXML, alignment, and provenance on the
+  retained score fixtures; and
+- exercise install, relaunch, score generation, signed App update, retained
+  capability, removal, and score-free degradation in the visible desktop App.
+
 Byte-identical MusicXML is meaningful only for the same source event
 identities. Cross-session hashes may differ because MusicXML note IDs encode
 session-addressed source event IDs; semantic and alignment comparisons must
@@ -271,26 +421,45 @@ account for that contract.
 
 ## Open Questions
 
-- Does the pinned source and custom music21 stack run unchanged on the bundled
-  Python 3.10 interpreter?
-- Which score-only package versions genuinely conflict with the main runtime,
-  once evaluation and training imports are removed?
+- Can a later release run the pinned source and custom music21 stack on the
+  bundled Python 3.10 interpreter and remove the separate Python 3.11 support
+  environment?
+- Which score-only packages can be removed once evaluation and training imports
+  are separated from inference?
 - Can the minimal RoFormer implementation remain sourced from upstream
   without broad Transformers packaging, or should that wait for a licensed
   replacement?
-- Should the score checkpoint ship inside a future installer or be an
-  explicitly acquired model pack?
+- Can `ScoreTransformer` and MUSTER be removed from inference entirely, and do
+  their maintainers later publish explicit license terms?
 - What installed/download target is worth the extra maintenance after the
   low-risk checkpoint and duplication reductions land?
-- What source and checkpoint rights apply to a derived inference-only
-  artifact? The current provisional internal acceptance does not answer that
-  release question.
+- Should an upstream license later appear, and how should a signed release
+  change the notice without weakening existing receipt/provenance evidence?
+- What source and checkpoint rights apply to any future derived inference-only
+  artifact? The current education/research acknowledgement does not answer
+  that release question.
+
+## Later Todo — Evaluation Dependency Cleanup
+
+After the proof-of-concept release, separate MIDI2ScoreTransformer inference
+from its eager evaluation imports. Atpiano calls `infer()` but not the upstream
+`eval()` path that uses `score_similarity` and MUSTER. Prove identical model
+tokens, MusicXML, and alignment after lazy-loading or otherwise isolating those
+metrics, then remove `ScoreTransformer`, MUSTER/amtevaluation, and dependencies
+reachable only through them from the support environment. Measure the size
+saving and re-run packaged score parity. If either package remains necessary,
+ask its maintainer for explicit license terms. This cleanup is desirable but is
+not a prerequisite for the noncommercial proof-of-concept release.
 
 ## Next Tactical
 
-When authorized, open one bounded tactical for the first two proof steps:
-derive an exact inference checkpoint, then run the unchanged score contract
-against the existing Python 3.10/Torch runtime. Stop at a measured
-human-review checkpoint before pruning general package payloads or changing
-the model. This work is a local optimization and does not require or imply
-resuming the deferred managed hosted-service plan.
+Implement
+[`052-user-acquired-score-runtime.md`](../tactical/052-user-acquired-score-runtime.md)
+and
+[`053-windows-desktop-release-lane.md`](../tactical/053-windows-desktop-release-lane.md)
+as prerequisites of the first public desktop tag. Stop at the dependency and
+support-layout checkpoint only for an explicit upstream prohibition, a direct
+maintainer objection, or a technical/security failure. Known missing license
+metadata for the evaluation helpers is recorded risk, not a reason to delay the
+proof of concept. Do not substitute a derived checkpoint or mirror the main
+model content to keep the release schedule.

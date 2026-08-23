@@ -9,7 +9,11 @@ frontend, migration gate, one-hour storage control, and unpackaged
 `workbench-v3` replay all pass without WSL. Accelerated CUDA settlement and
 process-restart recovery pass; wall-clock browser paint, physical microphone,
 and Windows desktop packaging have not passed. The accepted Tauri proof
-remains macOS arm64 only.
+remains macOS arm64 only. The product decision on 2026-08-23 made a Windows
+x86_64 CPU package a prerequisite of the first binary proof-of-concept release;
+tactical
+[`053-windows-desktop-release-lane.md`](../tactical/053-windows-desktop-release-lane.md)
+owns that work.
 
 ## Intent
 
@@ -64,9 +68,31 @@ security, update, and distribution shape.
 the validated x86_64 Linux control and may help distinguish a Windows defect
 from a general model or dependency defect.
 
-This topic does not open the full desktop Phase 6, authorize an installer,
-select signing or updater infrastructure, or claim Windows microphone or
-packaged-app parity before those paths are measured.
+This topic does not itself authorize an installer, select credentials, or claim
+Windows microphone or packaged-app parity before those paths are measured.
+Tactical 053 now owns the bounded implementation and release lane.
+
+## First Public Desktop Decision
+
+The first public binary tag must contain both `darwin-aarch64` and
+`windows-x86_64` CPU applications with the same ordinary and user-acquired
+score features. A successful macOS artifact alone is not publication-ready.
+CUDA is useful measured acceleration but is not required for Windows feature
+parity: Basic Pitch uses ONNX Runtime CPU, Transkun supports CPU with the
+measured conservative after-Stop profile, and Atpiano's MIDI2Score adapter
+loads and executes its checkpoint on CPU. MIDI2Score still needs a packaged
+Windows x64 dependency and output-parity proof.
+
+The configured `~/code/machine-control` Windows testbed was ready on
+2026-08-23 with target-native administration, UI Automation, capture, and input.
+It is a Windows 11 ARM64 guest. The current Atpiano lock contains Windows x64
+wheels, but not a complete native Windows ARM64 model stack, so the release
+target remains x64. Windows 11 supports x64 user-mode applications under
+emulation; use that path for repeatable installed UI, consent, acquisition,
+score, removal, and updater testing. Label the result as x64-on-ARM64 emulation,
+not native x64 performance evidence. Native x64 GitHub Actions builds and the
+existing physical x64 server baseline cover the complementary architecture
+boundary. Native Windows ARM64 packaging is later work.
 
 ## Direction
 
@@ -213,7 +239,7 @@ should retain separate CPU and NVIDIA pack identities, derive an
 inference-minimal CUDA DLL inventory, and prove every size or startup
 optimization against the frozen fixture and profile identity.
 
-The existing desktop proof is not a Windows starting artifact:
+The existing desktop proof is not yet a Windows artifact:
 
 - the Tauri launcher accepts only `macos` / `arm64` / `cpu` sidecar identity;
 - runtime resource discovery assumes a macOS `.app` layout;
@@ -222,8 +248,8 @@ The existing desktop proof is not a Windows starting artifact:
 - the accepted review explicitly excludes Windows packaging and microphone
   parity.
 
-Those are known future adaptation points, not reasons to pull desktop
-packaging into the first native-server slice.
+Those are the concrete adaptation points for tactical 053. They no longer
+justify deferring Windows until after the first binary release.
 
 ## Reproducible Implementation Sequence
 
@@ -307,8 +333,8 @@ supervise:
 - installer, signing, update, and rollback work that remains deliberately
   unimplemented.
 
-Only then decide the bounded scope of the first Windows Tauri development
-build.
+Tactical 053 now consumes this handoff to produce the first Windows Tauri
+development build, signed installer, and installed updater evidence.
 
 ## Baseline Acceptance
 
@@ -348,6 +374,9 @@ yet occurred, but it also must not be described as microphone-validated.
   decode, preprocessing, host-to-device transfer, and post-processing?
 - Should the future Windows desktop ship separate CPU and NVIDIA model packs,
   or one manifest-selected pack with shared immutable assets?
-- What is the smallest Windows Tauri development slice that proves the native
-  server can be staged and supervised without prematurely implementing the
-  installer, signing, or updater?
+- Which critical dependency versions or packaging substitutions are required
+  for the Windows x64 MIDI2Score support layer while preserving model-token,
+  MusicXML, and alignment parity?
+- Which x64-on-ARM64 testbed timings differ materially from a native x64 CPU
+  installation, without making that performance comparison a publication
+  blocker for the proof of concept?

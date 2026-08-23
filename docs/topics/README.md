@@ -23,9 +23,10 @@ normally reuse the document slug in its `Topic:` trailers.
   artifact executes under a web WASM runtime, while real-browser parity and
   end-to-end behavior remain unvalidated.
 - [`desktop-score-runtime-footprint.md`](desktop-score-runtime-footprint.md):
-  measured internal desktop score footprint, duplicated dependency evidence,
-  inference-only checkpoint opportunity, safe pruning order, and parity
-  gates.
+  measured internal desktop score footprint plus the planned public
+  user-acquisition, acknowledgement, provenance, removal, update-persistence,
+  proof-of-concept dependency inventory, later evaluation-helper cleanup, and
+  parity gates.
 - [`family-workspaces-and-attribution.md`](family-workspaces-and-attribution.md):
   implemented managed performer profiles, fast shared-piano selection, and
   explicit creator-versus-performer attribution, with shareable multi-space
@@ -76,15 +77,16 @@ normally reuse the document slug in its `Topic:` trailers.
   moment-centered reflection, readable engraving, cautious tool-backed
   analysis, trusted collaboration, and teacher review.
 - [`public-desktop-release.md`](public-desktop-release.md):
-  active macOS arm64 signing, notarization, public-release, and installed
-  desktop-update contract, with explicit score-runtime and publication gates.
+  coordinated macOS arm64 and Windows x86_64 CPU signing, public-release, and
+  installed desktop-update contract, with explicit score-runtime and
+  publication gates.
 - [`session-workspace-management.md`](session-workspace-management.md):
   accepted v2 foundation for explicit New, session history, separate
   active/selected identities, recoverable deletion, and future continuation.
 - [`windows-native-runtime-portability.md`](windows-native-runtime-portability.md):
-  proposed native Windows Python/model and unpackaged local-server baseline,
-  aligned with later Tauri sidecar and model-pack work without opening desktop
-  packaging yet.
+  established native Windows x64 Python/model and unpackaged local-server
+  baseline, now feeding the first-release Tauri x64 sidecar/package lane and
+  ARM64 machine-control testbed acceptance.
 
 ## Update Policy
 

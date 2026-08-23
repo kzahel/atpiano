@@ -2,17 +2,26 @@
 
 Topic: public-desktop-release
 
-Status: **active at binary-publication hold. The source repository and CI lane
+Status: **active before binary publication.** The source repository and CI lane
 are public with no declared Atpiano source license. The release lane, desktop
-updater, and complete LGPL media candidate passed signed/notarized installed
-acceptance on 2026-08-11. The published `0.1.0 -> 0.1.1` campaign requires
-explicit approval.**
+updater, and complete score-assets-free LGPL media baseline passed
+signed/notarized installed acceptance on 2026-08-11. The first published build
+now depends on tactical
+[`052-user-acquired-score-runtime.md`](052-user-acquired-score-runtime.md).
+After that changes the signed contents, the exact candidate must repeat local
+acceptance, credentialed CI rehearsal, and explicit publication review before
+the real `0.1.0 -> 0.1.1` campaign. The first binary release now also depends
+on the coordinated Windows x64 lane in tactical
+[`053-windows-desktop-release-lane.md`](053-windows-desktop-release-lane.md);
+this macOS tactical cannot publish a one-platform tag by itself.
 
 ## Outcome
 
-Turn the accepted R5 Tauri boundary into Atpiano's first repeatable signed
-macOS arm64 release lane, then prove one real installed signed update from
-`0.1.0` to `0.1.1` through the production update service.
+Turn the accepted R5 Tauri boundary into Atpiano's repeatable signed macOS
+arm64 half of the first release lane, contribute a score-assets-free but
+user-acquisition-capable App to the coordinated two-platform tag, then prove
+one real installed signed update from `0.1.0` to `0.1.1` through the production
+update service without losing the compatible external score runtime.
 
 This tactical adopts `~/code/desktop-release-kit/contract/desktop-update-v1.md`
 and the canary's accepted `0.1.0 -> 0.1.1` evidence. It does not add a Git
@@ -41,8 +50,11 @@ generic release framework.
 - Retain `com.atpiano.desktop`, product ID `atpiano`, route prefix `/atpiano`,
   and `desktop-v<version>` tags.
 - Keep user workspace and installation identity outside the App bundle.
-- Keep the ordinary release score-free. Do not stage, archive, attest, or
-  publish MIDI2ScoreTransformer source or checkpoint.
+- Keep the ordinary release score-assets-free. Do not stage, archive, attest,
+  or publish the MIDI2ScoreTransformer repository or checkpoint. The
+  acquisition controller, tracked upstream contract, and pinned, inventoried
+  proof-of-concept support layer from tactical 052 may enter the App only after
+  their dedicated audits pass.
 - Preserve hosted-web asset-update behavior as a separate composition.
 - Do not publish a release or activate the production update-server product
   before the explicit binary-publication hold. Repository visibility may
@@ -60,6 +72,13 @@ generic release framework.
 5. Install from the DMG and validate launch, authenticated sidecar handshake,
    representative replay/scoring, artifact export, bundle immutability, and
    clean shutdown with no Python/media orphan.
+
+The score-free baseline has passed this gate. After tactical 052 lands, repeat
+all five steps for the exact acquisition-capable candidate from clean staged
+inputs. Also acquire the external runtime from a clean installed App, generate
+the accepted score, and prove that neither acquisition nor use mutates the
+sealed App. Prior notarization is implementation evidence, not acceptance of
+changed signed contents.
 
 If a keychain or password prompt is required, stop at that exact interactive
 step and give the maintainer the safe command. Do not put credential values in
@@ -81,12 +100,68 @@ an outer `codesign --deep` success without nested verification is not evidence.
    bundled LGPL media libraries.
 5. Validate exactly `darwin-aarch64`, GitHub SHA-256 asset digests, matching
    version/tag/URL, non-empty signature, Developer ID signing, notarization,
-   stapling, and the absence of forbidden score assets.
+   stapling, the exact acquisition contract/support manifest, and the absence
+   of the forbidden MIDI2ScoreTransformer repository and checkpoint.
 6. Write `SHA256SUMS`, attach GitHub artifact attestations for distributable
    files, and publish only from the successful finalizer after approval.
 
 The workflow must not inherit the canary's five-target requirement. Its
 validator consumes Atpiano's explicit supported target/artifact declaration.
+It must construct the public App without access to the ignored local score
+runtime or upstream checkpoint.
+
+This stage's macOS job and credential contract remain platform-specific.
+Tactical 053 adds the Windows job, certificate contract, artifacts, and second
+target to the coordinated finalizer. It must not weaken any macOS gate while
+expanding the final artifact matrix.
+
+## Release Credential Setup And Verification
+
+The current workflow requires exactly these repository Actions secrets:
+
+| Secret | Purpose |
+| --- | --- |
+| `TAURI_SIGNING_PRIVATE_KEY` | Atpiano-specific updater private key |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Updater key password |
+| `MACOS_CERTIFICATE_P12_BASE64` | Developer ID Application certificate and private key |
+| `MACOS_CERTIFICATE_PASSWORD` | PKCS#12 import password |
+| `MACOS_KEYCHAIN_PASSWORD` | Temporary CI build-keychain password |
+| `ASC_API_KEY_P8_BASE64` | App Store Connect notarization API private key |
+| `ASC_API_KEY_ID` | Notarization API key ID |
+| `ASC_API_ISSUER_ID` | Notarization API issuer ID |
+
+Secrets are an external mutation and remain behind publication approval. When
+approved, follow the canonical dotfiles signing runbook and add a local helper
+or operator procedure with these properties:
+
+1. verify the authenticated GitHub account and exact target repository
+   `kzahel/atpiano` before reading secret material;
+2. obtain key files from explicit maintainer-selected paths and passwords from
+   a hidden TTY or local Keychain lookup, never command-line arguments;
+3. transmit each value through `gh secret set --repo kzahel/atpiano` using
+   standard input; encode binary P12/P8 data in memory or a permission-bounded
+   temporary file and delete that file on every exit path;
+4. never echo values, enable shell tracing, place values in GitHub workflow
+   inputs, write them under the repository, or retain base64 output;
+5. query GitHub's secret metadata after upload and verify that all eight names
+   exist without attempting to read values; and
+6. retain only secret names, GitHub `updated_at` timestamps, operator time,
+   target repository, and the following CI run URL as redacted evidence.
+
+Secret presence is not acceptance. Immediately run the existing
+`workflow_dispatch` lane from the exact candidate commit. It must pass source
+and Rust prerequisites, import the Developer ID identity without a prompt,
+sign every nested native file, build the updater signature with the Atpiano
+key, notarize and staple the App/DMG, run the packaged scoring smoke, audit the
+acquisition-capable score-assets-free contents, and clean its temporary
+keychain/key files. A manual run has no release tag and must create no public
+GitHub Release. Inspect logs for accidental secret, private-path, certificate,
+or key material before authorizing a tag.
+
+If any credential is missing, expired, rejected, or prompts unexpectedly, stop
+at that exact boundary. Rotate or re-upload only the affected external secret,
+repeat metadata verification, and rerun the non-tagged rehearsal. Do not weaken
+the fail-closed workflow or fall back to local signing for the published build.
 
 ## Stage 3 — Desktop Updater
 
@@ -114,7 +189,8 @@ The client must:
 - deduplicate checks, use a 20-second timeout, retain discovered updates
   through later silent checks, and fail closed on signature errors; and
 - report Tauri app version, web build identity, Python sidecar/package build
-  identity, model-pack identity/hash, and stable installation identity.
+  identity, model-pack identity/hash, optional score-runtime contract/state,
+  and stable installation identity.
 
 Before `downloadAndInstall`, the application must prove that no capture is
 requesting, warming, recording, or stopping; no session or import is settling;
@@ -122,22 +198,37 @@ and no score job is running. After successful replacement, normal Tauri exit
 must gracefully stop and reap the Python sidecar before relaunch. Installation
 failures retain the running application and recovery action.
 
+The external score runtime lives outside the App and updater archive. A signed
+update must preserve it byte-for-byte when its acquisition contract remains
+compatible, must never acquire it as part of an automatic update, and must
+degrade visibly without blocking startup when it becomes incompatible.
+
 ## Stage 4 — Installed Acceptance Campaign
 
 After the publication hold is approved:
 
 1. Freeze the exact `desktop-v0.1.0` DMG, hashes, workflow, commit, update
    metadata, and macOS testbed identity.
-2. Install its App from the DMG, launch it, and complete a representative
-   Atpiano flow.
-3. Publish a `desktop-v0.1.1` successor with an unmistakable visible change.
-4. Discover, download, install, and relaunch the successor through the
+2. Install its App from the DMG, launch it from clean application data, and
+   complete a representative score-free Atpiano flow.
+3. Review and accept the optional score notice, acquire the exact runtime
+   directly from upstream, relaunch, and generate a retained score with
+   verified runtime and producer provenance.
+4. Publish a `desktop-v0.1.1` successor with an unmistakable visible change
+   and a compatible score-acquisition contract.
+5. Discover, download, install, and relaunch the successor through the
    production `/atpiano` route.
-5. Verify all component identities, workspace/session persistence, score-free
-   sidecar function, unchanged installation UUID, and zero orphan processes.
-6. Inspect redacted shared-server requests for startup, manual discovery, and
-   relaunched startup, and retain an evidence document comparable to the
-   canary record.
+6. Verify all component identities, workspace/session persistence, unchanged
+   installation UUID, unchanged local acknowledgement/runtime hashes, score
+   capability without reacquisition, post-update score generation, and zero
+   orphan processes.
+7. Remove the optional runtime, relaunch, and prove that capture/review and
+   retained sessions/artifacts survive while capability returns to unavailable.
+8. Inspect redacted update-server requests for startup, manual discovery, and
+   relaunched startup. Separately retain redacted upstream acquisition
+   destinations proving that no model bytes came from Atpiano infrastructure.
+   Keep the acknowledgement receipt local and redact private paths from all
+   evidence.
 
 ## Publication Hold
 
@@ -147,10 +238,75 @@ Repository visibility has a separate preflight and approval boundary. Present:
 
 - proposed version and tag;
 - complete public artifact set;
+- completed tactical 052 acceptance and exact score-acquisition contract;
+- completed tactical 053 Windows package, signing, and testbed acceptance;
+- proof that the candidate contains no MIDI2ScoreTransformer repository or
+  checkpoint;
 - exact product route and JSON configuration;
 - signing/notarization rehearsal commands and results;
+- the complete configured secret names/timestamps and successful non-tagged
+  macOS and Windows credentialed CI rehearsals, with no values;
 - public-tree/history and distribution-license preflight;
 - exact remaining risks and manual steps.
+
+Pushing `desktop-v0.1.0` authorizes the workflow finalizer to publish the
+validated draft automatically. Treat the tag push itself as the irreversible
+publication action; do not describe it as a harmless build rehearsal.
+
+## Publication And Update Operation
+
+After the hold packet is explicitly approved, execute the external mutations
+in this order:
+
+1. start from a clean `main` whose intended commits are pushed and whose
+   ordinary public CI run is green;
+2. validate coherent `0.1.0` in `pyproject.toml`, `src/atpiano/__init__.py`,
+   `app/package.json`, `app/src-tauri/Cargo.toml`,
+   `app/src-tauri/tauri.conf.json`, lock/generated identities, acquisition
+   compatibility, and `CHANGELOG.md`;
+3. replace the historical changelog statement that the score generator is
+   intentionally absent with accurate score-assets-free, user-acquisition
+   release notes;
+4. record the candidate commit, source/tree scan, acquisition-contract hash,
+   local signed artifact evidence, and clean-account acceptance;
+5. upload and metadata-verify the eight macOS/updater Actions secrets using the
+   preceding procedure and the Windows signing secrets using tactical 053;
+6. run and inspect both credentialed non-tagged workflow rehearsals from that
+   exact commit;
+7. deploy and validate `update-server/atpiano.json` through the shared update
+   server's own review/restart procedure, confirming only product `atpiano`,
+   path `/atpiano`, repository `kzahel/atpiano`, and exactly
+   `darwin-aarch64` plus `windows-x86_64` are eligible;
+8. create and push annotated tag `desktop-v0.1.0` at the frozen commit, then
+   monitor the workflow through final publication without manually bypassing
+   a failed or draft gate;
+9. verify the public release's exact DMG, Windows NSIS installer, both updater
+   artifacts/signatures, `latest.json`, `SHA256SUMS`, corresponding media
+   sources, attestations, release notes, platform signatures, macOS
+   notarization, and forbidden-score-content result;
+10. verify the production route returns each signed `0.1.0` platform update
+    only for an eligible older test version and no update for installed
+    `0.1.0`;
+11. install both public `0.1.0` applications, run their clean
+    acquisition/score acceptances, and retain their external runtimes and
+    installation UUIDs;
+12. implement one unmistakable visible successor change, update the same
+    complete identity set coherently to `0.1.1`, add its changelog entry, and
+    keep the score-acquisition contract compatible unless a deliberate new
+    acknowledgement is part of the test;
+13. pass local and ordinary CI gates, freeze the new commit, and push annotated
+    tag `desktop-v0.1.1`;
+14. discover, download, install, and relaunch `0.1.1` from each installed
+    `0.1.0` application through the production route; and
+15. finish every Stage 4 identity, persistence, score, request, removal,
+    signature, immutability, and orphan-process check before marking this
+    tactical complete.
+
+Rollback before `desktop-v0.1.0` publication means removing or deactivating the
+product config and retaining any draft release. Rollback after publication
+uses a new signed forward release; never retarget or replace a published tag,
+serve unsigned metadata, reuse an updater signature for different bytes, or
+delete an acquired runtime silently.
 
 ## Validation
 
@@ -159,6 +315,9 @@ Repository visibility has a separate preflight and approval boundary. Present:
 - Configuration and draft-finalization tests reject version drift, unexpected
   targets, missing artifacts, absent signatures/digests, and forbidden score
   content.
+- Score-acquisition tests prove informed opt-in, direct upstream URLs,
+  transactional external installation/removal, score parity, update
+  persistence, and complete exclusion of acquired assets from releases.
 - The staged and final App audits reconcile all files and bytes, validate all
   Mach-O architectures/load paths/signatures, and remain immutable after use.
 - CI proves signed artifact construction; only Stage 4 proves installed
@@ -170,8 +329,10 @@ The release workflow, product configuration, updater plugin, and desktop-only
 UI are additive. Hosted web operation and its refresh notice remain
 independent. Removing the updater configuration and desktop composition
 returns to the accepted R5 boundary without migrating or deleting the external
-workspace. Draft GitHub Releases and an unactivated product JSON are not
-eligible for production update checks.
+workspace. Disabling acquisition or refusing an incompatible external score
+runtime returns to score-free behavior without deleting the user's acquired
+runtime or existing score artifacts. Draft GitHub Releases and an unactivated
+product JSON are not eligible for production update checks.
 
 ## Execution Record
 
@@ -417,7 +578,14 @@ release finalizer did not run. This proves that the public lane fails closed
 before signing when credentials are absent without invoking the maintainer's
 local Keychain.
 
-Source visibility and the fail-closed CI rehearsal are complete. The remaining
-gate is approval to upload the eight macOS/updater Actions secrets, activate
-the production product configuration, push the first release tag, publish the
-binary release, and run the real installed `0.1.0 -> 0.1.1` campaign.
+Source visibility and the fail-closed CI rehearsal are complete. On 2026-08-23
+the intended first release changed from a purely score-unavailable App to a
+score-assets-free App with explicit user acquisition. Tactical 052 now blocks
+the macOS candidate, and tactical 053 blocks the coordinated Windows half of
+the publication hold. After both land, the exact changed macOS candidate must
+repeat the signed/notarized local gate. Publication approval may then authorize
+uploading/verifying the macOS/updater Actions secrets and the credentialed
+non-tagged CI rehearsal alongside the Windows rehearsal. Only after both pass
+may the release operation activate production product configuration, push the
+first release tag, publish both binary targets, and run both installed
+`0.1.0 -> 0.1.1` campaigns with external score-runtime persistence.
