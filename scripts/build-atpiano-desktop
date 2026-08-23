@@ -307,25 +307,33 @@ require_environment() {
 stage_runtime() {
   local mode="${1:-ordinary}"
   local output_report="${report_root}/stage-report.json"
-  local extra_arguments=()
+  local stage_arguments
   if [[ "${mode}" == "internal-score" ]]; then
     mkdir -p "${internal_report_root}"
     output_report="${internal_report_root}/stage-report.json"
-    extra_arguments=(
+    stage_arguments=(
+      --output
+      "${runtime_root}"
+      --report
+      "${output_report}"
       --include-internal-score-runtime
       --score-runtime-source
       "${repository_root}/results/midi2score-runtime"
     )
   else
     mkdir -p "${report_root}"
+    stage_arguments=(
+      --output
+      "${runtime_root}"
+      --report
+      "${output_report}"
+    )
   fi
   "${repository_root}/scripts/build-atpiano-media-runtime" ensure
   (
     cd "${repository_root}"
     uv run python -m atpiano.desktop_packaging stage \
-      --output "${runtime_root}" \
-      --report "${output_report}" \
-      "${extra_arguments[@]}"
+      "${stage_arguments[@]}"
   )
 }
 
