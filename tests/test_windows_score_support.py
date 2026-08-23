@@ -119,3 +119,19 @@ def test_pruning_preserves_license_material_named_testing(tmp_path: Path) -> Non
 
     assert not package_tests.exists()
     assert license_tests.is_dir()
+
+
+def test_pruning_removes_build_only_windows_launchers(tmp_path: Path) -> None:
+    python_root = tmp_path / ".venv"
+    setuptools = python_root / "Lib" / "site-packages" / "setuptools"
+    launcher = setuptools / "cli-32.exe"
+    launcher.parent.mkdir(parents=True)
+    launcher.write_bytes(b"launcher")
+    venv = python_root / "Lib" / "venv" / "scripts" / "nt"
+    venv.mkdir(parents=True)
+    (venv / "redirector.exe").write_bytes(b"launcher")
+
+    windows_score_support._prune_python(python_root)
+
+    assert not launcher.exists()
+    assert not venv.exists()

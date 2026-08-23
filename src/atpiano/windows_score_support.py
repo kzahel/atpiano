@@ -472,8 +472,10 @@ def _prune_python(python_root: Path) -> None:
         Path("libs"),
         Path("Lib/test"),
         Path("Lib/idlelib"),
+        Path("Lib/ensurepip"),
         Path("Lib/tkinter"),
         Path("Lib/turtledemo"),
+        Path("Lib/venv"),
     ):
         target = python_root / relative
         if target.is_dir():
@@ -483,6 +485,10 @@ def _prune_python(python_root: Path) -> None:
         if target.is_dir():
             _remove_tree(target)
     _prune_distribution_test_material(site_packages)
+    setuptools = site_packages / "setuptools"
+    if setuptools.is_dir():
+        for launcher in setuptools.glob("*.exe"):
+            launcher.unlink()
     for direct_url in site_packages.rglob("direct_url.json"):
         direct_url.unlink()
     scripts = python_root / "Scripts"

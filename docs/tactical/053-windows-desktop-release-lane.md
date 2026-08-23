@@ -352,6 +352,9 @@ Pruning deliberately skips `*.dist-info`/`*.egg-info` license trees even when
 an upstream notice directory is named `testing`. All transactional cleanup uses
 Windows extended-length paths so deeply nested Torch notices and read-only
 standalone-Python files cannot strand a failed stage.
+Build-only `venv`/`ensurepip` content and Setuptools launcher templates are
+removed before PE validation; those templates include intentional 32-bit and
+ARM64 executables and are not used to run the signed application.
 The builder itself must now run on the claimed Windows testbed; this paragraph
 does not claim a successful Windows package.
 
