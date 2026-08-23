@@ -88,3 +88,25 @@ def test_score_build_root_fails_with_actionable_long_path(tmp_path: Path) -> Non
 
     with pytest.raises(RuntimeError, match="ATPIANO_WINDOWS_BUILD_ROOT"):
         windows_desktop_packaging._validate_score_build_root(long_root)
+
+
+def test_windows_tauri_package_is_current_user_nsis() -> None:
+    repository = Path(__file__).resolve().parents[1]
+    config = json.loads(
+        (repository / "app" / "src-tauri" / "tauri.windows.conf.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert config["bundle"]["targets"] == ["nsis"]
+    assert config["bundle"]["windows"] == {
+        "allowDowngrades": False,
+        "webviewInstallMode": {"type": "embedBootstrapper", "silent": False},
+        "nsis": {
+            "installMode": "currentUser",
+            "languages": ["English"],
+            "displayLanguageSelector": False,
+            "compression": "lzma",
+        },
+    }
+    assert config["plugins"]["updater"]["windows"]["installMode"] == "passive"
