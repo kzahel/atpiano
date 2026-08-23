@@ -20,6 +20,7 @@ function fixture() {
     `${windowsUpdater}.sig`,
     `Atpiano_${version}_media-sources.tar.gz`,
     "latest.json",
+    "SHA256SUMS",
   ];
   return {
     release: {

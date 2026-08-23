@@ -62,7 +62,7 @@ export function validateRelease({ release, latest, tag, repository }) {
     new RegExp(`^Atpiano_${version.replaceAll(".", "\\.")}_media-sources\\.tar\\.gz$`),
     "corresponding media source archive",
   );
-  for (const required of ["latest.json", signature, windowsSignature]) {
+  for (const required of ["latest.json", "SHA256SUMS", signature, windowsSignature]) {
     if (!assetNames.has(required)) fail(`missing required release asset: ${required}`);
   }
   const expectedAssets = new Set([
@@ -74,6 +74,7 @@ export function validateRelease({ release, latest, tag, repository }) {
     windowsSignature,
     mediaSources,
     "latest.json",
+    "SHA256SUMS",
   ]);
   const unexpected = [...assetNames].filter((name) => !expectedAssets.has(name));
   if (unexpected.length) fail(`unexpected release assets: ${unexpected.join(", ")}`);
