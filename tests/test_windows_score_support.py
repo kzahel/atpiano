@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import stat
 import struct
 from pathlib import Path
 
@@ -73,3 +74,33 @@ def test_acquisition_contract_matches_windows_support_inputs() -> None:
     contract = windows_score_support._read_acquisition_contract(repository)
 
     assert contract["support_layer_id"] == windows_score_support.SUPPORT_LAYER_ID
+
+
+def test_vcs_requirements_are_exact(tmp_path: Path) -> None:
+    path = tmp_path / "requirements.txt"
+    path.write_text(
+        "\n".join(
+            (
+                "music21 @ git+https://example.test/music21@commit",
+                "muster @ git+https://example.test/muster@commit",
+                "score-transformer @ git+https://example.test/score@commit",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    requirements = windows_score_support._vcs_requirements(path)
+
+    assert set(requirements) == {"music21", "muster", "score-transformer"}
+
+
+def test_cleanup_handles_read_only_build_files(tmp_path: Path) -> None:
+    root = tmp_path / "staging"
+    root.mkdir()
+    read_only = root / "runtime.dll"
+    read_only.write_bytes(b"native")
+    read_only.chmod(stat.S_IREAD)
+
+    windows_score_support._remove_tree(root)
+
+    assert not root.exists()

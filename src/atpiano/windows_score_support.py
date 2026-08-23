@@ -9,6 +9,7 @@ import json
 import os
 import platform
 import shutil
+import stat
 import struct
 import subprocess
 import sys
@@ -41,6 +42,8 @@ EXPECTED_VCS_SOURCES = {
         "934a228ee33e5731dde6c7b22a2cf13a0825b18f"
     ),
 }
+MUSTER_REPOSITORY = "https://github.com/TimFelixBeyer/amtevaluation.github.io"
+MUSTER_COMMIT = "4ef1165edda1f719068c4c699bd8ab2076e4d7ec"
 FORBIDDEN_DISTRIBUTION_PREFIXES = (
     "cuda-",
     "nvidia-",
@@ -286,6 +289,21 @@ def _direct_url_inventory(site_packages: Path) -> list[dict[str, Any]]:
     return sources
 
 
+def _vcs_requirements(path: Path) -> dict[str, str]:
+    requirements = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        name, separator, requirement = stripped.partition(" @ ")
+        if not separator:
+            raise RuntimeError("score support VCS requirement is malformed")
+        requirements[name] = f"{name} @ {requirement}"
+    if set(requirements) != {"music21", "muster", "score-transformer"}:
+        raise RuntimeError("score support VCS requirement set changed")
+    return requirements
+
+
 def _validate_vcs_sources(sources: list[dict[str, Any]]) -> None:
     observed: dict[str, str] = {}
     for source in sources:
@@ -297,6 +315,119 @@ def _validate_vcs_sources(sources: list[dict[str, Any]]) -> None:
             observed[str(document.get("url"))] = str(vcs.get("commit_id"))
     if observed != EXPECTED_VCS_SOURCES:
         raise RuntimeError("score support VCS provenance differs from its pins")
+
+
+def _remove_tree(path: Path) -> None:
+    def make_writable_and_retry(
+        function: Any,
+        value: str,
+        _: tuple[type[BaseException], BaseException, Any],
+    ) -> None:
+        os.chmod(value, stat.S_IWRITE)
+        function(value)
+
+    if path.exists():
+        shutil.rmtree(path, onerror=make_writable_and_retry)
+
+
+def _install_windows_vcs_dependencies(
+    uv: Sequence[str],
+    python: Path,
+    vcs_lock: Path,
+    working_root: Path,
+    repository: Path,
+) -> list[dict[str, Any]]:
+    requirements = _vcs_requirements(vcs_lock)
+    for name in ("music21", "score-transformer"):
+        _run(
+            [
+                *uv,
+                "pip",
+                "install",
+                "--python",
+                python,
+                "--no-deps",
+                "--strict",
+                "--link-mode",
+                "copy",
+                requirements[name],
+            ],
+            cwd=repository,
+        )
+    git = shutil.which("git")
+    if git is None:
+        raise RuntimeError("Git is required on the Windows score-support build host")
+    source = working_root / "muster-source"
+    source.mkdir()
+    _run([git, "init", "--quiet"], cwd=source)
+    _run([git, "remote", "add", "origin", MUSTER_REPOSITORY], cwd=source)
+    _run([git, "fetch", "--quiet", "--depth", "1", "origin", MUSTER_COMMIT], cwd=source)
+    _run([git, "checkout", "--quiet", "--detach", "FETCH_HEAD"], cwd=source)
+    observed_commit = _run(
+        [git, "rev-parse", "HEAD"],
+        cwd=source,
+        capture_output=True,
+    ).stdout.strip()
+    if observed_commit != MUSTER_COMMIT:
+        raise RuntimeError("MUSTER source commit changed during Windows packaging")
+    (source / "setup.py").write_text(
+        """from setuptools import find_packages, setup
+
+setup(
+    name="muster",
+    version="0.0.1",
+    description="A simple wrapper for MUSTER",
+    packages=find_packages(),
+    package_data={"muster": ["evaluate_XML_voicePlus.sh"]},
+    include_package_data=True,
+)
+""",
+        encoding="utf-8",
+        newline="\n",
+    )
+    _run(
+        [
+            *uv,
+            "pip",
+            "install",
+            "--python",
+            python,
+            "--no-deps",
+            "--strict",
+            "--link-mode",
+            "copy",
+            source,
+        ],
+        cwd=repository,
+    )
+    site_packages = _site_packages(python.parent)
+    sources = [
+        item
+        for item in _direct_url_inventory(site_packages)
+        if not str(item.get("distribution", "")).lower().startswith("muster-")
+    ]
+    sources.append(
+        {
+            "distribution": "muster-0.0.1",
+            "source": {
+                "url": MUSTER_REPOSITORY,
+                "vcs_info": {
+                    "vcs": "git",
+                    "commit_id": MUSTER_COMMIT,
+                    "requested_revision": MUSTER_COMMIT,
+                },
+            },
+            "packaging_override": {
+                "reason": "evaluation-only Unix native tools are not used by inference",
+                "retained": "Python wrapper and evaluate_XML_voicePlus.sh",
+                "omitted": "compile.sh, Code, Programs, and demo",
+            },
+        }
+    )
+    sources.sort(key=lambda item: str(item.get("distribution", "")).lower())
+    _validate_vcs_sources(sources)
+    _remove_tree(source)
+    return sources
 
 
 def _remove_runtime_caches(root: Path) -> None:
@@ -592,23 +723,15 @@ def stage_windows_score_support(output: Path, repository: Path) -> dict[str, Any
             cwd=repository,
         )
         _run(
-            [
-                *uv,
-                "pip",
-                "install",
-                "--python",
-                python,
-                "--requirements",
-                vcs_lock,
-                "--no-deps",
-                "--strict",
-                "--link-mode",
-                "copy",
-            ],
-            cwd=repository,
+            [python, "-I", "-B", "-c", "import sys; assert sys.maxsize > 2**32"],
         )
-        vcs_sources = _direct_url_inventory(site_packages)
-        _validate_vcs_sources(vcs_sources)
+        vcs_sources = _install_windows_vcs_dependencies(
+            uv,
+            python,
+            vcs_lock,
+            temporary,
+            repository,
+        )
         _prune_python(python_root)
         _materialize_runtime_symlinks(root)
         packages = _package_inventory(python)
@@ -661,7 +784,7 @@ def stage_windows_score_support(output: Path, repository: Path) -> dict[str, Any
         return audit_windows_score_support(output, repository)
     finally:
         if temporary.exists():
-            shutil.rmtree(temporary)
+            _remove_tree(temporary)
 
 
 def build_parser() -> argparse.ArgumentParser:

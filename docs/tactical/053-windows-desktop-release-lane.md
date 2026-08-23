@@ -342,6 +342,12 @@ transactional and audits package/VCS identities, canonical payload hashes,
 symbolic links, forbidden model and accelerator content, x64 PE headers, and
 both retained import groups. Unit tests cover relative managed-Python paths,
 cross-platform hash ordering, PE rejection, and acquisition-input identity.
+The upstream MUSTER package unconditionally invokes Unix `sh` and `g++` to
+compile evaluation executables during wheel construction. The Windows builder
+records a narrow packaging override: it checks out the exact pinned commit and
+installs its importable Python wrapper without `compile.sh`, C++ sources,
+evaluation programs, or demo data. Atpiano does not call the omitted evaluation
+path; removing this eager dependency remains tactical 052's later cleanup.
 The builder itself must now run on the claimed Windows testbed; this paragraph
 does not claim a successful Windows package.
 
