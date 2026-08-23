@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -70,4 +71,4 @@ def test_score_support_uses_a_short_independent_workspace(tmp_path: Path) -> Non
 
     working_output = mocked.call_args.args[0]
     assert destination.is_dir()
-    assert working_output.parent.parent != destination.parent
+    assert working_output.parent == Path(tempfile.gettempdir()).resolve()

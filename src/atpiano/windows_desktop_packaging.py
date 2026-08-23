@@ -301,14 +301,14 @@ def _score_support_record(root: Path) -> dict[str, Any]:
 
 
 def _stage_score_support(root: Path, repository: Path) -> None:
-    working = Path(tempfile.mkdtemp(prefix="atpiano-score-support-")).resolve()
-    staged = working / "score-support"
+    staged = Path(tempfile.mkdtemp(prefix="atps-")).resolve()
+    staged.rmdir()
     try:
         stage_windows_score_support(staged, repository)
         shutil.move(str(staged), root)
     finally:
-        if working.exists():
-            _remove_tree(working)
+        if staged.exists():
+            _remove_tree(staged)
 
 
 def _package_identities(packages: Sequence[Mapping[str, Any]]) -> list[dict[str, str]]:
