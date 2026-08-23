@@ -139,6 +139,12 @@ def test_pruning_removes_build_only_windows_launchers(tmp_path: Path) -> None:
     venv = python_root / "Lib" / "venv" / "scripts" / "nt"
     venv.mkdir(parents=True)
     (venv / "redirector.exe").write_bytes(b"launcher")
+    tcl = python_root / "tcl" / "tcl8.6" / "init.tcl"
+    tcl.parent.mkdir(parents=True)
+    tcl.write_bytes(b"tcl")
+    tcl_dll = python_root / "DLLs" / "tcl86t.dll"
+    tcl_dll.parent.mkdir(parents=True)
+    tcl_dll.write_bytes(b"native")
     license_file = (
         python_root
         / "Lib"
@@ -154,6 +160,8 @@ def test_pruning_removes_build_only_windows_launchers(tmp_path: Path) -> None:
 
     assert not launcher.exists()
     assert not venv.exists()
+    assert not tcl.exists()
+    assert not tcl_dll.exists()
 
 
 def test_distribution_licenses_are_flattened_with_provenance(tmp_path: Path) -> None:

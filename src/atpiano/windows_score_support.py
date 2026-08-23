@@ -564,10 +564,16 @@ def _prune_python(python_root: Path) -> None:
         Path("Lib/tkinter"),
         Path("Lib/turtledemo"),
         Path("Lib/venv"),
+        Path("DLLs/_tkinter.pyd"),
+        Path("DLLs/tcl86t.dll"),
+        Path("DLLs/tk86t.dll"),
+        Path("tcl"),
     ):
         target = python_root / relative
         if target.is_dir():
             _remove_tree(target)
+        elif target.is_file():
+            target.unlink()
     for relative in PRUNABLE_PACKAGE_DIRECTORIES:
         target = site_packages / relative
         if target.is_dir():
