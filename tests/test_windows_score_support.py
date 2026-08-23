@@ -77,6 +77,14 @@ def test_acquisition_contract_matches_windows_support_inputs() -> None:
     assert contract["support_layer_id"] == windows_score_support.SUPPORT_LAYER_ID
 
 
+def test_windows_support_hash_inputs_are_checked_out_with_lf() -> None:
+    repository = Path(__file__).resolve().parents[1]
+    attributes = (repository / ".gitattributes").read_text(encoding="utf-8").splitlines()
+
+    assert "desktop-score/support-requirements.lock text eol=lf" in attributes
+    assert "desktop-score/support-vcs-requirements.txt text eol=lf" in attributes
+
+
 def test_vcs_requirements_are_exact(tmp_path: Path) -> None:
     path = tmp_path / "requirements.txt"
     path.write_text(

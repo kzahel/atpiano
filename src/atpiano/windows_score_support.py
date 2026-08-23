@@ -189,18 +189,21 @@ def _read_acquisition_contract(repository: Path) -> dict[str, Any]:
     }
     registry_lock = repository / "desktop-score" / "support-requirements.lock"
     vcs_lock = repository / "desktop-score" / "support-vcs-requirements.txt"
+    registry_hash = sha256_file(registry_lock)
+    vcs_hash = sha256_file(vcs_lock)
     if (
         document.get("schema_version") != "atpiano.score-acquisition.v1"
         or document.get("support_layer_id") != SUPPORT_LAYER_ID
         or document.get("support_python_version") != PYTHON_VERSION
         or (PLATFORM, ARCHITECTURE) not in targets
         or document.get("execution_backend") != EXECUTION_BACKEND
-        or document.get("support_requirements_sha256")
-        != sha256_file(registry_lock)
-        or document.get("support_vcs_requirements_sha256")
-        != sha256_file(vcs_lock)
+        or document.get("support_requirements_sha256") != registry_hash
+        or document.get("support_vcs_requirements_sha256") != vcs_hash
     ):
-        raise RuntimeError("score acquisition contract and support inputs differ")
+        raise RuntimeError(
+            "score acquisition contract and support inputs differ "
+            f"(requirements={registry_hash}, vcs={vcs_hash})"
+        )
     return document
 
 
