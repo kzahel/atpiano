@@ -18,6 +18,8 @@ use std::{
 use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
 
+mod desktop_score;
+
 const DESKTOP_PROTOCOL: &str = "atpiano.desktop.v1";
 const CONTRACT_SCHEMA: &str = "atpiano.contract.v1";
 const MODEL_PACK_ID: &str = "atpiano-cpu-models-2026.07";
@@ -742,7 +744,7 @@ fn start_sidecar(
     let python = runtime.join(target.python_relative);
     let model_pack = runtime.join("model-pack/model-pack.json");
     let replay_manifest = runtime.join("fixture/input.json");
-    let score_runtime = runtime.join("score-runtime");
+    let score_runtime = desktop_score::active_runtime(app, target.platform, target.architecture);
     require_file(&python, "Python runtime")?;
     require_file(&model_pack, "model pack")?;
     require_file(&replay_manifest, "replay fixture")?;
@@ -776,11 +778,12 @@ fn start_sidecar(
         .arg(CONTRACT_SCHEMA)
         .arg("--desktop-origin")
         .arg(target.origin)
-        .arg("--score-runtime")
-        .arg(&score_runtime)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    if let Some(score_runtime) = score_runtime {
+        command.arg("--score-runtime").arg(score_runtime);
+    }
     configure_sidecar_environment(&mut command, target, &runtime, &workspace, &credential)?;
     let mut child = command
         .spawn()
@@ -914,6 +917,55 @@ fn desktop_runtime(state: tauri::State<'_, DesktopState>) -> Result<DesktopRunti
     current_runtime_info(&state.status)
 }
 
+#[tauri::command]
+fn desktop_score_runtime_status(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, desktop_score::ScoreAcquisitionState>,
+) -> Result<desktop_score::ScoreRuntimeStatus, String> {
+    let target = current_desktop_target()?;
+    desktop_score::status(&app, &state, target.platform, target.architecture)
+}
+
+#[tauri::command(async)]
+async fn desktop_score_acquire(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, desktop_score::ScoreAcquisitionState>,
+    acknowledged: bool,
+) -> Result<desktop_score::ScoreRuntimeStatus, String> {
+    let target = current_desktop_target()?;
+    let operation = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        desktop_score::acquire(
+            &app,
+            operation,
+            target.platform,
+            target.architecture,
+            acknowledged,
+        )
+    })
+    .await
+    .map_err(|error| format!("score model operation stopped unexpectedly: {error}"))?
+}
+
+#[tauri::command(async)]
+async fn desktop_score_remove(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, desktop_score::ScoreAcquisitionState>,
+) -> Result<desktop_score::ScoreRuntimeStatus, String> {
+    let target = current_desktop_target()?;
+    let operation = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        desktop_score::remove(&app, operation, target.platform, target.architecture)
+    })
+    .await
+    .map_err(|error| format!("score model operation stopped unexpectedly: {error}"))?
+}
+
+#[tauri::command]
+fn desktop_score_cancel(state: tauri::State<'_, desktop_score::ScoreAcquisitionState>) -> bool {
+    state.cancel()
+}
+
 #[tauri::command(async)]
 fn desktop_prepare_update_install(state: tauri::State<'_, DesktopState>) -> Result<(), String> {
     state.prepare_update_install()
@@ -1015,10 +1067,15 @@ pub fn run() {
                 status,
                 process: Mutex::new(process),
             });
+            app.manage(desktop_score::ScoreAcquisitionState::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             desktop_runtime,
+            desktop_score_runtime_status,
+            desktop_score_acquire,
+            desktop_score_cancel,
+            desktop_score_remove,
             desktop_export_artifact,
             desktop_prepare_update_install,
             desktop_resume_after_update_failure

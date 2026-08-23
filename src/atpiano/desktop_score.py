@@ -26,6 +26,7 @@ class ScoreSourceAsset(BaseModel):
     archive_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     archive_bytes: int = Field(gt=0)
     archive_root: str
+    tree_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     maximum_entry_count: int = Field(gt=0, le=10_000)
     maximum_expanded_bytes: int = Field(gt=0)
 

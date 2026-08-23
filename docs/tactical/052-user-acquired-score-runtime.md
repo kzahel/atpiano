@@ -3,8 +3,10 @@
 Topics: `desktop-score-runtime-footprint`, `public-desktop-release`,
 `performance-to-notation`
 
-Status: **planned as the minimal proof-of-concept prerequisite for the first
-public desktop tag.** Dependency cleanup is explicitly deferred.
+Status: **implementation active as a proof-of-concept prerequisite for the
+first public desktop tag.** The external asset contract and transactional
+native controller are implemented; support-layer staging, the dialog, and
+installed validation remain. Dependency cleanup is explicitly deferred.
 
 ## Goal
 
@@ -476,6 +478,25 @@ unknown fields, non-HTTPS or unlisted hosts, inconsistent byte totals,
 unsupported target pairs, receipt identity creep, and unsafe active-runtime
 paths. The three focused contract tests pass. The platform support-layer
 inventory/hash, native transactional downloader, and UI remain active work.
+
+The first native controller now embeds and independently validates that
+contract, reports score-runtime status without making a request, and exposes
+acknowledged acquire, cancel, and remove commands only to the Tauri
+composition. Acquisition uses fixed URLs, HTTPS-only bounded redirects,
+content lengths, streaming SHA-256, cancellation, free-space checks, exact ZIP
+root/path/type/count/expanded-byte limits, a cross-platform normalized tree
+hash, and private same-filesystem staging. It copies only the signed target
+support layer, writes the existing score-runtime manifest, publishes the
+complete directory before atomically activating its relative pointer, and
+rolls back unpublished staging/final data on failure. Removal first validates
+the exact contract-relative target and never follows a runtime-root symlink.
+
+Desktop startup now selects only a valid external active record and otherwise
+starts score-free. The Python boundary independently rehashes acquired source
+and checkpoint assets before exposing score capability. Eighteen Rust tests,
+Rust Clippy with warnings denied, and 28 focused Python desktop/score tests
+pass on macOS. The real 390 MB download and support layer have not yet been
+exercised; no network test ran merely from status or test execution.
 
 ## Later Todo — Remove Evaluation Helpers
 

@@ -34,6 +34,7 @@ from atpiano.util import (
     git_worktree_dirty,
     read_json,
     sha256_file,
+    sha256_path,
     utc_now,
     write_json,
 )
@@ -50,6 +51,7 @@ MIDI2SCORE_CHECKPOINT_URL = (
     "releases/download/v0.0.1/MIDI2ScoreTF.ckpt"
 )
 MIDI2SCORE_CHECKPOINT_SHA256 = "7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d43cb2011245db638"
+MIDI2SCORE_TREE_SHA256 = "86274feed5a9d28c41a314d1ea435fc84e67a053293b281d7b1e9b86da431516"
 MAX_SCORE_NOTES = 4096
 MAX_SCORE_SOURCE_S = 15 * 60
 SCORE_TIMEOUT_S = 180
@@ -205,6 +207,18 @@ def inspect_score_runtime(runtime_directory: Path) -> dict[str, Any]:
             "available": False,
             "directory": str(paths["root"]),
             "error": "score runtime versions do not match the pinned contract",
+        }
+    tree_sha256 = manifest.get("repository", {}).get("tree_sha256")
+    if tree_sha256 is not None and (
+        tree_sha256 != MIDI2SCORE_TREE_SHA256
+        or sha256_path(paths["repository"]) != MIDI2SCORE_TREE_SHA256
+        or sha256_file(paths["checkpoint"])
+        != MIDI2SCORE_CHECKPOINT_SHA256
+    ):
+        return {
+            "available": False,
+            "directory": str(paths["root"]),
+            "error": "score runtime assets do not match the pinned contract",
         }
     return {
         "available": True,

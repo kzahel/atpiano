@@ -13,6 +13,7 @@
     "archive_sha256": "42953b3d184807b9e4d18f2b9280e8e7593d5b74890f8d9755187f0e27537cb7",
     "archive_bytes": 187103,
     "archive_root": "MIDI2ScoreTransformer-115432bda16ca16e0fec2e9465788f2ba369971f",
+    "tree_sha256": "86274feed5a9d28c41a314d1ea435fc84e67a053293b281d7b1e9b86da431516",
     "maximum_entry_count": 128,
     "maximum_expanded_bytes": 5000000
   },
