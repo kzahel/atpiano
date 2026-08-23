@@ -10,12 +10,11 @@ const digest = `sha256:${"a".repeat(64)}`;
 
 function fixture() {
   const updater = "Atpiano_aarch64.app.tar.gz";
-  const windowsUpdater = `Atpiano_${version}_x64-setup.nsis.zip`;
+  const windowsUpdater = `Atpiano_${version}_x64-setup.exe`;
   const names = [
     `Atpiano_${version}_aarch64.dmg`,
     updater,
     `${updater}.sig`,
-    `Atpiano_${version}_x64-setup.exe`,
     windowsUpdater,
     `${windowsUpdater}.sig`,
     `Atpiano_${version}_media-sources.tar.gz`,
@@ -69,7 +68,7 @@ test("rejects updater URLs outside the exact tagged release", () => {
   assert.throws(() => validateRelease({ ...data, tag, repository }), /unexpected URL/);
   data.latest.platforms["darwin-aarch64"].url =
     `https://github.com/${repository}/releases/download/${tag}/Atpiano_aarch64.app.tar.gz`;
-  data.latest.platforms["windows-x86_64"].url = "https://example.test/setup.nsis.zip";
+  data.latest.platforms["windows-x86_64"].url = "https://example.test/setup.exe";
   assert.throws(() => validateRelease({ ...data, tag, repository }), /unexpected URL/);
 });
 

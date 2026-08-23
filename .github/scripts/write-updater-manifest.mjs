@@ -38,7 +38,7 @@ export function updaterManifest({
   if (!/^Atpiano(?:_[0-9.]+)?_aarch64\.app\.tar\.gz$/.test(macosAsset)) {
     fail(`unexpected macOS updater asset: ${macosAsset}`);
   }
-  if (windowsAsset !== `Atpiano_${version}_x64-setup.nsis.zip`) {
+  if (windowsAsset !== `Atpiano_${version}_x64-setup.exe`) {
     fail(`unexpected Windows updater asset: ${windowsAsset}`);
   }
   const publishedAt = pubDate ?? new Date().toISOString();

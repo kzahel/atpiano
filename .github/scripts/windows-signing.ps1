@@ -18,15 +18,8 @@ $installers = @(
         -Filter 'Atpiano_*_x64-setup.exe' `
         -File
 )
-$updaters = @(
-    Get-ChildItem `
-        -LiteralPath (Join-Path $ReleaseRoot 'bundle\nsis') `
-        -Filter 'Atpiano_*_x64-setup.nsis.zip' `
-        -File
-)
-if ($applications.Count -ne 1 -or $installers.Count -ne 1 -or
-    $updaters.Count -ne 1) {
-    throw 'Expected one signed app, NSIS installer, and NSIS updater archive'
+if ($applications.Count -ne 1 -or $installers.Count -ne 1) {
+    throw 'Expected one signed app and one signed NSIS installer'
 }
 
 $records = @()
@@ -59,7 +52,7 @@ foreach ($file in @($applications[0], $installers[0])) {
     }
 }
 
-$signaturePath = "$($updaters[0].FullName).sig"
+$signaturePath = "$($installers[0].FullName).sig"
 if (-not (Test-Path -LiteralPath $signaturePath) -or
     (Get-Item -LiteralPath $signaturePath).Length -lt 32) {
     throw 'The Windows updater detached signature is missing or empty'
@@ -91,9 +84,9 @@ $report = [ordered]@{
         } | Sort-Object -Unique)
     signedFiles = $records
     updater = [ordered]@{
-        name = $updaters[0].Name
-        bytes = $updaters[0].Length
-        sha256 = (Get-FileHash -LiteralPath $updaters[0].FullName `
+        name = $installers[0].Name
+        bytes = $installers[0].Length
+        sha256 = (Get-FileHash -LiteralPath $installers[0].FullName `
             -Algorithm SHA256).Hash.ToLowerInvariant()
         signatureBytes = (Get-Item -LiteralPath $signaturePath).Length
     }

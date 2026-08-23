@@ -51,11 +51,7 @@ export function validateRelease({ release, latest, tag, repository }) {
     new RegExp(`^Atpiano_${version.replaceAll(".", "\\.")}_x64-setup\\.exe$`),
     "Windows x64 NSIS installer",
   );
-  const windowsUpdater = matchingAsset(
-    assetNames,
-    new RegExp(`^Atpiano_${version.replaceAll(".", "\\.")}_x64-setup\\.nsis\\.zip$`),
-    "Windows x64 updater archive",
-  );
+  const windowsUpdater = windowsInstaller;
   const windowsSignature = `${windowsUpdater}.sig`;
   const mediaSources = matchingAsset(
     assetNames,

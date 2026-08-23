@@ -410,8 +410,7 @@ jobs:
           retention-days: 7
           path: |
             app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-            app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip
-            app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip.sig
+            app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe.sig
 
       - name: Retain redacted Windows build evidence
         uses: actions/upload-artifact@v4
@@ -430,8 +429,7 @@ jobs:
         with:
           subject-path: |
             app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-            app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip
-            app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip.sig
+            app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe.sig
 
   finalize-release:
     if: always() && startsWith(github.ref, 'refs/tags/desktop-v')
@@ -494,11 +492,11 @@ jobs:
           )
           mapfile -t WINDOWS_UPDATERS < <(
             find "$RELEASE_DIRECTORY" -maxdepth 1 -type f \
-              -name "Atpiano_${VERSION}_x64-setup.nsis.zip" -print
+              -name "Atpiano_${VERSION}_x64-setup.exe" -print
           )
           if [ "${#MACOS_UPDATERS[@]}" -ne 1 ] || \
              [ "${#WINDOWS_UPDATERS[@]}" -ne 1 ]; then
-            echo "::error::Expected exactly one updater archive for each platform"
+            echo "::error::Expected exactly one updater artifact for each platform"
             exit 1
           fi
           node .github/scripts/write-updater-manifest.mjs \

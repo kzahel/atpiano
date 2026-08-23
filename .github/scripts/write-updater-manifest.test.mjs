@@ -11,7 +11,7 @@ function fixture() {
   const macosUpdaterPath = path.join(directory, "Atpiano_aarch64.app.tar.gz");
   const windowsUpdaterPath = path.join(
     directory,
-    "Atpiano_1.2.3_x64-setup.nsis.zip",
+    "Atpiano_1.2.3_x64-setup.exe",
   );
   fs.writeFileSync(`${macosUpdaterPath}.sig`, "m".repeat(64));
   fs.writeFileSync(`${windowsUpdaterPath}.sig`, "w".repeat(64));
@@ -41,7 +41,7 @@ test("writes the exact two-target update identity", (context) => {
       },
       "windows-x86_64": {
         signature: "w".repeat(64),
-        url: "https://github.com/kzahel/atpiano/releases/download/desktop-v1.2.3/Atpiano_1.2.3_x64-setup.nsis.zip",
+        url: "https://github.com/kzahel/atpiano/releases/download/desktop-v1.2.3/Atpiano_1.2.3_x64-setup.exe",
       },
     },
   });
