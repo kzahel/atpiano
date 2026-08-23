@@ -440,8 +440,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" --draft
-            echo "::error::Required jobs failed; $GITHUB_REF_NAME remains a draft"
+            IS_DRAFT=$(gh release view "$GITHUB_REF_NAME" --json isDraft \
+              --jq '.isDraft')
+            if [ "$IS_DRAFT" = "true" ]; then
+              echo "::error::Required jobs failed; $GITHUB_REF_NAME remains a draft"
+            else
+              echo "::error::Required jobs failed during a rerun; the existing public release was not changed"
+            fi
           else
             echo "::error::Required jobs failed; no release was created"
           fi
