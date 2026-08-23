@@ -499,7 +499,8 @@ finalizer accepts exactly the macOS arm64 and Windows x64 artifact pairs,
 creates one two-target updater manifest, adds final GitHub asset checksums,
 validates the private draft, and publishes only after both jobs succeed. The
 workflow parses and passes `actionlint`, but it has not run with credentials;
-all 11 required Actions secret names are absent as of 2026-08-23.
+all 11 required Actions secret names were configured and verified on
+2026-08-23. The first credentialed two-platform rehearsal remains pending.
 
 The post-integration local gate passes Ruff, all 305 Python tests, frontend
 typecheck, 17 Node contract tests, 109 React/browser tests, all 23 Rust tests,

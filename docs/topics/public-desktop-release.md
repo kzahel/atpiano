@@ -7,8 +7,9 @@ license; binary publication remains on hold as of 2026-08-23 while the first
 release adds user-acquired score capability.** Atpiano has implemented the
 accepted Desktop Update Contract v1 for a first public proof-of-concept
 release. The accepted direction now requires both macOS arm64 and Windows
-x86_64 CPU applications in the first binary tag. No GitHub Release exists and
-all 11 required Actions secret names remain absent as of 2026-08-23. Tactical
+x86_64 CPU applications in the first binary tag. No GitHub Release exists. All
+11 required Actions secret names were configured and verified on 2026-08-23;
+the credentialed workflow rehearsal has not run. Tactical
 [`051-signed-macos-update-lane.md`](../tactical/051-signed-macos-update-lane.md)
 owns the macOS signed baseline and update campaign. The earlier macOS
 score-assets-free LGPL candidate is signed, notarized, installed, and locally
@@ -301,17 +302,16 @@ has no EULA restricting LGPL debugging or modification.
    adapter result, and reinstall preservation also pass. The exact credentialed
    CI package, packaged replay/export and frontend score flows, explicit
    removal, and Windows updater remain.
-7. **Release credentials: not configured.** GitHub reports zero Actions
-   secrets. The exact contract is eight updater/Apple names plus
+7. **Release credentials: configured; rehearsal pending.** GitHub reports all
+   11 required Actions secret names. The exact contract is eight updater/Apple names plus
    `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_CLIENT_SECRET`. The tracked
    updater public key matches the local Atpiano per-product public-key file.
    The local Developer ID identity validates, App Store Connect notarization
    authentication succeeds, and the private credential files are owner-only.
-   The two signing passwords and Azure secret still require attended entry.
-   Validate all four credential groups through the canonical private signing
-   runbook, upload through non-logging input boundaries, verify names only with
-   `scripts/check-desktop-release-secrets`, and run the non-tagged two-platform
-   rehearsal before creating a tag.
+   The canonical attended helper validated all four credential groups before
+   uploading through non-logging input boundaries, and
+   `scripts/check-desktop-release-secrets` confirms every expected name. Run
+   the non-tagged two-platform rehearsal before creating a tag.
 8. **Binary-publication hold:** repository visibility and public CI rehearsal
    are complete. Review the proposed tag, artifact set, exact route, rehearsal
    evidence, and remaining risks before uploading Actions secrets, activating

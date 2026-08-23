@@ -9,16 +9,19 @@ itself.
 
 As of 2026-08-23, `kzahel/atpiano` is public and has no GitHub Release. The
 source tree contains the score-model notice and acquisition capability, but no
-MIDI2ScoreTransformer source or checkpoint. GitHub Actions has none of the 11
-required secret names configured. The production updater product remains
+MIDI2ScoreTransformer source or checkpoint. All 11 required GitHub Actions
+secret names were configured and independently verified on 2026-08-23. The
+production updater product remains
 inactive: both the macOS arm64 and Windows x64 concrete `0.1.0` routes return
 HTTP 404 `Unknown product for this hostname`.
 
 The local Developer ID identity is valid and App Store Connect notarization
 authentication succeeds. The Atpiano updater keypair is present and its public
 half matches the application configuration. Private key/certificate files are
-owner-readable only. The certificate/updater passwords and Azure client secret
-still require attended validation before the 11 values can be uploaded.
+owner-readable only. The attended helper validated the Developer ID,
+notarization, updater-key, and Azure credential groups before uploading the 11
+values through non-logging input boundaries. A credentialed workflow run has
+not yet exercised them.
 
 The Windows package built and installed successfully on the Windows 11 ARM64
 testbed as an x64-emulated, unsigned development package. Its real acknowledged
