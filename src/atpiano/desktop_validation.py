@@ -44,6 +44,7 @@ MAX_GOLDEN_FRAME_F1_DELTA = 0.02
 MAX_GOLDEN_VELOCITY_MAE_DELTA = 2.0
 MAX_GOLDEN_NOTE_COUNT_RELATIVE_DELTA = 0.05
 REPLAY_START_TIMEOUT_S = 30
+WINDOWS_REPLAY_START_TIMEOUT_S = 5 * 60
 VOLATILE_EVENT_FIELDS = {
     "emitted_at_monotonic_ns",
     "emitted_elapsed_s",
@@ -355,7 +356,11 @@ def run_packaged_replay(
         )
         with urllib.request.urlopen(
             request,
-            timeout=REPLAY_START_TIMEOUT_S,
+            timeout=(
+                WINDOWS_REPLAY_START_TIMEOUT_S
+                if desktop_origin == "http://tauri.localhost"
+                else REPLAY_START_TIMEOUT_S
+            ),
         ) as response:
             state = json.load(response)
         deadline = time.monotonic() + 20 * 60
