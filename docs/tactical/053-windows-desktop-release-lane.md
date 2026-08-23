@@ -8,10 +8,11 @@ release.** The Python desktop identity/model-pack contracts now accept exactly
 macOS arm64 and Windows x86_64 CPU pairings. The Tauri launcher and frontend
 now carry exact resource, origin, package, and updater variants for both
 targets. The native Windows x64 application core is established and the
-universal score-support registry lock resolves for Windows x64. A tracked
-Windows x64 score-support package now passes on the testbed under x64-on-ARM64
-emulation. No complete relocatable Windows runtime, application package,
-signed installer, packaged MIDI2Score result, or updater campaign exists.
+universal score-support registry lock resolves for Windows x64. A complete
+2.12 GB relocatable Windows x64 runtime, including the ordinary model pack,
+pinned media payload, and publication-safe score support, now passes twice on
+the testbed under x64-on-ARM64 emulation. No Tauri application package, signed
+installer, packaged MIDI2Score result, or updater campaign exists.
 
 ## Goal
 
@@ -384,6 +385,47 @@ second independent audit of the published directory passed. These results do
 not establish native x64 timing, ordinary desktop runtime staging, actual
 MIDI2Score inference, MusicXML parity, Tauri packaging, or installed UI
 acceptance.
+
+The Phase 2 ordinary-runtime builder now selects standalone x64 CPython
+3.10.19 build `20260114`, installs the 101 locked production dependencies plus
+Atpiano, extracts the Windows ONNX Basic Pitch asset and Transkun CPU assets
+into the platform-bound model pack, and bundles the exact BtbN
+`n8.1.2-44-g7c533d0f86` shared-LGPL FFmpeg/FFprobe payload. The media archive
+SHA-256 is
+`d311c8c7b86e06b54588e442652f963bae165bd4d8393e73cc9ebb445b025547`;
+an encode/probe control passes without a user-installed media tool.
+
+Windows traversal found that Torch's retained `*.dist-info` third-party
+license files were too deeply nested for a real Tauri resource path. The
+builder now preserves those files under a flat, hashed
+`share/licenses/python` inventory with their distribution, original path, and
+digest. The final score-support layer retains 165 such files, has 20,577 total
+files and 920,111,485 installed bytes, and its 920,110,834-byte canonical
+payload hashes to
+`1f5ba6c1987e48781b115593c1e92940fff9074a02d34e22c9dc15dbb4008c4b`.
+
+Exact commit `c753038` then produced the complete resource tree at the path
+Tauri will consume. The builder's acceptance audit and a second independent
+in-place audit both passed on the Windows 11 ARM64 testbed as x64 processes:
+
+| Evidence | Value |
+| --- | ---: |
+| Ordinary distributions | 102 |
+| x64 PE files, complete tree | 583 |
+| Files, complete tree | 35,364 |
+| Installed bytes | 2,123,359,429 |
+| Canonical payload SHA-256 | `c07b13bac776fcb51fda4389d3be3470ce1a0aa589bb5bf64670f46b9103544d` |
+| Bundle-manifest SHA-256 | `e16526415e23367f64da41cd872177be469b5c0522bb327a5b3a4212ff40a771` |
+| Model-pack SHA-256 | `9d1dfeaa8de67145e8fb0866e578228092afe6ced55e280e434c7841de95227f` |
+
+The packaged-layout sidecar smoke returned the Windows x86_64 identity,
+rejected the unauthenticated handshake with HTTP 401, accepted the exact Tauri
+Windows origin and bearer token, reported score unavailable before user
+acquisition, and stopped cleanly on parent EOF. The complete stage contains no
+MIDI2ScoreTransformer source or checkpoint. This completes the deterministic
+runtime-staging portion of Phase 2; Basic Pitch/Transkun fixture replay,
+external acquired-score inference, Tauri/NSIS packaging, installation, UI,
+signing, and update acceptance remain.
 
 ## Rollback
 

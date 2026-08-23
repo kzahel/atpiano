@@ -4,7 +4,8 @@ Topic: desktop-score-runtime-footprint
 
 Status: **a user-acquired score runtime is now implemented through the packaged
 macOS consent gate, with platform support layers built for macOS arm64 and
-Windows x64 as of 2026-08-23.** The complete Windows application and actual
+Windows x64 as of 2026-08-23.** The complete 2.12 GB Windows desktop resource
+tree also passes its staged audit; the Windows Tauri/NSIS package and actual
 acquired-model run remain in progress.
 The published applications and GitHub Release must still exclude the
 MIDI2ScoreTransformer repository and checkpoint. Each application may include
@@ -87,18 +88,23 @@ earlier projection while keeping the main model external:
 | Unsigned packaged Atpiano application | 1,959,847,221 | 1.96 GB |
 | Generated updater archive | 586,901,211 | 586.9 MB |
 | Later user-acquired source plus checkpoint | 390,016,983 | 390.0 MB |
-| Windows x64 score-support package | 920,228,180 | 920.2 MB |
+| Windows x64 score-support package | 920,111,485 | 920.1 MB |
+| Complete staged Windows desktop runtime | 2,123,359,429 | 2.12 GB |
 
 The support package has 64 distributions and excludes the
 MIDI2ScoreTransformer repository and checkpoint. Its 926,842,450-byte
 canonical payload hashes to
 `8f25d0131cfc7b76e8efde1c19f2b8f255823b263003c187bf46b69b560e5bce`.
 The Windows support package has the same 64 distributions, 196 x64 PE files,
-and a 920,227,529-byte canonical payload with SHA-256
-`4b9c41b350978164a97070bad4d894982b2d454b7ea1d628cabffef4c6461bd1`.
+165 flattened and hash-inventoried distribution-license files, and a
+920,110,834-byte canonical payload with SHA-256
+`1f5ba6c1987e48781b115593c1e92940fff9074a02d34e22c9dc15dbb4008c4b`.
+The complete Windows stage has 102 ordinary distributions, 583 x64 PE files,
+35,364 files, and canonical SHA-256
+`c07b13bac776fcb51fda4389d3be3470ce1a0aa589bb5bf64670f46b9103544d`.
 Its build and independent repeat audit passed under Windows x64-on-ARM64
-emulation. The unsigned packaged-macOS-App audit and Windows support audit find
-no forbidden score assets. Signed DMG, complete Windows package, and
+emulation. The unsigned packaged-macOS-App audit and Windows staged-runtime
+audit find no forbidden score assets. Signed DMG, Windows NSIS package, and
 post-acquisition installed sizes remain unmeasured.
 
 The score runtime is large primarily because it is a second standalone Python

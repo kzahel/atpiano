@@ -122,10 +122,11 @@ ARM64 support.
 | Successor version/tag | `0.1.1` / `desktop-v0.1.1` |
 | Accepted local macOS installer | `Atpiano_0.1.0_aarch64.dmg` baseline; acquisition-capable rebuild pending |
 | macOS update pair | `Atpiano.app.tar.gz` and `Atpiano.app.tar.gz.sig` |
-| Windows installer/update | planned signed x64 NSIS setup executable and updater signature; no package exists |
+| Windows runtime | complete 2.12 GB x64 resource stage passes twice under x64-on-ARM64 emulation |
+| Windows installer/update | signed x64 NSIS setup executable and updater signature still pending |
 | CI metadata/finalizer output | `latest.json` and `SHA256SUMS` |
 | Corresponding media sources | `Atpiano_0.1.0_media-sources.tar.gz` |
-| Score acquisition | tactical 052 planned; not present in the signed rehearsal candidate |
+| Score acquisition | consent/acquisition controller implemented; not present in the earlier signed rehearsal candidate |
 | MIDI2ScoreTransformer release assets | repository and checkpoint forbidden; direct upstream acquisition only |
 | Product proposal | `update-server/atpiano.json` |
 | Exact route | `https://updates.graehlarts.com/atpiano/tauri/...` |

@@ -2,16 +2,16 @@
 
 Topic: windows-native-runtime-portability
 
-Status: **native Windows CPU and RTX 4090 CUDA server baselines established on
-2026-07-31.** The locked ordinary, CPU corrected, and CUDA corrected
-environments, Basic Pitch ONNX preview, Transkun controls, production
-frontend, migration gate, one-hour storage control, and unpackaged
-`workbench-v3` replay all pass without WSL. Accelerated CUDA settlement and
-process-restart recovery pass; wall-clock browser paint, physical microphone,
-and Windows desktop packaging have not passed. The accepted Tauri proof
-remains macOS arm64 only. The product decision on 2026-08-23 made a Windows
-x86_64 CPU package a prerequisite of the first binary proof-of-concept release;
-tactical
+Status: **native Windows CPU/CUDA server baselines and the complete relocatable
+Windows x64 CPU desktop resource stage are established as of 2026-08-23.** The
+locked ordinary and corrected environments, Basic Pitch ONNX model pack,
+Transkun CPU assets, pinned FFmpeg/FFprobe, publication-safe score support,
+authenticated sidecar startup, and repeat package/PE/hash audits pass without
+WSL. The 2.12 GB stage is validated under x64-on-ARM64 emulation; Tauri/NSIS,
+installation, wall-clock browser paint, physical microphone, actual acquired
+score inference, signing, and updates have not passed. The product decision on
+2026-08-23 made a Windows x86_64 CPU package a prerequisite of the first binary
+proof-of-concept release; tactical
 [`053-windows-desktop-release-lane.md`](../tactical/053-windows-desktop-release-lane.md)
 owns that work.
 
@@ -94,16 +94,17 @@ not native x64 performance evidence. Native x64 GitHub Actions builds and the
 existing physical x64 server baseline cover the complementary architecture
 boundary. Native Windows ARM64 packaging is later work.
 
-The first implementation slices now generalize the Python and Tauri desktop
+The implementation slices now generalize the Python and Tauri desktop
 boundary to the two exact supported pairs. Python normalizes a Windows AMD64
 process to `windows/x86_64`, rejects Windows ARM64 and invalid cross-pairs, and
 requires the model pack to match the host/backend. Tauri selects explicit
 macOS arm64 and Windows x86_64 Python, resource, origin, package, and updater
 variants; its Windows local origin is passed through the authenticated
 sidecar, handshake, and artifact paths. The frontend likewise accepts only
-the matching `.app` and NSIS identity triples. The Windows runtime still needs
-to be staged, compiled, packaged, installed, and exercised on Windows, so
-these portable contracts alone are not a Windows desktop build.
+the matching `.app` and NSIS identity triples. The complete Windows resource
+runtime is now staged and audited; the Tauri shell still needs to be composed
+with it, packaged as NSIS, installed, and exercised before this becomes
+Windows desktop acceptance.
 
 The Tauri shell now also compiles as `x86_64-pc-windows-msvc`, and all 15 Rust
 tests execute successfully as x64 processes on the ARM64 Windows testbed. The
