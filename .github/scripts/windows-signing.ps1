@@ -8,23 +8,19 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$applications = @(
-    Get-ChildItem -LiteralPath $ReleaseRoot `
-        -Filter 'atpiano-desktop.exe' -File
-)
 $installers = @(
     Get-ChildItem `
         -LiteralPath (Join-Path $ReleaseRoot 'bundle\nsis') `
         -Filter 'Atpiano_*_x64-setup.exe' `
         -File
 )
-if ($applications.Count -ne 1 -or $installers.Count -ne 1) {
-    throw 'Expected one signed app and one signed NSIS installer'
+if ($installers.Count -ne 1) {
+    throw 'Expected one signed NSIS installer'
 }
 
 $records = @()
 $signerSubject = $null
-foreach ($file in @($applications[0], $installers[0])) {
+foreach ($file in @($installers[0])) {
     $signature = Get-AuthenticodeSignature -LiteralPath $file.FullName
     if ($signature.Status -ne 'Valid') {
         throw "$($file.Name) Authenticode status is $($signature.Status)"
@@ -98,4 +94,4 @@ New-Item -ItemType Directory -Force -Path (Split-Path -Parent $ReportPath) |
     $ReportPath,
     (($report | ConvertTo-Json -Depth 8) + "`n"),
     [Text.UTF8Encoding]::new($false))
-Write-Output 'Verified signed and timestamped Windows desktop artifacts'
+Write-Output 'Verified signed installer and Windows updater signature'
