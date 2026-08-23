@@ -46,15 +46,35 @@ export function validateRelease({ release, latest, tag, repository }) {
     "macOS Apple-silicon updater archive",
   );
   const signature = `${updater}.sig`;
+  const windowsInstaller = matchingAsset(
+    assetNames,
+    new RegExp(`^Atpiano_${version.replaceAll(".", "\\.")}_x64-setup\\.exe$`),
+    "Windows x64 NSIS installer",
+  );
+  const windowsUpdater = matchingAsset(
+    assetNames,
+    new RegExp(`^Atpiano_${version.replaceAll(".", "\\.")}_x64-setup\\.nsis\\.zip$`),
+    "Windows x64 updater archive",
+  );
+  const windowsSignature = `${windowsUpdater}.sig`;
   const mediaSources = matchingAsset(
     assetNames,
     new RegExp(`^Atpiano_${version.replaceAll(".", "\\.")}_media-sources\\.tar\\.gz$`),
     "corresponding media source archive",
   );
-  for (const required of ["latest.json", signature]) {
+  for (const required of ["latest.json", signature, windowsSignature]) {
     if (!assetNames.has(required)) fail(`missing required release asset: ${required}`);
   }
-  const expectedAssets = new Set([dmg, updater, signature, mediaSources, "latest.json"]);
+  const expectedAssets = new Set([
+    dmg,
+    updater,
+    signature,
+    windowsInstaller,
+    windowsUpdater,
+    windowsSignature,
+    mediaSources,
+    "latest.json",
+  ]);
   const unexpected = [...assetNames].filter((name) => !expectedAssets.has(name));
   if (unexpected.length) fail(`unexpected release assets: ${unexpected.join(", ")}`);
 
@@ -65,17 +85,25 @@ export function validateRelease({ release, latest, tag, repository }) {
     fail("latest.json platforms are missing");
   }
   const platforms = Object.keys(latest.platforms).sort();
-  if (JSON.stringify(platforms) !== JSON.stringify(["darwin-aarch64"])) {
+  if (
+    JSON.stringify(platforms) !==
+    JSON.stringify(["darwin-aarch64", "windows-x86_64"])
+  ) {
     fail(`unexpected latest.json platforms: ${platforms.join(", ")}`);
   }
-  const metadata = latest.platforms["darwin-aarch64"];
-  if (typeof metadata.signature !== "string" || metadata.signature.length < 32) {
-    fail("latest.json darwin-aarch64 has no usable signature");
-  }
-  const expectedUrl =
-    `https://github.com/${repository}/releases/download/${tag}/${encodeURIComponent(updater)}`;
-  if (metadata.url !== expectedUrl) {
-    fail(`latest.json darwin-aarch64 has an unexpected URL: ${metadata.url}`);
+  for (const [platform, asset] of [
+    ["darwin-aarch64", updater],
+    ["windows-x86_64", windowsUpdater],
+  ]) {
+    const metadata = latest.platforms[platform];
+    if (typeof metadata.signature !== "string" || metadata.signature.length < 32) {
+      fail(`latest.json ${platform} has no usable signature`);
+    }
+    const expectedUrl =
+      `https://github.com/${repository}/releases/download/${tag}/${encodeURIComponent(asset)}`;
+    if (metadata.url !== expectedUrl) {
+      fail(`latest.json ${platform} has an unexpected URL: ${metadata.url}`);
+    }
   }
   return { version, platforms };
 }

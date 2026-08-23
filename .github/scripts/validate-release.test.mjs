@@ -10,10 +10,14 @@ const digest = `sha256:${"a".repeat(64)}`;
 
 function fixture() {
   const updater = "Atpiano_aarch64.app.tar.gz";
+  const windowsUpdater = `Atpiano_${version}_x64-setup.nsis.zip`;
   const names = [
     `Atpiano_${version}_aarch64.dmg`,
     updater,
     `${updater}.sig`,
+    `Atpiano_${version}_x64-setup.exe`,
+    windowsUpdater,
+    `${windowsUpdater}.sig`,
     `Atpiano_${version}_media-sources.tar.gz`,
     "latest.json",
   ];
@@ -30,12 +34,16 @@ function fixture() {
           signature: "signed-updater-metadata-that-is-long-enough",
           url: `https://github.com/${repository}/releases/download/${tag}/${updater}`,
         },
+        "windows-x86_64": {
+          signature: "signed-windows-metadata-that-is-long-enough",
+          url: `https://github.com/${repository}/releases/download/${tag}/${windowsUpdater}`,
+        },
       },
     },
   };
 }
 
-test("accepts the exact Atpiano one-target draft", () => {
+test("accepts the exact Atpiano two-target draft", () => {
   assert.equal(validateRelease({ ...fixture(), tag, repository }).version, version);
 });
 
@@ -47,7 +55,7 @@ test("rejects an already-public release", () => {
 
 test("rejects target expansion", () => {
   const data = fixture();
-  data.latest.platforms["windows-x86_64"] = {
+  data.latest.platforms["linux-x86_64"] = {
     signature: "signed-updater-metadata-that-is-long-enough",
     url: "https://example.test/setup.exe",
   };
@@ -57,6 +65,10 @@ test("rejects target expansion", () => {
 test("rejects updater URLs outside the exact tagged release", () => {
   const data = fixture();
   data.latest.platforms["darwin-aarch64"].url = "https://example.test/Atpiano.app.tar.gz";
+  assert.throws(() => validateRelease({ ...data, tag, repository }), /unexpected URL/);
+  data.latest.platforms["darwin-aarch64"].url =
+    `https://github.com/${repository}/releases/download/${tag}/Atpiano_aarch64.app.tar.gz`;
+  data.latest.platforms["windows-x86_64"].url = "https://example.test/setup.nsis.zip";
   assert.throws(() => validateRelease({ ...data, tag, repository }), /unexpected URL/);
 });
 
