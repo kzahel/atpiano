@@ -553,10 +553,18 @@ fn checked_response(response: Response, expected_bytes: u64) -> Result<Response,
     let response = response
         .error_for_status()
         .map_err(|error| format!("score model download was rejected: {error}"))?;
-    if response.content_length() != Some(expected_bytes) {
+    validate_reported_download_length(response.content_length(), expected_bytes)?;
+    Ok(response)
+}
+
+fn validate_reported_download_length(
+    reported_bytes: Option<u64>,
+    expected_bytes: u64,
+) -> Result<(), String> {
+    if reported_bytes.is_some_and(|reported| reported != expected_bytes) {
         return Err("score model download size differs from its contract".to_string());
     }
-    Ok(response)
+    Ok(())
 }
 
 struct DownloadSpec<'a> {
@@ -1126,6 +1134,16 @@ mod tests {
         );
         assert_eq!(link_url("paper").expect("paper link"), contract.paper_url);
         assert!(link_url("arbitrary-url").is_err());
+    }
+
+    #[test]
+    fn download_length_allows_unknown_but_rejects_conflicts() {
+        validate_reported_download_length(None, 187_103).expect("streamed length");
+        validate_reported_download_length(Some(187_103), 187_103)
+            .expect("matching reported length");
+        assert!(validate_reported_download_length(Some(0), 187_103)
+            .expect_err("conflicting reported length")
+            .contains("differs from its contract"));
     }
 
     #[test]
