@@ -300,6 +300,17 @@ def _score_support_record(root: Path) -> dict[str, Any]:
     }
 
 
+def _stage_score_support(root: Path, repository: Path) -> None:
+    working = Path(tempfile.mkdtemp(prefix="atpiano-score-support-")).resolve()
+    staged = working / "score-support"
+    try:
+        stage_windows_score_support(staged, repository)
+        shutil.move(str(staged), root)
+    finally:
+        if working.exists():
+            _remove_tree(working)
+
+
 def _package_identities(packages: Sequence[Mapping[str, Any]]) -> list[dict[str, str]]:
     return sorted(
         (
@@ -523,7 +534,7 @@ def stage_windows_runtime(output: Path, repository: Path) -> dict[str, Any]:
         _run_import_smoke(root / "python.exe")
         _audit_native(root)
         score_root = root / "score-support"
-        stage_windows_score_support(score_root, repository)
+        _stage_score_support(score_root, repository)
         score_support = _score_support_record(score_root)
         sidecar = smoke_sidecar(root, temporary)
         _remove_tree(temporary / "workspace")

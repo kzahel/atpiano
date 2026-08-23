@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 from atpiano import windows_desktop_packaging
 
@@ -49,3 +50,24 @@ def test_package_identity_is_stable_and_minimal() -> None:
         {"name": "Atpiano", "version": "0.1.0"},
         {"name": "torch", "version": "2.13.0"},
     ]
+
+
+def test_score_support_uses_a_short_independent_workspace(tmp_path: Path) -> None:
+    destination = tmp_path / "deep" / "desktop-runtime" / "score-support"
+    destination.parent.mkdir(parents=True)
+    repository = tmp_path / "repository"
+    repository.mkdir()
+
+    def stage(output: Path, _: Path) -> None:
+        output.mkdir(parents=True)
+        (output / "support-manifest.json").write_text("{}", encoding="utf-8")
+
+    with patch(
+        "atpiano.windows_desktop_packaging.stage_windows_score_support",
+        side_effect=stage,
+    ) as mocked:
+        windows_desktop_packaging._stage_score_support(destination, repository)
+
+    working_output = mocked.call_args.args[0]
+    assert destination.is_dir()
+    assert working_output.parent.parent != destination.parent
