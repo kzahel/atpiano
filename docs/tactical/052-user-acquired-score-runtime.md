@@ -6,9 +6,11 @@ Topics: `desktop-score-runtime-footprint`, `public-desktop-release`,
 Status: **implementation active as a proof-of-concept prerequisite for the
 first public desktop tag.** The external asset contract, transactional native
 controller, shared consent/management dialog, and macOS arm64 score-support
-package are implemented. Windows x64 support staging, a real acknowledged
-model acquisition, installed score validation, and both signed update
-campaigns remain. Dependency cleanup is explicitly deferred.
+package are implemented. The Windows x64 score-support package is also built
+and audited under x64-on-ARM64 emulation. A real acknowledged model
+acquisition, installed score validation, complete Windows application, and
+both signed update campaigns remain. Dependency cleanup is explicitly
+deferred.
 
 ## Goal
 
@@ -525,8 +527,7 @@ lock is exact and hash-required; the VCS inventory rejects any commit drift.
 `pretty-midi` 0.2.11 has no wheel for this target, so the build host constructs
 that exact hash-pinned source distribution. No compiler, package manager, Git,
 or network dependency is left for the user's machine. The same registry lock
-resolves to Windows x64 artifacts in a `uv` target dry run; that is resolver
-evidence, not a built Windows support package.
+now builds on Windows x64 as described below.
 
 The staged macOS support package contains 64 distributions, no symbolic links,
 and 926,843,098 bytes. Its canonical payload is 926,842,450 bytes with SHA-256
@@ -544,7 +545,17 @@ package, begins with acknowledgement unchecked and download disabled, and
 enables download only after the checkbox is selected. The dialog was cancelled
 without starting acquisition and the application quit without an orphan. The
 real 390 MB model download, bounded import/model smoke, installed relaunch,
-signed/notarized package, and Windows path have not yet been exercised.
+and signed/notarized package have not yet been exercised.
+
+The Windows testbed subsequently built the same support contract with exact
+x64 CPython 3.11.14 under Windows 11 ARM64 emulation. The output contains 64
+distributions, 196 x64 PE files, 20,621 files total, and 920,228,180 bytes. Its
+920,227,529-byte canonical payload hashes to
+`4b9c41b350978164a97070bad4d894982b2d454b7ea1d628cabffef4c6461bd1`.
+Both import groups and a complete independent repeat audit pass, no temporary
+stage remains, and the output contains no main model source or checkpoint.
+This validates only the support layer; acquired-model inference and notation
+parity remain unproven on Windows.
 
 ## Later Todo — Remove Evaluation Helpers
 

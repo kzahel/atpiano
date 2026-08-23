@@ -9,9 +9,9 @@ macOS arm64 and Windows x86_64 CPU pairings. The Tauri launcher and frontend
 now carry exact resource, origin, package, and updater variants for both
 targets. The native Windows x64 application core is established and the
 universal score-support registry lock resolves for Windows x64. A tracked
-Windows support builder is implemented but not yet accepted on the testbed;
-no complete relocatable Windows runtime, package, signed installer, packaged
-MIDI2Score result, or updater campaign exists.
+Windows x64 score-support package now passes on the testbed under x64-on-ARM64
+emulation. No complete relocatable Windows runtime, application package,
+signed installer, packaged MIDI2Score result, or updater campaign exists.
 
 ## Goal
 
@@ -355,8 +355,35 @@ standalone-Python files cannot strand a failed stage.
 Build-only `venv`/`ensurepip` content and Setuptools launcher templates are
 removed before PE validation; those templates include intentional 32-bit and
 ARM64 executables and are not used to run the signed application.
-The builder itself must now run on the claimed Windows testbed; this paragraph
-does not claim a successful Windows package.
+The live build result follows below; it is support-layer evidence, not a
+successful Windows application package.
+
+Exact commit `264905bb92312e1fe5c0a2cdbf3e2700956280d7` was transferred to
+the claimed Windows 11 ARM64 testbed with the builder and input hashes matched
+before execution. An ARM64 `uv` process selected standalone x64 CPython
+3.11.14 build `20260114`; the interpreter reported `AMD64` and all package
+imports therefore ran under Windows x64 emulation.
+
+The completed support package records:
+
+| Evidence | Value |
+| --- | ---: |
+| Distributions | 64 |
+| x64 PE files | 196 |
+| Files | 20,621 |
+| Payload bytes, excluding manifest | 920,227,529 |
+| Total installed bytes | 920,228,180 |
+| Payload SHA-256 | `4b9c41b350978164a97070bad4d894982b2d454b7ea1d628cabffef4c6461bd1` |
+| Manifest SHA-256 | `115da3b8287a84fc1c8204335fc3a16b109a6d811b3cdff4606ddf2358f05479` |
+| Package-inventory SHA-256 | `5449e41ab60a41e6f5cfa3ef2d7a798a63fe95146e387a02d6ad417b476ce43d` |
+
+The build ran both retained import groups, validated every remaining
+`.exe`/`.dll`/`.pyd` as x86_64, rejected symbolic links and accelerator/model
+content, published transactionally, and left zero staging directories. A
+second independent audit of the published directory passed. These results do
+not establish native x64 timing, ordinary desktop runtime staging, actual
+MIDI2Score inference, MusicXML parity, Tauri packaging, or installed UI
+acceptance.
 
 ## Rollback
 
