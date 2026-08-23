@@ -589,7 +589,7 @@ fn download_asset(
         .map_err(|error| format!("could not create a score model download: {error}"))?;
     let mut digest = Sha256::new();
     let mut downloaded = 0_u64;
-    let mut block = [0_u8; 1024 * 1024];
+    let mut block = vec![0_u8; 1024 * 1024];
     loop {
         if cancelled.load(Ordering::SeqCst) {
             return Err("Score model download was cancelled.".to_string());
@@ -773,7 +773,7 @@ fn directory_bytes(root: &Path) -> Result<u64, String> {
 fn file_sha256(path: &Path) -> Result<String, String> {
     let mut file = File::open(path).map_err(|error| format!("could not hash file: {error}"))?;
     let mut digest = Sha256::new();
-    let mut block = [0_u8; 1024 * 1024];
+    let mut block = vec![0_u8; 1024 * 1024];
     loop {
         let count = file
             .read(&mut block)
@@ -840,7 +840,7 @@ fn tree_sha256_without(root: &Path, excluded: Option<&Path>) -> Result<String, S
         let mut file = File::open(root.join(relative))
             .map_err(|error| format!("could not hash score source: {error}"))?;
         let mut digest = Sha256::new();
-        let mut block = [0_u8; 1024 * 1024];
+        let mut block = vec![0_u8; 1024 * 1024];
         loop {
             let count = file
                 .read(&mut block)
