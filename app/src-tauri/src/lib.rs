@@ -21,7 +21,6 @@ use tauri_plugin_dialog::DialogExt;
 const DESKTOP_PROTOCOL: &str = "atpiano.desktop.v1";
 const CONTRACT_SCHEMA: &str = "atpiano.contract.v1";
 const MODEL_PACK_ID: &str = "atpiano-cpu-models-2026.07";
-const DESKTOP_ORIGIN: &str = "tauri://localhost";
 const UPDATE_ENDPOINT: &str =
     "https://updates.graehlarts.com/atpiano/tauri/{{target}}/{{arch}}/{{current_version}}";
 const INSTALL_ID_FILE: &str = "cfu-id";
@@ -30,6 +29,43 @@ const MAX_HANDSHAKE_BYTES: u64 = 1024 * 1024;
 const MAX_ARTIFACT_HEADER_BYTES: usize = 64 * 1024;
 const MAX_ARTIFACT_URL_BYTES: usize = 4 * 1024;
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct DesktopTarget {
+    platform: &'static str,
+    architecture: &'static str,
+    python_relative: &'static str,
+    package_type: &'static str,
+    origin: &'static str,
+}
+
+const MACOS_ARM64_TARGET: DesktopTarget = DesktopTarget {
+    platform: "macos",
+    architecture: "arm64",
+    python_relative: "bin/python3",
+    package_type: "app",
+    origin: "tauri://localhost",
+};
+
+const WINDOWS_X86_64_TARGET: DesktopTarget = DesktopTarget {
+    platform: "windows",
+    architecture: "x86_64",
+    python_relative: "python.exe",
+    package_type: "nsis",
+    origin: "http://tauri.localhost",
+};
+
+fn desktop_target_for(os: &str, architecture: &str) -> Result<DesktopTarget, String> {
+    match (os, architecture) {
+        ("macos", "aarch64") => Ok(MACOS_ARM64_TARGET),
+        ("windows", "x86_64") => Ok(WINDOWS_X86_64_TARGET),
+        _ => Err("desktop builds require macOS arm64 or Windows x86_64".to_string()),
+    }
+}
+
+fn current_desktop_target() -> Result<DesktopTarget, String> {
+    desktop_target_for(env::consts::OS, env::consts::ARCH)
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -243,19 +279,25 @@ fn get_or_create_installation_id(config_dir: &Path) -> Result<String, String> {
     Ok(id)
 }
 
-fn resource_dir_for_executable(executable: &Path) -> Option<PathBuf> {
-    let macos = executable.parent()?;
-    if macos.file_name()? != "MacOS" {
-        return None;
+fn resource_dir_for_executable(executable: &Path, target: DesktopTarget) -> Option<PathBuf> {
+    if target == MACOS_ARM64_TARGET {
+        let macos = executable.parent()?;
+        if macos.file_name()? != "MacOS" {
+            return None;
+        }
+        let contents = macos.parent()?;
+        if contents.file_name()? != "Contents" {
+            return None;
+        }
+        return Some(contents.join("Resources"));
     }
-    let contents = macos.parent()?;
-    if contents.file_name()? != "Contents" {
-        return None;
+    if target == WINDOWS_X86_64_TARGET {
+        return executable.parent().map(Path::to_path_buf);
     }
-    Some(contents.join("Resources"))
+    None
 }
 
-fn runtime_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+fn runtime_root(app: &tauri::AppHandle, target: DesktopTarget) -> Result<PathBuf, String> {
     #[cfg(debug_assertions)]
     if let Some(override_path) = env::var_os("ATPIANO_DESKTOP_RUNTIME_ROOT") {
         return Ok(PathBuf::from(override_path));
@@ -265,7 +307,7 @@ fn runtime_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         Err(error) => {
             let fallback = env::current_exe()
                 .ok()
-                .and_then(|executable| resource_dir_for_executable(&executable))
+                .and_then(|executable| resource_dir_for_executable(&executable, target))
                 .filter(|directory| directory.is_dir());
             fallback
                 .map(|directory| directory.join("desktop-runtime"))
@@ -295,13 +337,13 @@ fn read_ready(reader: &mut BufReader<impl Read>) -> Result<ReadyRecord, String> 
         .map_err(|error| format!("desktop startup record is invalid: {error}"))
 }
 
-fn validate_ready(ready: &ReadyRecord) -> Result<(), String> {
+fn validate_ready(ready: &ReadyRecord, target: DesktopTarget) -> Result<(), String> {
     if ready.schema_version != "atpiano.desktop-ready.v1"
         || ready.protocol_version != DESKTOP_PROTOCOL
         || ready.contract_schema_version != CONTRACT_SCHEMA
         || ready.host != "127.0.0.1"
-        || ready.platform != "macos"
-        || ready.architecture != "arm64"
+        || ready.platform != target.platform
+        || ready.architecture != target.architecture
         || ready.execution_backend != "cpu"
         || ready.model_pack_id != MODEL_PACK_ID
         || !is_lower_hex_64(&ready.model_pack_sha256)
@@ -481,6 +523,7 @@ fn temporary_export_file(destination: &Path) -> Result<(PathBuf, File), String> 
 fn download_artifact(
     port: u16,
     credential: &str,
+    origin: &str,
     artifact_url: &str,
     destination: &Path,
 ) -> Result<(), String> {
@@ -500,7 +543,7 @@ fn download_artifact(
         stream,
         "GET {artifact_url} HTTP/1.0\r\n\
          Host: 127.0.0.1:{port}\r\n\
-         Origin: {DESKTOP_ORIGIN}\r\n\
+         Origin: {origin}\r\n\
          Authorization: Bearer {credential}\r\n\
          Connection: close\r\n\r\n"
     )
@@ -527,7 +570,7 @@ fn download_artifact(
     result
 }
 
-fn fetch_handshake(port: u16, credential: &str) -> Result<HandshakeRecord, String> {
+fn fetch_handshake(port: u16, credential: &str, origin: &str) -> Result<HandshakeRecord, String> {
     let address = SocketAddr::from(([127, 0, 0, 1], port));
     let mut stream = TcpStream::connect_timeout(&address, Duration::from_secs(5))
         .map_err(|error| format!("desktop handshake connection failed: {error}"))?;
@@ -541,7 +584,7 @@ fn fetch_handshake(port: u16, credential: &str) -> Result<HandshakeRecord, Strin
         stream,
         "GET /desktop/v1/handshake HTTP/1.0\r\n\
          Host: 127.0.0.1:{port}\r\n\
-         Origin: {DESKTOP_ORIGIN}\r\n\
+         Origin: {origin}\r\n\
          Authorization: Bearer {credential}\r\n\
          Connection: close\r\n\r\n"
     )
@@ -649,16 +692,26 @@ fn monitor_child(
 
 fn configure_sidecar_environment(
     command: &mut Command,
+    target: DesktopTarget,
     runtime: &Path,
     workspace: &Path,
     credential: &str,
-) {
+) -> Result<(), String> {
     let cache_root = workspace.join(".runtime-cache");
-    let path = format!(
-        "{}:{}",
-        runtime.join("bin").display(),
-        env::var("PATH").unwrap_or_default()
-    );
+    let mut path_entries = if target == WINDOWS_X86_64_TARGET {
+        vec![
+            runtime.to_path_buf(),
+            runtime.join("Scripts"),
+            runtime.join("bin"),
+        ]
+    } else {
+        vec![runtime.join("bin")]
+    };
+    if let Some(existing) = env::var_os("PATH") {
+        path_entries.extend(env::split_paths(&existing));
+    }
+    let path = env::join_paths(path_entries)
+        .map_err(|error| format!("could not construct desktop runtime PATH: {error}"))?;
     command
         .env("ATPIANO_DESKTOP_TOKEN", credential)
         .env("ATPIANO_EXECUTION_BACKEND", "cpu")
@@ -676,6 +729,7 @@ fn configure_sidecar_environment(
         .env_remove("ATPIANO_BASIC_PITCH_MODEL")
         .env_remove("ATPIANO_TRANSKUN_CHECKPOINT")
         .env_remove("ATPIANO_TRANSKUN_CONFIG");
+    Ok(())
 }
 
 fn start_sidecar(
@@ -683,167 +737,164 @@ fn start_sidecar(
     status: Arc<RwLock<RuntimeStatus>>,
     installation_id: &str,
 ) -> Result<(DesktopProcess, DesktopRuntimeInfo), String> {
-    #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
-    return Err("Phase 5 desktop builds require macOS arm64".to_string());
+    let target = current_desktop_target()?;
+    let runtime = runtime_root(app, target)?;
+    let python = runtime.join(target.python_relative);
+    let model_pack = runtime.join("model-pack/model-pack.json");
+    let replay_manifest = runtime.join("fixture/input.json");
+    let score_runtime = runtime.join("score-runtime");
+    require_file(&python, "Python runtime")?;
+    require_file(&model_pack, "model pack")?;
+    require_file(&replay_manifest, "replay fixture")?;
 
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    {
-        let runtime = runtime_root(app)?;
-        let python = runtime.join("bin/python3");
-        let model_pack = runtime.join("model-pack/model-pack.json");
-        let replay_manifest = runtime.join("fixture/input.json");
-        let score_runtime = runtime.join("score-runtime");
-        require_file(&python, "Python runtime")?;
-        require_file(&model_pack, "model pack")?;
-        require_file(&replay_manifest, "replay fixture")?;
+    let workspace = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("could not locate desktop data: {error}"))?
+        .join("workspace");
+    fs::create_dir_all(&workspace)
+        .map_err(|error| format!("could not create desktop workspace: {error}"))?;
 
-        let workspace = app
-            .path()
-            .app_data_dir()
-            .map_err(|error| format!("could not locate desktop data: {error}"))?
-            .join("workspace");
-        fs::create_dir_all(&workspace)
-            .map_err(|error| format!("could not create desktop workspace: {error}"))?;
-
-        let credential = token()?;
-        let mut command = Command::new(&python);
-        command
-            .arg("-I")
-            .arg("-B")
-            .arg("-m")
-            .arg("atpiano.desktop_sidecar")
-            .arg("--workspace")
-            .arg(&workspace)
-            .arg("--replay-manifest")
-            .arg(&replay_manifest)
-            .arg("--model-pack")
-            .arg(&model_pack)
-            .arg("--expected-model-pack")
-            .arg(MODEL_PACK_ID)
-            .arg("--expected-protocol")
-            .arg(DESKTOP_PROTOCOL)
-            .arg("--expected-contract")
-            .arg(CONTRACT_SCHEMA)
-            .arg("--score-runtime")
-            .arg(&score_runtime)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        configure_sidecar_environment(&mut command, &runtime, &workspace, &credential);
-        let mut child = command
-            .spawn()
-            .map_err(|error| format!("could not start the local engine: {error}"))?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| "local engine stdout is unavailable".to_string())?;
-        let stderr = child
-            .stderr
-            .take()
-            .ok_or_else(|| "local engine stderr is unavailable".to_string())?;
-        let child = Arc::new(Mutex::new(child));
-        let stderr_lines = Arc::new(Mutex::new(Vec::new()));
-        let stderr_target = Arc::clone(&stderr_lines);
-        thread::spawn(move || {
-            for line in BufReader::new(stderr).lines().map_while(Result::ok) {
-                if let Ok(mut lines) = stderr_target.lock() {
-                    lines.push(line);
-                    if lines.len() > 16 {
-                        lines.remove(0);
-                    }
+    let credential = token()?;
+    let mut command = Command::new(&python);
+    command
+        .arg("-I")
+        .arg("-B")
+        .arg("-m")
+        .arg("atpiano.desktop_sidecar")
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--replay-manifest")
+        .arg(&replay_manifest)
+        .arg("--model-pack")
+        .arg(&model_pack)
+        .arg("--expected-model-pack")
+        .arg(MODEL_PACK_ID)
+        .arg("--expected-protocol")
+        .arg(DESKTOP_PROTOCOL)
+        .arg("--expected-contract")
+        .arg(CONTRACT_SCHEMA)
+        .arg("--desktop-origin")
+        .arg(target.origin)
+        .arg("--score-runtime")
+        .arg(&score_runtime)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    configure_sidecar_environment(&mut command, target, &runtime, &workspace, &credential)?;
+    let mut child = command
+        .spawn()
+        .map_err(|error| format!("could not start the local engine: {error}"))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "local engine stdout is unavailable".to_string())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "local engine stderr is unavailable".to_string())?;
+    let child = Arc::new(Mutex::new(child));
+    let stderr_lines = Arc::new(Mutex::new(Vec::new()));
+    let stderr_target = Arc::clone(&stderr_lines);
+    thread::spawn(move || {
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            if let Ok(mut lines) = stderr_target.lock() {
+                lines.push(line);
+                if lines.len() > 16 {
+                    lines.remove(0);
                 }
             }
-        });
+        }
+    });
 
-        let (sender, receiver) = mpsc::sync_channel(1);
-        thread::spawn(move || {
-            let mut reader = BufReader::new(stdout);
-            let record = read_ready(&mut reader);
-            let _ = sender.send(record);
-            let _ = io::copy(&mut reader, &mut io::sink());
-        });
-        let ready = match receiver.recv_timeout(STARTUP_TIMEOUT) {
-            Ok(Ok(ready)) => ready,
-            Ok(Err(error)) => {
-                let process = DesktopProcess {
-                    child,
-                    expected_shutdown: Arc::new(AtomicBool::new(true)),
-                };
-                process.shutdown();
-                return Err(error);
-            }
-            Err(_) => {
-                let process = DesktopProcess {
-                    child,
-                    expected_shutdown: Arc::new(AtomicBool::new(true)),
-                };
-                process.shutdown();
-                return Err("local engine startup timed out".to_string());
-            }
-        };
-        if let Err(error) = validate_ready(&ready) {
-            DesktopProcess {
+    let (sender, receiver) = mpsc::sync_channel(1);
+    thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        let record = read_ready(&mut reader);
+        let _ = sender.send(record);
+        let _ = io::copy(&mut reader, &mut io::sink());
+    });
+    let ready = match receiver.recv_timeout(STARTUP_TIMEOUT) {
+        Ok(Ok(ready)) => ready,
+        Ok(Err(error)) => {
+            let process = DesktopProcess {
                 child,
                 expected_shutdown: Arc::new(AtomicBool::new(true)),
-            }
-            .shutdown();
+            };
+            process.shutdown();
             return Err(error);
         }
-        let handshake = match fetch_handshake(ready.port, &credential) {
-            Ok(handshake) => handshake,
-            Err(error) => {
-                DesktopProcess {
-                    child,
-                    expected_shutdown: Arc::new(AtomicBool::new(true)),
-                }
-                .shutdown();
-                return Err(error);
-            }
-        };
-        if let Err(error) = validate_handshake(&handshake, &ready) {
-            DesktopProcess {
+        Err(_) => {
+            let process = DesktopProcess {
                 child,
                 expected_shutdown: Arc::new(AtomicBool::new(true)),
-            }
-            .shutdown();
-            return Err(error);
+            };
+            process.shutdown();
+            return Err("local engine startup timed out".to_string());
         }
-
-        let info = DesktopRuntimeInfo {
-            app_version: env!("CARGO_PKG_VERSION").to_string(),
-            base_url: format!("http://127.0.0.1:{}", ready.port),
-            bearer_token: credential.clone(),
-            web_socket_protocol: format!("{DESKTOP_PROTOCOL}.{credential}"),
-            protocol_version: ready.protocol_version,
-            contract_schema_version: ready.contract_schema_version,
-            sidecar_version: ready.sidecar_version,
-            platform: ready.platform,
-            architecture: ready.architecture,
-            execution_backend: ready.execution_backend,
-            model_pack_id: ready.model_pack_id,
-            model_pack_sha256: ready.model_pack_sha256,
-            score_available: handshake.score_available,
-            installation_id: installation_id.to_string(),
-            package_type: "app".to_string(),
-            update_endpoint: UPDATE_ENDPOINT.to_string(),
-        };
-        let expected_shutdown = Arc::new(AtomicBool::new(false));
-        monitor_child(
-            app.clone(),
-            Arc::clone(&child),
-            Arc::clone(&expected_shutdown),
-            Arc::clone(&status),
-            stderr_lines,
-            credential,
-        );
-        Ok((
-            DesktopProcess {
-                child,
-                expected_shutdown,
-            },
-            info,
-        ))
+    };
+    if let Err(error) = validate_ready(&ready, target) {
+        DesktopProcess {
+            child,
+            expected_shutdown: Arc::new(AtomicBool::new(true)),
+        }
+        .shutdown();
+        return Err(error);
     }
+    let handshake = match fetch_handshake(ready.port, &credential, target.origin) {
+        Ok(handshake) => handshake,
+        Err(error) => {
+            DesktopProcess {
+                child,
+                expected_shutdown: Arc::new(AtomicBool::new(true)),
+            }
+            .shutdown();
+            return Err(error);
+        }
+    };
+    if let Err(error) = validate_handshake(&handshake, &ready) {
+        DesktopProcess {
+            child,
+            expected_shutdown: Arc::new(AtomicBool::new(true)),
+        }
+        .shutdown();
+        return Err(error);
+    }
+
+    let info = DesktopRuntimeInfo {
+        app_version: env!("CARGO_PKG_VERSION").to_string(),
+        base_url: format!("http://127.0.0.1:{}", ready.port),
+        bearer_token: credential.clone(),
+        web_socket_protocol: format!("{DESKTOP_PROTOCOL}.{credential}"),
+        protocol_version: ready.protocol_version,
+        contract_schema_version: ready.contract_schema_version,
+        sidecar_version: ready.sidecar_version,
+        platform: ready.platform,
+        architecture: ready.architecture,
+        execution_backend: ready.execution_backend,
+        model_pack_id: ready.model_pack_id,
+        model_pack_sha256: ready.model_pack_sha256,
+        score_available: handshake.score_available,
+        installation_id: installation_id.to_string(),
+        package_type: target.package_type.to_string(),
+        update_endpoint: UPDATE_ENDPOINT.to_string(),
+    };
+    let expected_shutdown = Arc::new(AtomicBool::new(false));
+    monitor_child(
+        app.clone(),
+        Arc::clone(&child),
+        Arc::clone(&expected_shutdown),
+        Arc::clone(&status),
+        stderr_lines,
+        credential,
+    );
+    Ok((
+        DesktopProcess {
+            child,
+            expected_shutdown,
+        },
+        info,
+    ))
 }
 
 fn current_runtime_info(status: &RwLock<RuntimeStatus>) -> Result<DesktopRuntimeInfo, String> {
@@ -897,6 +948,7 @@ fn desktop_export_artifact(
         return Err("desktop artifact export request is invalid".to_string());
     }
     let info = current_runtime_info(&state.status)?;
+    let target = current_desktop_target()?;
     let port = runtime_port(&info)?;
     let destination = app
         .dialog()
@@ -913,7 +965,13 @@ fn desktop_export_artifact(
     let destination = destination
         .into_path()
         .map_err(|_| "artifact export destination is not a local file".to_string())?;
-    download_artifact(port, &info.bearer_token, &artifact_url, &destination)?;
+    download_artifact(
+        port,
+        &info.bearer_token,
+        target.origin,
+        &artifact_url,
+        &destination,
+    )?;
     Ok(DesktopArtifactExportResult {
         saved: true,
         file_name: destination
@@ -987,6 +1045,7 @@ mod tests {
         response: Vec<u8>,
         expected_path: &'static str,
         expected_credential: String,
+        expected_origin: &'static str,
     ) -> (u16, thread::JoinHandle<()>) {
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("test listener");
         let port = listener.local_addr().expect("listener address").port();
@@ -1004,7 +1063,7 @@ mod tests {
             assert!(request.contains(&format!(
                 "\r\nAuthorization: Bearer {expected_credential}\r\n"
             )));
-            assert!(request.contains(&format!("\r\nOrigin: {DESKTOP_ORIGIN}\r\n")));
+            assert!(request.contains(&format!("\r\nOrigin: {expected_origin}\r\n")));
             stream.write_all(&response).expect("artifact response");
         });
         (port, handle)
@@ -1063,13 +1122,39 @@ mod tests {
         let executable = Path::new("/tmp/Atpiano.app/Contents/MacOS/atpiano-desktop");
 
         assert_eq!(
-            resource_dir_for_executable(executable),
+            resource_dir_for_executable(executable, MACOS_ARM64_TARGET),
             Some(PathBuf::from("/tmp/Atpiano.app/Contents/Resources"))
         );
         assert_eq!(
-            resource_dir_for_executable(Path::new("/tmp/atpiano-desktop")),
+            resource_dir_for_executable(Path::new("/tmp/atpiano-desktop"), MACOS_ARM64_TARGET,),
             None
         );
+        assert_eq!(
+            resource_dir_for_executable(
+                Path::new("/install/Atpiano/atpiano-desktop.exe"),
+                WINDOWS_X86_64_TARGET,
+            ),
+            Some(PathBuf::from("/install/Atpiano"))
+        );
+    }
+
+    #[test]
+    fn accepts_only_declared_desktop_targets() {
+        assert_eq!(
+            desktop_target_for("macos", "aarch64").expect("macOS target"),
+            MACOS_ARM64_TARGET
+        );
+        assert_eq!(
+            desktop_target_for("windows", "x86_64").expect("Windows target"),
+            WINDOWS_X86_64_TARGET
+        );
+        for (os, architecture) in [
+            ("macos", "x86_64"),
+            ("windows", "aarch64"),
+            ("linux", "x86_64"),
+        ] {
+            assert!(desktop_target_for(os, architecture).is_err());
+        }
     }
 
     #[test]
@@ -1077,10 +1162,12 @@ mod tests {
         let mut command = Command::new("/bundle/runtime/bin/python3");
         configure_sidecar_environment(
             &mut command,
+            MACOS_ARM64_TARGET,
             Path::new("/bundle/runtime"),
             Path::new("/data/workspace"),
             "credential",
-        );
+        )
+        .expect("desktop environment");
         let environment = command.get_envs().collect::<Vec<_>>();
 
         for (key, expected) in [
@@ -1102,8 +1189,20 @@ mod tests {
         with_newline.push(b'\n');
         let mut reader = BufReader::new(&with_newline[..]);
         let ready = read_ready(&mut reader).expect("ready record");
-        validate_ready(&ready).expect("compatible record");
+        validate_ready(&ready, MACOS_ARM64_TARGET).expect("compatible record");
         assert_eq!(ready.port, 49152);
+    }
+
+    #[test]
+    fn validates_windows_ready_record_only_for_windows_target() {
+        let document = br#"{"schema_version":"atpiano.desktop-ready.v1","protocol_version":"atpiano.desktop.v1","contract_schema_version":"atpiano.contract.v1","sidecar_version":"0.1.0","host":"127.0.0.1","port":49152,"platform":"windows","architecture":"x86_64","execution_backend":"cpu","model_pack_id":"atpiano-cpu-models-2026.07","model_pack_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#;
+        let mut with_newline = document.to_vec();
+        with_newline.push(b'\n');
+        let ready =
+            read_ready(&mut BufReader::new(&with_newline[..])).expect("Windows ready record");
+
+        validate_ready(&ready, WINDOWS_X86_64_TARGET).expect("Windows target");
+        assert!(validate_ready(&ready, MACOS_ARM64_TARGET).is_err());
     }
 
     #[test]
@@ -1213,12 +1312,24 @@ mod tests {
         .into_iter()
         .chain(body.iter().copied())
         .collect();
-        let (port, server) = artifact_server(response, path, credential.clone());
+        let (port, server) = artifact_server(
+            response,
+            path,
+            credential.clone(),
+            MACOS_ARM64_TARGET.origin,
+        );
         let directory = export_test_directory("artifact-export");
         let destination = directory.join("artifact.txt");
         fs::write(&destination, b"old bytes").expect("old destination");
 
-        download_artifact(port, &credential, path, &destination).expect("artifact export");
+        download_artifact(
+            port,
+            &credential,
+            MACOS_ARM64_TARGET.origin,
+            path,
+            &destination,
+        )
+        .expect("artifact export");
         server.join().expect("artifact server");
 
         assert_eq!(fs::read(&destination).expect("saved artifact"), body);
@@ -1234,13 +1345,24 @@ mod tests {
         let path = "/api/v1/workspaces/local/sessions/session-1/artifacts/artifact%3Aabc/content";
         let credential = "d".repeat(64);
         let response = b"HTTP/1.0 200 OK\r\nContent-Length: 20\r\n\r\nshort".to_vec();
-        let (port, server) = artifact_server(response, path, credential.clone());
+        let (port, server) = artifact_server(
+            response,
+            path,
+            credential.clone(),
+            WINDOWS_X86_64_TARGET.origin,
+        );
         let directory = export_test_directory("truncated-export");
         let destination = directory.join("artifact.txt");
         fs::write(&destination, b"old bytes").expect("old destination");
 
-        let error =
-            download_artifact(port, &credential, path, &destination).expect_err("truncated");
+        let error = download_artifact(
+            port,
+            &credential,
+            WINDOWS_X86_64_TARGET.origin,
+            path,
+            &destination,
+        )
+        .expect_err("truncated");
         server.join().expect("artifact server");
 
         assert!(error.contains("declared length"));

@@ -24,6 +24,11 @@ DESKTOP_TOKEN_ENV = "ATPIANO_DESKTOP_TOKEN"
 DESKTOP_TOKEN_PATTERN = re.compile(r"[0-9a-f]{64}")
 DESKTOP_WEBSOCKET_PREFIX = f"{DESKTOP_PROTOCOL_VERSION}."
 MAX_DESKTOP_READY_BYTES = 64 * 1024
+DESKTOP_ORIGIN_BY_PLATFORM = {
+    "macos": "tauri://localhost",
+    "windows": "http://tauri.localhost",
+}
+SUPPORTED_DESKTOP_ORIGINS = frozenset(DESKTOP_ORIGIN_BY_PLATFORM.values())
 DesktopPlatform = Literal["macos", "windows"]
 DesktopArchitecture = Literal["arm64", "x86_64"]
 SUPPORTED_DESKTOP_IDENTITIES = frozenset(
@@ -160,6 +165,20 @@ def validate_desktop_token(raw_token: str) -> str:
     if DESKTOP_TOKEN_PATTERN.fullmatch(raw_token) is None:
         raise ValueError("desktop token must be 32 bytes encoded as lowercase hex")
     return raw_token
+
+
+def validate_desktop_origin(
+    raw_origin: str | None,
+    platform_name: str | None = None,
+) -> str:
+    if raw_origin is None or raw_origin not in SUPPORTED_DESKTOP_ORIGINS:
+        raise ValueError("desktop origin must be a bundled Tauri origin")
+    if (
+        platform_name is not None
+        and DESKTOP_ORIGIN_BY_PLATFORM.get(platform_name) != raw_origin
+    ):
+        raise ValueError("desktop origin does not match the desktop platform")
+    return raw_origin
 
 
 def model_pack_sha256(pack: ModelPack) -> str:

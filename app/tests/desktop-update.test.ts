@@ -10,13 +10,13 @@ import {
 } from "../src/desktop-update/schedule.js";
 import { progressPercent } from "../src/desktop-update/state.js";
 
-test("only the declared macOS App package can install in-app", () => {
+test("the declared macOS and Windows packages can install in-app", () => {
   assert.equal(installPolicy("app").canInstallInApp, true);
+  assert.equal(installPolicy("nsis").canInstallInApp, true);
   for (const bundle of [
     "appimage",
     "deb",
     "msi",
-    "nsis",
     "rpm",
     null,
   ]) {

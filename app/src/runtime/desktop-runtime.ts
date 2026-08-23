@@ -37,7 +37,7 @@ export interface DesktopReleaseInfo {
   readonly modelPackId: string;
   readonly modelPackSha256: string;
   readonly installationId: string;
-  readonly packageType: "app";
+  readonly packageType: "app" | "nsis";
   readonly updateEndpoint: string;
   readonly platform: string;
   readonly architecture: string;
@@ -58,6 +58,20 @@ export function isTauriRuntime(): boolean {
   return "__TAURI_INTERNALS__" in window;
 }
 
+export function isSupportedDesktopRelease(
+  platform: string,
+  architecture: string,
+  packageType: string,
+): packageType is DesktopReleaseInfo["packageType"] {
+  return (
+    platform === "macos" && architecture === "arm64" && packageType === "app"
+  ) || (
+    platform === "windows" &&
+    architecture === "x86_64" &&
+    packageType === "nsis"
+  );
+}
+
 function validateRuntimeInfo(value: DesktopRuntimeInfo): DesktopRuntimeInfo {
   const baseUrl = new URL(value.baseUrl);
   if (
@@ -72,8 +86,11 @@ function validateRuntimeInfo(value: DesktopRuntimeInfo): DesktopRuntimeInfo {
   if (
     value.protocolVersion !== desktopProtocol ||
     value.contractSchemaVersion !== contractSchema ||
-    value.platform !== "macos" ||
-    value.architecture !== "arm64" ||
+    !isSupportedDesktopRelease(
+      value.platform,
+      value.architecture,
+      value.packageType,
+    ) ||
     value.executionBackend !== "cpu" ||
     !tokenPattern.test(value.bearerToken) ||
     value.webSocketProtocol !== `${desktopProtocol}.${value.bearerToken}` ||
@@ -85,7 +102,6 @@ function validateRuntimeInfo(value: DesktopRuntimeInfo): DesktopRuntimeInfo {
     ) ||
     value.updateEndpoint !==
       "https://updates.graehlarts.com/atpiano/tauri/{{target}}/{{arch}}/{{current_version}}" ||
-    value.packageType !== "app" ||
     !value.sidecarVersion ||
     !value.modelPackId
   ) {
@@ -138,7 +154,7 @@ export async function createDesktopRuntime(): Promise<DesktopRuntimeBootstrap> {
       modelPackId: info.modelPackId,
       modelPackSha256: info.modelPackSha256,
       installationId: info.installationId,
-      packageType: "app",
+      packageType: info.packageType as DesktopReleaseInfo["packageType"],
       updateEndpoint: info.updateEndpoint,
       platform: info.platform,
       architecture: info.architecture,

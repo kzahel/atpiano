@@ -9,6 +9,9 @@ export function installPolicy(
   if (bundleType === "app") {
     return { canInstallInApp: true, packageLabel: "macOS app" };
   }
+  if (bundleType === "nsis") {
+    return { canInstallInApp: true, packageLabel: "Windows setup" };
+  }
   return {
     canInstallInApp: false,
     packageLabel: bundleType === null || bundleType === undefined

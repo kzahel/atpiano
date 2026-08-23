@@ -21,7 +21,7 @@ function statusCopy(state: UpdaterState): { title: string; body: string } {
     case "checking":
       return {
         title: "Checking for updates",
-        body: "Looking for a signed macOS Apple-silicon release.",
+        body: "Looking for a signed compatible desktop release.",
       };
     case "up-to-date":
       return {

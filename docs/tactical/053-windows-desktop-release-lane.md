@@ -5,10 +5,11 @@ Topics: `public-desktop-release`, `windows-native-runtime-portability`,
 
 Status: **implementation active as a prerequisite of the first binary
 release.** The Python desktop identity/model-pack contracts now accept exactly
-macOS arm64 and Windows x86_64 CPU pairings. The native Windows x64 application
-core is established, but the Tauri launcher remains macOS-only and no Windows
-package, signed installer, packaged MIDI2Score result, or updater campaign
-exists.
+macOS arm64 and Windows x86_64 CPU pairings. The Tauri launcher and frontend
+now carry exact resource, origin, package, and updater variants for both
+targets. The native Windows x64 application core is established, but no
+relocatable Windows runtime, package, signed installer, packaged MIDI2Score
+result, or updater campaign exists.
 
 ## Goal
 
@@ -295,6 +296,22 @@ Darwin arm64/aarch64 to `macos/arm64` and Windows AMD64/x86_64 to
 native target. Focused Ruff and `tests/test_desktop.py` validation pass with 16
 tests. This is contract evidence only and does not yet make the Rust launcher
 or package Windows-compatible.
+
+The next boundary slice replaced the Rust launcher's compile-time macOS gate
+with an exact target descriptor. macOS arm64 uses `bin/python3`, `.app`, and
+`tauri://localhost`; Windows x86_64 uses `python.exe`, NSIS, and Tauri's
+default `http://tauri.localhost` origin. Ready records remain target-bound,
+resource fallback handles `.app` resources or an executable-adjacent Windows
+resource directory, the child `PATH` uses platform-native separators, and the
+same exact origin is passed to the sidecar, handshake, and artifact export.
+The Python server accepts only those two bundled origins. The frontend accepts
+only the corresponding identity/package triples and permits Tauri's updater
+to install both `.app` and NSIS packages in-app.
+
+Focused validation on macOS passes 17 Python desktop tests, 15 Rust tests,
+TypeScript compilation, and 17 Node contract/updater tests. These injected
+Windows cases establish portable contracts; they are not Windows compilation,
+staging, installation, or UI evidence. Phase 2 runtime staging is next.
 
 ## Rollback
 

@@ -93,6 +93,7 @@ from atpiano.corrected_pipeline import CorrectedSessionPipeline
 from atpiano.desktop import (
     DESKTOP_WEBSOCKET_PREFIX,
     DesktopHandshake,
+    validate_desktop_origin,
     validate_desktop_token,
 )
 from atpiano.live import LiveWindowModel, parse_pcm_block
@@ -222,14 +223,14 @@ class CorrectedWorkbenchRuntime:
                 )
         else:
             validate_desktop_token(desktop_token)
-            if desktop_origin != "tauri://localhost":
-                raise ValueError(
-                    "desktop origin must be the bundled Tauri origin"
-                )
             if desktop_handshake is None:
                 raise ValueError(
                     "desktop authentication requires a handshake"
                 )
+            validate_desktop_origin(
+                desktop_origin,
+                desktop_handshake.platform,
+            )
         self.workspace_directory = workspace_directory.resolve()
         self.workspace_directory.mkdir(parents=True, exist_ok=True)
         self.session_store = LocalSessionStore(self.workspace_directory)

@@ -94,12 +94,16 @@ not native x64 performance evidence. Native x64 GitHub Actions builds and the
 existing physical x64 server baseline cover the complementary architecture
 boundary. Native Windows ARM64 packaging is later work.
 
-The first implementation slice now generalizes the Python desktop model-pack,
-ready, and handshake schemas to the two exact supported pairs. It normalizes a
-Windows AMD64 process to `windows/x86_64`, rejects Windows ARM64 and invalid
-cross-pairs, and requires the model pack to match the host/backend. Rust/Tauri
-resource discovery, process launch, staging, and packaging remain macOS-only,
-so this contract change alone is not a Windows desktop build.
+The first implementation slices now generalize the Python and Tauri desktop
+boundary to the two exact supported pairs. Python normalizes a Windows AMD64
+process to `windows/x86_64`, rejects Windows ARM64 and invalid cross-pairs, and
+requires the model pack to match the host/backend. Tauri selects explicit
+macOS arm64 and Windows x86_64 Python, resource, origin, package, and updater
+variants; its Windows local origin is passed through the authenticated
+sidecar, handshake, and artifact paths. The frontend likewise accepts only
+the matching `.app` and NSIS identity triples. The Windows runtime still needs
+to be staged, compiled, packaged, installed, and exercised on Windows, so
+these portable contracts alone are not a Windows desktop build.
 
 ## Direction
 

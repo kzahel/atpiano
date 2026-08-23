@@ -28,6 +28,7 @@ from atpiano.desktop import (
     load_model_pack,
     model_pack_sha256,
     normalize_desktop_identity,
+    validate_desktop_origin,
     validate_desktop_token,
 )
 from atpiano.fixture import generate_fixture
@@ -167,6 +168,25 @@ def test_desktop_token_is_exact_lowercase_hex() -> None:
     for value in ("", "ab" * 31, "AB" * 32, "g0" * 32, "ab" * 33):
         with pytest.raises(ValueError, match="desktop token"):
             validate_desktop_token(value)
+
+
+def test_desktop_origin_accepts_only_release_origins() -> None:
+    assert validate_desktop_origin("tauri://localhost") == "tauri://localhost"
+    assert validate_desktop_origin("http://tauri.localhost") == "http://tauri.localhost"
+    assert (
+        validate_desktop_origin("http://tauri.localhost", "windows")
+        == "http://tauri.localhost"
+    )
+    with pytest.raises(ValueError, match="does not match"):
+        validate_desktop_origin("http://tauri.localhost", "macos")
+    for value in (
+        "https://tauri.localhost",
+        "http://localhost",
+        "tauri://localhost/",
+        "http://tauri.localhost/",
+    ):
+        with pytest.raises(ValueError, match="bundled Tauri origin"):
+            validate_desktop_origin(value)
 
 
 def test_desktop_identity_accepts_release_targets() -> None:
