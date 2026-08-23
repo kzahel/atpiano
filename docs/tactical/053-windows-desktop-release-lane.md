@@ -3,19 +3,15 @@
 Topics: `public-desktop-release`, `windows-native-runtime-portability`,
 `desktop-score-runtime-footprint`
 
-Status: **implementation active as a prerequisite of the first binary
-release.** The Python desktop identity/model-pack contracts now accept exactly
-macOS arm64 and Windows x86_64 CPU pairings. The Tauri launcher and frontend
-now carry exact resource, origin, package, and updater variants for both
-targets. The native Windows x64 application core is established and the
-universal score-support registry lock resolves for Windows x64. A complete
-2.12 GB relocatable Windows x64 runtime, including the ordinary model pack,
-pinned media payload, and publication-safe score support, now passes twice on
-the testbed under x64-on-ARM64 emulation. An unsigned per-user NSIS package is
-now built and installed; it passes the shared model-download dialog, real
-acknowledged acquisition, CPU adapter output, relaunch, and reinstall
-preservation. The credentialed Authenticode build, full packaged replay/score
-flows, removal, and updater campaign remain.
+Status: **signed `0.1.0` release published; installed update/full-flow
+acceptance active.** Native Windows x64 CI staged and independently re-audited
+the 2.10 GB CPU runtime, signed the per-user NSIS installer through Azure
+Trusted Signing, verified Authenticode and the trusted timestamp, verified the
+Tauri updater signature, rejected forbidden model assets, and issued build
+provenance. The installed development package still owns the acknowledged
+acquisition, CPU adapter output, relaunch, and reinstall-preservation evidence.
+Full packaged replay/score flows, explicit removal, and the installed
+`0.1.0 -> 0.1.1` updater campaign remain.
 
 ## Goal
 
@@ -491,16 +487,29 @@ frontend score request, explicit model removal, Authenticode signature, and
 old-to-new updater remain unaccepted. The replay timeout is not native x64
 performance evidence or a failure of the isolated MIDI2Score capability.
 
-The Windows CI lane and coordinated finalizer are implemented. A native x64
-`windows-2025` job stages and independently audits the runtime, signs through
-Azure Trusted Signing, verifies application/installer signatures and trusted
-timestamps, retains updater artifacts, and emits redacted evidence. The tag
-finalizer accepts exactly the macOS arm64 and Windows x64 artifact pairs,
-creates one two-target updater manifest, adds final GitHub asset checksums,
-validates the private draft, and publishes only after both jobs succeed. The
-workflow parses and passes `actionlint`, but it has not run with credentials;
-all 11 required Actions secret names were configured and verified on
-2026-08-23. The first credentialed two-platform rehearsal remains pending.
+The Windows CI lane has now run with credentials in exact-candidate rehearsal
+and tagged release builds. The tagged native x64 `windows-2025` job staged and
+independently re-audited 32,827 files and 2,102,342,989 bytes with canonical
+payload SHA-256
+`8a4cfb272792be8c30f4973559c16c45130382f27f6f40370bfc7c18ace31d99`.
+The runtime contains 570 native x64 files, 102 ordinary packages, CPU identity,
+and no forbidden MIDI2ScoreTransformer source/checkpoint.
+
+Azure Trusted Signing produced the public
+`Atpiano_0.1.0_x64-setup.exe`: 435,644,168 bytes with SHA-256
+`7ee234725481027a223089d1a6b9db242d67967706f2190158b7e82b2d796197`.
+The signing audit records signer subject `Kyle Graehl`, certificate thumbprint
+`E1C64C8768CD2EB85F6CC1E759309B72FBB311A5`, and Microsoft Public RSA Time
+Stamping Authority. Tauri v2 uses that same signed NSIS executable as the
+Windows updater; its 416-byte detached signature has SHA-256
+`3ee00e5c7af232d523ca0f2b8dd271aa5ffa1a13dd4a12191106c1bd23187365`
+and verifies against the embedded updater public key. GitHub build provenance
+resolves both files to `refs/tags/desktop-v0.1.0`.
+
+Production requests to `windows/x86_64/0.0.0` return the exact signed `0.1.0`
+metadata, while `windows/x86_64/0.1.0` returns HTTP 204. This completes signed
+initial publication, not full packaged replay/score/removal acceptance or the
+installed `0.1.0 -> 0.1.1` campaign.
 
 The post-integration local gate passes Ruff, all 305 Python tests, frontend
 typecheck, 17 Node contract tests, 109 React/browser tests, all 23 Rust tests,

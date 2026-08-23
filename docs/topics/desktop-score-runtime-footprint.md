@@ -2,16 +2,14 @@
 
 Topic: desktop-score-runtime-footprint
 
-Status: **a user-acquired score runtime is now implemented through the packaged
-macOS and Windows consent gates, with platform support layers built for macOS
-arm64 and Windows x64 as of 2026-08-23.** The complete 2.12 GB Windows desktop
-resource tree passes its staged audit, and its unsigned per-user NSIS package
-passes installed notice/acknowledgement/cancel acceptance under x64-on-ARM64
-emulation. A real Windows acquisition, relaunch, CPU adapter result, and
-reinstall-preservation check also pass. Equivalent macOS acquisition, the full
-packaged score flow, removal, signed candidates, and update campaigns remain.
-The published applications and GitHub Release must still exclude the
-MIDI2ScoreTransformer repository and checkpoint. Each application may include
+Status: **the user-acquired score-runtime core is published in signed macOS and
+Windows `desktop-v0.1.0` applications as of 2026-08-24.** Exact platform
+support layers and both installed notice/acknowledgement/cancel gates pass.
+Tagged CI independently audits both packages and excludes the
+MIDI2ScoreTransformer repository and checkpoint. A real Windows acquisition,
+relaunch, CPU adapter result, and reinstall-preservation check also pass.
+Equivalent macOS acquisition, the full packaged score flow, removal, and
+installed update campaigns remain. Each application includes
 a pinned platform-specific support environment with best-effort dependency
 provenance, plus a shared acquisition controller that downloads the exact
 model source and checkpoint only after an explicit education/research-use
@@ -50,11 +48,11 @@ and installed update campaign remain owned by
 [`051-signed-macos-update-lane.md`](../tactical/051-signed-macos-update-lane.md),
 with the Windows half in tactical 053.
 
-This direction authorizes planning and implementation of acquisition support;
+This direction authorized and now governs the published acquisition support;
 it does not authorize Atpiano to distribute or mirror the
 MIDI2ScoreTransformer repository or checkpoint, claim upstream permission,
-quantize or derive a new model artifact, or publish a desktop binary before the
-separate release hold is approved. For this noncommercial proof of concept,
+quantize or derive a new model artifact. The separate `0.1.0` release hold was
+approved and completed without those model assets. For this noncommercial proof of concept,
 removing evaluation-only `ScoreTransformer` and MUSTER dependencies is a later
 optimization rather than a publication prerequisite.
 
@@ -95,6 +93,9 @@ earlier projection while keeping the main model external:
 | Complete staged Windows desktop runtime | 2,123,362,588 | 2.12 GB |
 | Unsigned corrected Windows NSIS installer | 433,446,738 | 433.4 MB |
 | Acquired Windows score runtime | 1,310,274,855 | 1.31 GB |
+| Published signed macOS updater | 584,024,206 | 584.0 MB |
+| Published notarized macOS DMG | 575,135,484 | 575.1 MB |
+| Published signed Windows NSIS/updater | 435,644,168 | 435.6 MB |
 
 The support package has 64 distributions and excludes the
 MIDI2ScoreTransformer repository and checkpoint. Its 926,842,450-byte
@@ -104,18 +105,19 @@ The Windows support package has the same 64 distributions, 196 x64 PE files,
 165 flattened and hash-inventoried distribution-license files, and a current
 canonical payload with SHA-256
 `2c16307fd59a85479d55fffeb2d8674f4ac4014430dcb4d6eb074f12ec619106`.
-The complete Windows stage has 102 ordinary distributions, 583 x64 PE files,
-35,364 files, and canonical SHA-256
-`d07f00487568801960ace389dea79464a7d5800b50582a8c1d1f828759ff37d8`.
-Its build and independent repeat audit passed under Windows x64-on-ARM64
-emulation. The unsigned packaged-macOS-App audit, Windows staged-runtime audit,
-and installed Windows dialog cancellation find no forbidden score assets.
+The published Windows CI stage has 102 ordinary distributions, 570 x64 PE
+files, 32,827 files, 2,102,342,989 bytes, and canonical SHA-256
+`8a4cfb272792be8c30f4973559c16c45130382f27f6f40370bfc7c18ace31d99`.
+Its native x64 build and independent repeat audit pass. The signed packaged
+macOS and Windows audits and installed Windows dialog cancellation find no
+forbidden score assets.
 The real Windows acquisition installed 1,310,274,855 bytes outside the App and
 preserved them through uninstall/reinstall. A direct eight-note CPU adapter
 smoke completed in 14.22 seconds and produced validated MusicXML/alignment; its
 6,943-byte report has SHA-256
 `f04e1d2d45293ef15a6963f9edbfcf0ff6e8bc7d1d3692de6bac8ce2600dd8b1`.
-Signed exact package sizes remain unmeasured.
+The signed exact package sizes are recorded in the table above and in the
+public release checksums.
 
 The score runtime is large primarily because it is a second standalone Python
 environment. Package-name intersection with the normal desktop runtime totals
@@ -283,8 +285,8 @@ research guardrail cases. Quantization is not packaging cleanup.
 
 ## Public User-Acquired Runtime Contract
 
-The acquisition feature is desktop-only and must ship in both macOS arm64 and
-Windows x86_64 CPU applications for the first release. Hosted web compositions
+The acquisition feature is desktop-only and ships in both macOS arm64 and
+Windows x86_64 CPU applications in the first release. Hosted web compositions
 continue to report only the server's operator-installed score capability and
 must not expose the desktop download dialog.
 
@@ -407,14 +409,18 @@ does not delete sessions, source MIDI, MusicXML, alignments, or exports.
 7. Prove external-runtime preservation through the real signed
    `0.1.0 -> 0.1.1` updater campaign on both operating systems.
 
+Steps 1 through 5 and the signed-package/audit portion of step 6 are complete
+in public `0.1.0`. Windows acquisition and isolated CPU output also pass.
+macOS acquisition, visible end-to-end score parity/removal, and step 7 remain.
+
 Python 3.10 consolidation, removal of eager ScoreTransformer/MUSTER imports,
 checkpoint derivation, broader dependency pruning, and quantization remain
 later optimizations. The first public flow must acquire the exact released
 checkpoint rather than an Atpiano-derived weight artifact.
 
-The macOS reference now measures 1.96 GB installed and 586.9 MB in Tauri's
-generated updater archive before model acquisition. These are unsigned local
-artifact measurements, not final DMG or Windows evidence.
+The earlier macOS reference measured 1.96 GB installed and 586.9 MB in Tauri's
+generated updater archive before model acquisition. The exact public signed
+artifact sizes now appear in the measured-baseline table.
 
 ## Validation Contract
 
@@ -493,15 +499,14 @@ saving and re-run packaged score parity. If either package remains necessary,
 ask its maintainer for explicit license terms. This cleanup is desirable but is
 not a prerequisite for the noncommercial proof-of-concept release.
 
-## Next Tactical
+## Next Tactical Work
 
-Implement
+Continue
 [`052-user-acquired-score-runtime.md`](../tactical/052-user-acquired-score-runtime.md)
 and
 [`053-windows-desktop-release-lane.md`](../tactical/053-windows-desktop-release-lane.md)
-as prerequisites of the first public desktop tag. Stop at the dependency and
-support-layout checkpoint only for an explicit upstream prohibition, a direct
-maintainer objection, or a technical/security failure. Known missing license
-metadata for the evaluation helpers is recorded risk, not a reason to delay the
-proof of concept. Do not substitute a derived checkpoint or mirror the main
-model content to keep the release schedule.
+through macOS acquisition, visible score/removal checks, and the installed
+`0.1.0 -> 0.1.1` campaigns. Known missing license metadata for the evaluation
+helpers remains recorded risk, not a reason to retract the proof of concept.
+Do not substitute a derived checkpoint or mirror the main model content in a
+future release merely to simplify acquisition.

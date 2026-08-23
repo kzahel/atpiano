@@ -9,6 +9,22 @@ The v3 shared React workspace is the primary application. Model selection,
 streaming behavior, correction, notation quality, and deployment remain active
 research concerns, supported by reproducible benchmarks and retained evidence.
 
+## Proof-of-Concept Desktop Downloads
+
+The public/latest
+[`desktop-v0.1.0` release](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.0)
+provides signed CPU applications for macOS Apple silicon and Windows x86_64.
+Use the DMG on macOS or the per-user NSIS setup executable on Windows. The
+applications include automatic update support; the production route is live,
+while the first installed `0.1.0 -> 0.1.1` acceptance campaign remains future
+work.
+
+Optional sheet-music generation requires a separate direct upstream download.
+The application shows an education/research-only acknowledgement and the
+upstream license caveat before enabling that download. The
+MIDI2ScoreTransformer repository and checkpoint are not bundled in Atpiano or
+its GitHub Release.
+
 ## Project Boundary
 
 Atpiano owns:
@@ -72,18 +88,17 @@ Native Windows is now an authoritative CPU development and local-server lane.
 The locked environment, deterministic Basic Pitch and Transkun CPU controls,
 production frontend, migration gate, compact storage path, and unpackaged
 `workbench-v3` replay pass on the RTX 4090 host without WSL. This is a
-packaging-aligned development baseline, not yet a supported Windows desktop
-build. The explicit `corrected-cu132` environment now also passes strict-FP32
-Transkun parity and accelerated replay through the same native server on the
-RTX 4090. The first binary proof of concept is now intended to publish both
-macOS arm64 and Windows x86_64 CPU builds with the same user-acquired score
-capability; CUDA remains optional later acceleration. The configured Windows
+packaging-aligned development baseline, and the first signed Windows x86_64
+CPU desktop proof of concept is now public. The explicit `corrected-cu132`
+environment also passes strict-FP32 Transkun parity and accelerated replay
+through the same native server on the RTX 4090. CUDA remains optional later
+acceleration. The configured Windows
 11 ARM64 `machine-control` VM is the primary interactive development and UI
 testbed for the x64 package under supported Windows emulation, while native x64
 CI and the established x64 server baseline own architecture-specific build and
-runtime evidence. Tauri adaptation, Windows packaging/signing, WebView2 and
-microphone acceptance, and updater proof are active release prerequisites, not
-post-release expansion. WSL2 remains a labeled Linux reference and
+runtime evidence. Tauri adaptation, Windows packaging/signing, and updater
+metadata now pass; full WebView2/microphone behavior and an installed updater
+campaign remain acceptance work. WSL2 remains a labeled Linux reference and
 failure-isolation option rather than a product dependency. Current direction
 and evidence are recorded in
 [`docs/topics/windows-native-runtime-portability.md`](docs/topics/windows-native-runtime-portability.md)
@@ -108,13 +123,13 @@ private review path. It is not a distribution artifact and does not change the
 ordinary score-free R5 archive. The reviewed score now keeps its original
 model MusicXML with the other session exports, and artifact export uses
 ordinary browser downloads on the web or a native Save As dialog on desktop.
-The later score-assets-free macOS arm64 candidate has passed Developer ID
-signing, notarization, installed-App review, and local updater checks. The
-source repository and CI lane are public, but no binary release exists and the
-production updater route is inactive. The first intended public release now
-adds an explicit user-acquired score-runtime flow and requires coordinated
-macOS arm64 and Windows x86_64 CPU artifacts while continuing to exclude the
-MIDI2ScoreTransformer repository and checkpoint from every release artifact.
+The acquisition-capable macOS arm64 candidate passed Developer ID signing,
+notarization, stapling, Gatekeeper, packaged replay, and updater-signature
+checks. It is published with the Authenticode-signed Windows x86_64 CPU
+application in `desktop-v0.1.0`, and the production updater route serves both
+targets. The release exposes the explicit user-acquired score-runtime flow
+while continuing to exclude the MIDI2ScoreTransformer repository and
+checkpoint from every release artifact.
 The pinned ScoreTransformer/MUSTER evaluation helpers may remain in the first
 proof-of-concept support environments; removing their eager inference imports
 is recorded as later cleanup. Current status and plans live in

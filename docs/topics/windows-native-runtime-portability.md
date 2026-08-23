@@ -2,20 +2,22 @@
 
 Topic: windows-native-runtime-portability
 
-Status: **native Windows CPU/CUDA server baselines and the complete relocatable
-Windows x64 CPU desktop package are established as of 2026-08-23.** The
+Status: **native Windows CPU/CUDA server baselines and the first signed Windows
+x64 CPU desktop release are established as of 2026-08-24.** The
 locked ordinary and corrected environments, Basic Pitch ONNX model pack,
 Transkun CPU assets, pinned FFmpeg/FFprobe, publication-safe score support,
 authenticated sidecar startup, and repeat package/PE/hash audits pass without
-WSL. The 2.12 GB stage and an unsigned 433 MB per-user NSIS setup executable
-are built and installed under x64-on-ARM64 emulation. The production window,
+WSL. The installed development package passes under x64-on-ARM64 emulation;
+native x64 CI independently stages/re-audits the 2.10 GB runtime and publishes
+a 435.6 MB Authenticode-signed, trusted-timestamped per-user NSIS executable.
+The production window,
 hidden sidecar, score-model disclosure/acknowledgement gate, and cancellation
 without acquisition pass. A real acquisition, relaunch, isolated CPU
 MusicXML/alignment result, and reinstall preservation also pass. Full packaged
 replay/export and frontend score flows, physical microphone, model removal,
-Authenticode signing, and updates have not passed. The product decision on
-2026-08-23 made a Windows x86_64 CPU package a prerequisite of the first binary
-proof-of-concept release; tactical
+physical microphone, model removal, and an installed update have not passed.
+The public/latest `desktop-v0.1.0` release and production updater metadata now
+include Windows x86_64. Tactical
 [`053-windows-desktop-release-lane.md`](../tactical/053-windows-desktop-release-lane.md)
 owns that work.
 
@@ -78,9 +80,9 @@ Tactical 053 now owns the bounded implementation and release lane.
 
 ## First Public Desktop Decision
 
-The first public binary tag must contain both `darwin-aarch64` and
+The first public binary tag contains both `darwin-aarch64` and
 `windows-x86_64` CPU applications with the same ordinary and user-acquired
-score features. A successful macOS artifact alone is not publication-ready.
+score features. A macOS-only artifact was not treated as publication-ready.
 CUDA is useful measured acceleration but is not required for Windows feature
 parity: Basic Pitch uses ONNX Runtime CPU, Transkun supports CPU with the
 measured conservative after-Stop profile, and Atpiano's MIDI2Score adapter
@@ -109,7 +111,9 @@ sidecar, handshake, and artifact paths. The frontend likewise accepts only
 the matching `.app` and NSIS identity triples. The complete Windows resource
 runtime is staged and audited, and the Tauri shell is composed with it in an
 installed current-user NSIS development package. The application and notice
-gate pass; complete packaged feature and signing acceptance remain.
+gate pass; native x64 CI signing, timestamping, updater-signature verification,
+and publication also pass. Complete packaged feature and installed-update
+acceptance remain.
 
 The Tauri shell now also compiles as `x86_64-pc-windows-msvc`, and all 15 Rust
 tests execute successfully as x64 processes on the ARM64 Windows testbed. The
@@ -265,13 +269,12 @@ should retain separate CPU and NVIDIA pack identities, derive an
 inference-minimal CUDA DLL inventory, and prove every size or startup
 optimization against the frozen fixture and profile identity.
 
-The Windows artifact now exists as an unsigned development package. It is not
-the public candidate because GitHub Actions has not rebuilt it on native x64,
-Azure Trusted Signing has not authenticated it, its actual user-acquired
-MIDI2Score flow has only an isolated adapter result, its full ordinary
-replay/export path has not completed, and no installed Windows update has
-occurred. Those are acceptance gaps, not reasons to revert the two-platform
-product decision.
+The unsigned development package remains installed-testbed evidence. GitHub
+Actions rebuilt the public `0.1.0` package on native x64, and Azure Trusted
+Signing authenticated and timestamped it. The user-acquired MIDI2Score flow
+still has only an isolated adapter result, the full ordinary replay/export
+path has not completed, and no installed Windows update has occurred. Those
+are acceptance gaps, not reasons to retract the two-platform proof of concept.
 
 ## Reproducible Implementation Sequence
 
@@ -357,8 +360,8 @@ supervise:
 
 Tactical 053 has consumed this handoff for the first Windows Tauri development
 build, installed dialog, real acquisition, CPU adapter result, and reinstall
-preservation. Signed CI artifacts, full installed runtime behavior, removal,
-and updater evidence remain.
+preservation. Signed CI artifacts and public updater metadata now pass; full
+installed runtime behavior, removal, and the installed updater campaign remain.
 
 ## Baseline Acceptance
 

@@ -7,31 +7,27 @@ itself.
 
 ## Current Boundary
 
-As of 2026-08-23, `kzahel/atpiano` is public and has no GitHub Release. The
-source tree contains the score-model notice and acquisition capability, but no
-MIDI2ScoreTransformer source or checkpoint. All 11 required GitHub Actions
-secret names were configured and independently verified on 2026-08-23. The
-production updater product remains
-inactive: both the macOS arm64 and Windows x64 concrete `0.1.0` routes return
-HTTP 404 `Unknown product for this hostname`.
+As of 2026-08-24, `kzahel/atpiano` is public and has no declared Atpiano
+source license. The public/latest
+[`desktop-v0.1.0`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.0)
+release contains signed macOS arm64 and Windows x86_64 CPU applications. Both
+contain the score-model acknowledgement and acquisition capability but no
+MIDI2ScoreTransformer source or checkpoint.
 
-The local Developer ID identity is valid and App Store Connect notarization
-authentication succeeds. The Atpiano updater keypair is present and its public
-half matches the application configuration. Private key/certificate files are
-owner-readable only. The attended helper validated the Developer ID,
-notarization, updater-key, and Azure credential groups before uploading the 11
-values through non-logging input boundaries. A credentialed workflow run has
-not yet exercised them.
+All 11 required GitHub Actions secret names were configured, independently
+verified, and exercised. The credentialed
+[two-platform rehearsal](https://github.com/kzahel/atpiano/actions/runs/32666483577)
+passed on exact candidate commit
+`ed76f74686981990ce230679ccae9af19dfd61f2`. The
+[tagged run](https://github.com/kzahel/atpiano/actions/runs/32669326956)
+produced and attested both platform sets from that same commit. Private
+credential values remain outside Git and release evidence.
 
-The Windows package built and installed successfully on the Windows 11 ARM64
-testbed as an x64-emulated, unsigned development package. Its real acknowledged
-model acquisition, CPU MusicXML/alignment smoke, relaunch, and package
-reinstall preservation pass. The exact unsigned installer is 433,446,738 bytes
-with SHA-256
-`a6c9fb9edc469bd6ab9cf9711f32b1e7f9a9fec181bb063f9e6f348abbef43df`.
-The macOS package has an earlier signed/notarized baseline, but the exact
-acquisition-capable build still needs its credentialed CI rehearsal. Neither
-local artifact is a public release candidate.
+Production update routing is active. Public `darwin/aarch64` and
+`windows/x86_64` requests from version `0.0.0` return signed `0.1.0` metadata;
+requests from `0.1.0` return HTTP 204. The response signatures match the
+published `latest.json` byte-for-byte. Installed `0.1.0 -> 0.1.1` acceptance
+on both platforms remains open.
 
 ## Required Actions Secrets
 
@@ -98,11 +94,19 @@ Download and inspect the rehearsal artifacts before authorizing a tag. A
 successful rehearsal proves build/signing readiness, not the production
 updater or a public release.
 
-Before treating the rehearsal as the exact candidate, repeat the real model
-acquisition and score check on macOS, exercise the complete packaged score
-request and removal paths on both systems, and run the ordinary Windows
-import/replay/export matrix on a native x64 host. The Windows x64-on-ARM64
-testbed proves correctness boundaries but is not native x64 timing evidence.
+For `0.1.0`, rehearsal run
+[`32666483577`](https://github.com/kzahel/atpiano/actions/runs/32666483577)
+passed both signed platform jobs at candidate commit `ed76f74`. Its updater
+signatures verified against the embedded public key; the DMG passed signing,
+stapler, and Gatekeeper checks; and the Windows installer passed Azure Trusted
+Signing, Authenticode, and Microsoft trusted-timestamp verification.
+
+For `0.1.0`, the maintainer explicitly accepted proof-of-concept publication
+before the real macOS acquisition, complete packaged score/removal paths, and
+ordinary native-x64 Windows replay matrix were complete. Preserve those as
+acceptance work for `0.1.1` or a later release; do not retroactively describe
+them as passing. The Windows x64-on-ARM64 testbed proves correctness boundaries
+but is not native x64 timing evidence.
 
 ## Tag And Draft-First Publication
 
@@ -125,18 +129,59 @@ The finalizer then:
 Any missing credential, platform, signature, hash, source archive, or expected
 asset fails closed. The finalizer refuses to replace an already-public release.
 
+The first tag exposed one Tauri v2 filename drift after both platform jobs
+passed: the finalizer expected an architecture-suffixed macOS updater, while
+Tauri emitted `Atpiano.app.tar.gz`. It failed before creating a draft. Release
+recovery used only the retained, attested tagged-run artifacts, independently
+verified both updater signatures and the notarized DMG, reconciled every local
+hash with GitHub's asset digests, generated the exact two-target metadata, and
+passed the strict draft validator before publication. Commit `f1c905e` fixes
+and tests the automatic selector for all future tags.
+
+## Published 0.1.0 Evidence
+
+| Asset | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `Atpiano_0.1.0_aarch64.dmg` | 575,135,484 | `704b1623c5cfdc55b206ed2aa067aa22d931f0078549515c56266a0037720edd` |
+| `Atpiano.app.tar.gz` | 584,024,206 | `369d7efa775adb145ef21d53fa54b15aab78157bec94993d4aef5cd21eb54996` |
+| `Atpiano.app.tar.gz.sig` | 404 | `6fdf3cddb73ccfadaf300463a43188e693e723f20e535ce24fc4646327fd557d` |
+| `Atpiano_0.1.0_x64-setup.exe` | 435,644,168 | `7ee234725481027a223089d1a6b9db242d67967706f2190158b7e82b2d796197` |
+| `Atpiano_0.1.0_x64-setup.exe.sig` | 416 | `3ee00e5c7af232d523ca0f2b8dd271aa5ffa1a13dd4a12191106c1bd23187365` |
+| `Atpiano_0.1.0_media-sources.tar.gz` | 13,220,731 | `c662d0b3b2aadc11a170534cb83a7dcd071443be74a9ec8e3255ce29a58a78c2` |
+| `latest.json` | 1,749 | `d204eca56f8d17f1d6593fc7243380b809e8f75de34675ab62a06bf0531bf765` |
+| `SHA256SUMS` | 637 | `8e2f0506d89ed26ec8bf9d52633ff2c3547bb6c6110512f17495d3cf5e2220e1` |
+
+The Windows signing audit records signer subject `Kyle Graehl`, certificate
+thumbprint `E1C64C8768CD2EB85F6CC1E759309B72FBB311A5`, the Microsoft
+Public RSA Time Stamping Authority, and zero forbidden score assets. GitHub
+build-provenance verification resolves all six platform files to workflow
+`.github/workflows/desktop.yml` at `refs/tags/desktop-v0.1.0`.
+
+The production product is the tracked `update-server/atpiano.json` exposed by
+the shared update service. Validate it after deployment with:
+
+```bash
+curl -i https://updates.graehlarts.com/atpiano/tauri/darwin/aarch64/0.0.0
+curl -i https://updates.graehlarts.com/atpiano/tauri/windows/x86_64/0.0.0
+curl -i https://updates.graehlarts.com/atpiano/tauri/darwin/aarch64/0.1.0
+curl -i https://updates.graehlarts.com/atpiano/tauri/windows/x86_64/0.1.0
+```
+
+The first two must return HTTP 200 with version `0.1.0`, exact release URLs,
+and the published signatures. The last two must return HTTP 204.
+
 ## Remaining Acceptance After `0.1.0`
 
 Auto-update is implemented in the applications and release metadata, but it is
-not accepted until the production product route is deliberately activated and
-an installed `0.1.0 -> 0.1.1` campaign passes on both operating systems. That
+live through the production product route. It is not fully accepted until an
+installed `0.1.0 -> 0.1.1` campaign passes on both operating systems. That
 campaign must preserve sessions, installation identity, acknowledgement, and
 the compatible externally acquired score runtime without downloading the
 model again.
 
-Before the first tag, also close or explicitly waive the current Windows media
-corresponding-source attachment gap: the tracked Windows manifest pins the
-BtbN build repository and FFmpeg commits, while the existing attached source
-archive was produced for the macOS FFmpeg/LAME build. Do not describe that one
-archive as exact corresponding source for both binaries until the Windows
-source bundle is reconciled.
+The Windows media corresponding-source attachment gap was explicitly accepted
+for this free proof-of-concept release: the tracked Windows manifest pins the
+BtbN build repository and FFmpeg commits, while the attached source archive is
+the exact macOS FFmpeg/LAME source set. Do not describe that archive as exact
+corresponding source for the Windows binaries. Reconcile a Windows source
+bundle in a future release when practical.

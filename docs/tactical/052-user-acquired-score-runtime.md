@@ -3,16 +3,15 @@
 Topics: `desktop-score-runtime-footprint`, `public-desktop-release`,
 `performance-to-notation`
 
-Status: **implementation active as a proof-of-concept prerequisite for the
-first public desktop tag.** The external asset contract, transactional native
-controller, shared consent/management dialog, and macOS arm64 score-support
-package are implemented. The Windows x64 score-support package is also built
-and audited under x64-on-ARM64 emulation. Its installed Tauri dialog passes the
-no-request acknowledgement/cancel gate and a real acknowledged acquisition,
-relaunch, CPU adapter smoke, and reinstall-preservation check. The equivalent
-macOS acquisition, complete packaged score flow, removal, both signed exact
-candidates, and both update campaigns remain. Dependency cleanup is explicitly
-deferred.
+Status: **published proof-of-concept core; installed full-flow acceptance
+active.** `desktop-v0.1.0` ships the transactional controller, shared
+education/research acknowledgement dialog, and audited macOS arm64/Windows
+x64 support layers, but no MIDI2ScoreTransformer source or checkpoint. Both
+signed release candidates passed forbidden-model audits. The installed Windows
+dialog, acknowledged acquisition, relaunch, CPU adapter smoke, and reinstall
+preservation pass. Equivalent macOS acquisition, complete packaged score
+flow, explicit removal on both systems, and both `0.1.0 -> 0.1.1` persistence
+campaigns remain. Dependency cleanup is explicitly deferred.
 
 ## Goal
 
@@ -549,8 +548,9 @@ renders the exact education/research-only notice, recognizes the support
 package, begins with acknowledgement unchecked and download disabled, and
 enables download only after the checkbox is selected. The dialog was cancelled
 without starting acquisition and the application quit without an orphan. The
-real 390 MB model download, bounded import/model smoke, installed relaunch,
-and signed/notarized package have not yet been exercised.
+real 390 MB model download, bounded import/model smoke, and installed relaunch
+have not yet been exercised on macOS. The exact signed/notarized package later
+passed in the tagged CI release as recorded below.
 
 The Windows testbed subsequently built the same support contract with exact
 x64 CPython 3.11.14 under Windows 11 ARM64 emulation. The current output
@@ -594,8 +594,22 @@ The exact acquired runtime and acknowledgement also survived uninstall and
 reinstall of the final unsigned package. This is proof of acquisition,
 external activation, CPU inference, artifact validation, and package
 preservation under x64-on-ARM64 emulation; the full frontend score request,
-macOS acquisition, explicit removal, signed candidates, and signed update
-campaigns remain.
+macOS acquisition, explicit removal, and signed update campaigns remain.
+
+## Published 0.1.0 Boundary
+
+The public/latest `desktop-v0.1.0` macOS and Windows applications contain the
+controller, notice, and exact platform support layers described above. Tagged
+CI independently audited both packages and found no MIDI2ScoreTransformer
+repository or checkpoint. The model source and 389,829,880-byte checkpoint
+remain a separate direct upstream download after explicit acknowledgement;
+neither is a GitHub Release asset or automatic startup/update download.
+
+Production updater routing is active for both published CPU targets. This
+closes the first-public-build prerequisite but does not close this tactical:
+macOS acquisition/use, frontend score generation on both platforms, explicit
+removal, and compatible acquired-runtime preservation through installed
+`0.1.0 -> 0.1.1` updates remain the acceptance plan.
 
 ## Later Todo — Remove Evaluation Helpers
 

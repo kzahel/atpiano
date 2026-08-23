@@ -2,14 +2,16 @@
 
 Topic: public-desktop-release
 
-Status: **the source repository is public with no declared Atpiano source
-license; binary publication remains on hold as of 2026-08-23 while the first
-release adds user-acquired score capability.** Atpiano has implemented the
-accepted Desktop Update Contract v1 for a first public proof-of-concept
-release. The accepted direction now requires both macOS arm64 and Windows
-x86_64 CPU applications in the first binary tag. No GitHub Release exists. All
-11 required Actions secret names were configured and verified on 2026-08-23;
-the credentialed workflow rehearsal has not run. Tactical
+Status: **the first public two-platform proof-of-concept release is live as of
+2026-08-24.** The public, unlicensed source repository and the public/latest
+[`desktop-v0.1.0`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.0)
+GitHub Release contain signed macOS arm64 and Windows x86_64 CPU applications.
+Both include the education/research acknowledgement dialog and direct
+user-acquisition capability, but neither contains the MIDI2ScoreTransformer
+repository or checkpoint. All 11 Actions secrets were configured and
+exercised in a successful signed two-platform rehearsal and tagged build. The
+production updater serves both targets. Installed `0.1.0 -> 0.1.1` acceptance
+on both operating systems remains open. Tactical
 [`051-signed-macos-update-lane.md`](../tactical/051-signed-macos-update-lane.md)
 owns the macOS signed baseline and update campaign. The earlier macOS
 score-assets-free LGPL candidate is signed, notarized, installed, and locally
@@ -20,10 +22,9 @@ proof-of-concept score-support layers without adding the
 MIDI2ScoreTransformer repository or checkpoint.
 Tactical
 [`053-windows-desktop-release-lane.md`](../tactical/053-windows-desktop-release-lane.md)
-has produced and installed the matching unsigned Windows x64 development
-package, including a real user-acquired CPU score result and reinstall
-preservation; signed CI artifacts and updater evidence remain. No release has
-been published and no production update-server configuration has been changed.
+has produced and installed the matching Windows x64 development package,
+including a real user-acquired CPU score result and reinstall preservation,
+and now owns the remaining installed signed-update and full-flow acceptance.
 
 ## Scope
 
@@ -59,19 +60,19 @@ public visibility must not be described as open-source licensing. The
 maintainer's email address is acceptable public information.
 
 The ordinary application release must not contain MIDI2ScoreTransformer
-source or its checkpoint. The first published build is now intended to contain
-the capability to acquire those exact assets directly from upstream after a
+source or its checkpoint. The published `0.1.0` build contains the capability
+to acquire those exact assets directly from upstream after a
 person acknowledges an education/research-only notice. The notice must also
 say that upstream source and weights currently have no explicit license and
 that Atpiano and the acknowledgement do not grant rights. Atpiano must not
 mirror, rebundle, or imply that its own repository terms cover those assets.
 
-The two-platform acquisition-capable release needs pinned upstream URLs and
+The two-platform acquisition-capable release uses pinned upstream URLs and
 hashes, displayed terms, local acknowledgement provenance, bounded
 transactional download, failure recovery, relaunch activation, removal, update
 compatibility, and an exact signed support-layer inventory. These are the scope
-of tactical 052. Tactical 053 owns Windows packaging and installed parity. Both
-are prerequisites of `desktop-v0.1.0`. Every release artifact remains free of
+of tactical 052. Tactical 053 owns Windows packaging and installed parity.
+Every release artifact remains free of
 the MIDI2ScoreTransformer repository and checkpoint even though each installed
 application can become score-capable after the user's separate acquisition.
 
@@ -109,41 +110,39 @@ selection; installed user files are never silently deleted.
 | Installation privilege | no root/admin; DMG copy on macOS and per-user NSIS on Windows |
 | Mutable data | platform application-data/config directories, outside the App |
 
-The first proposed release pair is `desktop-v0.1.0` followed by
-`desktop-v0.1.1`. The first release must already contain the updater. The
-successor must carry an unmistakable visible change and coherent Tauri,
+The first release is `desktop-v0.1.0`; its planned acceptance successor is
+`desktop-v0.1.1`. The first release contains the updater. The successor must
+carry an unmistakable visible change and coherent Tauri,
 web-client, Python-sidecar, and model-pack identities.
 
 This product-declared two-target matrix deliberately specializes the canary's
 five-target contract. It does not claim Linux, Intel macOS, or native Windows
 ARM64 support.
 
-## Publication Hold Snapshot
+## Published 0.1.0 Snapshot
 
-| Concern | Proposed or observed value |
+| Concern | Published or observed value |
 | --- | --- |
-| Baseline version/tag | `0.1.0` / `desktop-v0.1.0` |
+| Baseline version/tag | public/latest `0.1.0` / `desktop-v0.1.0` |
 | Successor version/tag | `0.1.1` / `desktop-v0.1.1` |
-| Accepted local macOS installer | `Atpiano_0.1.0_aarch64.dmg` baseline; acquisition-capable rebuild pending |
-| macOS update pair | `Atpiano.app.tar.gz` and `Atpiano.app.tar.gz.sig` |
-| Windows runtime | complete 2.12 GB x64 resource stage passes twice under x64-on-ARM64 emulation |
-| Windows installer/update | corrected unsigned NSIS package accepted locally; signed CI package and updater proof pending |
-| CI metadata/finalizer output | exact two-target `latest.json` and final `SHA256SUMS` implemented; credentialed run pending |
-| Corresponding media sources | `Atpiano_0.1.0_media-sources.tar.gz` |
+| macOS installer | notarized/stapled 575,135,484-byte DMG, SHA-256 `704b1623c5cfdc55b206ed2aa067aa22d931f0078549515c56266a0037720edd` |
+| macOS updater | 584,024,206-byte `Atpiano.app.tar.gz`, SHA-256 `369d7efa775adb145ef21d53fa54b15aab78157bec94993d4aef5cd21eb54996`, plus verified signature |
+| Windows runtime | 32,827 files and 2,102,342,989 bytes; native x64 CPU stage and independent re-audit pass |
+| Windows installer/update | Authenticode-signed and timestamped 435,644,168-byte NSIS executable, SHA-256 `7ee234725481027a223089d1a6b9db242d67967706f2190158b7e82b2d796197`, plus verified updater signature |
+| CI metadata | exact two-target `latest.json`, `SHA256SUMS`, and platform build-provenance attestations published |
+| Corresponding media sources | 13,220,731-byte `Atpiano_0.1.0_media-sources.tar.gz`, SHA-256 `c662d0b3b2aadc11a170534cb83a7dcd071443be74a9ec8e3255ce29a58a78c2` |
 | Score acquisition | controller/dialog implemented; both cancel gates pass; real Windows acquisition, CPU adapter result, and reinstall preservation pass |
 | MIDI2ScoreTransformer release assets | repository and checkpoint forbidden; direct upstream acquisition only |
-| Product proposal | `update-server/atpiano.json` |
+| Product configuration | tracked `update-server/atpiano.json`, active through the Pi service |
 | Exact route | `https://updates.graehlarts.com/atpiano/tauri/...` |
 | Repository state | public `kzahel/atpiano`, default branch `main`, no declared Atpiano license |
-| Actions secrets | none configured; 11 required updater, Apple, and Azure Trusted Signing names |
-| Production route | inactive; current macOS arm64 and Windows x64 `0.1.0` requests both return HTTP 404 JSON |
+| Actions secrets | all 11 updater, Apple, and Azure Trusted Signing names configured and exercised |
+| Production route | active; both targets return signed `0.1.0` metadata to `0.0.0` and HTTP 204 to `0.1.0` |
 
-The local artifact hashes and notarization submission are retained in the
-tactical execution record. They remain baseline signing evidence rather than
-the exact future `0.1.0` candidate once tactical 052 changes the App.
-`latest.json` and `SHA256SUMS` deliberately do not exist as hand-authored local
-artifacts; the draft workflow produces and validates them against the tagged
-GitHub release.
+The exact release hashes, CI runs, notarization result, finalizer recovery, and
+production-route checks are retained in the tactical and operator runbook.
+`latest.json` and `SHA256SUMS` are release assets reconciled against GitHub's
+server-side asset digests, not hand-authored repository files.
 
 ## Release Safety Contract
 
@@ -206,16 +205,16 @@ topic was generalized; other child/family references describe product scope.
 The one literal `192.168.1.104` is an unroutable historical LAN default in the
 sharing script, not a public host or credential.
 
-The local macOS rehearsal App contains the local username in Rust dependency
+The local macOS rehearsal App contained the local username in Rust dependency
 diagnostic paths and Python build-time `sysconfig` metadata. Those strings are
 generated rather than tracked, disclose no user data beyond the maintainer
-identity, and will be replaced by GitHub runner paths in the authoritative CI
-rebuild. The exact CI artifacts still require a post-build private-path and
-secret-pattern scan before publication.
+identity, and were replaced by GitHub runner paths in the authoritative CI
+rebuild. The exact CI package audits, forbidden-content checks, signing-file
+cleanup, and log review passed before publication.
 
-Tactical 052 changes the distributable dependency and content boundary. Before
-publication, record exact provenance, known license status, and available
-notices for both platform score-support layers and scan both applications plus
+Tactical 052 changed the distributable dependency and content boundary. The
+release records exact provenance, known license status, and available notices
+for both platform score-support layers and scans both applications plus
 every nested release archive for the MIDI2ScoreTransformer repository tree,
 checkpoint name/hash, internal runtime manifests, acquisition staging, and
 local acknowledgement data. ScoreTransformer and MUSTER are provisionally
@@ -227,7 +226,7 @@ publishing certificate material or private testbed inventory.
 
 The earlier rehearsal used Homebrew FFmpeg 8.1.2 with `--enable-gpl`, x264,
 x265, and 18 bundled media libraries. That artifact remains useful historical
-signing evidence but is no longer the proposed public candidate.
+signing evidence but is not the published candidate.
 
 The replacement media contract is tracked in `desktop-media/manifest.json`.
 It builds FFmpeg 8.1.2 as LGPL-2.1-or-later and LAME 4.0 as
@@ -249,89 +248,70 @@ has no EULA restricting LGPL debugging or modification.
 
 ## Current Gates
 
-1. **Complete-bundle signing baseline: passed; exact-candidate rerun pending.**
-   The complete score-assets-free LGPL candidate passed Developer ID signing,
-   hardened runtime, notarization, stapling, mounted-DMG and installed-App
-   Gatekeeper checks, packaged replay, a visible 42-second import/scoring flow,
-   external-session persistence, stable installation identity, and clean
-   shutdown. The sealed App contains 14,327 files, 1,035,469,721 bytes, and 381
-   individually verified arm64 native signatures. Tactical 052 changes the
-   signed contents, so its final acquisition-capable candidate must repeat
-   this gate before tagging.
-2. **Two-platform release lane: implemented; credentialed CI pending.** The
-   product JSON, macOS-26 arm64 and Windows-2025 x64 jobs, Azure Trusted
-   Signing verification, exact two-target updater-manifest writer, draft
-   validator/finalizer, final checksums, and attestations are present and pass
-   local tests plus `actionlint`. The earlier one-target public
-   [source run](https://github.com/kzahel/atpiano/actions/runs/31516122672)
-   passed its Ubuntu source and macOS Rust jobs. A subsequent
-   [manual rehearsal](https://github.com/kzahel/atpiano/actions/runs/31516446700)
-   passed both prerequisite jobs, then failed closed before signing setup with
-   `Desktop builds require both Atpiano updater signing secrets`. No Actions
-   secrets have been uploaded.
-3. **Desktop updater: implemented and locally accepted.** The installed
-   notarized App exposes manual and scheduled checks, stable installation and
-   component identities, install blockers, download/install states, and
-   graceful sidecar preparation/recovery. A manual check reached the proposed
-   route and failed safely against its expected HTTP 404 while the product was
-   inactive. The installation UUID remained unchanged across relaunch.
-4. **Distribution compliance: locally accepted.** The pinned minimal LGPL
-   macOS build, notices, exact corresponding-source archive, release
-   attachment, checksum, attestation, and fail-closed draft validation are
-   implemented.
-   The unsigned full stage passed with 14,321 files, 1,015,793,592 bytes and
-   378 arm64 native files. The signed App reconciles a 14-file/2,871,458-byte
-   media category and passed Gate 1. The separately consumed Windows BtbN
-   media build has exact binary/build/FFmpeg commit provenance, but its exact
-   corresponding-source attachment has not been reconciled with the macOS
-   source archive and remains a publication gap.
-5. **User-acquired score runtime: implemented core; macOS and full-flow
-   acceptance still blocking.** The shared truthful acknowledgement, direct
-   upstream transactional acquisition, dependency inventories, external
-   activation/removal, and forbidden-model-content checks are implemented.
-   Both packaged dialogs pass the disabled-until-accepted and cancel-with-no-
-   acquisition gate. Windows also passes a real acknowledged download,
-   relaunch, direct CPU MusicXML/alignment result, and uninstall/reinstall
-   preservation. The equivalent macOS acquisition, full packaged score
-   request, explicit removal, and compatible-update persistence remain.
-6. **Windows desktop lane: unsigned development package accepted; signing and
-   complete behavior remain.** The generalized sidecar/resource boundary,
-   Windows x64 CPU and score-support runtime, current-user NSIS installer,
-   hidden sidecar, and installed disclosure pass on the machine-control
-   testbed under x64-on-ARM64 emulation. Its actual acquisition, isolated CPU
-   adapter result, and reinstall preservation also pass. The exact credentialed
-   CI package, packaged replay/export and frontend score flows, explicit
-   removal, and Windows updater remain.
-7. **Release credentials: configured; rehearsal pending.** GitHub reports all
-   11 required Actions secret names. The exact contract is eight updater/Apple names plus
-   `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_CLIENT_SECRET`. The tracked
-   updater public key matches the local Atpiano per-product public-key file.
-   The local Developer ID identity validates, App Store Connect notarization
-   authentication succeeds, and the private credential files are owner-only.
-   The canonical attended helper validated all four credential groups before
-   uploading through non-logging input boundaries, and
-   `scripts/check-desktop-release-secrets` confirms every expected name. Run
-   the non-tagged two-platform rehearsal before creating a tag.
-8. **Binary-publication hold:** repository visibility and public CI rehearsal
-   are complete. Review the proposed tag, artifact set, exact route, rehearsal
-   evidence, and remaining risks before uploading Actions secrets, activating
-   the production product config, pushing a release tag, or publishing a
-   release.
-9. **Installed update campaigns:** after approval, prove the exact signed
+1. **Exact macOS candidate: passed and published.** The tagged App and DMG
+   passed Developer ID signing, hardened runtime, Apple notarization,
+   stapling, Gatekeeper assessment, forbidden-model audit, and packaged CPU
+   scoring replay in CI. The independently submitted DMG, updater archive, and
+   detached signature were reverified during release recovery.
+2. **Two-platform signed build: passed.** The exact candidate commit
+   `ed76f74686981990ce230679ccae9af19dfd61f2` passed the credentialed
+   [rehearsal](https://github.com/kzahel/atpiano/actions/runs/32666483577).
+   The tagged
+   [release run](https://github.com/kzahel/atpiano/actions/runs/32669326956)
+   produced attested macOS and Windows artifacts. Attempt 1 encountered a
+   transient `notarytool` bus error after Apple accepted the DMG submission;
+   attempt 2 passed all platform gates.
+3. **Release publication: passed with recorded recovery.** The automatic
+   finalizer failed closed before draft creation because it expected an old
+   architecture-suffixed macOS updater filename. The retained, attested
+   artifacts were downloaded; updater signatures, DMG notarization, and local
+   hashes were reverified; `latest.json` and `SHA256SUMS` were reconciled with
+   GitHub digests; and the strict draft validator passed before publication.
+   Commit `f1c905e` fixes and tests the Tauri v2 `Atpiano.app.tar.gz`
+   contract for future tags.
+4. **Desktop updater routing: active; installed update pending.** The Pi loads
+   the tracked product config from the public checkout. Public macOS arm64 and
+   Windows x64 requests from `0.0.0` return exact signed `0.1.0` metadata;
+   requests from `0.1.0` return HTTP 204. Public response signatures match
+   `latest.json` byte-for-byte. An installed `0.1.0 -> 0.1.1` replacement has
+   not yet been exercised on either operating system.
+5. **Distribution compliance: provisionally accepted for this proof of
+   concept.** The macOS LGPL notices, exact corresponding-source archive,
+   checksums, and build provenance are public. The Windows BtbN media payload
+   retains exact binary/build/FFmpeg commit provenance. Its exact corresponding
+   source was not reconciled into the macOS source archive; the maintainer
+   explicitly accepted this limited proof-of-concept gap rather than delaying
+   `0.1.0`.
+6. **User-acquired score runtime: published core; full-flow work remains.**
+   Both applications contain the truthful acknowledgement and transactional
+   acquisition controller without upstream source/checkpoint bytes. Both
+   packaged cancel gates pass. Windows additionally passes acknowledged
+   acquisition, relaunch, direct CPU MusicXML/alignment output, and reinstall
+   preservation. Equivalent macOS acquisition, frontend score generation,
+   explicit removal on both platforms, and update persistence remain.
+7. **Windows signed package: passed and published; broader acceptance
+   remains.** Native x64 CI passed deterministic stage/re-audit, Azure Trusted
+   Signing, Authenticode verification, trusted timestamping, updater-signature
+   verification, forbidden-model checks, and provenance. Ordinary packaged
+   replay/export and frontend score flows, explicit removal, and installed
+   updater behavior remain open.
+8. **Release credentials and publication hold: complete.** All 11 secret names
+   were verified and exercised without exposing their values. The explicit
+   authorization covered the real two-platform tag, public release, and
+   production-route activation. The repository remains public with no
+   declared Atpiano source license.
+9. **Installed update campaigns: open.** Prove the exact signed
    `0.1.0 -> 0.1.1` path through production on macOS and Windows with each
    acquired runtime retained and usable, then retain redacted updater and
    upstream-request evidence.
 
 ## Recommended Direction
 
-Use [`desktop-release-operator-runbook.md`](../desktop-release-operator-runbook.md)
-to configure and verify the 11 secrets, run one non-tagged credentialed
-rehearsal, and inspect both exact signed candidates. Reconcile the Windows
-media corresponding-source attachment, perform the macOS acquisition and the
-remaining full score/removal paths on both OSes, then review and deliberately
-authorize the tag and production-route mutations. The existing local
-implementation, unsigned Windows install, and accepted score-free DMG
-rehearsal are not authorization to activate production routing, push a tag, or
-publish a release. Only signed `0.1.0 -> 0.1.1` campaigns through production
-on both platforms, with compatible user-acquired runtimes preserved and
-exercised, can close the update contract.
+Keep `desktop-v0.1.0` public while gathering proof-of-concept feedback. Use
+[`desktop-release-operator-runbook.md`](../desktop-release-operator-runbook.md)
+for future releases. Next, create a small visibly distinguishable `0.1.1`,
+run the corrected credentialed workflow, and exercise the signed production
+update from installed `0.1.0` on macOS and Windows. Preserve and re-exercise a
+compatible acquired score runtime on both systems. Complete macOS acquisition,
+frontend score generation, and explicit removal checks as practical; they are
+remaining acceptance work, not a claim that `0.1.0` is unpublished.

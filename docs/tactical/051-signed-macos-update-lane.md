@@ -2,18 +2,15 @@
 
 Topic: public-desktop-release
 
-Status: **active before binary publication.** The source repository and CI lane
-are public with no declared Atpiano source license. The release lane, desktop
-updater, and complete score-assets-free LGPL media baseline passed
-signed/notarized installed acceptance on 2026-08-11. The first published build
-now depends on tactical
-[`052-user-acquired-score-runtime.md`](052-user-acquired-score-runtime.md).
-After that changes the signed contents, the exact candidate must repeat local
-acceptance, credentialed CI rehearsal, and explicit publication review before
-the real `0.1.0 -> 0.1.1` campaign. The first binary release now also depends
-on the coordinated Windows x64 lane in tactical
-[`053-windows-desktop-release-lane.md`](053-windows-desktop-release-lane.md);
-this macOS tactical cannot publish a one-platform tag by itself.
+Status: **published baseline complete; installed update campaign active.** The
+public/latest `desktop-v0.1.0` release contains the signed/notarized macOS arm64
+application alongside the signed Windows x64 application. The tagged App and
+DMG passed hardened signing, app and DMG notarization, stapling, Gatekeeper,
+packaged replay, forbidden-model audit, updater-signature verification, and
+build-provenance verification. Production routing returns signed `0.1.0`
+metadata. The real installed `0.1.0 -> 0.1.1` campaign, compatible acquired
+runtime preservation, and remaining macOS acquisition/full-flow checks are
+still open.
 
 ## Outcome
 
@@ -578,14 +575,45 @@ release finalizer did not run. This proves that the public lane fails closed
 before signing when credentials are absent without invoking the maintainer's
 local Keychain.
 
-Source visibility and the fail-closed CI rehearsal are complete. On 2026-08-23
-the intended first release changed from a purely score-unavailable App to a
-score-assets-free App with explicit user acquisition. Tactical 052 now blocks
-the macOS candidate, and tactical 053 blocks the coordinated Windows half of
-the publication hold. After both land, the exact changed macOS candidate must
-repeat the signed/notarized local gate. Publication approval may then authorize
-uploading/verifying the macOS/updater Actions secrets and the credentialed
-non-tagged CI rehearsal alongside the Windows rehearsal. Only after both pass
-may the release operation activate production product configuration, push the
-first release tag, publish both binary targets, and run both installed
-`0.1.0 -> 0.1.1` campaigns with external score-runtime persistence.
+The publication prerequisites subsequently completed. All 11 Actions secret
+names were configured and verified. Exact-candidate
+[rehearsal run 32666483577](https://github.com/kzahel/atpiano/actions/runs/32666483577)
+passed both signed platforms at commit
+`ed76f74686981990ce230679ccae9af19dfd61f2`.
+
+## Published 0.1.0 Execution Record
+
+Annotated tag `desktop-v0.1.0` resolves to the same candidate commit. Tagged
+[run 32669326956](https://github.com/kzahel/atpiano/actions/runs/32669326956)
+passed the macOS and Windows build gates. The first macOS attempt successfully
+notarized and stapled the App, submitted the DMG as Apple request
+`5862795e-692d-4ef4-b6ea-4c2e3e91ff16`, then encountered a transient
+`notarytool` bus error while waiting. The failed-job rerun passed app and DMG
+notarization, stapling, Gatekeeper, packaged replay, release retention, and
+build-provenance attestation.
+
+The exact published macOS files are:
+
+- `Atpiano_0.1.0_aarch64.dmg`: 575,135,484 bytes, SHA-256
+  `704b1623c5cfdc55b206ed2aa067aa22d931f0078549515c56266a0037720edd`;
+- `Atpiano.app.tar.gz`: 584,024,206 bytes, SHA-256
+  `369d7efa775adb145ef21d53fa54b15aab78157bec94993d4aef5cd21eb54996`;
+- `Atpiano.app.tar.gz.sig`: 404 bytes, SHA-256
+  `6fdf3cddb73ccfadaf300463a43188e693e723f20e535ce24fc4646327fd557d`;
+  and
+- `Atpiano_0.1.0_media-sources.tar.gz`: 13,220,731 bytes, SHA-256
+  `c662d0b3b2aadc11a170534cb83a7dcd071443be74a9ec8e3255ce29a58a78c2`.
+
+The automatic finalizer failed closed before draft creation because its
+macOS selector expected a historical architecture-suffixed updater name.
+Recovery used only the retained, attested tagged artifacts. Both updater
+signatures and the notarized DMG were independently reverified, every local
+hash matched GitHub's digest, and the exact draft validator passed. Commit
+`f1c905e` fixes and tests the Tauri v2 `Atpiano.app.tar.gz` contract for future
+tags. The public/latest release was published on 2026-08-24.
+
+The production updater now returns exact signed `0.1.0` metadata for
+`darwin/aarch64/0.0.0` and HTTP 204 for `darwin/aarch64/0.1.0`. The response
+signature matches public `latest.json`. This completes initial publication,
+but not the real installed `0.1.0 -> 0.1.1` campaign or compatible acquired
+runtime persistence proof.

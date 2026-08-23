@@ -77,16 +77,16 @@ normally reuse the document slug in its `Topic:` trailers.
   moment-centered reflection, readable engraving, cautious tool-backed
   analysis, trusted collaboration, and teacher review.
 - [`public-desktop-release.md`](public-desktop-release.md):
-  coordinated macOS arm64 and Windows x86_64 CPU signing, public-release, and
-  installed desktop-update contract, with explicit score-runtime and
-  publication gates.
+  published macOS arm64 and Windows x86_64 CPU proof of concept, production
+  updater routing, and the remaining installed desktop-update contract, with
+  explicit score-runtime gates.
 - [`session-workspace-management.md`](session-workspace-management.md):
   accepted v2 foundation for explicit New, session history, separate
   active/selected identities, recoverable deletion, and future continuation.
 - [`windows-native-runtime-portability.md`](windows-native-runtime-portability.md):
   established native Windows x64 Python/model and unpackaged local-server
-  baseline, now feeding the first-release Tauri x64 sidecar/package lane and
-  ARM64 machine-control testbed acceptance.
+  baseline, published signed Tauri x64 CPU package, and remaining ARM64
+  machine-control installed-update/full-flow acceptance.
 
 ## Update Policy
 
