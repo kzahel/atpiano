@@ -30,6 +30,7 @@ function sectionVersion(contents, section) {
 export function validateDesktopReleaseConfiguration({
   appPackage,
   tauri,
+  windowsTauri,
   cargo,
   pyproject,
   product,
@@ -55,6 +56,18 @@ export function validateDesktopReleaseConfiguration({
   }
   if (tauri.bundle?.createUpdaterArtifacts !== true) {
     fail("Tauri updater artifacts must be enabled");
+  }
+  if (JSON.stringify(windowsTauri.bundle?.targets) !== JSON.stringify(["nsis"])) {
+    fail(`unexpected Windows bundle targets: ${JSON.stringify(windowsTauri.bundle?.targets)}`);
+  }
+  if (
+    windowsTauri.bundle?.windows?.nsis?.installMode !== "currentUser" ||
+    windowsTauri.bundle?.windows?.allowDowngrades !== false
+  ) {
+    fail("Windows NSIS must be current-user and reject downgrades");
+  }
+  if (windowsTauri.plugins?.updater?.windows?.installMode !== "passive") {
+    fail("Windows updater install mode must be passive");
   }
   const endpoints = tauri.plugins?.updater?.endpoints;
   if (!Array.isArray(endpoints) || endpoints.length !== 1 || endpoints[0] !== UPDATE_ENDPOINT) {
@@ -105,6 +118,9 @@ export function validateDesktopReleaseRepository(root) {
   const result = validateDesktopReleaseConfiguration({
     appPackage: readJson(path.join(root, "app", "package.json")),
     tauri: readJson(path.join(root, "app", "src-tauri", "tauri.conf.json")),
+    windowsTauri: readJson(
+      path.join(root, "app", "src-tauri", "tauri.windows.conf.json"),
+    ),
     cargo: fs.readFileSync(path.join(root, "app", "src-tauri", "Cargo.toml"), "utf8"),
     pyproject: fs.readFileSync(path.join(root, "pyproject.toml"), "utf8"),
     product: readJson(path.join(root, "update-server", "atpiano.json")),

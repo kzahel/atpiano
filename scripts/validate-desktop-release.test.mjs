@@ -21,6 +21,16 @@ function fixture() {
       bundle: { targets: ["app", "dmg"], createUpdaterArtifacts: true },
       plugins: { updater: { endpoints: [UPDATE_ENDPOINT], pubkey: publicKey } },
     },
+    windowsTauri: {
+      bundle: {
+        targets: ["nsis"],
+        windows: {
+          allowDowngrades: false,
+          nsis: { installMode: "currentUser" },
+        },
+      },
+      plugins: { updater: { windows: { installMode: "passive" } } },
+    },
     product: {
       id: "atpiano",
       displayName: "Atpiano",
@@ -34,7 +44,7 @@ function fixture() {
   };
 }
 
-test("accepts Atpiano's exact one-target release contract", () => {
+test("accepts Atpiano's exact two-platform release contract", () => {
   assert.equal(validateDesktopReleaseConfiguration(fixture()).version, "1.2.3");
 });
 
@@ -44,10 +54,19 @@ test("rejects version drift", () => {
   assert.throws(() => validateDesktopReleaseConfiguration(data), /version drift/);
 });
 
-test("rejects accidental target expansion", () => {
+test("rejects accidental macOS target expansion", () => {
   const data = fixture();
   data.tauri.bundle.targets.push("nsis");
   assert.throws(() => validateDesktopReleaseConfiguration(data), /bundle targets/);
+});
+
+test("rejects unsafe Windows package or updater drift", () => {
+  const data = fixture();
+  data.windowsTauri.bundle.windows.nsis.installMode = "perMachine";
+  assert.throws(() => validateDesktopReleaseConfiguration(data), /current-user/);
+  data.windowsTauri.bundle.windows.nsis.installMode = "currentUser";
+  data.windowsTauri.plugins.updater.windows.installMode = "quiet";
+  assert.throws(() => validateDesktopReleaseConfiguration(data), /passive/);
 });
 
 test("rejects an unresolved or reused updater key", () => {
