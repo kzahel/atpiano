@@ -2,6 +2,19 @@
 
 Focused, living records of continuing concerns live here.
 
+## Documentation Map
+
+- The [root README](../../README.md) is the product-oriented introduction and
+  desktop download guide.
+- The [development guide](../development.md) owns source setup, validation,
+  prototype entry points, and benchmark commands.
+- The [architecture reference](../architecture.md) owns durable system
+  boundaries and shared technical contracts.
+- The [desktop release operator runbook](../desktop-release-operator-runbook.md)
+  owns signed publication and update operations.
+- This directory owns the current status, evidence, gaps, and recommended
+  direction for each continuing concern.
+
 Prefer the smallest coherent topic whose status, decisions, evidence, and next
 work benefit from continuity across sessions or commits. Topic docs own
 current truth, decisions, evidence, gaps, and recommended direction. Bounded
