@@ -2,15 +2,15 @@
 
 Topic: public-desktop-release
 
-Status: **published baseline complete; installed update campaign active.** The
-public/latest `desktop-v0.1.0` release contains the signed/notarized macOS arm64
+Status: **signed `0.1.1` published; installed update campaign active.** The
+public/latest `desktop-v0.1.1` release contains the signed/notarized macOS arm64
 application alongside the signed Windows x64 application. The tagged App and
 DMG passed hardened signing, app and DMG notarization, stapling, Gatekeeper,
 packaged replay, forbidden-model audit, updater-signature verification, and
-build-provenance verification. Production routing returns signed `0.1.0`
-metadata. The real installed `0.1.0 -> 0.1.1` campaign, compatible acquired
-runtime preservation, and remaining macOS acquisition/full-flow checks are
-still open.
+build-provenance verification. Production routing returns signed `0.1.1`
+metadata to `0.1.0`. The exact public macOS `0.1.0` baseline has acquired and
+used the external score runtime; its real in-app update and preservation check
+remain open.
 
 ## Outcome
 
@@ -617,3 +617,42 @@ The production updater now returns exact signed `0.1.0` metadata for
 signature matches public `latest.json`. This completes initial publication,
 but not the real installed `0.1.0 -> 0.1.1` campaign or compatible acquired
 runtime persistence proof.
+
+## Published 0.1.1 And Installed Baseline Record
+
+Exact-candidate rehearsal
+[32703066998](https://github.com/kzahel/atpiano/actions/runs/32703066998)
+and tagged
+[32707274179](https://github.com/kzahel/atpiano/actions/runs/32707274179)
+passed from commit `66a82e2d4d87795c79ef286cb5f9709adb13e6c2`. The
+automatic finalizer selected the corrected Tauri v2 updater filename, created
+the exact two-target metadata, reconciled GitHub digests, attested the release,
+and published without manual recovery. The public macOS files are:
+
+- `Atpiano_0.1.1_aarch64.dmg`: 575,149,993 bytes, SHA-256
+  `0cb3e9ea3c5528c76a6ef177700e80b3381881e50d2dfac5a938035c3392ccde`;
+- `Atpiano.app.tar.gz`: 584,017,257 bytes, SHA-256
+  `01985b8f1c94dbc6a13e22eef96aaddf03ae8deca7cc9186381888f080804e8c`;
+  and
+- `Atpiano.app.tar.gz.sig`: 404 bytes, SHA-256
+  `366ea0e5c6976eb140ff59e5de9c113ef1c50d3e935c9cc654d6eb96e17664ee`.
+
+Before publication, the exact public `0.1.0` DMG was installed in
+`/Applications`. Developer ID, notarization, stapling, and version `0.1.0`
+were independently reverified. Through the published dialog, the maintainer
+acknowledged the displayed education/research-only and absent-upstream-license
+notice and downloaded the model directly from upstream. Relaunch selected the
+external runtime, and the frontend generated a retained 12-note, three-measure
+score through the pinned runtime. Its current MusicXML SHA-256 is
+`93eb41e1988d6e592db971aa26f9601338865099fb62e75f46744fd9b052d58a`.
+
+The pre-update evidence freezes the installation-ID hash
+`e7a100200ebdd87edc5bd784428e8e5632dc82f85270566df76e6dd96086e04f`,
+acknowledgement hash
+`b24f7e911e1a43178db0e05a6ade39f9dc17067898724ea37259c073cc4080cd`,
+checkpoint hash
+`7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d43cb2011245db638`,
+and support-manifest hash
+`7b20d437348f900c5d59fcc1a8706e12994644fa9f8e259fb99bc47f005ec041`.
+Production now offers signed `0.1.1` to this App and returns HTTP 204 to
+`0.1.1`; the in-app replacement and post-update comparison remain open.

@@ -12,12 +12,12 @@ research concerns, supported by reproducible benchmarks and retained evidence.
 ## Proof-of-Concept Desktop Downloads
 
 The public/latest
-[`desktop-v0.1.0` release](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.0)
+[`desktop-v0.1.1` release](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.1)
 provides signed CPU applications for macOS Apple silicon and Windows x86_64.
 Use the DMG on macOS or the per-user NSIS setup executable on Windows. The
-applications include automatic update support; the production route is live,
-while the first installed `0.1.0 -> 0.1.1` acceptance campaign remains future
-work.
+applications include automatic update support, and the production route now
+serves `0.1.1` to installed `0.1.0` applications. Installed old-to-new
+acceptance is in progress on both operating systems.
 
 Optional sheet-music generation requires a separate direct upstream download.
 The application shows an education/research-only acknowledgement and the
@@ -126,8 +126,8 @@ ordinary browser downloads on the web or a native Save As dialog on desktop.
 The acquisition-capable macOS arm64 candidate passed Developer ID signing,
 notarization, stapling, Gatekeeper, packaged replay, and updater-signature
 checks. It is published with the Authenticode-signed Windows x86_64 CPU
-application in `desktop-v0.1.0`, and the production updater route serves both
-targets. The release exposes the explicit user-acquired score-runtime flow
+application in `desktop-v0.1.1`, and the production updater route serves both
+targets. The releases expose the explicit user-acquired score-runtime flow
 while continuing to exclude the MIDI2ScoreTransformer repository and
 checkpoint from every release artifact.
 The pinned ScoreTransformer/MUSTER evaluation helpers may remain in the first

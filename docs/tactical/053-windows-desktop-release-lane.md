@@ -3,15 +3,16 @@
 Topics: `public-desktop-release`, `windows-native-runtime-portability`,
 `desktop-score-runtime-footprint`
 
-Status: **signed `0.1.0` release published; installed update/full-flow
+Status: **signed `0.1.1` release published; installed update/full-flow
 acceptance active.** Native Windows x64 CI staged and independently re-audited
 the 2.10 GB CPU runtime, signed the per-user NSIS installer through Azure
 Trusted Signing, verified Authenticode and the trusted timestamp, verified the
 Tauri updater signature, rejected forbidden model assets, and issued build
-provenance. The installed development package still owns the acknowledged
-acquisition, CPU adapter output, relaunch, and reinstall-preservation evidence.
-Full packaged replay/score flows, explicit removal, and the installed
-`0.1.0 -> 0.1.1` updater campaign remain.
+provenance for both public versions. The public signed `0.1.0` installer now
+also passes exact-hash installation over retained development state without
+changing the installation ID, acknowledgement, checkpoint, runtime records,
+or retained session. Full packaged replay/score flows, explicit removal, and
+the installed `0.1.0 -> 0.1.1` updater campaign remain.
 
 ## Goal
 
@@ -517,6 +518,43 @@ Rust formatting and Clippy with warnings denied, all 15 release/configuration
 tests, repository release validation, workflow YAML parsing, and `actionlint`.
 The Windows PowerShell signing verifier also parses on the testbed and rejects
 the unsigned development output at its expected missing signed-updater gate.
+
+## Published 0.1.1 And Signed Baseline Record
+
+Exact-candidate rehearsal
+[32703066998](https://github.com/kzahel/atpiano/actions/runs/32703066998)
+and tagged
+[32707274179](https://github.com/kzahel/atpiano/actions/runs/32707274179)
+passed from commit `66a82e2d4d87795c79ef286cb5f9709adb13e6c2`. Native
+x64 CI repeated deterministic stage/re-audit, Azure Trusted Signing,
+Authenticode and timestamp verification, updater-signature verification,
+forbidden-model checks, and build-provenance attestation. The public signed
+NSIS installer/updater is 435,673,016 bytes with SHA-256
+`7b8f6f78b49661bcac60f9b05ef95b2b83c0aa6f223a2f73c919e0bced1d07bd`;
+its 416-byte updater signature has SHA-256
+`e08feeec8702f538237a1ddaa7416bfd8e7b7ca7586bb477d115ea833c826502`.
+
+The x64-on-ARM64 testbed downloaded the exact public `0.1.0` installer,
+verified its published SHA-256 and Authenticode signature, and installed it
+with exit code 0 over the earlier development package. The installed app and
+registry both report `0.1.0`, and the app executable has a valid `Kyle Graehl`
+signature. The operation preserved one retained session and byte-identical
+external state: installation-ID SHA-256
+`ce5896e270b1b7c0bedbd2ceac5a28da68e6570eff53ece2452f20a1037b275d`,
+acknowledgement SHA-256
+`11d6427a89173d3f51a43ab6a10c5b448506811cc7f7c4d55685c0782d73f678`,
+checkpoint SHA-256
+`7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d43cb2011245db638`,
+and support-manifest SHA-256
+`09dc2747cc1e63d12c3e70fc1347b6aa1405b63be699a8b09d6c2b5738351a1b`.
+
+Two cold launches of that exact signed baseline exceeded the launcher's
+30-second readiness timeout under x64-on-ARM64 emulation. The launcher stopped
+the sidecar and displayed `local engine startup timed out`; this is a real
+installed-testbed limitation and blocks updater UI acceptance until a healthy
+baseline launch is available. It is not native-x64 timing evidence. Production
+routing and signed metadata pass independently, but this tactical does not yet
+claim that the Windows in-app replacement passed.
 
 ## Rollback
 

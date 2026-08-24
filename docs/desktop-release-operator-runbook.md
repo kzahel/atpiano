@@ -9,7 +9,7 @@ itself.
 
 As of 2026-08-24, `kzahel/atpiano` is public and has no declared Atpiano
 source license. The public/latest
-[`desktop-v0.1.0`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.0)
+[`desktop-v0.1.1`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.1)
 release contains signed macOS arm64 and Windows x86_64 CPU applications. Both
 contain the score-model acknowledgement and acquisition capability but no
 MIDI2ScoreTransformer source or checkpoint.
@@ -23,11 +23,15 @@ passed on exact candidate commit
 produced and attested both platform sets from that same commit. Private
 credential values remain outside Git and release evidence.
 
+The exact `0.1.1` candidate commit `66a82e2d4d87795c79ef286cb5f9709adb13e6c2`
+passed credentialed rehearsal
+[32703066998](https://github.com/kzahel/atpiano/actions/runs/32703066998)
+and tagged publication
+[32707274179](https://github.com/kzahel/atpiano/actions/runs/32707274179).
 Production update routing is active. Public `darwin/aarch64` and
-`windows/x86_64` requests from version `0.0.0` return signed `0.1.0` metadata;
-requests from `0.1.0` return HTTP 204. The response signatures match the
-published `latest.json` byte-for-byte. Installed `0.1.0 -> 0.1.1` acceptance
-on both platforms remains open.
+`windows/x86_64` requests from version `0.1.0` return signed `0.1.1` metadata;
+requests from `0.1.1` return HTTP 204. Installed old-to-new acceptance remains
+open until both applications complete replacement and persistence checks.
 
 ## Required Actions Secrets
 
@@ -103,10 +107,11 @@ Signing, Authenticode, and Microsoft trusted-timestamp verification.
 
 For `0.1.0`, the maintainer explicitly accepted proof-of-concept publication
 before the real macOS acquisition, complete packaged score/removal paths, and
-ordinary native-x64 Windows replay matrix were complete. Preserve those as
-acceptance work for `0.1.1` or a later release; do not retroactively describe
-them as passing. The Windows x64-on-ARM64 testbed proves correctness boundaries
-but is not native x64 timing evidence.
+ordinary native-x64 Windows replay matrix were complete. That was the truthful
+publication boundary; later macOS acquisition/score evidence is recorded
+separately, while removal and broader Windows work remain. The Windows
+x64-on-ARM64 testbed proves correctness boundaries but is not native x64 timing
+evidence.
 
 ## Tag And Draft-First Publication
 
@@ -157,23 +162,43 @@ Public RSA Time Stamping Authority, and zero forbidden score assets. GitHub
 build-provenance verification resolves all six platform files to workflow
 `.github/workflows/desktop.yml` at `refs/tags/desktop-v0.1.0`.
 
+## Published 0.1.1 Evidence
+
+| Asset | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `Atpiano_0.1.1_aarch64.dmg` | 575,149,993 | `0cb3e9ea3c5528c76a6ef177700e80b3381881e50d2dfac5a938035c3392ccde` |
+| `Atpiano.app.tar.gz` | 584,017,257 | `01985b8f1c94dbc6a13e22eef96aaddf03ae8deca7cc9186381888f080804e8c` |
+| `Atpiano.app.tar.gz.sig` | 404 | `366ea0e5c6976eb140ff59e5de9c113ef1c50d3e935c9cc654d6eb96e17664ee` |
+| `Atpiano_0.1.1_x64-setup.exe` | 435,673,016 | `7b8f6f78b49661bcac60f9b05ef95b2b83c0aa6f223a2f73c919e0bced1d07bd` |
+| `Atpiano_0.1.1_x64-setup.exe.sig` | 416 | `e08feeec8702f538237a1ddaa7416bfd8e7b7ca7586bb477d115ea833c826502` |
+| `Atpiano_0.1.1_media-sources.tar.gz` | 13,220,729 | `f631ac0a47f82bd95968226fbea1e3bbadcd5ab08e49ece1c3bf0b30f4e6b3fe` |
+| `latest.json` | 1,602 | `a07227cdf7f318e9fcf92c556082a23bba3a4d6e13f9abb22d435bf87482cdab` |
+| `SHA256SUMS` | 637 | `eebccd7f0e746048336de3a0486fa4f27a9ca8f719daa9a63d04ee98d904ed4d` |
+
+The finalizer published exactly eight assets and marked the release latest,
+non-draft, and non-prerelease. GitHub server-side digests match
+`SHA256SUMS`. Local verification of the detached signature files and checksum
+manifest resolves tag-scoped GitHub build provenance to
+`refs/tags/desktop-v0.1.1`. The tag and workflow head SHA both resolve to
+`66a82e2d4d87795c79ef286cb5f9709adb13e6c2`.
+
 The production product is the tracked `update-server/atpiano.json` exposed by
 the shared update service. Validate it after deployment with:
 
 ```bash
 curl -i https://updates.graehlarts.com/atpiano/tauri/darwin/aarch64/0.0.0
 curl -i https://updates.graehlarts.com/atpiano/tauri/windows/x86_64/0.0.0
-curl -i https://updates.graehlarts.com/atpiano/tauri/darwin/aarch64/0.1.0
-curl -i https://updates.graehlarts.com/atpiano/tauri/windows/x86_64/0.1.0
+curl -i https://updates.graehlarts.com/atpiano/tauri/darwin/aarch64/0.1.1
+curl -i https://updates.graehlarts.com/atpiano/tauri/windows/x86_64/0.1.1
 ```
 
-The first two must return HTTP 200 with version `0.1.0`, exact release URLs,
-and the published signatures. The last two must return HTTP 204.
+The first two must return HTTP 200 with the current version, exact release
+URLs, and published signatures. The last two must return HTTP 204.
 
 ## Remaining Acceptance After `0.1.0`
 
-Auto-update is implemented in the applications and release metadata, but it is
-live through the production product route. It is not fully accepted until an
+Auto-update is implemented in the applications and release metadata and is
+live through the production product route. It is not fully accepted until the
 installed `0.1.0 -> 0.1.1` campaign passes on both operating systems. That
 campaign must preserve sessions, installation identity, acknowledgement, and
 the compatible externally acquired score runtime without downloading the

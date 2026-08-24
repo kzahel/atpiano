@@ -3,15 +3,15 @@
 Topics: `desktop-score-runtime-footprint`, `public-desktop-release`,
 `performance-to-notation`
 
-Status: **published proof-of-concept core; installed full-flow acceptance
-active.** `desktop-v0.1.0` ships the transactional controller, shared
+Status: **published proof-of-concept core; update/removal acceptance active.**
+`desktop-v0.1.0` and `desktop-v0.1.1` ship the transactional controller, shared
 education/research acknowledgement dialog, and audited macOS arm64/Windows
 x64 support layers, but no MIDI2ScoreTransformer source or checkpoint. Both
-signed release candidates passed forbidden-model audits. The installed Windows
-dialog, acknowledged acquisition, relaunch, CPU adapter smoke, and reinstall
-preservation pass. Equivalent macOS acquisition, complete packaged score
-flow, explicit removal on both systems, and both `0.1.0 -> 0.1.1` persistence
-campaigns remain. Dependency cleanup is explicitly deferred.
+signed releases passed forbidden-model audits. Installed acknowledgement,
+direct acquisition, activation, and CPU score generation now pass on both
+platforms; Windows also passes reinstall preservation. Explicit removal on
+both systems and both `0.1.0 -> 0.1.1` persistence campaigns remain.
+Dependency cleanup is explicitly deferred.
 
 ## Goal
 
@@ -594,7 +594,8 @@ The exact acquired runtime and acknowledgement also survived uninstall and
 reinstall of the final unsigned package. This is proof of acquisition,
 external activation, CPU inference, artifact validation, and package
 preservation under x64-on-ARM64 emulation; the full frontend score request,
-macOS acquisition, explicit removal, and signed update campaigns remain.
+explicit removal, and signed update campaigns remain. The later macOS record
+below closes its acquisition and packaged frontend score flow.
 
 ## Published 0.1.0 Boundary
 
@@ -607,9 +608,28 @@ neither is a GitHub Release asset or automatic startup/update download.
 
 Production updater routing is active for both published CPU targets. This
 closes the first-public-build prerequisite but does not close this tactical:
-macOS acquisition/use, frontend score generation on both platforms, explicit
-removal, and compatible acquired-runtime preservation through installed
-`0.1.0 -> 0.1.1` updates remain the acceptance plan.
+explicit removal and compatible acquired-runtime preservation through
+installed `0.1.0 -> 0.1.1` updates remain the acceptance plan.
+
+## Installed macOS Acquisition And Score Record
+
+The exact public, notarized `0.1.0` App displayed the shared notice before any
+model request. The acknowledgement gate began unchecked, and acquisition began
+only after the maintainer selected it. The direct upstream transfer installed
+the 389,829,880-byte checkpoint with the expected SHA-256
+`7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d43cb2011245db638`
+and an external runtime totaling approximately 1.3 GB. The local receipt and
+active-runtime records remain outside the sealed App.
+
+Relaunch passed the external runtime to the hidden Python sidecar and exposed
+score capability. The published frontend generated a retained score for a
+12-note session through contract `midi2score-research-2026.08`. The result has
+three measures, producer application version `0.1.0`, current MusicXML SHA-256
+`93eb41e1988d6e592db971aa26f9601338865099fb62e75f46744fd9b052d58a`,
+and baseline MusicXML SHA-256
+`e239e8c1535310f74a98ca87cdfbbdace8866af086af0f179a376025b4315e00`.
+This closes macOS acknowledgement, acquisition, activation, and packaged
+frontend score generation. It does not close removal or update persistence.
 
 ## Later Todo — Remove Evaluation Helpers
 

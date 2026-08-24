@@ -2,16 +2,18 @@
 
 Topic: public-desktop-release
 
-Status: **the first public two-platform proof-of-concept release is live as of
-2026-08-24.** The public, unlicensed source repository and the public/latest
-[`desktop-v0.1.0`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.0)
+Status: **the coordinated `0.1.1` update is public and installed acceptance is
+active as of 2026-08-24.** The public, unlicensed source repository and the
+public/latest
+[`desktop-v0.1.1`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.1)
 GitHub Release contain signed macOS arm64 and Windows x86_64 CPU applications.
 Both include the education/research acknowledgement dialog and direct
 user-acquisition capability, but neither contains the MIDI2ScoreTransformer
 repository or checkpoint. All 11 Actions secrets were configured and
-exercised in a successful signed two-platform rehearsal and tagged build. The
-production updater serves both targets. Installed `0.1.0 -> 0.1.1` acceptance
-on both operating systems remains open. Tactical
+exercised again in a successful signed two-platform rehearsal and tagged
+`0.1.1` build. The production updater offers `0.1.1` to both `0.1.0` targets
+and returns no update to `0.1.1`. Installed `0.1.0 -> 0.1.1` acceptance on
+both operating systems remains open. Tactical
 [`051-signed-macos-update-lane.md`](../tactical/051-signed-macos-update-lane.md)
 owns the macOS signed baseline and update campaign. The earlier macOS
 score-assets-free LGPL candidate is signed, notarized, installed, and locally
@@ -22,9 +24,9 @@ proof-of-concept score-support layers without adding the
 MIDI2ScoreTransformer repository or checkpoint.
 Tactical
 [`053-windows-desktop-release-lane.md`](../tactical/053-windows-desktop-release-lane.md)
-has produced and installed the matching Windows x64 development package,
-including a real user-acquired CPU score result and reinstall preservation,
-and now owns the remaining installed signed-update and full-flow acceptance.
+has produced the signed public Windows x64 packages and a real user-acquired
+CPU score result with reinstall preservation, and now owns the remaining
+installed signed-update and full-flow acceptance.
 
 ## Scope
 
@@ -110,9 +112,9 @@ selection; installed user files are never silently deleted.
 | Installation privilege | no root/admin; DMG copy on macOS and per-user NSIS on Windows |
 | Mutable data | platform application-data/config directories, outside the App |
 
-The first release is `desktop-v0.1.0`; its planned acceptance successor is
-`desktop-v0.1.1`. The first release contains the updater. The successor must
-carry an unmistakable visible change and coherent Tauri,
+The first release is `desktop-v0.1.0`; its published acceptance successor is
+`desktop-v0.1.1`. The first release contains the updater. The successor carries
+an unmistakable visible proof-of-concept update marker and coherent Tauri,
 web-client, Python-sidecar, and model-pack identities.
 
 This product-declared two-target matrix deliberately specializes the canary's
@@ -123,7 +125,7 @@ ARM64 support.
 
 | Concern | Published or observed value |
 | --- | --- |
-| Baseline version/tag | public/latest `0.1.0` / `desktop-v0.1.0` |
+| Baseline version/tag | public baseline `0.1.0` / `desktop-v0.1.0` |
 | Successor version/tag | `0.1.1` / `desktop-v0.1.1` |
 | macOS installer | notarized/stapled 575,135,484-byte DMG, SHA-256 `704b1623c5cfdc55b206ed2aa067aa22d931f0078549515c56266a0037720edd` |
 | macOS updater | 584,024,206-byte `Atpiano.app.tar.gz`, SHA-256 `369d7efa775adb145ef21d53fa54b15aab78157bec94993d4aef5cd21eb54996`, plus verified signature |
@@ -143,6 +145,20 @@ The exact release hashes, CI runs, notarization result, finalizer recovery, and
 production-route checks are retained in the tactical and operator runbook.
 `latest.json` and `SHA256SUMS` are release assets reconciled against GitHub's
 server-side asset digests, not hand-authored repository files.
+
+## Published 0.1.1 Snapshot
+
+| Concern | Published or observed value |
+| --- | --- |
+| Version/tag/commit | public/latest `0.1.1` / `desktop-v0.1.1` / `66a82e2d4d87795c79ef286cb5f9709adb13e6c2` |
+| Tagged workflow | [run 32707274179](https://github.com/kzahel/atpiano/actions/runs/32707274179), all source, Rust, signed platform, finalizer, and attestation jobs passed |
+| macOS installer | notarized/stapled 575,149,993-byte DMG, SHA-256 `0cb3e9ea3c5528c76a6ef177700e80b3381881e50d2dfac5a938035c3392ccde` |
+| macOS updater | 584,017,257-byte `Atpiano.app.tar.gz`, SHA-256 `01985b8f1c94dbc6a13e22eef96aaddf03ae8deca7cc9186381888f080804e8c`, plus verified signature |
+| Windows installer/update | Authenticode-signed and timestamped 435,673,016-byte NSIS executable, SHA-256 `7b8f6f78b49661bcac60f9b05ef95b2b83c0aa6f223a2f73c919e0bced1d07bd`, plus verified updater signature |
+| Corresponding media sources | 13,220,729 bytes, SHA-256 `f631ac0a47f82bd95968226fbea1e3bbadcd5ab08e49ece1c3bf0b30f4e6b3fe` |
+| Release metadata | exact two-target `latest.json`, `SHA256SUMS`, GitHub asset digests, and tag-scoped build-provenance attestations verified |
+| Production route | both `0.1.0` targets return signed `0.1.1` metadata; both `0.1.1` targets return HTTP 204 |
+| Installed acceptance | active; publication and routing do not imply that either installed replacement has passed |
 
 ## Release Safety Contract
 
@@ -271,10 +287,9 @@ has no EULA restricting LGPL debugging or modification.
    contract for future tags.
 4. **Desktop updater routing: active; installed update pending.** The Pi loads
    the tracked product config from the public checkout. Public macOS arm64 and
-   Windows x64 requests from `0.0.0` return exact signed `0.1.0` metadata;
-   requests from `0.1.0` return HTTP 204. Public response signatures match
-   `latest.json` byte-for-byte. An installed `0.1.0 -> 0.1.1` replacement has
-   not yet been exercised on either operating system.
+   Windows x64 requests from `0.1.0` return exact signed `0.1.1` metadata;
+   requests from `0.1.1` return HTTP 204. Public response signatures match
+   `latest.json` byte-for-byte. Installed replacement remains the open gate.
 5. **Distribution compliance: provisionally accepted for this proof of
    concept.** The macOS LGPL notices, exact corresponding-source archive,
    checksums, and build provenance are public. The Windows BtbN media payload
@@ -282,13 +297,13 @@ has no EULA restricting LGPL debugging or modification.
    source was not reconciled into the macOS source archive; the maintainer
    explicitly accepted this limited proof-of-concept gap rather than delaying
    `0.1.0`.
-6. **User-acquired score runtime: published core; full-flow work remains.**
+6. **User-acquired score runtime: both platform acquisition flows pass.**
    Both applications contain the truthful acknowledgement and transactional
    acquisition controller without upstream source/checkpoint bytes. Both
-   packaged cancel gates pass. Windows additionally passes acknowledged
-   acquisition, relaunch, direct CPU MusicXML/alignment output, and reinstall
-   preservation. Equivalent macOS acquisition, frontend score generation,
-   explicit removal on both platforms, and update persistence remain.
+   packaged cancel gates pass. Both platforms pass acknowledged acquisition,
+   relaunch, and CPU score output; Windows additionally passes reinstall
+   preservation. Explicit removal on both platforms and update persistence
+   remain.
 7. **Windows signed package: passed and published; broader acceptance
    remains.** Native x64 CI passed deterministic stage/re-audit, Azure Trusted
    Signing, Authenticode verification, trusted timestamping, updater-signature
@@ -307,11 +322,9 @@ has no EULA restricting LGPL debugging or modification.
 
 ## Recommended Direction
 
-Keep `desktop-v0.1.0` public while gathering proof-of-concept feedback. Use
+Keep both public releases available while gathering proof-of-concept feedback. Use
 [`desktop-release-operator-runbook.md`](../desktop-release-operator-runbook.md)
-for future releases. Next, create a small visibly distinguishable `0.1.1`,
-run the corrected credentialed workflow, and exercise the signed production
-update from installed `0.1.0` on macOS and Windows. Preserve and re-exercise a
-compatible acquired score runtime on both systems. Complete macOS acquisition,
-frontend score generation, and explicit removal checks as practical; they are
-remaining acceptance work, not a claim that `0.1.0` is unpublished.
+for future releases. Next, finish the signed production update from installed
+`0.1.0` on macOS and Windows. Preserve and re-exercise the compatible acquired
+score runtime on both systems. Explicit removal remains follow-up acceptance,
+not a prerequisite for keeping this free proof-of-concept release public.
