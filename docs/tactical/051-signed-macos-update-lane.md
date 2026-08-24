@@ -2,15 +2,16 @@
 
 Topic: public-desktop-release
 
-Status: **signed `0.1.1` published; installed update campaign active.** The
-public/latest `desktop-v0.1.1` release contains the signed/notarized macOS arm64
-application alongside the signed Windows x64 application. The tagged App and
-DMG passed hardened signing, app and DMG notarization, stapling, Gatekeeper,
+Status: **complete; signed `0.1.1` published and installed update accepted.**
+The public/latest `desktop-v0.1.1` release contains the signed/notarized macOS
+arm64 application alongside the signed Windows x64 application. The tagged App
+and DMG passed hardened signing, app and DMG notarization, stapling, Gatekeeper,
 packaged replay, forbidden-model audit, updater-signature verification, and
 build-provenance verification. Production routing returns signed `0.1.1`
-metadata to `0.1.0`. The exact public macOS `0.1.0` baseline has acquired and
-used the external score runtime; its real in-app update and preservation check
-remain open.
+metadata to `0.1.0`. A claimed Tart macOS arm64 appliance installed the exact
+public `0.1.0`, acquired and used the external score runtime, updated through
+the production in-app route, and retained that runtime, its acknowledgement,
+installation identity, session, and score under `0.1.1`.
 
 ## Outcome
 
@@ -655,4 +656,57 @@ checkpoint hash
 and support-manifest hash
 `7b20d437348f900c5d59fcc1a8706e12994644fa9f8e259fb99bc47f005ec041`.
 Production now offers signed `0.1.1` to this App and returns HTTP 204 to
-`0.1.1`; the in-app replacement and post-update comparison remain open.
+`0.1.1`.
+
+## Tart Installed Update Acceptance Record
+
+A claimed macOS 26.2 arm64 Tart appliance began without Atpiano or application
+data. Its guest-agent administration, resident semantics, and target-local
+input paths passed with outer input prohibited. Tart framebuffer captures were
+used only to inspect WKWebView pixels that the guest Quartz capture omitted.
+
+The appliance downloaded the exact public `0.1.0` DMG and verified SHA-256
+`704b1623c5cfdc55b206ed2aa067aa22d931f0078549515c56266a0037720edd`.
+The installed App reported `0.1.0` and passed strict code-signature,
+notarized-Developer-ID, Gatekeeper, and stapler validation. Its published
+dialog displayed the absent-upstream-license, education/research-only,
+noncommercial, no-redistribution, local-code-execution, and byte-count notice.
+Download remained gated by its initially unchecked acknowledgement.
+
+After acknowledgement, direct acquisition installed the 389,829,880-byte
+checkpoint and approximately 1.3 GB external runtime. Relaunch passed that
+runtime to the sidecar. Importing the App's 42-second packaged fixture produced
+a retained 151-note session and a two-part, 12-measure score. Before update,
+the score producer recorded application `0.1.0`; its MusicXML SHA-256 was
+`a70be72d666dc535d7a8f8d4217c63710612fec97053ccce9de8995f3d169dc7`.
+
+The pre-update external-state hashes were:
+
+- installation ID:
+  `fd34198438a04a61355bff693dcbc8f98c395f382499b66c88c72a2e34e24d3e`;
+- acknowledgement:
+  `45f89450dc2e1133cf5da91b008221d2beba4107d2204dc618608fa2c6f5cf4e`;
+- active-runtime record:
+  `8abcfd60b1def3d01b97f3dc0a9041a199ed9b6fdb47feb870b2f455aa6bd5ee`;
+- checkpoint:
+  `7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d43cb2011245db638`;
+- runtime manifest:
+  `90a94c99863d7e64f3eb91c735fd5f30dccbc232327ab1f7cd5365803e532cb1`;
+  and
+- support manifest:
+  `7b20d437348f900c5d59fcc1a8706e12994644fa9f8e259fb99bc47f005ec041`.
+
+The in-app updater detected `0.1.1`, visibly downloaded the signed 557 MiB
+payload, replaced the App, and relaunched. The installed App reported `0.1.1`
+and again passed strict signing, notarized-Developer-ID, Gatekeeper, and stapler
+validation. Exactly one new App/sidecar pair remained. Every external-state
+hash above and the retained session, events, MIDI, pre-update score record, and
+MusicXML hashes were unchanged immediately after replacement.
+
+The retained score opened without a notice or model download. **Refresh score**
+then produced a new record whose producer application is `0.1.1`, checkpoint is
+the same exact SHA-256, and MusicXML remains byte-identical at the hash above.
+The manual updater check reported **Atpiano is up to date**. A normal quit left
+no App, sidecar, or model-worker orphan. The temporary source fixture was
+removed, and the appliance was suspended before its exclusive claim was
+released.

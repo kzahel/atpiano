@@ -30,8 +30,9 @@ and tagged publication
 [32707274179](https://github.com/kzahel/atpiano/actions/runs/32707274179).
 Production update routing is active. Public `darwin/aarch64` and
 `windows/x86_64` requests from version `0.1.0` return signed `0.1.1` metadata;
-requests from `0.1.1` return HTTP 204. Installed old-to-new acceptance remains
-open until both applications complete replacement and persistence checks.
+requests from `0.1.1` return HTTP 204. macOS old-to-new acceptance passed on a
+claimed Tart appliance. Windows remains open until its installed application
+completes replacement and persistence checks.
 
 ## Required Actions Secrets
 
@@ -195,14 +196,31 @@ curl -i https://updates.graehlarts.com/atpiano/tauri/windows/x86_64/0.1.1
 The first two must return HTTP 200 with the current version, exact release
 URLs, and published signatures. The last two must return HTTP 204.
 
+## Installed macOS `0.1.0 -> 0.1.1` Evidence
+
+On 2026-08-24, a claimed macOS 26.2 arm64 Tart appliance downloaded and
+verified the exact public `0.1.0` DMG, installed it into `/Applications`, and
+passed Developer ID, notarization, Gatekeeper, and stapler checks. From clean
+application data, the published dialog required the education/research
+acknowledgement before directly acquiring the exact upstream checkpoint.
+
+The activated runtime generated a retained 151-note, 12-measure score from the
+42-second packaged fixture. The production updater visibly downloaded and
+installed `0.1.1`, relaunched one App/sidecar pair, and preserved the exact
+installation ID, acknowledgement, runtime pointer, checkpoint, runtime/support
+manifests, session, events, MIDI, and MusicXML. The replacement App passed the
+same signature/notarization checks. A score refresh recorded producer version
+`0.1.1` with byte-identical MusicXML, and a manual check reported the App up to
+date. Normal quit left no App, sidecar, or model-worker orphan.
+
 ## Remaining Acceptance After `0.1.0`
 
 Auto-update is implemented in the applications and release metadata and is
-live through the production product route. It is not fully accepted until the
-installed `0.1.0 -> 0.1.1` campaign passes on both operating systems. That
-campaign must preserve sessions, installation identity, acknowledgement, and
-the compatible externally acquired score runtime without downloading the
-model again.
+live through the production product route. The macOS installed
+`0.1.0 -> 0.1.1` campaign passes. Complete the equivalent Windows campaign,
+preserving sessions, installation identity, acknowledgement, and the
+compatible externally acquired score runtime without downloading the model
+again.
 
 The Windows media corresponding-source attachment gap was explicitly accepted
 for this free proof-of-concept release: the tracked Windows manifest pins the

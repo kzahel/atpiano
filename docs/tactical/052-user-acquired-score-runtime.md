@@ -3,14 +3,15 @@
 Topics: `desktop-score-runtime-footprint`, `public-desktop-release`,
 `performance-to-notation`
 
-Status: **published proof-of-concept core; update/removal acceptance active.**
-`desktop-v0.1.0` and `desktop-v0.1.1` ship the transactional controller, shared
-education/research acknowledgement dialog, and audited macOS arm64/Windows
-x64 support layers, but no MIDI2ScoreTransformer source or checkpoint. Both
-signed releases passed forbidden-model audits. Installed acknowledgement,
-direct acquisition, activation, and CPU score generation now pass on both
-platforms; Windows also passes reinstall preservation. Explicit removal on
-both systems and both `0.1.0 -> 0.1.1` persistence campaigns remain.
+Status: **published core; macOS update passed, Windows/removal acceptance
+active.** `desktop-v0.1.0` and `desktop-v0.1.1` ship the transactional
+controller, shared education/research acknowledgement dialog, and audited
+macOS arm64/Windows x64 support layers, but no MIDI2ScoreTransformer source or
+checkpoint. Both signed releases passed forbidden-model audits. Installed
+acknowledgement, direct acquisition, activation, and CPU score generation now
+pass on both platforms; Windows also passes reinstall preservation, and macOS
+passes its signed `0.1.0 -> 0.1.1` persistence campaign. Explicit removal on
+both systems and the Windows installed update remain.
 Dependency cleanup is explicitly deferred.
 
 ## Goal
@@ -606,10 +607,10 @@ repository or checkpoint. The model source and 389,829,880-byte checkpoint
 remain a separate direct upstream download after explicit acknowledgement;
 neither is a GitHub Release asset or automatic startup/update download.
 
-Production updater routing is active for both published CPU targets. This
-closes the first-public-build prerequisite but does not close this tactical:
-explicit removal and compatible acquired-runtime preservation through
-installed `0.1.0 -> 0.1.1` updates remain the acceptance plan.
+Production updater routing is active for both published CPU targets. macOS now
+passes compatible acquired-runtime preservation through the installed signed
+`0.1.0 -> 0.1.1` update. Explicit removal and Windows update preservation
+remain the acceptance plan.
 
 ## Installed macOS Acquisition And Score Record
 
@@ -629,7 +630,31 @@ three measures, producer application version `0.1.0`, current MusicXML SHA-256
 and baseline MusicXML SHA-256
 `e239e8c1535310f74a98ca87cdfbbdace8866af086af0f179a376025b4315e00`.
 This closes macOS acknowledgement, acquisition, activation, and packaged
-frontend score generation. It does not close removal or update persistence.
+frontend score generation. It does not close removal.
+
+## Installed macOS Update-Persistence Record
+
+A separate, clean macOS 26.2 arm64 Tart appliance repeated the public `0.1.0`
+notice and acquisition path rather than receiving copied model state. It
+installed the exact checkpoint, relaunched with score capability, imported the
+42-second packaged fixture, retained 151 notes, and generated a 12-measure
+MusicXML score through the published frontend.
+
+Before the update, the installation-ID, acknowledgement, active-runtime,
+checkpoint, runtime-manifest, and support-manifest SHA-256 values were frozen.
+The production in-app updater downloaded, installed, and relaunched signed
+`0.1.1`. All six hashes were byte-identical afterward, as were the retained
+session, events, MIDI, and MusicXML. There was no reacquisition prompt or
+partial acquisition stage.
+
+Refreshing the preserved score under the new App recorded producer version
+`0.1.1`, retained checkpoint SHA-256
+`7b8ec6e3da365b97443fb67a8f0b37d63997e93c152d665d43cb2011245db638`,
+and reproduced the same MusicXML SHA-256
+`a70be72d666dc535d7a8f8d4217c63710612fec97053ccce9de8995f3d169dc7`.
+The UI rendered that score, the updater reported no newer compatible release,
+and normal quit left no process orphan. Tactical 051 retains the complete
+per-file execution record.
 
 ## Later Todo — Remove Evaluation Helpers
 

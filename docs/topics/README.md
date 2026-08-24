@@ -91,8 +91,8 @@ normally reuse the document slug in its `Topic:` trailers.
   analysis, trusted collaboration, and teacher review.
 - [`public-desktop-release.md`](public-desktop-release.md):
   published macOS arm64 and Windows x86_64 CPU proof of concept, production
-  updater routing, and the remaining installed desktop-update contract, with
-  explicit score-runtime gates.
+  updater routing, accepted macOS installed update, and the remaining Windows
+  desktop-update contract, with explicit score-runtime gates.
 - [`session-workspace-management.md`](session-workspace-management.md):
   accepted v2 foundation for explicit New, session history, separate
   active/selected identities, recoverable deletion, and future continuation.

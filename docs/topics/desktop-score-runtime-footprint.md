@@ -3,17 +3,18 @@
 Topic: desktop-score-runtime-footprint
 
 Status: **the user-acquired score-runtime core is published in signed macOS and
-Windows `desktop-v0.1.0` applications as of 2026-08-24.** Exact platform
+Windows desktop applications as of 2026-08-24.** Exact platform
 support layers and both installed notice/acknowledgement/cancel gates pass.
 Tagged CI independently audits both packages and excludes the
-MIDI2ScoreTransformer repository and checkpoint. A real Windows acquisition,
-relaunch, CPU adapter result, and reinstall-preservation check also pass.
-Equivalent macOS acquisition, the full packaged score flow, removal, and
-installed update campaigns remain. Each application includes
-a pinned platform-specific support environment with best-effort dependency
-provenance, plus a shared acquisition controller that downloads the exact
-model source and checkpoint only after an explicit education/research-use
-acknowledgement.
+MIDI2ScoreTransformer repository and checkpoint. Real acquisition, relaunch,
+and CPU score generation pass on both platforms. Windows additionally passes
+reinstall preservation; macOS passes compatible acquired-runtime and score
+preservation through the signed `0.1.0 -> 0.1.1` update. Explicit removal on
+both platforms and the Windows installed update remain. Each application
+includes a pinned platform-specific support environment with best-effort
+dependency provenance, plus a shared acquisition controller that downloads
+the exact model source and checkpoint only after an explicit
+education/research-use acknowledgement.
 Tactical
 [`052-user-acquired-score-runtime.md`](../tactical/052-user-acquired-score-runtime.md)
 owns that implementation, and tactical
@@ -409,9 +410,8 @@ does not delete sessions, source MIDI, MusicXML, alignments, or exports.
 7. Prove external-runtime preservation through the real signed
    `0.1.0 -> 0.1.1` updater campaign on both operating systems.
 
-Steps 1 through 5 and the signed-package/audit portion of step 6 are complete
-in public `0.1.0`. Windows acquisition and isolated CPU output also pass.
-macOS acquisition, visible end-to-end score parity/removal, and step 7 remain.
+Steps 1 through 6 are complete. macOS also passes its half of step 7. Explicit
+removal on both platforms and Windows update preservation remain.
 
 Python 3.10 consolidation, removal of eager ScoreTransformer/MUSTER imports,
 checkpoint derivation, broader dependency pruning, and quantization remain
@@ -505,8 +505,8 @@ Continue
 [`052-user-acquired-score-runtime.md`](../tactical/052-user-acquired-score-runtime.md)
 and
 [`053-windows-desktop-release-lane.md`](../tactical/053-windows-desktop-release-lane.md)
-through macOS acquisition, visible score/removal checks, and the installed
-`0.1.0 -> 0.1.1` campaigns. Known missing license metadata for the evaluation
-helpers remains recorded risk, not a reason to retract the proof of concept.
+through explicit removal checks and the Windows installed `0.1.0 -> 0.1.1`
+campaign. Known missing license metadata for the evaluation helpers remains
+recorded risk, not a reason to retract the proof of concept.
 Do not substitute a derived checkpoint or mirror the main model content in a
 future release merely to simplify acquisition.

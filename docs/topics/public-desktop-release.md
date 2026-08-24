@@ -2,9 +2,9 @@
 
 Topic: public-desktop-release
 
-Status: **the coordinated `0.1.1` update is public and installed acceptance is
-active as of 2026-08-24.** The public, unlicensed source repository and the
-public/latest
+Status: **the coordinated `0.1.1` update is public, and macOS installed
+acceptance passed as of 2026-08-24.** The public, unlicensed source repository
+and the public/latest
 [`desktop-v0.1.1`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.1)
 GitHub Release contain signed macOS arm64 and Windows x86_64 CPU applications.
 Both include the education/research acknowledgement dialog and direct
@@ -12,8 +12,10 @@ user-acquisition capability, but neither contains the MIDI2ScoreTransformer
 repository or checkpoint. All 11 Actions secrets were configured and
 exercised again in a successful signed two-platform rehearsal and tagged
 `0.1.1` build. The production updater offers `0.1.1` to both `0.1.0` targets
-and returns no update to `0.1.1`. Installed `0.1.0 -> 0.1.1` acceptance on
-both operating systems remains open. Tactical
+and returns no update to `0.1.1`. A claimed Tart macOS arm64 appliance passed
+the real installed `0.1.0 -> 0.1.1` update with its acquired runtime,
+acknowledgement, installation identity, session, and score preserved. Windows
+installed acceptance remains open. Tactical
 [`051-signed-macos-update-lane.md`](../tactical/051-signed-macos-update-lane.md)
 owns the macOS signed baseline and update campaign. The earlier macOS
 score-assets-free LGPL candidate is signed, notarized, installed, and locally
@@ -158,7 +160,7 @@ server-side asset digests, not hand-authored repository files.
 | Corresponding media sources | 13,220,729 bytes, SHA-256 `f631ac0a47f82bd95968226fbea1e3bbadcd5ab08e49ece1c3bf0b30f4e6b3fe` |
 | Release metadata | exact two-target `latest.json`, `SHA256SUMS`, GitHub asset digests, and tag-scoped build-provenance attestations verified |
 | Production route | both `0.1.0` targets return signed `0.1.1` metadata; both `0.1.1` targets return HTTP 204 |
-| Installed acceptance | active; publication and routing do not imply that either installed replacement has passed |
+| Installed acceptance | macOS arm64 passed on a claimed Tart appliance; Windows x86_64 remains open |
 
 ## Release Safety Contract
 
@@ -285,11 +287,14 @@ has no EULA restricting LGPL debugging or modification.
    GitHub digests; and the strict draft validator passed before publication.
    Commit `f1c905e` fixes and tests the Tauri v2 `Atpiano.app.tar.gz`
    contract for future tags.
-4. **Desktop updater routing: active; installed update pending.** The Pi loads
+4. **Desktop updater routing: active; macOS installed update passed.** The Pi
+   loads
    the tracked product config from the public checkout. Public macOS arm64 and
    Windows x64 requests from `0.1.0` return exact signed `0.1.1` metadata;
    requests from `0.1.1` return HTTP 204. Public response signatures match
-   `latest.json` byte-for-byte. Installed replacement remains the open gate.
+   `latest.json` byte-for-byte. The macOS App completed the production
+   replacement and its manual post-update check reported no newer release;
+   Windows installed replacement remains open.
 5. **Distribution compliance: provisionally accepted for this proof of
    concept.** The macOS LGPL notices, exact corresponding-source archive,
    checksums, and build provenance are public. The Windows BtbN media payload
@@ -302,8 +307,9 @@ has no EULA restricting LGPL debugging or modification.
    acquisition controller without upstream source/checkpoint bytes. Both
    packaged cancel gates pass. Both platforms pass acknowledged acquisition,
    relaunch, and CPU score output; Windows additionally passes reinstall
-   preservation. Explicit removal on both platforms and update persistence
-   remain.
+   preservation. macOS additionally passes compatible runtime and session
+   preservation through the signed update. Explicit removal on both platforms
+   and Windows update persistence remain.
 7. **Windows signed package: passed and published; broader acceptance
    remains.** Native x64 CI passed deterministic stage/re-audit, Azure Trusted
    Signing, Authenticode verification, trusted timestamping, updater-signature
@@ -315,16 +321,16 @@ has no EULA restricting LGPL debugging or modification.
    authorization covered the real two-platform tag, public release, and
    production-route activation. The repository remains public with no
    declared Atpiano source license.
-9. **Installed update campaigns: open.** Prove the exact signed
-   `0.1.0 -> 0.1.1` path through production on macOS and Windows with each
-   acquired runtime retained and usable, then retain redacted updater and
-   upstream-request evidence.
+9. **Installed update campaigns: macOS passed; Windows open.** The exact signed
+   macOS `0.1.0 -> 0.1.1` path preserved and reused the acquired runtime and
+   retained score. Complete the equivalent Windows campaign and retain its
+   redacted updater evidence.
 
 ## Recommended Direction
 
 Keep both public releases available while gathering proof-of-concept feedback. Use
 [`desktop-release-operator-runbook.md`](../desktop-release-operator-runbook.md)
 for future releases. Next, finish the signed production update from installed
-`0.1.0` on macOS and Windows. Preserve and re-exercise the compatible acquired
-score runtime on both systems. Explicit removal remains follow-up acceptance,
-not a prerequisite for keeping this free proof-of-concept release public.
+`0.1.0` on Windows and re-exercise its compatible acquired score runtime.
+Explicit removal remains follow-up acceptance, not a prerequisite for keeping
+this free proof-of-concept release public.
