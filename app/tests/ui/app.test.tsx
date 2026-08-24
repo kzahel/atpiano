@@ -1165,7 +1165,9 @@ describe("shared application", () => {
     renderApp(runtime);
     await screen.findByRole("heading", { name: "Morning progression" });
 
-    await user.click(screen.getByRole("button", { name: "Refresh score" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Refresh score" }),
+    );
 
     expect(await screen.findAllByText(message)).toHaveLength(2);
     expect(
@@ -1205,7 +1207,9 @@ describe("shared application", () => {
     expect(await screen.findByRole("heading", { name: "Morning progression" }))
       .toBeTruthy();
 
-    await user.click(screen.getByRole("button", { name: "Refresh score" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Refresh score" }),
+    );
 
     expect(
       await screen.findAllByText("Score job status unavailable"),
