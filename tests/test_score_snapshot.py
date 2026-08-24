@@ -10,6 +10,7 @@ import mido
 import pytest
 
 import atpiano.score_snapshot as score_snapshot
+from atpiano import __version__
 from atpiano.corrected import CORRECTED_EVENT_SCHEMA, CorrectedSession
 from atpiano.score_snapshot import (
     SCORE_ALIGNMENT_SCHEMA,
@@ -313,7 +314,7 @@ def test_score_snapshot_selects_only_closed_committed_prefix(
             "schema_version": "atpiano.score-producer.v1",
             "pipeline_revision": SCORE_PIPELINE_REVISION,
             "pipeline_fingerprint": score_pipeline_fingerprint(),
-            "application_version": "0.1.0",
+            "application_version": __version__,
             "application_revision": producer["application_revision"],
             "application_dirty": producer["application_dirty"],
             "execution": "injected-runner",

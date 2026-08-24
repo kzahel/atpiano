@@ -120,6 +120,10 @@ export function DesktopUpdatePanel({
             </button>
           </div>
           <p className="desktop-update-copy">{copy.body}</p>
+          <p className="desktop-update-release-marker">
+            <strong>Proof-of-concept update release</strong>
+            This 0.1.1 build verifies the signed macOS and Windows update path.
+          </p>
           {canInstall && installBlocker && (
             <p className="desktop-update-blocker" role="status">
               {installBlocker}
