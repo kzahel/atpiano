@@ -2,24 +2,22 @@
 
 Topic: public-desktop-release
 
-Status: **the coordinated `0.1.1` update is public, but its hardened macOS App
-cannot request microphone access. A source correction is implemented and a
-replacement signed release is required.** The 2026-08-24 macOS installed
-acceptance remains valid for signed update replacement, acquired score-runtime
-persistence, imported recording, and retained-session behavior; it did not
-exercise a physical microphone. The public, unlicensed source repository and
-the public/latest
-[`desktop-v0.1.1`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.1)
-GitHub Release contain signed macOS arm64 and Windows x86_64 CPU applications.
-Both include the education/research acknowledgement dialog and direct
-user-acquisition capability, but neither contains the MIDI2ScoreTransformer
-repository or checkpoint. All 11 Actions secrets were configured and
-exercised again in a successful signed two-platform rehearsal and tagged
-`0.1.1` build. The production updater offers `0.1.1` to both `0.1.0` targets
-and returns no update to `0.1.1`. A claimed Tart macOS arm64 appliance passed
-the real installed `0.1.0 -> 0.1.1` update with its acquired runtime,
-acknowledgement, installation identity, session, and score preserved. Windows
-installed acceptance remains open. Tactical
+Status: **the coordinated `0.1.2` microphone correction is public/latest.**
+The public, unlicensed source repository and
+[`desktop-v0.1.2`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.2)
+contain signed macOS arm64 and Windows x86_64 CPU applications. Tagged
+[run 32890134829](https://github.com/kzahel/atpiano/actions/runs/32890134829)
+published exact commit `aaa608bd9e62b37af5c24e6029ae95048b44259f` after
+all source, Rust, signed-platform, notarization, packaged-flow, provenance, and
+finalizer gates passed. The hardened macOS signature now embeds the narrow
+audio-input entitlement required for TCC to show the native consent prompt;
+a development-signed physical capture passed before publication. The
+production updater offers signed `0.1.2` metadata to both `0.1.1` targets and
+returns no update to `0.1.2`. An installed public `0.1.1 -> 0.1.2` clean-TCC
+microphone repeat remains a follow-up, not a publication blocker. Both apps
+retain the education/research acknowledgement and direct user-acquisition
+capability without containing the MIDI2ScoreTransformer repository or
+checkpoint. Windows installed acceptance also remains open. Tactical
 [`051-signed-macos-update-lane.md`](../tactical/051-signed-macos-update-lane.md)
 owns the macOS signed baseline and update campaign. The earlier macOS
 score-assets-free LGPL candidate is signed, notarized, installed, and locally
@@ -36,7 +34,7 @@ installed signed-update and full-flow acceptance.
 Tactical
 [`055-macos-microphone-entitlement-repair.md`](../tactical/055-macos-microphone-entitlement-repair.md)
 owns the macOS microphone incident, signing correction, and replacement-release
-acceptance gate.
+evidence.
 
 ## Scope
 
@@ -122,10 +120,11 @@ selection; installed user files are never silently deleted.
 | Installation privilege | no root/admin; DMG copy on macOS and per-user NSIS on Windows |
 | Mutable data | platform application-data/config directories, outside the App |
 
-The first release is `desktop-v0.1.0`; its published acceptance successor is
-`desktop-v0.1.1`. The first release contains the updater. The successor carries
-an unmistakable visible proof-of-concept update marker and coherent Tauri,
-web-client, Python-sidecar, and model-pack identities.
+The first release is `desktop-v0.1.0`; its first acceptance successor is
+`desktop-v0.1.1`, and its current microphone correction is
+`desktop-v0.1.2`. The first release contains the updater. Each successor
+carries an unmistakable visible proof-of-concept update marker and coherent
+Tauri, web-client, Python-sidecar, and model-pack identities.
 
 This product-declared two-target matrix deliberately specializes the canary's
 five-target contract. It does not claim Linux, Intel macOS, or native Windows
@@ -169,6 +168,20 @@ server-side asset digests, not hand-authored repository files.
 | Release metadata | exact two-target `latest.json`, `SHA256SUMS`, GitHub asset digests, and tag-scoped build-provenance attestations verified |
 | Production route | both `0.1.0` targets return signed `0.1.1` metadata; both `0.1.1` targets return HTTP 204 |
 | Installed acceptance | macOS arm64 passed on a claimed Tart appliance; Windows x86_64 remains open |
+
+## Published 0.1.2 Snapshot
+
+| Concern | Published or observed value |
+| --- | --- |
+| Version/tag/commit | public/latest `0.1.2` / `desktop-v0.1.2` / `aaa608bd9e62b37af5c24e6029ae95048b44259f` |
+| Tagged workflow | [run 32890134829](https://github.com/kzahel/atpiano/actions/runs/32890134829), all source, Rust, signed platform, finalizer, and attestation jobs passed |
+| macOS installer | notarized/stapled 575,203,142-byte DMG, SHA-256 `fb3f0ea1848ff36c4f3603d35bb5c15c9dc42ecbedd96814d81cffc14248deaa` |
+| macOS updater | 584,016,946-byte `Atpiano.app.tar.gz`, SHA-256 `277bf7c83c689932e3a7fb7c5e7244c1ba58a2be7b85cda8be952d53e362d76c`, plus verified signature |
+| Windows installer/update | Authenticode-signed and timestamped 435,645,608-byte NSIS executable, SHA-256 `bc974a83dc8b2aadcac47441b4c15ee8433420b63c8187d0662dbc57cb2aa1dc`, plus verified updater signature |
+| Corresponding media sources | 13,220,730 bytes, SHA-256 `5ac34c42caabaf36d52dcbf516e39f696459692147a364a8eb701a8ee09f2797` |
+| Release metadata | exactly eight assets; two-target `latest.json`, `SHA256SUMS`, GitHub asset digests, and tag-scoped build-provenance attestations published |
+| Production route | both `0.1.1` targets return signed `0.1.2` metadata; both `0.1.2` targets return HTTP 204 |
+| Microphone acceptance | signed development App passed native prompt and physical capture; installed public update repeat remains follow-up |
 
 ## Release Safety Contract
 
@@ -274,17 +287,15 @@ has no EULA restricting LGPL debugging or modification.
 
 ## Current Gates
 
-1. **Published macOS artifact integrity passed; microphone capability failed.**
-   The tagged App and DMG
-   passed Developer ID signing, hardened runtime, Apple notarization,
-   stapling, Gatekeeper assessment, forbidden-model audit, and packaged CPU
-   scoring replay in CI. The independently submitted DMG, updater archive, and
-   detached signature were reverified during release recovery. On 2026-08-25,
-   the installed `0.1.1` App reached WebKit microphone capture but macOS TCC
-   denied it before prompting because the hardened shell lacked
-   `com.apple.security.device.audio-input`. The App already contained
-   `NSMicrophoneUsageDescription`; the missing signature entitlement was the
-   blocker.
+1. **Published `0.1.2` macOS artifact and microphone entitlement gates passed.**
+   The tagged App and DMG passed Developer ID signing, hardened runtime,
+   exact audio-input entitlement inspection, Apple notarization, stapling,
+   Gatekeeper assessment, forbidden-model audit, and packaged CPU scoring
+   replay. This corrects the `0.1.1` TCC failure, where the usage description
+   existed but the hardened signature lacked
+   `com.apple.security.device.audio-input`. A development-signed physical
+   microphone prompt and capture passed; repeating it after a public installed
+   update remains follow-up acceptance.
 2. **Two-platform signed build: passed.** The exact candidate commit
    `ed76f74686981990ce230679ccae9af19dfd61f2` passed the credentialed
    [rehearsal](https://github.com/kzahel/atpiano/actions/runs/32666483577).
@@ -301,14 +312,12 @@ has no EULA restricting LGPL debugging or modification.
    GitHub digests; and the strict draft validator passed before publication.
    Commit `f1c905e` fixes and tests the Tauri v2 `Atpiano.app.tar.gz`
    contract for future tags.
-4. **Desktop updater routing: active; macOS installed update passed.** The Pi
-   loads
-   the tracked product config from the public checkout. Public macOS arm64 and
-   Windows x64 requests from `0.1.0` return exact signed `0.1.1` metadata;
-   requests from `0.1.1` return HTTP 204. Public response signatures match
-   `latest.json` byte-for-byte. The macOS App completed the production
-   replacement and its manual post-update check reported no newer release;
-   Windows installed replacement remains open.
+4. **Desktop updater routing: active.** The Pi loads the tracked product config
+   from the public checkout. Public macOS arm64 and Windows x64 requests from
+   version `0.1.1` return exact signed `0.1.2` metadata; requests from `0.1.2`
+   return HTTP 204. The earlier macOS `0.1.0 -> 0.1.1` installed replacement
+   passed. Its `0.1.1 -> 0.1.2` microphone repeat and Windows installed
+   replacement remain open.
 5. **Distribution compliance: provisionally accepted for this proof of
    concept.** The macOS LGPL notices, exact corresponding-source archive,
    checksums, and build provenance are public. The Windows BtbN media payload
@@ -335,19 +344,18 @@ has no EULA restricting LGPL debugging or modification.
    authorization covered the real two-platform tag, public release, and
    production-route activation. The repository remains public with no
    declared Atpiano source license.
-9. **Installed update campaigns: macOS passed; Windows open.** The exact signed
-   macOS `0.1.0 -> 0.1.1` path preserved and reused the acquired runtime and
-   retained score. Complete the equivalent Windows campaign and retain its
-   redacted updater evidence.
+9. **Installed update campaigns: first macOS successor passed; follow-ups
+   open.** The exact signed macOS `0.1.0 -> 0.1.1` path preserved and reused the
+   acquired runtime and retained score. A `0.1.1 -> 0.1.2` clean-TCC
+   microphone repeat and the equivalent Windows campaign remain useful
+   follow-up evidence.
 
 ## Recommended Direction
 
-Prioritize a macOS correction release ahead of the remaining Windows update
-campaign. Its exact signed and notarized artifact must embed the audio-input
-entitlement, show the native consent prompt from clean TCC state, retain
-nonzero physical-microphone samples, complete Stop and settlement, and preserve
-the existing session/update/runtime contracts. Until that release is public,
-describe macOS `0.1.1` microphone capture as unavailable and direct users to
-WAV or MP3 import. Continue to use
+The macOS correction release is public. Next acceptance work may install the
+public `0.1.1 -> 0.1.2` update, confirm the native consent prompt from clean
+TCC state, retain nonzero physical-microphone samples through Stop and
+settlement, and verify the existing session/update/runtime contracts. The
+remaining Windows installed-update campaign is independent. Continue to use
 [`desktop-release-operator-runbook.md`](../desktop-release-operator-runbook.md)
-for the replacement release.
+for future releases.

@@ -2,8 +2,8 @@
 
 Topic: public-desktop-release
 
-Status: **implemented locally; signed development prompt and physical capture
-passed, while exact replacement publication remains open.**
+Status: **complete for the correction release. Signed development prompt and
+physical capture passed, and the exact `0.1.2` replacement is public.**
 
 ## Incident
 
@@ -44,7 +44,7 @@ microphone reviews did not exercise TCC for the signed macOS application.
   of a missing audio entitlement, an extra camera entitlement, and a missing
   microphone usage description.
 - Both entitlement and `Info.plist` sources pass `plutil -lint`; the release
-  repository validator accepts the corrected `0.1.1` source identity.
+  repository validator accepts the corrected `0.1.2` source identity.
 - A complete arm64 development App was built with Apple Development identity
   `22WW382YN8`. Strict deep signature validation passes, hardened runtime
   remains enabled, the final signature reports
@@ -60,17 +60,27 @@ microphone reviews did not exercise TCC for the signed macOS application.
   source frames with no missing input, render-clock gaps, repeated frames, or
   boundary jumps of at least 0.05. Stop produced a verified 268,077-byte MP3,
   a settled one-note session, MIDI/event exports, and a score snapshot.
+- Exact commit `aaa608bd9e62b37af5c24e6029ae95048b44259f` was published as
+  [`desktop-v0.1.2`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.2)
+  by tagged
+  [run 32890134829](https://github.com/kzahel/atpiano/actions/runs/32890134829).
+  Source, Rust, signed Windows, Developer ID, hardened-runtime entitlement,
+  notarization, packaged replay, updater-signature, provenance, and finalizer
+  gates all passed.
+- The finalizer published exactly eight non-draft, non-prerelease assets. The
+  notarized DMG SHA-256 is
+  `fb3f0ea1848ff36c4f3603d35bb5c15c9dc42ecbedd96814d81cffc14248deaa`;
+  `SHA256SUMS` and GitHub server-side digests are public with the release.
+- Production updater requests from `0.1.1` return signed `0.1.2` metadata for
+  both supported platforms; requests from `0.1.2` return HTTP 204.
 
-## Remaining Acceptance And Publication Gate
+## Post-Publication Follow-Up
 
-1. Repeat the source, signature, packaged replay, and physical-microphone gates
-   against the exact Developer ID signed and notarized replacement artifact.
-2. Prepare a coherent successor version and update metadata, then stop at the
-   existing explicit tag/publication authorization boundary.
-3. After publication, verify a real installed `0.1.1` update preserves sessions,
-   installation identity, acknowledgement, and compatible acquired runtime,
-   then performs the same clean-TCC microphone flow.
+An installed `0.1.1 -> 0.1.2` acceptance may still verify that update
+replacement preserves sessions, installation identity, acknowledgement, and a
+compatible acquired runtime before repeating the clean-TCC microphone flow.
+That follow-up is not part of the completed correction-publication gate.
 
 The public `0.1.1` binary cannot be repaired by resetting System Settings;
-only a newly signed App can supply the missing entitlement. WAV and MP3 import
-remain the temporary recording path for that release.
+only the newly signed `0.1.2` App supplies the missing entitlement. WAV and MP3
+import remain the temporary recording path for users who stay on `0.1.1`.

@@ -7,9 +7,9 @@ itself.
 
 ## Current Boundary
 
-As of 2026-08-24, `kzahel/atpiano` is public and has no declared Atpiano
+As of 2026-08-25, `kzahel/atpiano` is public and has no declared Atpiano
 source license. The public/latest
-[`desktop-v0.1.1`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.1)
+[`desktop-v0.1.2`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.2)
 release contains signed macOS arm64 and Windows x86_64 CPU applications. Both
 contain the score-model acknowledgement and acquisition capability but no
 MIDI2ScoreTransformer source or checkpoint.
@@ -29,10 +29,13 @@ passed credentialed rehearsal
 and tagged publication
 [32707274179](https://github.com/kzahel/atpiano/actions/runs/32707274179).
 Production update routing is active. Public `darwin/aarch64` and
-`windows/x86_64` requests from version `0.1.0` return signed `0.1.1` metadata;
-requests from `0.1.1` return HTTP 204. macOS old-to-new acceptance passed on a
-claimed Tart appliance. Windows remains open until its installed application
-completes replacement and persistence checks.
+`windows/x86_64` requests from version `0.1.1` return signed `0.1.2` metadata;
+requests from `0.1.2` return HTTP 204. Tagged
+[run 32890134829](https://github.com/kzahel/atpiano/actions/runs/32890134829)
+published exact commit `aaa608bd9e62b37af5c24e6029ae95048b44259f` with
+the macOS audio-input entitlement embedded and verified. The earlier macOS
+old-to-new acceptance passed on a claimed Tart appliance; the installed
+`0.1.1 -> 0.1.2` microphone repeat and Windows campaign remain follow-ups.
 
 ## Required Actions Secrets
 
@@ -183,18 +186,39 @@ manifest resolves tag-scoped GitHub build provenance to
 `refs/tags/desktop-v0.1.1`. The tag and workflow head SHA both resolve to
 `66a82e2d4d87795c79ef286cb5f9709adb13e6c2`.
 
+## Published 0.1.2 Evidence
+
+| Asset | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `Atpiano_0.1.2_aarch64.dmg` | 575,203,142 | `fb3f0ea1848ff36c4f3603d35bb5c15c9dc42ecbedd96814d81cffc14248deaa` |
+| `Atpiano.app.tar.gz` | 584,016,946 | `277bf7c83c689932e3a7fb7c5e7244c1ba58a2be7b85cda8be952d53e362d76c` |
+| `Atpiano.app.tar.gz.sig` | 404 | `dde086b02535ec5371a71c1f9ace9dda876a5a680d5c9ee9feb6d62b9b9ade56` |
+| `Atpiano_0.1.2_x64-setup.exe` | 435,645,608 | `bc974a83dc8b2aadcac47441b4c15ee8433420b63c8187d0662dbc57cb2aa1dc` |
+| `Atpiano_0.1.2_x64-setup.exe.sig` | 416 | `7b51f92412721838710cd0a974237484be30d946b294f7ce7ca9428e990c983f` |
+| `Atpiano_0.1.2_media-sources.tar.gz` | 13,220,730 | `5ac34c42caabaf36d52dcbf516e39f696459692147a364a8eb701a8ee09f2797` |
+| `latest.json` | 1,509 | `7726d7193afac42c5398ffe689106453b99a6505e3d765b802faf85160a7a3d9` |
+| `SHA256SUMS` | 637 | `f20650f2bcb42e93a405d46402d760fefdeb2903a66e8bb20ebc5f3c35d7a0de` |
+
+Tagged run
+[32890134829](https://github.com/kzahel/atpiano/actions/runs/32890134829)
+published all eight assets as a non-draft, non-prerelease release. GitHub's
+server-side digests match the generated checksum manifest. The macOS gates
+verified Developer ID signing, hardened runtime, the exact audio-input
+entitlement, notarization, stapling, and packaged scoring; Windows signing and
+updater verification also passed.
+
 The production product is the tracked `update-server/atpiano.json` exposed by
 the shared update service. Validate it after deployment with:
 
 ```bash
-curl -i https://updates.graehlarts.com/atpiano/tauri/darwin/aarch64/0.0.0
-curl -i https://updates.graehlarts.com/atpiano/tauri/windows/x86_64/0.0.0
 curl -i https://updates.graehlarts.com/atpiano/tauri/darwin/aarch64/0.1.1
 curl -i https://updates.graehlarts.com/atpiano/tauri/windows/x86_64/0.1.1
+curl -i https://updates.graehlarts.com/atpiano/tauri/darwin/aarch64/0.1.2
+curl -i https://updates.graehlarts.com/atpiano/tauri/windows/x86_64/0.1.2
 ```
 
-The first two must return HTTP 200 with the current version, exact release
-URLs, and published signatures. The last two must return HTTP 204.
+The `0.1.1` requests must return HTTP 200 with version `0.1.2`, exact release
+URLs, and published signatures. The `0.1.2` requests must return HTTP 204.
 
 ## Installed macOS `0.1.0 -> 0.1.1` Evidence
 
