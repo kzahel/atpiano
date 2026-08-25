@@ -1,0 +1,57 @@
+---
+import SiteFooter from "../components/SiteFooter.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+
+const title = "Atpiano privacy note";
+const description =
+  "How Atpiano handles email addresses submitted to the hosted-access interest list.";
+---
+
+<SiteLayout title={title} description={description} canonicalPath="/privacy/">
+  <SiteHeader />
+  <main class="prose-page">
+    <div class="shell prose">
+      <p class="eyebrow">Privacy</p>
+      <h1>A small list with a narrow purpose.</h1>
+      <p class="lede">
+        If you join the hosted Atpiano interest list, your email address is used
+        only to learn whether people want a browser-based version and to contact
+        you if hosted Atpiano becomes available.
+      </p>
+
+      <h2>What is stored</h2>
+      <p>
+        The list stores your email address, the time you joined, the page where
+        you joined, and the version of this consent notice. Duplicate signups
+        update the existing entry rather than creating additional records.
+      </p>
+
+      <h2>Where it is stored</h2>
+      <p>
+        The marketing site and signup database run on Cloudflare. Cloudflare
+        Turnstile is used to distinguish ordinary visitors from automated form
+        submissions. The Atpiano list does not intentionally retain your IP
+        address or browser fingerprint.
+      </p>
+
+      <h2>What it is not used for</h2>
+      <p>
+        Joining this list does not create an Atpiano account. The address is not
+        sold, shared for unrelated marketing, or added to a general newsletter.
+      </p>
+
+      <h2>Removal and questions</h2>
+      <p>
+        To ask what is stored or to have your address removed, email
+        <a href="mailto:kyle@graehlarts.com?subject=Atpiano%20privacy"
+        >kyle@graehlarts.com</a>. Future list emails will also provide a simple
+        way to opt out.
+      </p>
+
+      <p>Last updated: August 25, 2026.</p>
+      <p><a href="/">← Return to the Atpiano homepage</a></p>
+    </div>
+  </main>
+  <SiteFooter />
+</SiteLayout>

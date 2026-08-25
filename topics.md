@@ -51,3 +51,6 @@
   later Windows desktop sidecar and model-pack lane
 - `public-desktop-release` — public-repository preflight, signed and notarized
   macOS distribution, desktop updates, and installed release evidence
+- `public-marketing-site` — red/ivory/black product and download pages,
+  Cloudflare deployment, hosted-product interest collection, and public
+  discovery links

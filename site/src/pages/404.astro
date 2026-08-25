@@ -1,0 +1,28 @@
+---
+import SiteFooter from "../components/SiteFooter.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+---
+
+<SiteLayout
+  title="Page not found — Atpiano"
+  description="The requested Atpiano page could not be found."
+  canonicalPath="/404/"
+>
+  <SiteHeader />
+  <main class="prose-page">
+    <div class="shell prose">
+      <p class="eyebrow">404</p>
+      <h1>That page isn’t here.</h1>
+      <p class="lede">
+        The performance may be over, but you can return to the Atpiano
+        homepage or choose a desktop download.
+      </p>
+      <div class="actions">
+        <a class="button button-primary" href="/">Atpiano home</a>
+        <a class="button button-secondary" href="/download/">Download</a>
+      </div>
+    </div>
+  </main>
+  <SiteFooter />
+</SiteLayout>

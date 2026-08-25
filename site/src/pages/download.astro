@@ -1,0 +1,69 @@
+---
+import SiteFooter from "../components/SiteFooter.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+
+const title = "Download Atpiano for macOS or Windows";
+const description =
+  "Download the free Atpiano desktop proof of concept for Apple-silicon Macs or 64-bit Windows.";
+const releaseBase =
+  "https://github.com/kzahel/atpiano/releases/download/desktop-v0.1.1";
+---
+
+<SiteLayout title={title} description={description} canonicalPath="/download/">
+  <SiteHeader />
+  <main class="prose-page">
+    <div class="shell prose">
+      <p class="eyebrow">Atpiano 0.1.1</p>
+      <h1>Choose your download.</h1>
+      <p class="lede">
+        Atpiano is free to try, runs locally, and does not require an account.
+        Both installers are signed; the macOS package is also notarized.
+      </p>
+
+      <div class="download-options">
+        <article class="download-option">
+          <h2>macOS</h2>
+          <p>For Macs with Apple silicon. Download the DMG, open it, and copy Atpiano to Applications.</p>
+          <a
+            class="button button-primary"
+            href={`${releaseBase}/Atpiano_0.1.1_aarch64.dmg`}
+          >Download for macOS ↓</a>
+        </article>
+        <article class="download-option">
+          <h2>Windows</h2>
+          <p>For 64-bit Windows. The per-user installer does not require administrator access.</p>
+          <a
+            class="button button-primary"
+            href={`${releaseBase}/Atpiano_0.1.1_x64-setup.exe`}
+          >Download for Windows ↓</a>
+        </article>
+      </div>
+
+      <h2>Before you begin</h2>
+      <p>
+        Acoustic transcription and generated notation can make mistakes. Treat
+        their output as a way to review what you played, not as an authoritative
+        score.
+      </p>
+      <p>
+        Recording, playback, piano roll, keyboard, and export work without the
+        optional sheet-music model. If you enable score generation, Atpiano
+        shows an education/research acknowledgement before downloading the
+        model from its upstream source. The upstream repository and checkpoint
+        currently have no explicit license, are not bundled with Atpiano, and
+        are not covered by Atpiano’s terms.
+      </p>
+
+      <h2>Release details</h2>
+      <p>
+        See the <a href="https://github.com/kzahel/atpiano/releases/latest"
+        >latest GitHub release</a> for checksums, updater files, and build
+        provenance. The Atpiano source repository is public but does not
+        currently declare a source license.
+      </p>
+      <p><a href="/">← Return to the Atpiano homepage</a></p>
+    </div>
+  </main>
+  <SiteFooter />
+</SiteLayout>

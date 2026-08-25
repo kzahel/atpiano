@@ -93,6 +93,10 @@ normally reuse the document slug in its `Topic:` trailers.
   published macOS arm64 and Windows x86_64 CPU proof of concept, production
   updater routing, accepted macOS installed update, and the remaining Windows
   desktop-update contract, with explicit score-runtime gates.
+- [`public-marketing-site.md`](public-marketing-site.md):
+  published red/ivory/black product and download site, Cloudflare D1 and
+  Turnstile hosted-product interest list, and its operating and privacy
+  boundaries.
 - [`session-workspace-management.md`](session-workspace-management.md):
   accepted v2 foundation for explicit New, session history, separate
   active/selected identities, recoverable deletion, and future continuation.

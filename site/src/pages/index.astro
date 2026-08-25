@@ -1,0 +1,191 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import { env } from "cloudflare:workers";
+
+const title = "Atpiano — A memory for your piano";
+const description =
+  "Record or import an acoustic-piano performance, then revisit it through synchronized audio, notes, piano roll, keyboard, and optional sheet music.";
+const turnstileSiteKey = env.TURNSTILE_SITE_KEY;
+---
+
+<SiteLayout title={title} description={description} canonicalPath="/">
+  <SiteHeader />
+
+  <main>
+    <section class="hero">
+      <div class="shell hero-grid">
+        <div>
+          <p class="eyebrow">Free desktop proof of concept</p>
+          <h1>A memory for your piano.</h1>
+          <p class="hero-copy">
+            Record or import an acoustic-piano performance. Then listen back and
+            follow what you played through synchronized notes, a piano roll,
+            keyboard, and optional sheet music.
+          </p>
+          <div class="actions">
+            <a class="button button-primary" href="/download/">
+              Download Atpiano <span aria-hidden="true">↓</span>
+            </a>
+            <a class="button button-secondary" href="#how-it-works">
+              See how it works <span aria-hidden="true">→</span>
+            </a>
+          </div>
+          <ul class="platform-proof" aria-label="Product details">
+            <li>macOS Apple silicon</li>
+            <li>Windows 64-bit</li>
+            <li>Works locally</li>
+            <li>No account</li>
+          </ul>
+        </div>
+        <figure class="product-window">
+          <img
+            src="/images/atpiano-performance-workspace.png"
+            width="1024"
+            height="874"
+            alt="Atpiano desktop workspace with session history, playback, and generated sheet music"
+          />
+        </figure>
+      </div>
+    </section>
+
+    <section class="section section-white" id="how-it-works">
+      <div class="shell">
+        <div class="section-heading">
+          <h2>From playing to something you can revisit.</h2>
+          <p>
+            Atpiano keeps the recording as the source, then adds useful ways to
+            see it. Transcription and notation can make mistakes, so the result
+            is a review aid—not an authoritative score.
+          </p>
+        </div>
+        <div class="steps">
+          <article class="step">
+            <span class="step-number">01 / CAPTURE</span>
+            <h3>Play naturally</h3>
+            <p>
+              Put a microphone near your acoustic piano, or import a WAV or MP3
+              you already recorded.
+            </p>
+          </article>
+          <article class="step">
+            <span class="step-number">02 / SEE</span>
+            <h3>Make the performance visible</h3>
+            <p>
+              Review detected notes beside synchronized audio, a keyboard,
+              piano roll, and optional score.
+            </p>
+          </article>
+          <article class="step">
+            <span class="step-number">03 / RETURN</span>
+            <h3>Keep the musical thought</h3>
+            <p>
+              Name sessions, revisit an idea later, and export audio, MIDI,
+              event history, or score artifacts.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section hosted-section" id="hosted">
+      <div class="shell hosted-grid">
+        <div class="hosted-copy">
+          <span class="hosted-label">Exploring—not available yet</span>
+          <h2>Would you use Atpiano in your browser?</h2>
+          <p>
+            No download, your sessions available wherever you practice, and an
+            easier path to sharing. <strong>A hosted version would be a paid service.</strong>{" "}
+            Your interest will help decide whether it gets built.
+          </p>
+        </div>
+        <form
+          class="interest-card"
+          action="/api/interest"
+          method="post"
+          data-interest-form
+        >
+          <label for="interest-email">Email for early hosted access</label>
+          <div class="interest-form-row">
+            <input
+              id="interest-email"
+              name="email"
+              type="email"
+              autocomplete="email"
+              placeholder="you@example.com"
+              required
+            />
+            <button type="submit">I’d try hosted Atpiano</button>
+          </div>
+          <div class="honeypot" aria-hidden="true">
+            <label for="interest-company">Leave this field empty</label>
+            <input
+              id="interest-company"
+              name="company"
+              type="text"
+              tabindex="-1"
+              autocomplete="off"
+            />
+          </div>
+          <input type="hidden" name="source" value="homepage" />
+          <div
+            class="cf-turnstile"
+            data-sitekey={turnstileSiteKey}
+            data-theme="light"
+            data-size="flexible"
+            data-appearance="interaction-only"
+            data-action="hosted-interest"
+          ></div>
+          <p class="form-note">
+            I’ll only email if hosted Atpiano becomes available. Unsubscribe
+            anytime. See the <a href="/privacy/">privacy note</a>.
+          </p>
+          <p class="form-status" data-form-status aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <section class="split-section" aria-label="Download and contribute">
+      <div class="split-panel">
+        <h3>Download the desktop app</h3>
+        <p>
+          Signed installers are available for macOS on Apple silicon and
+          64-bit Windows. Atpiano runs locally and includes automatic updates.
+        </p>
+        <div class="text-links">
+          <a class="text-link" href="/download/">Choose your download →</a>
+          <a
+            class="text-link"
+            href="https://github.com/kzahel/atpiano#optional-sheet-music"
+          >Model and score notes →</a>
+        </div>
+      </div>
+      <div class="split-panel">
+        <h3>Help shape Atpiano</h3>
+        <p>
+          Try it with a real piano, tell me where it gets the music wrong, read
+          the public source, or propose an improvement.
+        </p>
+        <div class="text-links">
+          <a class="text-link" href="https://github.com/kzahel/atpiano">
+            View source on GitHub →
+          </a>
+          <a
+            class="text-link"
+            href="mailto:kyle@graehlarts.com?subject=Atpiano%20feedback"
+          >Send feedback →</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <SiteFooter />
+
+  <script
+    is:inline
+    src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+    async
+    defer></script>
+  <script is:inline src="/scripts/interest.js" defer></script>
+</SiteLayout>

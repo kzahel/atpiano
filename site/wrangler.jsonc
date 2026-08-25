@@ -1,0 +1,35 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"compatibility_date": "2026-08-25",
+	"compatibility_flags": ["global_fetch_strictly_public"],
+	"name": "atpiano-marketing",
+	"main": "@astrojs/cloudflare/entrypoints/server",
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS"
+	},
+	"routes": [
+		{
+			"pattern": "at-piano.com",
+			"custom_domain": true
+		},
+		{
+			"pattern": "www.at-piano.com",
+			"custom_domain": true
+		}
+	],
+	"vars": {
+		"TURNSTILE_SITE_KEY": "0x4AAAAAAEbYw31sA2OHfbpY"
+	},
+	"d1_databases": [
+		{
+			"binding": "SIGNUPS",
+			"database_name": "atpiano-marketing",
+			"database_id": "55ab4416-07f8-404f-94f3-1f00b998c663",
+			"migrations_dir": "migrations"
+		}
+	],
+	"observability": {
+		"enabled": true
+	}
+}

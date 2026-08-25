@@ -9,7 +9,12 @@ piano roll, an 88-key keyboard, and optional sheet music.
 
 ## Download
 
-[Download the latest Atpiano release](https://github.com/kzahel/atpiano/releases/latest).
+[Download Atpiano for macOS or Windows](https://at-piano.com/download/).
+
+The product homepage, hosted-version interest list, and privacy note live at
+[at-piano.com](https://at-piano.com). Release checksums and updater artifacts
+remain available on the
+[GitHub Releases page](https://github.com/kzahel/atpiano/releases/latest).
 
 The current proof-of-concept desktop applications support:
 
