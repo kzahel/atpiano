@@ -658,6 +658,10 @@ h2 {
   color: var(--red-deep);
 }
 
+.prose .button-primary {
+  color: var(--white);
+}
+
 .prose .lede {
   color: var(--ink);
   font-size: 19px;
