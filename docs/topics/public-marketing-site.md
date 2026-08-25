@@ -16,6 +16,12 @@ site uses the intended piano-derived red, ivory, white, and black visual
 language; it is the reference direction for a later application-theme update,
 but does not change the desktop application yet.
 
+The social and Graehl Arts feature artwork uses intentionally
+nonrepresentational geometry rather than a stylized keyboard: a cropped
+asymmetric black form, ivory negative space, and one continuous red line. This
+keeps the piano-derived palette and rhythm without presenting physically
+incorrect key anatomy.
+
 The current public surface includes:
 
 - a product homepage with a real application screenshot and an honest
