@@ -19,7 +19,15 @@ function fixture() {
     tauri: {
       version: "1.2.3",
       identifier: "com.atpiano.desktop",
-      bundle: { targets: ["app", "dmg"], createUpdaterArtifacts: true },
+      bundle: {
+        targets: ["app", "dmg"],
+        createUpdaterArtifacts: true,
+        macOS: {
+          hardenedRuntime: true,
+          entitlements: "entitlements/app.plist",
+          infoPlist: "Info.plist",
+        },
+      },
       plugins: { updater: { endpoints: [UPDATE_ENDPOINT], pubkey: publicKey } },
     },
     windowsTauri: {
@@ -42,6 +50,17 @@ function fixture() {
       tauriUpdates: true,
     },
     capabilities: { permissions: ["process:default", "updater:default"] },
+    macosEntitlements: [
+      "<plist><dict>",
+      "<key>com.apple.security.device.audio-input</key><true/>",
+      "</dict></plist>",
+    ].join(""),
+    macosInfoPlist: [
+      "<plist><dict>",
+      "<key>NSMicrophoneUsageDescription</key>",
+      "<string>Record a piano performance.</string>",
+      "</dict></plist>",
+    ].join(""),
   };
 }
 
@@ -59,6 +78,42 @@ test("rejects accidental macOS target expansion", () => {
   const data = fixture();
   data.tauri.bundle.targets.push("nsis");
   assert.throws(() => validateDesktopReleaseConfiguration(data), /bundle targets/);
+});
+
+test("requires the narrow macOS microphone signing contract", () => {
+  const data = fixture();
+  delete data.tauri.bundle.macOS.entitlements;
+  assert.throws(
+    () => validateDesktopReleaseConfiguration(data),
+    /entitlements path/,
+  );
+
+  data.tauri.bundle.macOS.entitlements = "entitlements/app.plist";
+  data.macosEntitlements = "<plist><dict></dict></plist>";
+  assert.throws(
+    () => validateDesktopReleaseConfiguration(data),
+    /application entitlements/,
+  );
+
+  data.macosEntitlements = [
+    "<plist><dict>",
+    "<key>com.apple.security.device.audio-input</key><true/>",
+    "<key>com.apple.security.device.camera</key><true/>",
+    "</dict></plist>",
+  ].join("");
+  assert.throws(
+    () => validateDesktopReleaseConfiguration(data),
+    /application entitlements/,
+  );
+});
+
+test("requires the macOS microphone usage description", () => {
+  const data = fixture();
+  data.macosInfoPlist = "<plist><dict></dict></plist>";
+  assert.throws(
+    () => validateDesktopReleaseConfiguration(data),
+    /microphone usage description/,
+  );
 });
 
 test("rejects unsafe Windows package or updater drift", () => {
@@ -99,6 +154,8 @@ test("requires notarization, stapling, and Gatekeeper assessment for the DMG", (
     "xcrun stapler validate",
     "--type open",
     "--context context:primary-signature",
+    "codesign --display --entitlements -",
+    "com.apple.security.device.audio-input",
   ].join("\n");
   assert.doesNotThrow(() =>
     validateMacosDmgReleaseContract({ workflow, buildScript }),

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2]
+
+- Sign the hardened macOS application with its required audio-input
+  entitlement so the system microphone consent prompt can appear.
+- Reject release configuration and signed artifacts that omit the macOS
+  microphone usage description or application entitlement.
+
 ## [0.1.1]
 
 - Add an unmistakable proof-of-concept update marker to the desktop release

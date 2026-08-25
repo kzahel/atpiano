@@ -35,6 +35,8 @@ export function validateDesktopReleaseConfiguration({
   pyproject,
   product,
   capabilities,
+  macosEntitlements,
+  macosInfoPlist,
 }) {
   const versions = {
     appPackage: appPackage.version,
@@ -56,6 +58,34 @@ export function validateDesktopReleaseConfiguration({
   }
   if (tauri.bundle?.createUpdaterArtifacts !== true) {
     fail("Tauri updater artifacts must be enabled");
+  }
+  const macosBundle = tauri.bundle?.macOS;
+  if (macosBundle?.hardenedRuntime !== true) {
+    fail("macOS hardened runtime must be enabled");
+  }
+  if (macosBundle?.entitlements !== "entitlements/app.plist") {
+    fail(`unexpected macOS entitlements path: ${macosBundle?.entitlements}`);
+  }
+  if (macosBundle?.infoPlist !== "Info.plist") {
+    fail(`unexpected macOS Info.plist path: ${macosBundle?.infoPlist}`);
+  }
+  const entitlementKeys = [
+    ...macosEntitlements.matchAll(/<key>\s*([^<]+?)\s*<\/key>/g),
+  ].map((match) => match[1]);
+  if (
+    JSON.stringify(entitlementKeys) !==
+      JSON.stringify(["com.apple.security.device.audio-input"]) ||
+    !/<key>\s*com\.apple\.security\.device\.audio-input\s*<\/key>\s*<true\s*\/>/.test(
+      macosEntitlements,
+    )
+  ) {
+    fail(`unexpected macOS application entitlements: ${JSON.stringify(entitlementKeys)}`);
+  }
+  const microphoneUsage = macosInfoPlist.match(
+    /<key>\s*NSMicrophoneUsageDescription\s*<\/key>\s*<string>\s*([^<]+?)\s*<\/string>/,
+  )?.[1];
+  if (!microphoneUsage) {
+    fail("macOS Info.plist has no microphone usage description");
   }
   if (JSON.stringify(windowsTauri.bundle?.targets) !== JSON.stringify(["nsis"])) {
     fail(`unexpected Windows bundle targets: ${JSON.stringify(windowsTauri.bundle?.targets)}`);
@@ -127,6 +157,14 @@ export function validateDesktopReleaseRepository(root) {
     capabilities: readJson(
       path.join(root, "app", "src-tauri", "capabilities", "default.json"),
     ),
+    macosEntitlements: fs.readFileSync(
+      path.join(root, "app", "src-tauri", "entitlements", "app.plist"),
+      "utf8",
+    ),
+    macosInfoPlist: fs.readFileSync(
+      path.join(root, "app", "src-tauri", "Info.plist"),
+      "utf8",
+    ),
   });
   const changelog = fs.readFileSync(path.join(root, "CHANGELOG.md"), "utf8");
   if (!changelog.includes(`## [${result.version}]`)) {
@@ -158,6 +196,8 @@ export function validateMacosDmgReleaseContract({ workflow, buildScript }) {
     "xcrun stapler validate",
     "--type open",
     "--context context:primary-signature",
+    "codesign --display --entitlements -",
+    "com.apple.security.device.audio-input",
   ]) {
     if (!buildScript.includes(command)) {
       fail(`macOS DMG release contract is missing: ${command}`);

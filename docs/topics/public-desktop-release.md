@@ -2,9 +2,13 @@
 
 Topic: public-desktop-release
 
-Status: **the coordinated `0.1.1` update is public, and macOS installed
-acceptance passed as of 2026-08-24.** The public, unlicensed source repository
-and the public/latest
+Status: **the coordinated `0.1.1` update is public, but its hardened macOS App
+cannot request microphone access. A source correction is implemented and a
+replacement signed release is required.** The 2026-08-24 macOS installed
+acceptance remains valid for signed update replacement, acquired score-runtime
+persistence, imported recording, and retained-session behavior; it did not
+exercise a physical microphone. The public, unlicensed source repository and
+the public/latest
 [`desktop-v0.1.1`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.1)
 GitHub Release contain signed macOS arm64 and Windows x86_64 CPU applications.
 Both include the education/research acknowledgement dialog and direct
@@ -29,6 +33,10 @@ Tactical
 has produced the signed public Windows x64 packages and a real user-acquired
 CPU score result with reinstall preservation, and now owns the remaining
 installed signed-update and full-flow acceptance.
+Tactical
+[`055-macos-microphone-entitlement-repair.md`](../tactical/055-macos-microphone-entitlement-repair.md)
+owns the macOS microphone incident, signing correction, and replacement-release
+acceptance gate.
 
 ## Scope
 
@@ -266,11 +274,17 @@ has no EULA restricting LGPL debugging or modification.
 
 ## Current Gates
 
-1. **Exact macOS candidate: passed and published.** The tagged App and DMG
+1. **Published macOS artifact integrity passed; microphone capability failed.**
+   The tagged App and DMG
    passed Developer ID signing, hardened runtime, Apple notarization,
    stapling, Gatekeeper assessment, forbidden-model audit, and packaged CPU
    scoring replay in CI. The independently submitted DMG, updater archive, and
-   detached signature were reverified during release recovery.
+   detached signature were reverified during release recovery. On 2026-08-25,
+   the installed `0.1.1` App reached WebKit microphone capture but macOS TCC
+   denied it before prompting because the hardened shell lacked
+   `com.apple.security.device.audio-input`. The App already contained
+   `NSMicrophoneUsageDescription`; the missing signature entitlement was the
+   blocker.
 2. **Two-platform signed build: passed.** The exact candidate commit
    `ed76f74686981990ce230679ccae9af19dfd61f2` passed the credentialed
    [rehearsal](https://github.com/kzahel/atpiano/actions/runs/32666483577).
@@ -328,9 +342,12 @@ has no EULA restricting LGPL debugging or modification.
 
 ## Recommended Direction
 
-Keep both public releases available while gathering proof-of-concept feedback. Use
+Prioritize a macOS correction release ahead of the remaining Windows update
+campaign. Its exact signed and notarized artifact must embed the audio-input
+entitlement, show the native consent prompt from clean TCC state, retain
+nonzero physical-microphone samples, complete Stop and settlement, and preserve
+the existing session/update/runtime contracts. Until that release is public,
+describe macOS `0.1.1` microphone capture as unavailable and direct users to
+WAV or MP3 import. Continue to use
 [`desktop-release-operator-runbook.md`](../desktop-release-operator-runbook.md)
-for future releases. Next, finish the signed production update from installed
-`0.1.0` on Windows and re-exercise its compatible acquired score runtime.
-Explicit removal remains follow-up acceptance, not a prerequisite for keeping
-this free proof-of-concept release public.
+for the replacement release.

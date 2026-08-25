@@ -81,6 +81,7 @@ require_signing_identity() {
 
 verify_hardened_signature() {
   local expected_authority="${1}"
+  local app_entitlements
   local details
   local python_details
   local candidate
@@ -95,6 +96,13 @@ verify_hardened_signature() {
     [[ "${details}" != *"Authority=${expected_authority}"* ]]
   then
     printf '%s\n' "Atpiano.app has an unexpected signing authority" >&2
+    return 1
+  fi
+  app_entitlements="$(
+    codesign --display --entitlements - "${app_bundle}" 2>&1
+  )"
+  if [[ "${app_entitlements}" != *"com.apple.security.device.audio-input"* ]]; then
+    printf '%s\n' "Atpiano.app lacks its required audio-input entitlement" >&2
     return 1
   fi
   while IFS= read -r -d '' candidate; do
@@ -413,6 +421,7 @@ case "${1:-}" in
       npx tauri build \
         --target aarch64-apple-darwin \
         --bundles app \
+        --config '{"bundle":{"createUpdaterArtifacts":false}}' \
         --no-sign
     )
     archive_staging="${review_archive}.tmp"
@@ -438,6 +447,7 @@ case "${1:-}" in
       npx tauri build \
         --target aarch64-apple-darwin \
         --bundles app \
+        --config '{"bundle":{"createUpdaterArtifacts":false}}' \
         --no-sign
     )
     mkdir -p "${internal_report_root}"
@@ -467,7 +477,7 @@ case "${1:-}" in
         --target aarch64-apple-darwin \
         --bundles app \
         --config \
-        '{"bundle":{"macOS":{"signingIdentity":"Apple Development: Kyle Graehl (22WW382YN8)"}}}'
+        '{"bundle":{"createUpdaterArtifacts":false,"macOS":{"signingIdentity":"Apple Development: Kyle Graehl (22WW382YN8)"}}}'
     )
     verify_hardened_signature "${apple_development_identity}"
     audit_release_app

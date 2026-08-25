@@ -11,6 +11,10 @@ piano roll, an 88-key keyboard, and optional sheet music.
 
 [Download Atpiano for macOS or Windows](https://at-piano.com/download/).
 
+> **macOS 0.1.1 users:** upgrade to 0.1.2 or later for microphone recording.
+> The 0.1.1 hardened signature lacks the audio-input entitlement, although WAV
+> and MP3 import remain available in that version.
+
 The product homepage, hosted-version interest list, and privacy note live at
 [at-piano.com](https://at-piano.com). Release checksums and updater artifacts
 remain available on the

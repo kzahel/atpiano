@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Atpiano",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "identifier": "com.atpiano.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -46,6 +46,7 @@
       "minimumSystemVersion": "13.0",
       "signingIdentity": "Developer ID Application: Kyle Graehl (VD7BYQ6ABM)",
       "hardenedRuntime": true,
+      "entitlements": "entitlements/app.plist",
       "infoPlist": "Info.plist"
     }
   },
