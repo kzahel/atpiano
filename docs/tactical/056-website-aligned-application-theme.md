@@ -2,7 +2,7 @@
 
 Topic: application-color-theme
 
-Status: **Complete in source; prepared for signed desktop release `0.1.3`.**
+Status: **Complete; published in signed desktop release `0.1.3`.**
 
 ## Objective
 
@@ -54,3 +54,19 @@ and TypeScript gates passed, while real packaged macOS and Windows acceptance
 remains part of the next desktop release rather than this source-only slice.
 The on-demand shared service reported `stopped`, so it was not started or
 restarted solely for this change.
+
+## Release Evidence
+
+On August 26, 2026, signed coordinated release
+[`desktop-v0.1.3`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.3)
+published exact commit `12dd515274c6ac5ec33443bbcfd3e71e1e78e241`.
+Tagged [run 32940171525](https://github.com/kzahel/atpiano/actions/runs/32940171525)
+passed all source, native Rust, signed macOS, signed Windows, provenance,
+draft-validation, and finalizer jobs. Its eight public asset digests match
+`SHA256SUMS`, and its updater manifest contains only `darwin-aarch64` and
+`windows-x86_64` with the published signatures.
+
+Production updater requests from `0.1.2` return exact signed `0.1.3` metadata
+for both targets; requests from `0.1.3` return HTTP 204. The public download
+page pins both `0.1.3` installers and was deployed as Cloudflare Worker version
+`da9a81d8-3cdd-401b-8ef7-cd833985fc00`.

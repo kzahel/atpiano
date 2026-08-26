@@ -7,9 +7,9 @@ itself.
 
 ## Current Boundary
 
-As of 2026-08-25, `kzahel/atpiano` is public and has no declared Atpiano
+As of 2026-08-26, `kzahel/atpiano` is public and has no declared Atpiano
 source license. The public/latest
-[`desktop-v0.1.2`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.2)
+[`desktop-v0.1.3`](https://github.com/kzahel/atpiano/releases/tag/desktop-v0.1.3)
 release contains signed macOS arm64 and Windows x86_64 CPU applications. Both
 contain the score-model acknowledgement and acquisition capability but no
 MIDI2ScoreTransformer source or checkpoint.
@@ -29,13 +29,15 @@ passed credentialed rehearsal
 and tagged publication
 [32707274179](https://github.com/kzahel/atpiano/actions/runs/32707274179).
 Production update routing is active. Public `darwin/aarch64` and
-`windows/x86_64` requests from version `0.1.1` return signed `0.1.2` metadata;
-requests from `0.1.2` return HTTP 204. Tagged
-[run 32890134829](https://github.com/kzahel/atpiano/actions/runs/32890134829)
-published exact commit `aaa608bd9e62b37af5c24e6029ae95048b44259f` with
-the macOS audio-input entitlement embedded and verified. The earlier macOS
-old-to-new acceptance passed on a claimed Tart appliance; the installed
-`0.1.1 -> 0.1.2` microphone repeat and Windows campaign remain follow-ups.
+`windows/x86_64` requests from version `0.1.2` return signed `0.1.3` metadata;
+requests from `0.1.3` return HTTP 204. Tagged
+[run 32940171525](https://github.com/kzahel/atpiano/actions/runs/32940171525)
+published exact commit `12dd515274c6ac5ec33443bbcfd3e71e1e78e241` with
+the website-aligned light theme, explicit persistent dark mode, verified
+macOS audio-input entitlement, and coordinated signed platform artifacts. The
+earlier macOS old-to-new acceptance passed on a claimed Tart appliance; the
+installed `0.1.1 -> 0.1.2` microphone repeat and Windows campaign remain
+follow-ups.
 
 ## Required Actions Secrets
 
@@ -76,9 +78,41 @@ scripts/check-desktop-release-secrets
 This checker never reads secret values and fails if any required name is
 absent or if it resolves a repository other than `kzahel/atpiano`.
 
-## Credentialed Rehearsal
+## Ordinary Release
 
-Push the exact candidate commit to `main`, then run the workflow manually:
+For an ordinary application, UI, content, or bug-fix release, prepare one
+coherent version/changelog commit and create the annotated release tag:
+
+```bash
+git tag -a desktop-v<VERSION> -m "Atpiano Desktop <VERSION>"
+git push origin desktop-v<VERSION>
+gh run watch --repo kzahel/atpiano
+```
+
+The tagged workflow is the release authority. It runs the source, frontend,
+Python, and native Rust checks, builds and signs both supported platforms,
+validates the release matrix, and publishes only after every required job
+passes. Do not duplicate the full test suite locally or run a separate signed
+rehearsal merely because an ordinary release is being published. Targeted
+local checks remain useful while developing a change, but are not a release
+gate.
+
+## When A Credentialed Rehearsal Is Required
+
+Use the separate rehearsal when the change affects the signing or release
+lane itself, including:
+
+- `.github/workflows/desktop.yml`, its release helpers, or finalizer contract;
+- updater keys, signatures, routes, manifests, or supported targets;
+- macOS or Windows signing, entitlements, notarization, or installer settings;
+- packaged runtimes, media/source archives, forbidden-content audits, or
+  artifact composition;
+- new or rotated credentials and the first exercise of a new runner image; or
+- recovery from a release-lane failure whose cause is not already isolated.
+
+It may also be run when the maintainer explicitly requests a rehearsal for a
+particular release. Push the exact candidate commit to `main`, then run the
+workflow manually:
 
 ```bash
 gh workflow run desktop.yml --repo kzahel/atpiano --ref main
@@ -98,9 +132,9 @@ artifacts and redacted audits. It does not create a GitHub Release. Require:
   both installed applications; and
 - cleanup with no decoded key/certificate files or leaked secret values.
 
-Download and inspect the rehearsal artifacts before authorizing a tag. A
-successful rehearsal proves build/signing readiness, not the production
-updater or a public release.
+When a rehearsal is required, download and inspect its artifacts before
+authorizing a tag. A successful rehearsal proves build/signing readiness, not
+the production updater or a public release.
 
 For `0.1.0`, rehearsal run
 [`32666483577`](https://github.com/kzahel/atpiano/actions/runs/32666483577)
@@ -120,7 +154,8 @@ evidence.
 ## Tag And Draft-First Publication
 
 Creating or pushing a `desktop-v*` tag is a publication action and requires an
-explicit final decision after rehearsal review. The version must match
+explicit release request. When the exceptional rehearsal path applies, tag
+only after reviewing it. The version must match
 `app/src-tauri/tauri.conf.json` and the changelog.
 
 On a tag, the macOS and Windows jobs upload only internal Actions artifacts.
@@ -207,18 +242,40 @@ verified Developer ID signing, hardened runtime, the exact audio-input
 entitlement, notarization, stapling, and packaged scoring; Windows signing and
 updater verification also passed.
 
+## Published 0.1.3 Evidence
+
+| Asset | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `Atpiano_0.1.3_aarch64.dmg` | 575,200,770 | `943418cdb5f760da457171478923381a964d3a1e979b0c866c3d0d2025874dc5` |
+| `Atpiano.app.tar.gz` | 584,019,267 | `efa2a4b66a3c104c79cda4109158cd0f05f03f1136953cb31f6e2aec5229feea` |
+| `Atpiano.app.tar.gz.sig` | 404 | `fae8fcd14998b9b5ddedcd2e6a11251ee5af336dc03c0e9ead337cdb1a06dc31` |
+| `Atpiano_0.1.3_x64-setup.exe` | 435,668,376 | `005df9f2a7f372fa31c732bd55d39216ba43f46ce996adf48c184451e1db2e3c` |
+| `Atpiano_0.1.3_x64-setup.exe.sig` | 416 | `486c4a5bb9cfae0b423835e6c42782eb8877945941e62eb8f536facde34091ff` |
+| `Atpiano_0.1.3_media-sources.tar.gz` | 13,220,730 | `9d17f5d98c708a131b3bb5f6dd2b719d1eaca3fd05cdc269aa6a38aa136709ea` |
+| `latest.json` | 1,531 | `7312eac9e98e97a413dd89ac4aa9ad5c8be089410605cc73da74ea5f14e99f75` |
+| `SHA256SUMS` | 637 | `ba416ef792336cb961f9e7160851d528f8afbea6b969407632c0fb366e5edd46` |
+
+Tagged run
+[32940171525](https://github.com/kzahel/atpiano/actions/runs/32940171525)
+published all eight assets as latest, non-draft, and non-prerelease from exact
+commit `12dd515274c6ac5ec33443bbcfd3e71e1e78e241`. GitHub digests match
+`SHA256SUMS`; the two updater signatures and URLs reconcile with
+`latest.json`; and build provenance resolves to
+`refs/tags/desktop-v0.1.3`. The production updater returns signed `0.1.3`
+metadata to both `0.1.2` targets and HTTP 204 to both `0.1.3` targets.
+
 The production product is the tracked `update-server/atpiano.json` exposed by
 the shared update service. Validate it after deployment with:
 
 ```bash
-curl -i https://updates.graehlarts.com/atpiano/tauri/darwin/aarch64/0.1.1
-curl -i https://updates.graehlarts.com/atpiano/tauri/windows/x86_64/0.1.1
 curl -i https://updates.graehlarts.com/atpiano/tauri/darwin/aarch64/0.1.2
 curl -i https://updates.graehlarts.com/atpiano/tauri/windows/x86_64/0.1.2
+curl -i https://updates.graehlarts.com/atpiano/tauri/darwin/aarch64/0.1.3
+curl -i https://updates.graehlarts.com/atpiano/tauri/windows/x86_64/0.1.3
 ```
 
-The `0.1.1` requests must return HTTP 200 with version `0.1.2`, exact release
-URLs, and published signatures. The `0.1.2` requests must return HTTP 204.
+The `0.1.2` requests must return HTTP 200 with version `0.1.3`, exact release
+URLs, and published signatures. The `0.1.3` requests must return HTTP 204.
 
 ## Installed macOS `0.1.0 -> 0.1.1` Evidence
 

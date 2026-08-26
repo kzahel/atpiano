@@ -28,7 +28,7 @@ The current public surface includes:
 - a product homepage with a real application screenshot and an honest
   proof-of-concept/transcription caveat;
 - direct signed macOS Apple-silicon and Windows x64 downloads for desktop
-  release `0.1.1`, plus GitHub release checksums and provenance;
+  release `0.1.3`, plus GitHub release checksums and provenance;
 - public source, contribution, feedback-email, privacy, and Graehl Arts links;
   and
 - a hosted-product interest form which clearly states that the browser version
@@ -73,10 +73,15 @@ mark it withdrawn. The operator commands and query examples live in
 
 ## Release and Content Contract
 
-The download page currently pins explicit `0.1.1` GitHub assets so visitors get
+The download page currently pins explicit `0.1.3` GitHub assets so visitors get
 the correct signed files without relying on user-agent detection. When a new
 desktop release becomes current, update the displayed version, both artifact
 URLs, and any changed platform or model caveats in the same release slice.
+
+The `0.1.3` download update is live as Cloudflare Worker version
+`da9a81d8-3cdd-401b-8ef7-cd833985fc00`. The apex returns the intended version
+and exact installer links; `www` continues to redirect permanently to the
+apex.
 
 The marketing copy says that the source is public rather than calling the
 project open source because the repository does not currently declare a source
