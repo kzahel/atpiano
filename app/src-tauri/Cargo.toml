@@ -1,6 +1,6 @@
 [package]
 name = "atpiano-desktop"
-version = "0.1.2"
+version = "0.1.3"
 description = "Thin native supervisor for the Atpiano local engine"
 authors = ["Atpiano contributors"]
 license = ""

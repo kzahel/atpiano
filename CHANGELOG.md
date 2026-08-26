@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3]
+
+- Match the desktop application's default light palette to the public website's
+  warm paper, ivory, near-black, and piano-felt red visual language.
+- Add an explicit dark mode that persists across launches and keeps the native
+  desktop window chrome synchronized with the application.
+
 ## [0.1.2]
 
 - Sign the hardened macOS application with its required audio-input

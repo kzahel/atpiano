@@ -122,7 +122,7 @@ export function DesktopUpdatePanel({
           <p className="desktop-update-copy">{copy.body}</p>
           <p className="desktop-update-release-marker">
             <strong>Proof-of-concept update release</strong>
-            This 0.1.2 build restores microphone permission in the signed macOS app.
+            This 0.1.3 build matches the website palette and adds a persistent dark mode.
           </p>
           {canInstall && installBlocker && (
             <p className="desktop-update-blocker" role="status">

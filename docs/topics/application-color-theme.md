@@ -13,8 +13,8 @@ site. The marketing site's own layout and deployment remain owned by
 
 The shared application now defaults to the public site's warm paper, ivory,
 near-black, and piano-felt red palette. It also provides an explicit dark mode
-using the same red/black visual language. This source change is unreleased
-until it is included in a later signed desktop version.
+using the same red/black visual language. The source change is prepared for
+signed desktop release `0.1.3`; publication evidence is still pending.
 
 The control is available in the normal workspace, authenticated login, and
 full-screen score reader. A choice is stored under

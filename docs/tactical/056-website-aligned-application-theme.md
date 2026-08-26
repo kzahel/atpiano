@@ -2,7 +2,7 @@
 
 Topic: application-color-theme
 
-Status: **Complete in source; pending a future desktop release.**
+Status: **Complete in source; prepared for signed desktop release `0.1.3`.**
 
 ## Objective
 
