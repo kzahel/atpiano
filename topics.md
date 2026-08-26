@@ -54,3 +54,6 @@
 - `public-marketing-site` — red/ivory/black product and download pages,
   Cloudflare deployment, hosted-product interest collection, and public
   discovery links
+- `application-color-theme` — website-aligned paper, ivory, ink, and
+  piano-felt red application palette, explicit persistent dark mode, and
+  matching native desktop window chrome

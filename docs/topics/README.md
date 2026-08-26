@@ -30,6 +30,9 @@ normally reuse the document slug in its `Topic:` trailers.
 - [`acoustic-transcription-latency-quality.md`](acoustic-transcription-latency-quality.md):
   discovery-stage investigation of acoustic models, streaming adaptations,
   the latency/quality measurement contract, and reproducible benchmarks.
+- [`application-color-theme.md`](application-color-theme.md):
+  website-aligned paper, ivory, ink, and piano-felt red application palette,
+  explicit persistent dark mode, and matching native desktop window chrome.
 - [`browser-only-wasm-deployment.md`](browser-only-wasm-deployment.md):
   candidate static, offline-capable deployment that moves capture,
   transcription, persistence, and export into the browser; the exact ONNX

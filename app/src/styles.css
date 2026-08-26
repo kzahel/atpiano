@@ -1,18 +1,75 @@
 :root {
+  color-scheme: light;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
-  color: #edf1ec;
-  background: #091311;
+  color: var(--text);
+  background: var(--page);
   font-synthesis: none;
-  --ink: #091311;
-  --panel: #101d1a;
-  --panel-soft: #15231f;
-  --line: #293a34;
-  --muted: #8d9f98;
-  --cream: #edf1ec;
-  --mint: #62d6a5;
-  --mint-dark: #1c7457;
-  --amber: #e8ad63;
-  --red: #e47c70;
+  --page: #f4eee3;
+  --page-glow: rgba(170, 25, 39, 0.1);
+  --surface: #fffdf8;
+  --surface-soft: #f9f3eb;
+  --surface-inset: #eee4d9;
+  --surface-hover: #f5eae1;
+  --surface-selected: #f2dddd;
+  --surface-overlay: rgba(255, 253, 248, 0.96);
+  --text: #171311;
+  --text-soft: #5f5650;
+  --text-subtle: #75685f;
+  --line: #d7cbc0;
+  --line-strong: #b7a79b;
+  --accent: #aa1927;
+  --accent-strong: #74101a;
+  --accent-soft: #ecd0cf;
+  --accent-contrast: #ffffff;
+  --warning: #8b5715;
+  --warning-soft: #f4e3c4;
+  --danger: #9e2430;
+  --danger-soft: #f3d8d7;
+  --shadow: rgba(44, 21, 18, 0.14);
+  --backdrop: rgba(23, 19, 17, 0.62);
+  --accent-glow: rgba(170, 25, 39, 0.3);
+  --accent-glow-faint: rgba(170, 25, 39, 0.1);
+  --accent-key-light: #efb8bc;
+  --accent-key-mid: #c94b56;
+  --roll-surface: #211c19;
+  --roll-grid: rgba(244, 238, 227, 0.11);
+  --score-paper: #fffdf8;
+  --score-ink: #171311;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #12100f;
+  --page-glow: rgba(170, 25, 39, 0.18);
+  --surface: #1b1715;
+  --surface-soft: #241e1b;
+  --surface-inset: #0d0b0a;
+  --surface-hover: #2c2421;
+  --surface-selected: #3b2023;
+  --surface-overlay: rgba(27, 23, 21, 0.96);
+  --text: #f6f0e8;
+  --text-soft: #b9ada5;
+  --text-subtle: #9a8d84;
+  --line: #453b35;
+  --line-strong: #6d5b51;
+  --accent: #e55b67;
+  --accent-strong: #ff7a84;
+  --accent-soft: #4a2227;
+  --accent-contrast: #170d0e;
+  --warning: #e8ad63;
+  --warning-soft: #3d2d1b;
+  --danger: #f07878;
+  --danger-soft: #442326;
+  --shadow: rgba(0, 0, 0, 0.32);
+  --backdrop: rgba(5, 3, 3, 0.78);
+  --accent-glow: rgba(229, 91, 103, 0.42);
+  --accent-glow-faint: rgba(229, 91, 103, 0.14);
+  --accent-key-light: #f2a4ab;
+  --accent-key-mid: #d74a57;
+  --roll-surface: #0d0b0a;
+  --roll-grid: rgba(246, 240, 232, 0.09);
+  --score-paper: #f8f3ea;
+  --score-ink: #171311;
 }
 
 * {
@@ -29,8 +86,9 @@ body,
 body {
   min-width: 320px;
   background:
-    radial-gradient(circle at 76% -10%, rgba(49, 111, 85, 0.19), transparent 32rem),
-    var(--ink);
+    radial-gradient(circle at 76% -10%, var(--page-glow), transparent 32rem),
+    var(--page);
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 button,
@@ -53,16 +111,16 @@ button {
   width: min(calc(100% - 28px), 620px);
   padding: 11px 13px 11px 16px;
   transform: translateX(-50%);
-  border: 1px solid #47715f;
+  border: 1px solid var(--accent);
   border-radius: 10px;
-  color: #e8f8f0;
-  background: #173429;
+  color: var(--text);
+  background: var(--surface-selected);
   box-shadow: 0 14px 44px rgba(0, 0, 0, 0.42);
 }
 
 .client-update-notice.urgent {
-  border-color: #a57945;
-  background: #3a2b19;
+  border-color: var(--warning);
+  background: var(--warning-soft);
 }
 
 .client-update-notice span {
@@ -74,8 +132,8 @@ button {
   padding: 7px 11px;
   border: 1px solid currentColor;
   border-radius: 7px;
-  color: #10221b;
-  background: var(--mint);
+  color: var(--accent-contrast);
+  background: var(--accent);
   cursor: pointer;
   font-weight: 750;
 }
@@ -92,34 +150,34 @@ button {
   align-items: center;
   gap: 7px;
   padding: 7px 10px;
-  border: 1px solid #30463d;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  color: #c7d2cd;
-  background: rgba(12, 26, 22, 0.94);
+  color: var(--text);
+  background: var(--surface-overlay);
   cursor: pointer;
   font: 650 11px/1.2 "DM Mono", monospace;
 }
 
 .desktop-update-trigger span {
-  color: #739387;
+  color: var(--text-soft);
 }
 
 .desktop-update-trigger.attention {
-  border-color: #5fa889;
-  color: #effbf6;
+  border-color: var(--accent);
+  color: var(--text);
 }
 
 .desktop-update-trigger.attention span {
-  color: var(--mint);
+  color: var(--accent);
 }
 
 .desktop-update-panel {
   width: min(430px, calc(100vw - 28px));
   margin-top: 9px;
   padding: 20px;
-  border: 1px solid #39564b;
+  border: 1px solid var(--line-strong);
   border-radius: 13px;
-  background: #10201b;
+  background: var(--surface);
   box-shadow: 0 20px 70px rgba(0, 0, 0, 0.55);
 }
 
@@ -144,7 +202,7 @@ button {
   align-self: flex-start;
   padding: 0 5px;
   border: 0;
-  color: var(--muted);
+  color: var(--text-soft);
   background: transparent;
   cursor: pointer;
   font-size: 23px;
@@ -154,7 +212,7 @@ button {
 .desktop-update-notes,
 .desktop-update-blocker {
   margin: 14px 0;
-  color: #b8c8c1;
+  color: var(--text);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -163,7 +221,7 @@ button {
 .desktop-update-blocker {
   padding: 10px 12px;
   border-radius: 8px;
-  background: #142b23;
+  background: var(--surface-soft);
 }
 
 .desktop-update-release-marker {
@@ -171,31 +229,31 @@ button {
   gap: 4px;
   margin: 14px 0;
   padding: 10px 12px;
-  border: 1px solid #4b7d69;
+  border: 1px solid var(--accent);
   border-radius: 8px;
-  color: #b8c8c1;
-  background: #173127;
+  color: var(--text);
+  background: var(--surface-selected);
   font-size: 12px;
   line-height: 1.45;
 }
 
 .desktop-update-release-marker strong {
-  color: var(--mint);
+  color: var(--accent);
   font: 700 11px/1.3 "DM Mono", monospace;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .desktop-update-blocker {
-  border: 1px solid #725938;
-  color: #f2c891;
-  background: #2c2418;
+  border: 1px solid var(--warning);
+  color: var(--warning);
+  background: var(--warning-soft);
 }
 
 .desktop-update-panel > progress {
   width: 100%;
   margin: 2px 0 13px;
-  accent-color: var(--mint);
+  accent-color: var(--accent);
 }
 
 .desktop-update-actions .button {
@@ -207,7 +265,7 @@ button {
   margin-top: 14px;
   padding: 0;
   border: 0;
-  color: var(--mint);
+  color: var(--accent);
   background: transparent;
   cursor: pointer;
   font: 650 11px/1.3 "DM Mono", monospace;
@@ -221,7 +279,7 @@ button {
   overflow: auto;
   padding: 28px;
   place-items: center;
-  background: rgba(4, 10, 8, 0.82);
+  background: var(--backdrop);
 }
 
 .score-model-dialog {
@@ -229,10 +287,10 @@ button {
   max-height: calc(100vh - 56px);
   overflow: auto;
   padding: 24px;
-  border: 1px solid #45665a;
+  border: 1px solid var(--line-strong);
   border-radius: 14px;
-  color: #c9d6d1;
-  background: #10201b;
+  color: var(--text);
+  background: var(--surface);
   box-shadow: 0 26px 90px rgba(0, 0, 0, 0.68);
   font-size: 13px;
   line-height: 1.55;
@@ -252,7 +310,7 @@ button {
 
 .score-model-heading h2 {
   margin: 3px 0 0;
-  color: #f1f7f4;
+  color: var(--text);
   font-size: 22px;
   letter-spacing: -0.025em;
 }
@@ -261,7 +319,7 @@ button {
   align-self: flex-start;
   padding: 0 5px;
   border: 0;
-  color: var(--muted);
+  color: var(--text-soft);
   background: transparent;
   cursor: pointer;
   font-size: 25px;
@@ -269,16 +327,16 @@ button {
 
 .score-model-purpose {
   margin: 20px 0 8px;
-  color: #f0c881;
+  color: var(--warning);
   font-weight: 700;
 }
 
 .score-model-notice {
   padding: 13px 15px;
-  border: 1px solid #6b5534;
+  border: 1px solid var(--warning);
   border-radius: 9px;
-  color: #f1d3a1;
-  background: #2a2319;
+  color: var(--warning);
+  background: var(--warning-soft);
 }
 
 .score-model-links {
@@ -291,7 +349,7 @@ button {
 .score-model-links button {
   padding: 0;
   border: 0;
-  color: var(--mint);
+  color: var(--accent);
   background: transparent;
   cursor: pointer;
   font: 650 11px/1.4 "DM Mono", monospace;
@@ -304,15 +362,15 @@ button {
   gap: 10px;
   margin: 18px 0;
   padding: 13px;
-  border: 1px solid #385247;
+  border: 1px solid var(--line);
   border-radius: 9px;
-  background: #142a23;
+  background: var(--surface-soft);
 }
 
 .score-model-acknowledgement input,
 .score-model-removal input {
   margin-top: 3px;
-  accent-color: var(--mint);
+  accent-color: var(--accent);
 }
 
 .score-model-progress {
@@ -323,11 +381,11 @@ button {
 
 .score-model-progress progress {
   width: 100%;
-  accent-color: var(--mint);
+  accent-color: var(--accent);
 }
 
 .score-model-progress small {
-  color: var(--muted);
+  color: var(--text-soft);
 }
 
 .score-model-installed {
@@ -335,18 +393,18 @@ button {
   flex-direction: column;
   margin: 18px 0;
   padding: 13px 15px;
-  border: 1px solid #47715f;
+  border: 1px solid var(--accent);
   border-radius: 9px;
-  background: #173429;
+  background: var(--surface-selected);
 }
 
 .score-model-installed strong {
-  color: #effbf6;
+  color: var(--text);
 }
 
 .score-model-provenance {
   margin: 18px 0;
-  color: var(--muted);
+  color: var(--text-soft);
   font-size: 11px;
 }
 
@@ -374,7 +432,7 @@ button {
 
 .score-model-provenance dd {
   overflow: hidden;
-  color: #c8d6d0;
+  color: var(--text);
   font-family: "DM Mono", monospace;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -409,7 +467,7 @@ button {
   margin-top: 17px;
   padding-top: 14px;
   border-top: 1px solid var(--line);
-  color: var(--muted);
+  color: var(--text-soft);
   font-size: 11px;
 }
 
@@ -437,7 +495,7 @@ button {
 
 .desktop-release-identities dd {
   overflow: hidden;
-  color: #c8d6d0;
+  color: var(--text);
   font-family: "DM Mono", monospace;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -445,8 +503,47 @@ button {
 
 button:focus-visible,
 input:focus-visible {
-  outline: 2px solid var(--mint);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--text-soft);
+  background: var(--surface);
+  box-shadow: 0 3px 0 var(--shadow);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.theme-toggle span {
+  color: var(--accent);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.theme-toggle strong {
+  font: 700 9px/1 "DM Mono", monospace;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.theme-toggle.compact {
+  width: 44px;
+  min-height: 44px;
+  justify-content: center;
+  padding: 0;
 }
 
 .login-shell {
@@ -461,8 +558,13 @@ input:focus-visible {
   padding: clamp(28px, 6vw, 48px);
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: rgba(16, 29, 26, 0.96);
+  background: var(--surface-overlay);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.3);
+}
+
+.login-card > .theme-toggle {
+  float: right;
+  margin: -14px -14px 12px 18px;
 }
 
 .login-brand {
@@ -471,10 +573,10 @@ input:focus-visible {
   height: 48px;
   margin-bottom: 26px;
   place-items: center;
-  border: 1px solid #3d5b50;
+  border: 1px solid var(--line-strong);
   border-radius: 13px 13px 13px 4px;
-  color: var(--mint);
-  background: #10211c;
+  color: var(--accent);
+  background: var(--surface);
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 23px;
 }
@@ -487,7 +589,7 @@ input:focus-visible {
 
 .login-introduction {
   margin: 0 0 30px;
-  color: var(--muted);
+  color: var(--text-soft);
   line-height: 1.55;
 }
 
@@ -502,7 +604,7 @@ input:focus-visible {
 }
 
 .login-card label {
-  color: #c7d2cd;
+  color: var(--text);
   font-size: 13px;
   font-weight: 700;
 }
@@ -510,10 +612,10 @@ input:focus-visible {
 .login-card input {
   width: 100%;
   padding: 13px 14px;
-  border: 1px solid #365047;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  color: var(--cream);
-  background: #0b1714;
+  color: var(--text);
+  background: var(--surface-inset);
 }
 
 .login-card input:disabled {
@@ -529,13 +631,13 @@ input:focus-visible {
 .login-card > small {
   display: block;
   margin-top: 24px;
-  color: var(--muted);
+  color: var(--text-soft);
   line-height: 1.45;
 }
 
 .login-error {
   margin: -4px 0 0;
-  color: #ffaaa0;
+  color: var(--danger);
   font-size: 13px;
 }
 
@@ -550,17 +652,17 @@ input:focus-visible {
 .viewer-control > span {
   max-width: 180px;
   overflow: hidden;
-  color: #c7d2cd;
+  color: var(--text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .viewer-control button {
   padding: 5px 8px;
-  border: 1px solid #355347;
+  border: 1px solid var(--line);
   border-radius: 6px;
-  color: #dff8ec;
-  background: #152a23;
+  color: var(--text);
+  background: var(--surface-soft);
   cursor: pointer;
 }
 
@@ -579,10 +681,10 @@ input:focus-visible {
   align-items: center;
   gap: 9px;
   padding: 5px 8px 5px 5px;
-  border: 1px solid #30463d;
+  border: 1px solid var(--line);
   border-radius: 9px;
-  color: #dff8ec;
-  background: #14261f;
+  color: var(--text);
+  background: var(--surface-soft);
   cursor: pointer;
 }
 
@@ -592,7 +694,7 @@ input:focus-visible {
   height: 29px;
   place-items: center;
   border-radius: 7px;
-  color: #10221b;
+  color: var(--accent-contrast);
   background: var(--accent);
   font: 700 13px/1 "DM Mono", monospace;
 }
@@ -617,13 +719,13 @@ input:focus-visible {
 }
 
 .account-menu-trigger small {
-  color: #799087;
+  color: var(--text-soft);
   font: 9px/1.4 "DM Mono", monospace;
   text-transform: uppercase;
 }
 
 .account-menu-trigger b {
-  color: #789087;
+  color: var(--text-soft);
   font-size: 13px;
 }
 
@@ -634,9 +736,9 @@ input:focus-visible {
   right: 0;
   width: min(330px, calc(100vw - 32px));
   padding: 18px;
-  border: 1px solid #30483e;
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: #102119;
+  background: var(--surface);
   box-shadow: 0 20px 55px #0009;
 }
 
@@ -649,7 +751,7 @@ input:focus-visible {
 .account-menu-popover header p,
 .account-menu-help {
   margin: 0;
-  color: #82978f;
+  color: var(--text-soft);
   font: 9px/1.5 "DM Mono", monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -657,19 +759,19 @@ input:focus-visible {
 
 .account-menu-popover header strong {
   margin-top: 4px;
-  color: #eff8f4;
+  color: var(--text);
   font: 600 16px/1.4 Inter, sans-serif;
 }
 
 .account-menu-popover header small {
-  color: #84988f;
+  color: var(--text-soft);
   font: 11px/1.4 "DM Mono", monospace;
 }
 
 .performer-select {
   display: grid;
   gap: 6px;
-  color: #8da198;
+  color: var(--text-soft);
   font: 9px/1.3 "DM Mono", monospace;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -679,10 +781,10 @@ input:focus-visible {
 .session-performer-filter select {
   min-height: 36px;
   padding: 7px 30px 7px 10px;
-  border: 1px solid #385248;
+  border: 1px solid var(--line);
   border-radius: 7px;
-  color: #e3f1eb;
-  background: #172c24;
+  color: var(--text);
+  background: var(--surface-selected);
   font: 500 12px/1.3 Inter, sans-serif;
 }
 
@@ -692,7 +794,7 @@ input:focus-visible {
 
 .account-menu-help {
   margin-top: 8px;
-  color: #70877d;
+  color: var(--text-soft);
   letter-spacing: 0;
   text-transform: none;
 }
@@ -712,7 +814,7 @@ input:focus-visible {
 }
 
 .profile-create label span {
-  color: #8da198;
+  color: var(--text-soft);
   font: 9px/1.3 "DM Mono", monospace;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -721,26 +823,26 @@ input:focus-visible {
 .profile-create input {
   min-width: 0;
   padding: 8px 9px;
-  border: 1px solid #385248;
+  border: 1px solid var(--line);
   border-radius: 7px;
-  color: #eff8f4;
-  background: #172c24;
+  color: var(--text);
+  background: var(--surface-selected);
 }
 
 .profile-create button,
 .account-menu-popover footer button {
   align-self: end;
   padding: 8px 10px;
-  border: 1px solid #3b5a4e;
+  border: 1px solid var(--line-strong);
   border-radius: 7px;
-  color: #dff8ec;
-  background: #1b332a;
+  color: var(--text);
+  background: var(--surface-selected);
   cursor: pointer;
 }
 
 .account-menu-error {
   margin: 9px 0 0;
-  color: #ffaaa0;
+  color: var(--danger);
   font: 11px/1.4 Inter, sans-serif;
 }
 
@@ -752,7 +854,7 @@ input:focus-visible {
   margin-top: 15px;
   padding-top: 13px;
   border-top: 1px solid var(--line);
-  color: #81968d;
+  color: var(--text-soft);
   font: 9px/1.4 "DM Mono", monospace;
   text-transform: uppercase;
 }
@@ -773,7 +875,7 @@ input:focus-visible {
   padding: 26px 18px 20px;
   overflow: hidden;
   border-right: 1px solid var(--line);
-  background: rgba(8, 18, 15, 0.96);
+  background: var(--surface-overlay);
 }
 
 .session-rail-backdrop,
@@ -805,12 +907,12 @@ input:focus-visible {
   width: 36px;
   height: 36px;
   place-items: center;
-  border: 1px solid #3d5b50;
+  border: 1px solid var(--line-strong);
   border-radius: 10px 10px 10px 3px;
-  color: var(--mint);
+  color: var(--accent);
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 18px;
-  background: #10211c;
+  background: var(--surface);
 }
 
 .brand strong {
@@ -825,10 +927,10 @@ input:focus-visible {
   gap: 9px;
   width: 100%;
   padding: 12px 13px;
-  border: 1px solid #355347;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  color: #dff8ec;
-  background: #19372d;
+  color: var(--text);
+  background: var(--surface-selected);
   cursor: pointer;
   font-weight: 700;
   text-align: left;
@@ -837,21 +939,21 @@ input:focus-visible {
 .all-sessions {
   margin-bottom: 7px;
   border-color: transparent;
-  color: #a8bab3;
+  color: var(--text-soft);
   background: transparent;
 }
 
 .all-sessions:hover,
 .all-sessions.selected {
-  border-color: #2e493f;
-  color: #e1eee8;
-  background: #13241f;
+  border-color: var(--line);
+  color: var(--text);
+  background: var(--surface-hover);
 }
 
 .new-session:hover,
 .new-session.selected {
-  border-color: var(--mint);
-  background: #21493b;
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .new-session span {
@@ -863,7 +965,7 @@ input:focus-visible {
   display: flex;
   justify-content: space-between;
   padding: 28px 8px 10px;
-  color: #71847d;
+  color: var(--text-soft);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -883,20 +985,20 @@ input:focus-visible {
   padding: 12px 11px;
   border: 1px solid transparent;
   border-radius: 7px;
-  color: var(--cream);
+  color: var(--text);
   background: transparent;
   cursor: pointer;
   text-align: left;
 }
 
 .session-item:hover {
-  background: #101f1b;
+  background: var(--surface-hover);
 }
 
 .session-item.selected {
-  border-color: #2c473d;
-  background: #172923;
-  box-shadow: inset 3px 0 var(--mint);
+  border-color: var(--line-strong);
+  background: var(--surface-selected);
+  box-shadow: inset 3px 0 var(--accent);
 }
 
 .session-item-top,
@@ -921,8 +1023,8 @@ input:focus-visible {
 .live-pill {
   padding: 2px 5px;
   border-radius: 3px;
-  color: #b9f8dc;
-  background: #1b5c46;
+  color: var(--accent-contrast);
+  background: var(--accent);
   font-size: 8px;
   font-style: normal;
   letter-spacing: 0.08em;
@@ -933,7 +1035,7 @@ input:focus-visible {
 .session-source {
   gap: 5px;
   margin-top: 6px;
-  color: #748780;
+  color: var(--text-soft);
   font-size: 10px;
 }
 
@@ -949,22 +1051,22 @@ input:focus-visible {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #5f716a;
+  background: var(--text-subtle);
 }
 
 .status-pin.active,
 .status-pin.stopping {
-  background: var(--mint);
-  box-shadow: 0 0 0 4px rgba(98, 214, 165, 0.12);
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-glow-faint);
 }
 
 .status-pin.failed {
-  background: var(--red);
+  background: var(--danger);
 }
 
 .rail-note {
   margin: 18px 8px 0;
-  color: #81958d;
+  color: var(--text-soft);
   font-size: 10px;
   font-weight: 700;
 }
@@ -972,7 +1074,7 @@ input:focus-visible {
 .rail-note span {
   display: block;
   margin-top: 3px;
-  color: #50635c;
+  color: var(--text-subtle);
   font-weight: 400;
 }
 
@@ -1001,7 +1103,7 @@ input:focus-visible {
   display: flex;
   align-items: center;
   gap: 14px;
-  color: #6f837b;
+  color: var(--text-soft);
   font-family: "DM Mono", monospace;
   font-size: 10px;
   text-transform: uppercase;
@@ -1020,7 +1122,7 @@ input:focus-visible {
   display: grid;
   gap: 5px;
   margin-left: auto;
-  color: var(--muted);
+  color: var(--text-soft);
   font: 9px/1.3 "DM Mono", monospace;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -1033,16 +1135,16 @@ input:focus-visible {
   gap: 20px;
   margin-top: 18px;
   padding: 11px 14px;
-  border: 1px solid #365246;
+  border: 1px solid var(--line);
   border-radius: 7px;
-  color: #bfddd1;
-  background: #142a23;
+  color: var(--text);
+  background: var(--surface-soft);
   font-size: 12px;
 }
 
 .eyebrow {
   margin: 0 0 8px;
-  color: var(--mint);
+  color: var(--accent);
   font-family: "DM Mono", monospace;
   font-size: 9px;
   font-weight: 500;
@@ -1061,7 +1163,7 @@ input:focus-visible {
 .empty-workspace h1,
 .fatal-state h1 {
   margin: 0;
-  color: #f4f1e8;
+  color: var(--text);
   font-size: clamp(32px, 4vw, 52px);
   font-weight: 500;
   letter-spacing: -0.055em;
@@ -1070,7 +1172,7 @@ input:focus-visible {
 
 .session-title h1 {
   margin: 0;
-  color: #f4f1e8;
+  color: var(--text);
   font-size: clamp(25px, 3vw, 35px);
   font-weight: 550;
   letter-spacing: -0.045em;
@@ -1084,17 +1186,17 @@ input:focus-visible {
 }
 
 .session-title .eyebrow i {
-  color: #82978e;
+  color: var(--text-soft);
   font-style: normal;
 }
 
 .session-title .eyebrow .state-active,
 .session-title .eyebrow .state-stopping {
-  color: var(--mint);
+  color: var(--accent);
 }
 
 .session-title .eyebrow .state-failed {
-  color: var(--red);
+  color: var(--danger);
 }
 
 .session-name {
@@ -1115,10 +1217,10 @@ input:focus-visible {
 .session-name input {
   width: 100%;
   padding: 6px 9px;
-  border: 1px solid #4a685d;
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
-  color: #f4f1e8;
-  background: #0c1915;
+  color: var(--text);
+  background: var(--surface-inset);
   font-size: clamp(23px, 3vw, 34px);
   font-weight: 550;
   letter-spacing: -0.04em;
@@ -1132,45 +1234,45 @@ input:focus-visible {
   place-items: center;
   border: 1px solid transparent;
   border-radius: 50%;
-  color: #7e968c;
+  color: var(--text-soft);
   background: transparent;
   cursor: pointer;
 }
 
 .rename-trigger:hover {
-  border-color: #365247;
-  color: var(--mint);
-  background: #13251f;
+  border-color: var(--line);
+  color: var(--accent);
+  background: var(--surface-hover);
 }
 
 .save-state {
-  color: #7f948b;
+  color: var(--text-soft);
   font-size: 10px;
   white-space: nowrap;
 }
 
 .save-state.saving {
-  color: var(--amber);
+  color: var(--warning);
 }
 
 .save-state.saved {
-  color: var(--mint);
+  color: var(--accent);
 }
 
 .save-state.error {
-  color: #ffaaa0;
+  color: var(--danger);
 }
 
 .session-title > p:last-child {
   display: flex;
   gap: 8px;
   margin: 13px 0 0;
-  color: #80928b;
+  color: var(--text-soft);
   font-size: 12px;
 }
 
 .session-title > p:last-child span {
-  color: #42564e;
+  color: var(--text-subtle);
 }
 
 .session-actions,
@@ -1183,17 +1285,17 @@ input:focus-visible {
 .button {
   min-height: 38px;
   padding: 0 15px;
-  border: 1px solid #385046;
+  border: 1px solid var(--line);
   border-radius: 6px;
-  color: #dfe9e5;
-  background: #172721;
+  color: var(--text);
+  background: var(--surface-soft);
   cursor: pointer;
   font-size: 11px;
   font-weight: 700;
 }
 
 .button:hover:not(:disabled) {
-  border-color: #5c7b6e;
+  border-color: var(--line-strong);
   transform: translateY(-1px);
 }
 
@@ -1203,24 +1305,24 @@ input:focus-visible {
 }
 
 .button.primary {
-  border-color: #59bd94;
-  color: #07150f;
-  background: var(--mint);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  background: var(--accent);
 }
 
 .button.secondary {
-  background: #182a24;
+  background: var(--surface-soft);
 }
 
 .button.stop {
-  border-color: #985e55;
-  color: #ffd9d4;
-  background: #4a2925;
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-soft);
 }
 
 .button.danger-quiet {
   border-color: transparent;
-  color: #c78a82;
+  color: var(--danger);
   background: transparent;
 }
 
@@ -1232,8 +1334,8 @@ input:focus-visible {
 
 .active-capture-banner {
   width: 100%;
-  border-color: #3b664f;
-  color: #bad6cb;
+  border-color: var(--accent);
+  color: var(--text);
   cursor: pointer;
 }
 
@@ -1247,12 +1349,12 @@ input:focus-visible {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--mint);
+  background: var(--accent);
   animation: pulse 1.6s infinite;
 }
 
 .active-capture-banner strong {
-  color: var(--mint);
+  color: var(--accent);
   font-size: 11px;
 }
 
@@ -1263,10 +1365,10 @@ input:focus-visible {
   gap: 9px;
   margin-bottom: 12px;
   padding: 10px 13px;
-  border: 1px solid #355648;
+  border: 1px solid var(--line);
   border-radius: 7px;
-  color: #c6ddd4;
-  background: #12251f;
+  color: var(--text);
+  background: var(--surface-soft);
   font-size: 10px;
 }
 
@@ -1274,13 +1376,13 @@ input:focus-visible {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--mint);
+  background: var(--accent);
   animation: pulse 1.6s infinite;
 }
 
 .live-status-strip span {
   margin-left: auto;
-  color: #6f857c;
+  color: var(--text-soft);
 }
 
 .settle-progress {
@@ -1294,7 +1396,7 @@ input:focus-visible {
 
 .settle-progress span {
   margin: 0;
-  color: #9db2aa;
+  color: var(--text-soft);
   font-family: "DM Mono", monospace;
   font-size: 9px;
 }
@@ -1305,30 +1407,30 @@ input:focus-visible {
   overflow: hidden;
   border: 0;
   border-radius: 999px;
-  background: #263a33;
+  background: var(--line);
 }
 
 .settle-progress progress::-webkit-progress-bar {
   border-radius: 999px;
-  background: #263a33;
+  background: var(--line);
 }
 
 .settle-progress progress::-webkit-progress-value {
   border-radius: 999px;
-  background: var(--mint);
+  background: var(--accent);
 }
 
 .settle-progress progress::-moz-progress-bar {
   border-radius: 999px;
-  background: var(--mint);
+  background: var(--accent);
 }
 
 .live-status-strip.failed {
-  border-color: #6b413c;
+  border-color: var(--danger);
 }
 
 .live-status-strip.failed i {
-  background: var(--red);
+  background: var(--danger);
   animation: none;
 }
 
@@ -1338,22 +1440,22 @@ input:focus-visible {
   align-items: baseline;
   gap: 8px;
   padding: 11px 14px;
-  border: 1px solid #263a33;
+  border: 1px solid var(--line);
   border-radius: 7px;
-  color: #82978e;
-  background: #0d1916;
+  color: var(--text-soft);
+  background: var(--surface-inset);
   font-size: 11px;
 }
 
 .session-summary strong {
-  color: #e9f1ed;
+  color: var(--text);
   font-family: "DM Mono", monospace;
   font-size: 13px;
   font-weight: 600;
 }
 
 .session-summary > i {
-  color: #3f554c;
+  color: var(--text-subtle);
   font-style: normal;
 }
 
@@ -1380,7 +1482,7 @@ input:focus-visible {
 
 .sessions-home-heading p:last-child {
   margin: 10px 0 0;
-  color: var(--muted);
+  color: var(--text-soft);
   font-size: 13px;
 }
 
@@ -1393,12 +1495,12 @@ input:focus-visible {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 9px;
-  background: rgba(14, 27, 24, 0.84);
+  background: var(--surface-overlay);
 }
 
 .library-session.active {
-  border-color: #35624f;
-  box-shadow: inset 3px 0 var(--mint);
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 var(--accent);
 }
 
 .library-session-main {
@@ -1416,7 +1518,7 @@ input:focus-visible {
 }
 
 .library-session-main:hover {
-  background: #13241f;
+  background: var(--surface-hover);
 }
 
 .library-session-title {
@@ -1438,18 +1540,18 @@ input:focus-visible {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #7c9087;
+  color: var(--text-soft);
   font-size: 10px;
 }
 
 .library-session-meta i,
 .library-session-summary i {
-  color: #40564d;
+  color: var(--text-subtle);
   font-style: normal;
 }
 
 .library-session-open {
-  color: var(--mint);
+  color: var(--accent);
   font-size: 10px;
   font-weight: 700;
 }
@@ -1460,8 +1562,8 @@ input:focus-visible {
   align-items: center;
   gap: 18px;
   padding: 10px 18px 12px;
-  border-top: 1px solid #20332c;
-  background: #0a1612;
+  border-top: 1px solid var(--line);
+  background: var(--surface-inset);
 }
 
 .opening-preview-link {
@@ -1478,7 +1580,7 @@ input:focus-visible {
 
 .opening-preview-link:focus-visible {
   border-radius: 5px;
-  outline: 2px solid var(--mint);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
@@ -1486,16 +1588,16 @@ input:focus-visible {
   position: relative;
   height: 48px;
   overflow: hidden;
-  border: 1px solid #223a31;
+  border: 1px solid var(--line);
   border-radius: 5px;
   background:
     repeating-linear-gradient(
       to bottom,
       transparent 0,
       transparent calc(25% - 1px),
-      rgba(89, 121, 108, 0.09) 25%
+      var(--roll-grid) 25%
     ),
-    linear-gradient(90deg, rgba(98, 214, 165, 0.04), transparent);
+    linear-gradient(90deg, var(--accent-glow-faint), transparent);
 }
 
 .opening-preview > i {
@@ -1504,8 +1606,8 @@ input:focus-visible {
   height: 4px;
   border-radius: 2px;
   transform: translateY(-50%);
-  background: #5ecf9f;
-  box-shadow: 0 0 5px rgba(98, 214, 165, 0.2);
+  background: var(--accent);
+  box-shadow: 0 0 5px var(--accent-glow-faint);
 }
 
 .opening-preview-playhead {
@@ -1515,14 +1617,14 @@ input:focus-visible {
   bottom: 0;
   width: 1px;
   transform: translateX(-50%);
-  background: #f0c674;
+  background: var(--warning);
   box-shadow: 0 0 5px rgba(240, 198, 116, 0.55);
 }
 
 .opening-preview.empty {
   display: grid;
   place-items: center;
-  color: #52675f;
+  color: var(--text-subtle);
   font-size: 9px;
 }
 
@@ -1532,7 +1634,7 @@ input:focus-visible {
   background: linear-gradient(
     100deg,
     transparent 15%,
-    rgba(98, 214, 165, 0.09) 45%,
+    var(--accent-glow-faint) 45%,
     transparent 75%
   );
   content: "";
@@ -1561,19 +1663,19 @@ input:focus-visible {
   height: 32px;
   place-items: center;
   padding: 0;
-  border: 1px solid #3c5a4e;
+  border: 1px solid var(--line-strong);
   border-radius: 50%;
-  color: var(--mint);
-  background: #14251f;
+  color: var(--accent);
+  background: var(--surface-soft);
   cursor: pointer;
 }
 
 .library-player > button:hover:not(:disabled) {
-  border-color: var(--mint);
+  border-color: var(--accent);
 }
 
 .library-player > button:disabled {
-  color: #566b62;
+  color: var(--text-subtle);
   cursor: wait;
 }
 
@@ -1587,7 +1689,7 @@ input:focus-visible {
   width: 100%;
   min-width: 0;
   margin: 0;
-  accent-color: var(--mint);
+  accent-color: var(--accent);
   cursor: pointer;
 }
 
@@ -1596,7 +1698,7 @@ input:focus-visible {
 }
 
 .library-player output {
-  color: #71877d;
+  color: var(--text-soft);
   font-family: "DM Mono", monospace;
   font-size: 8px;
   text-align: right;
@@ -1605,7 +1707,7 @@ input:focus-visible {
 .library-session-error {
   grid-column: 1 / -1;
   margin: -2px 0 0;
-  color: #d99a90;
+  color: var(--danger);
   font-size: 9px;
 }
 
@@ -1615,21 +1717,21 @@ input:focus-visible {
   place-items: center;
   align-content: center;
   padding: 42px;
-  border: 1px dashed #31483f;
+  border: 1px dashed var(--line);
   border-radius: 12px;
-  color: var(--muted);
+  color: var(--text-soft);
   text-align: center;
 }
 
 .sessions-empty > span {
-  color: var(--mint);
+  color: var(--accent);
   font-family: serif;
   font-size: 32px;
 }
 
 .sessions-empty h2 {
   margin: 12px 0 0;
-  color: var(--cream);
+  color: var(--text);
 }
 
 .sessions-empty p {
@@ -1639,17 +1741,17 @@ input:focus-visible {
 
 .surface-feedback {
   margin: 8px 0;
-  color: #bdd3ca;
+  color: var(--text);
   font-size: 11px;
   line-height: 1.5;
 }
 
 .surface-feedback.error {
   padding: 9px 11px;
-  border: 1px solid #69443e;
+  border: 1px solid var(--danger);
   border-radius: 6px;
-  color: #ffc1b9;
-  background: #2b1816;
+  color: var(--danger);
+  background: var(--danger-soft);
 }
 
 .session-action-error {
@@ -1667,10 +1769,10 @@ input:focus-visible {
   z-index: 50;
   max-width: min(380px, calc(100vw - 30px));
   padding: 11px 14px;
-  border: 1px solid #416355;
+  border: 1px solid var(--accent);
   border-radius: 8px;
-  color: #dff5eb;
-  background: #173126;
+  color: var(--text);
+  background: var(--surface-selected);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32);
   font-size: 12px;
 }
@@ -1686,7 +1788,7 @@ input:focus-visible {
 .performance-heading h2,
 .capture-deck h2 {
   margin: 0;
-  color: #eceee8;
+  color: var(--text);
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.035em;
@@ -1703,17 +1805,17 @@ input:focus-visible {
   align-items: center;
   gap: 6px;
   padding: 7px 10px;
-  border: 1px solid #2a3d36;
+  border: 1px solid var(--line);
   border-radius: 5px;
-  color: #71867d;
+  color: var(--text-soft);
   cursor: pointer;
   font-size: 10px;
 }
 
 .view-chip.checked {
-  border-color: #3f6355;
-  color: #c6ddd4;
-  background: #14241f;
+  border-color: var(--line-strong);
+  color: var(--text);
+  background: var(--surface-soft);
 }
 
 .view-chip input {
@@ -1722,7 +1824,7 @@ input:focus-visible {
 }
 
 .view-chip span {
-  color: var(--mint);
+  color: var(--accent);
   font-family: "DM Mono", monospace;
 }
 
@@ -1740,7 +1842,7 @@ input:focus-visible {
   padding: 10px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0d1916;
+  background: var(--surface-inset);
 }
 
 .persistent-playback-audio {
@@ -1753,18 +1855,18 @@ input:focus-visible {
   height: 34px;
   place-items: center;
   padding: 0;
-  border: 1px solid #497967;
+  border: 1px solid var(--accent);
   border-radius: 50%;
-  color: #0a1511;
-  background: var(--mint);
+  color: var(--accent-contrast);
+  background: var(--accent);
   cursor: pointer;
   font-size: 12px;
 }
 
 .playback-button:disabled {
-  border-color: #2e423a;
-  color: #586c64;
-  background: #182722;
+  border-color: var(--line);
+  color: var(--text-subtle);
+  background: var(--surface-soft);
   cursor: not-allowed;
 }
 
@@ -1775,7 +1877,7 @@ input:focus-visible {
 
 .playback-scrubber input {
   width: 100%;
-  accent-color: var(--mint);
+  accent-color: var(--accent);
   cursor: pointer;
 }
 
@@ -1784,7 +1886,7 @@ input:focus-visible {
 }
 
 .playback-transport output {
-  color: #b6cbc2;
+  color: var(--text);
   font-family: "DM Mono", monospace;
   font-size: 9px;
   white-space: nowrap;
@@ -1792,7 +1894,7 @@ input:focus-visible {
 
 .playback-status {
   min-width: 48px;
-  color: #71857c;
+  color: var(--text-soft);
   font-size: 8px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1812,7 +1914,7 @@ input:focus-visible {
 .artifact-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: linear-gradient(145deg, #101d1a, #0d1916);
+  background: linear-gradient(145deg, var(--surface), var(--surface-inset));
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
 }
 
@@ -1831,13 +1933,13 @@ input:focus-visible {
 .view-heading h3,
 .artifact-panel h3 {
   margin: 0;
-  color: #dfe6e1;
+  color: var(--text);
   font-size: 15px;
   font-weight: 600;
 }
 
 .view-heading output {
-  color: #a8bbb3;
+  color: var(--text-soft);
   font-family: "DM Mono", monospace;
   font-size: 10px;
 }
@@ -1846,7 +1948,7 @@ input:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  color: #72857d;
+  color: var(--text-soft);
   font-size: 9px;
 }
 
@@ -1863,17 +1965,17 @@ input:focus-visible {
 }
 
 .legend-dot.provisional {
-  background: var(--amber);
+  background: var(--warning);
 }
 
 .legend-dot.committed {
-  background: var(--mint);
+  background: var(--accent);
 }
 
 .legend-line {
   width: 1px;
   height: 10px;
-  background: #d8e7df;
+  background: var(--text);
 }
 
 .roll-stage {
@@ -1881,9 +1983,9 @@ input:focus-visible {
   grid-template-columns: 42px 1fr;
   grid-template-rows: 260px auto;
   overflow: hidden;
-  border: 1px solid #243730;
+  border: 1px solid var(--line);
   border-radius: 5px;
-  background: #0b1512;
+  background: var(--roll-surface);
   cursor: crosshair;
 }
 
@@ -1893,8 +1995,8 @@ input:focus-visible {
   flex-direction: column;
   justify-content: space-around;
   padding: 7px 7px;
-  border-right: 1px solid #243730;
-  color: #52675f;
+  border-right: 1px solid var(--line);
+  color: var(--text-subtle);
   font-family: "DM Mono", monospace;
   font-size: 8px;
 }
@@ -1904,8 +2006,8 @@ input:focus-visible {
   grid-row: 1;
   overflow: hidden;
   background:
-    repeating-linear-gradient(to bottom, transparent 0, transparent calc(12.5% - 1px), rgba(82, 105, 96, 0.11) 12.5%),
-    repeating-linear-gradient(to right, transparent 0, transparent calc(10% - 1px), rgba(82, 105, 96, 0.08) 10%);
+    repeating-linear-gradient(to bottom, transparent 0, transparent calc(12.5% - 1px), var(--roll-grid) 12.5%),
+    repeating-linear-gradient(to right, transparent 0, transparent calc(10% - 1px), var(--roll-grid) 10%);
 }
 
 .roll-note {
@@ -1917,16 +2019,16 @@ input:focus-visible {
 }
 
 .roll-note.committed {
-  background: var(--mint);
-  box-shadow: 0 0 8px rgba(98, 214, 165, 0.22);
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
 }
 
 .roll-note.provisional {
-  background: var(--amber);
+  background: var(--warning);
 }
 
 .roll-note.retracted {
-  border: 1px solid #6b5542;
+  border: 1px solid var(--warning);
   background: transparent;
 }
 
@@ -1938,7 +2040,7 @@ input:focus-visible {
 }
 
 .roll-note-tail.committed {
-  border-color: rgba(98, 214, 165, 0.45);
+  border-color: var(--accent-glow);
 }
 
 .roll-note-tail.provisional {
@@ -1950,8 +2052,8 @@ input:focus-visible {
   top: 0;
   bottom: 0;
   width: 1px;
-  background: rgba(235, 244, 239, 0.6);
-  box-shadow: 0 0 8px rgba(235, 244, 239, 0.25);
+  background: color-mix(in srgb, var(--text) 62%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--text) 25%, transparent);
 }
 
 .roll-playhead {
@@ -1961,10 +2063,10 @@ input:focus-visible {
   bottom: 0;
   width: 2px;
   transform: translateX(-1px);
-  background: #2fbe8c;
+  background: var(--accent);
   box-shadow:
-    0 0 0 1px rgba(8, 20, 16, 0.65),
-    0 0 10px rgba(47, 190, 140, 0.72);
+    0 0 0 1px color-mix(in srgb, var(--roll-surface) 65%, transparent),
+    0 0 10px var(--accent-glow);
   pointer-events: none;
 }
 
@@ -1972,8 +2074,8 @@ input:focus-visible {
   grid-column: 1 / span 2;
   grid-row: 2;
   padding: 6px 8px 7px;
-  border-top: 1px solid #243730;
-  background: #0e1b17;
+  border-top: 1px solid var(--line);
+  background: var(--surface-inset);
 }
 
 .pedal-lane {
@@ -1986,7 +2088,7 @@ input:focus-visible {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  color: #587067;
+  color: var(--text-subtle);
   font-family: "DM Mono", monospace;
   font-size: 8px;
   line-height: 1;
@@ -1995,7 +2097,7 @@ input:focus-visible {
 
 .pedal-label small {
   margin-top: 3px;
-  color: #3f554d;
+  color: var(--text-subtle);
   font-size: 6px;
   letter-spacing: 0.06em;
 }
@@ -2015,12 +2117,12 @@ input:focus-visible {
 }
 
 .pedal-lane.sustain .pedal-gestures i {
-  border-color: #65a7b4;
+  border-color: #477c91;
   background: rgba(101, 167, 180, 0.72);
 }
 
 .pedal-lane.soft-pedal .pedal-gestures i {
-  border-color: #9879b8;
+  border-color: #7d5da3;
   background: rgba(152, 121, 184, 0.66);
 }
 
@@ -2043,7 +2145,7 @@ input:focus-visible {
   justify-content: space-between;
   margin-top: 8px;
   padding-left: 42px;
-  color: #52675f;
+  color: var(--text-subtle);
   font-family: "DM Mono", monospace;
   font-size: 8px;
 }
@@ -2052,9 +2154,9 @@ input:focus-visible {
   position: relative;
   height: 116px;
   overflow: hidden;
-  border: 1px solid #263a33;
+  border: 1px solid var(--line);
   border-radius: 4px;
-  background: #cdd2ce;
+  background: #d8d0c7;
 }
 
 .piano-keyboard button {
@@ -2070,46 +2172,46 @@ input:focus-visible {
 .piano-keyboard .white {
   z-index: 1;
   height: 100%;
-  border-right: 1px solid #859088;
-  background: linear-gradient(#f1f2ed, #c9cec8);
+  border-right: 1px solid #a99d94;
+  background: linear-gradient(#fffdf8, #ded4ca);
 }
 
 .piano-keyboard .black {
   z-index: 2;
   height: 61%;
   border-radius: 0 0 3px 3px;
-  background: linear-gradient(90deg, #0c1210, #26312d, #080d0b);
+  background: linear-gradient(90deg, #171311, #352f2c, #090706);
   box-shadow: 0 3px 5px rgba(0, 0, 0, 0.5);
 }
 
 .piano-keyboard .white.sounding {
-  background: linear-gradient(#8ce5bd, #49b88b);
+  background: linear-gradient(var(--accent-key-light), var(--accent-key-mid));
 }
 
 .piano-keyboard .black.sounding {
-  background: linear-gradient(#e6b36f, #9d6938);
+  background: linear-gradient(#e6b36f, #8f572a);
 }
 
 .piano-keyboard .white.auditioned {
-  background: linear-gradient(#bcebd7, #62d6a5);
-  box-shadow: inset 0 -7px 12px rgba(9, 48, 35, 0.24);
+  background: linear-gradient(var(--accent-key-light), var(--accent));
+  box-shadow: inset 0 -7px 12px var(--accent-glow);
 }
 
 .piano-keyboard .black.auditioned {
-  background: linear-gradient(90deg, #4aa985, #66d8aa, #28755b);
+  background: linear-gradient(90deg, var(--accent), var(--accent-key-mid), var(--accent-strong));
   box-shadow:
     0 3px 5px rgba(0, 0, 0, 0.5),
-    0 0 10px rgba(98, 214, 165, 0.46);
+    0 0 10px var(--accent-glow);
 }
 
 .piano-keyboard button:focus-visible {
-  outline: 2px solid #f2c06f;
+  outline: 2px solid var(--warning);
   outline-offset: -3px;
 }
 
 .keyboard-hint {
   margin: -8px 0 10px;
-  color: #657a71;
+  color: var(--text-subtle);
   font-size: 9px;
 }
 
@@ -2121,26 +2223,26 @@ input:focus-visible {
 .inspection-control > span {
   display: flex;
   justify-content: space-between;
-  color: #71857c;
+  color: var(--text-soft);
   font-size: 9px;
   text-transform: uppercase;
 }
 
 .inspection-control output {
-  color: #abc0b7;
+  color: var(--text-soft);
   font-family: "DM Mono", monospace;
 }
 
 .inspection-control input {
   width: 100%;
   margin: 10px 0 0;
-  accent-color: var(--mint);
+  accent-color: var(--accent);
 }
 
 .text-button {
   padding: 0;
   border: 0;
-  color: var(--mint);
+  color: var(--accent);
   background: transparent;
   cursor: pointer;
   font-size: 9px;
@@ -2148,17 +2250,17 @@ input:focus-visible {
 
 .score-state {
   margin: -4px 0 14px;
-  color: #80938b;
+  color: var(--text-soft);
   font-size: 10px;
 }
 
 .score-state.failed {
-  color: #d58e84;
+  color: var(--danger);
 }
 
 .score-not-live {
   margin: -8px 0 14px;
-  color: #61756d;
+  color: var(--text-subtle);
   font-size: 9px;
 }
 
@@ -2174,31 +2276,31 @@ input:focus-visible {
   display: grid;
   gap: 4px;
   min-width: min(100%, 290px);
-  color: #71857c;
+  color: var(--text-soft);
   font-size: 9px;
   text-transform: uppercase;
 }
 
 .score-engraving-controls select {
   min-height: 30px;
-  border: 1px solid #385046;
+  border: 1px solid var(--line);
   border-radius: 3px;
   padding: 0 28px 0 9px;
-  color: #d7e0dc;
-  background: #17231f;
+  color: var(--text);
+  background: var(--surface-soft);
   font: 10px "DM Mono", monospace;
 }
 
 .score-variant-description {
   flex-basis: 100%;
   margin: 0;
-  color: #71857c;
+  color: var(--text-soft);
   font-size: 9px;
 }
 
 .score-render-warning {
   margin: -4px 0 12px;
-  color: #d8b56b;
+  color: var(--warning);
   font-size: 10px;
 }
 
@@ -2207,14 +2309,14 @@ input:focus-visible {
   min-height: 90px;
   place-content: center;
   gap: 6px;
-  border: 1px dashed #31473e;
+  border: 1px dashed var(--line);
   border-radius: 4px;
-  color: #91a39b;
+  color: var(--text-soft);
   text-align: center;
 }
 
 .score-empty strong {
-  color: #c5d2cd;
+  color: var(--text);
   font-size: 11px;
 }
 
@@ -2228,8 +2330,8 @@ input:focus-visible {
   height: 170px;
   overflow: hidden;
   border-radius: 4px;
-  color: #15201d;
-  background: #eeece3;
+  color: var(--score-ink);
+  background: var(--score-paper);
 }
 
 .score-playback-frame {
@@ -2250,8 +2352,8 @@ input:focus-visible {
 
 .score-paper .playback-note-active,
 .score-paper .playback-note-active * {
-  fill: #df6d32 !important;
-  stroke: #913b18 !important;
+  fill: var(--accent) !important;
+  stroke: var(--accent-strong) !important;
 }
 
 .score-follow-playback {
@@ -2264,11 +2366,11 @@ input:focus-visible {
   align-items: center;
   gap: 7px;
   padding: 0 15px;
-  border: 1px solid #66d1aa;
+  border: 1px solid var(--accent);
   border-radius: 999px;
-  color: #e7fff6;
-  background: #173d31;
-  box-shadow: 0 7px 22px rgb(4 18 14 / 32%);
+  color: var(--text);
+  background: var(--surface-selected);
+  box-shadow: 0 7px 22px var(--shadow);
   cursor: pointer;
   font: 600 10px "DM Mono", monospace;
   letter-spacing: 0.02em;
@@ -2276,32 +2378,38 @@ input:focus-visible {
 
 .score-follow-playback:hover,
 .score-follow-playback:focus-visible {
-  border-color: #a3f0d4;
-  background: #205442;
+  border-color: var(--accent-strong);
+  color: var(--accent-contrast);
+  background: var(--accent-strong);
+}
+
+.score-follow-playback:hover span,
+.score-follow-playback:focus-visible span {
+  color: var(--accent-contrast);
 }
 
 .score-follow-playback span {
-  color: #8fe2c3;
+  color: var(--accent-strong);
   font-size: 17px;
   line-height: 1;
 }
 
 .score-render-error {
   margin: 9px 0 0;
-  color: #d58e84;
+  color: var(--danger);
   font-size: 10px;
 }
 
 .score-card > small {
   display: block;
   margin-top: 9px;
-  color: #63776f;
+  color: var(--text-subtle);
   font-family: "DM Mono", monospace;
   font-size: 8px;
 }
 
 .score-card > .score-provenance {
-  color: #8aa198;
+  color: var(--text-soft);
 }
 
 .artifact-panel {
@@ -2322,21 +2430,21 @@ input:focus-visible {
   display: grid;
   grid-template-columns: 24px 1fr;
   padding: 9px 10px;
-  border: 1px solid #2a3d36;
+  border: 1px solid var(--line);
   border-radius: 5px;
-  color: #bdd0c8;
-  background: #12211c;
+  color: var(--text);
+  background: var(--surface);
   cursor: pointer;
   text-align: left;
 }
 
 .artifact-list button:hover {
-  border-color: #527265;
+  border-color: var(--line-strong);
 }
 
 .artifact-list button > span {
   grid-row: 1 / span 2;
-  color: var(--mint);
+  color: var(--accent);
   font-size: 18px;
 }
 
@@ -2350,7 +2458,7 @@ input:focus-visible {
 .artifact-list small {
   overflow: hidden;
   margin-top: 3px;
-  color: #61756d;
+  color: var(--text-subtle);
   font-family: "DM Mono", monospace;
   font-size: 7px;
   text-overflow: ellipsis;
@@ -2359,7 +2467,7 @@ input:focus-visible {
 
 .empty-copy {
   margin: 2px 0;
-  color: #70847b;
+  color: var(--text-soft);
   font-size: 11px;
 }
 
@@ -2370,8 +2478,8 @@ input:focus-visible {
   border: 1px solid var(--line);
   border-radius: 10px;
   background:
-    linear-gradient(135deg, rgba(35, 72, 59, 0.24), transparent 60%),
-    #101d1a;
+    linear-gradient(135deg, var(--accent-glow-faint), transparent 60%),
+    var(--surface);
 }
 
 .capture-deck h2 {
@@ -2381,7 +2489,7 @@ input:focus-visible {
 .capture-copy {
   max-width: 600px;
   margin: 13px 0 25px;
-  color: #81938c;
+  color: var(--text-soft);
   font-size: 13px;
   line-height: 1.65;
 }
@@ -2389,9 +2497,9 @@ input:focus-visible {
 .capture-capability-warning {
   margin: 20px 0 0;
   padding: 11px 13px;
-  border: 1px solid #705a31;
+  border: 1px solid var(--warning);
   border-radius: 7px;
-  color: #d8caa9;
+  color: var(--warning);
   background: rgba(103, 77, 28, 0.18);
   font-size: 10px;
   line-height: 1.5;
@@ -2399,7 +2507,7 @@ input:focus-visible {
 
 .capture-capability-warning strong {
   display: block;
-  color: #f2d991;
+  color: var(--warning);
 }
 
 .capture-status {
@@ -2408,23 +2516,23 @@ input:focus-visible {
   gap: 11px;
   margin-top: 25px;
   padding-top: 18px;
-  border-top: 1px solid #293a34;
+  border-top: 1px solid var(--line);
 }
 
 .capture-status > i {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #60726b;
+  background: var(--text-subtle);
 }
 
 .capture-status.recording > i {
-  background: var(--mint);
+  background: var(--accent);
   animation: pulse 1.5s infinite;
 }
 
 .capture-status.failed > i {
-  background: var(--red);
+  background: var(--danger);
 }
 
 .capture-status span {
@@ -2442,7 +2550,7 @@ input:focus-visible {
 
 .capture-status small {
   margin-top: 3px;
-  color: #71847d;
+  color: var(--text-soft);
   font-size: 9px;
 }
 
@@ -2461,12 +2569,12 @@ input:focus-visible {
   height: 4px;
   margin-top: 7px;
   border: 0;
-  accent-color: var(--mint);
+  accent-color: var(--accent);
 }
 
 .capture-status button {
   border: 0;
-  color: var(--mint);
+  color: var(--accent);
   background: none;
   cursor: pointer;
   font-size: 9px;
@@ -2490,10 +2598,10 @@ input:focus-visible {
   height: 64px;
   margin-bottom: 24px;
   place-items: center;
-  border: 1px solid #345044;
+  border: 1px solid var(--line);
   border-radius: 50%;
-  color: var(--mint);
-  background: #11241d;
+  color: var(--accent);
+  background: var(--surface);
   font-family: serif;
   font-size: 28px;
 }
@@ -2502,7 +2610,7 @@ input:focus-visible {
 .fatal-state > p:not(.eyebrow) {
   max-width: 500px;
   margin: 17px 0 25px;
-  color: #81948c;
+  color: var(--text-soft);
   font-size: 13px;
   line-height: 1.7;
 }
@@ -2510,10 +2618,10 @@ input:focus-visible {
 @keyframes pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(98, 214, 165, 0.3);
+    box-shadow: 0 0 0 0 var(--accent-glow);
   }
   50% {
-    box-shadow: 0 0 0 6px rgba(98, 214, 165, 0);
+    box-shadow: 0 0 0 6px transparent;
   }
 }
 
@@ -2568,8 +2676,8 @@ input:focus-visible {
       max(18px, env(safe-area-inset-top))
       18px
       max(20px, env(safe-area-inset-bottom));
-    border-right: 1px solid #385048;
-    background: #08120f;
+    border-right: 1px solid var(--line);
+    background: var(--surface-inset);
     box-shadow: 24px 0 70px rgba(0, 0, 0, 0.52);
     transform: translateX(-102%);
     visibility: hidden;
@@ -2592,7 +2700,7 @@ input:focus-visible {
     height: 100%;
     padding: 0;
     border: 0;
-    background: rgba(2, 8, 6, 0.7);
+    background: var(--backdrop);
     backdrop-filter: blur(2px);
   }
 
@@ -2607,10 +2715,10 @@ input:focus-visible {
     margin-left: auto;
     place-items: center;
     padding: 0;
-    border: 1px solid #30473e;
+    border: 1px solid var(--line);
     border-radius: 50%;
-    color: #afc1ba;
-    background: #10201b;
+    color: var(--text-soft);
+    background: var(--surface);
     cursor: pointer;
   }
 
@@ -2626,10 +2734,10 @@ input:focus-visible {
     align-items: center;
     gap: 8px;
     padding: 0 11px;
-    border: 1px solid #345046;
+    border: 1px solid var(--line);
     border-radius: 7px;
-    color: #dce9e4;
-    background: #12241f;
+    color: var(--text);
+    background: var(--surface);
     cursor: pointer;
     font-size: 11px;
     font-weight: 700;
@@ -2645,7 +2753,7 @@ input:focus-visible {
     display: block;
     height: 1px;
     border-radius: 1px;
-    background: var(--mint);
+    background: var(--accent);
   }
 
   .workspace {
@@ -2760,16 +2868,16 @@ input:focus-visible {
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
-  color: #edf1ec;
+  color: var(--text);
   background:
-    radial-gradient(circle at 50% 0, rgba(59, 97, 82, 0.2), transparent 42rem),
-    #07100e;
+    radial-gradient(circle at 50% 0, var(--page-glow), transparent 42rem),
+    var(--surface-inset);
 }
 
 .reader-toolbar {
   z-index: 4;
   display: grid;
-  grid-template-columns: auto minmax(150px, 1fr) auto auto auto auto auto;
+  grid-template-columns: auto minmax(150px, 1fr) auto auto auto auto auto auto;
   align-items: center;
   gap: 10px;
   min-height: 64px;
@@ -2778,8 +2886,8 @@ input:focus-visible {
     max(12px, env(safe-area-inset-right))
     8px
     max(12px, env(safe-area-inset-left));
-  border-bottom: 1px solid #294039;
-  background: rgba(8, 20, 17, 0.96);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-overlay);
   transition:
     opacity 160ms ease,
     transform 160ms ease;
@@ -2788,10 +2896,10 @@ input:focus-visible {
 .reader-toolbar button,
 .reader-toolbar select {
   min-height: 44px;
-  border: 1px solid #345046;
+  border: 1px solid var(--line);
   border-radius: 7px;
-  color: #dce9e4;
-  background: #12241f;
+  color: var(--text);
+  background: var(--surface);
   cursor: pointer;
 }
 
@@ -2808,13 +2916,13 @@ input:focus-visible {
 }
 
 .reader-playback span {
-  color: var(--mint);
+  color: var(--accent);
 }
 
 .reader-toolbar button:hover,
 .reader-toolbar select:hover {
-  border-color: #5d8b79;
-  background: #183229;
+  border-color: var(--accent);
+  background: var(--surface-selected);
 }
 
 .reader-workspace {
@@ -2825,7 +2933,7 @@ input:focus-visible {
 }
 
 .reader-workspace span {
-  color: var(--mint);
+  color: var(--accent);
   font-size: 18px;
 }
 
@@ -2847,13 +2955,13 @@ input:focus-visible {
 
 .reader-identity small {
   margin-top: 3px;
-  color: #81978e;
+  color: var(--text-soft);
   font-family: "DM Mono", monospace;
   font-size: 9px;
 }
 
 .reader-toolbar output {
-  color: #c7d6d0;
+  color: var(--text);
   font-family: "DM Mono", monospace;
   font-size: 10px;
   white-space: nowrap;
@@ -2863,7 +2971,7 @@ input:focus-visible {
   display: flex;
   align-items: center;
   gap: 7px;
-  color: #83988f;
+  color: var(--text-soft);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -2916,7 +3024,7 @@ input:focus-visible {
   width: var(--reader-page-width) !important;
   max-width: var(--reader-page-width);
   margin: 0 !important;
-  background: #f5f3eb;
+  background: var(--score-paper);
   box-shadow:
     0 18px 60px rgba(0, 0, 0, 0.42),
     0 2px 8px rgba(0, 0, 0, 0.38);
@@ -2936,7 +3044,7 @@ input:focus-visible {
   width: clamp(44px, 8vw, 96px);
   padding: 0;
   border: 0;
-  color: rgba(226, 239, 233, 0.68);
+  color: var(--text-soft);
   background: transparent;
   cursor: pointer;
 }
@@ -2956,7 +3064,7 @@ input:focus-visible {
   margin: auto;
   place-items: center;
   border-radius: 22px;
-  background: rgba(4, 13, 10, 0.44);
+  background: var(--backdrop);
   font-size: 42px;
   line-height: 1;
   transition:
@@ -2966,8 +3074,8 @@ input:focus-visible {
 
 .reader-turn-zone:hover span,
 .reader-turn-zone:focus-visible span {
-  color: #fff;
-  background: rgba(24, 55, 44, 0.9);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .reader-turn-zone:disabled {
@@ -2982,10 +3090,10 @@ input:focus-visible {
   left: 50%;
   min-height: 44px;
   padding: 0 16px;
-  border: 1px solid #6f8863;
+  border: 1px solid var(--warning);
   border-radius: 22px;
-  color: #eff5df;
-  background: rgba(47, 69, 38, 0.96);
+  color: var(--text);
+  background: var(--warning-soft);
   cursor: pointer;
   transform: translateX(-50%);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.34);
@@ -2999,10 +3107,10 @@ input:focus-visible {
   max-width: min(390px, calc(100vw - 32px));
   margin: 0;
   padding: 10px 12px;
-  border: 1px solid #765a37;
+  border: 1px solid var(--warning);
   border-radius: 6px;
-  color: #ead5b6;
-  background: rgba(48, 35, 22, 0.94);
+  color: var(--warning);
+  background: var(--warning-soft);
   font-size: 10px;
 }
 
@@ -3019,21 +3127,21 @@ input:focus-visible {
   min-width: min(480px, calc(100vw - 40px));
   min-height: 240px;
   padding: 24px;
-  border: 1px dashed #355047;
+  border: 1px dashed var(--line);
   border-radius: 10px;
-  color: #91a69e;
+  color: var(--text-soft);
 }
 
 .reader-loading strong,
 .reader-boot strong {
-  color: #dce8e3;
+  color: var(--text);
   font-size: 16px;
 }
 
 .reader-loading span,
 .reader-boot span {
   max-width: 480px;
-  color: #81958e;
+  color: var(--text-soft);
   font-size: 11px;
 }
 
@@ -3041,9 +3149,9 @@ input:focus-visible {
   min-height: 44px;
   margin-top: 8px;
   padding: 0 16px;
-  border: 1px solid #416157;
+  border: 1px solid var(--line-strong);
   border-radius: 7px;
-  background: #152b24;
+  background: var(--surface-soft);
   cursor: pointer;
 }
 
@@ -3063,6 +3171,10 @@ input:focus-visible {
     grid-template-columns: auto minmax(0, 1fr) auto auto;
     min-height: 58px;
     gap: 6px;
+  }
+
+  .reader-toolbar > .theme-toggle {
+    display: none;
   }
 
   .reader-identity small,
@@ -3127,6 +3239,10 @@ input:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+
   .reader-toolbar,
   .reader-turn-zone span {
     transition: none;

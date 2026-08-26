@@ -3,12 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="light dark" />
     <meta
       name="description"
       content="Atpiano turns acoustic piano performances into corrected, reviewable note events."
     />
     <title>Atpiano · Performance workspace</title>
+    <script>
+      (() => {
+        let theme = "light";
+        try {
+          theme = localStorage.getItem("atpiano:color-theme") === "dark"
+            ? "dark"
+            : "light";
+        } catch {
+          // Keep the website-like light default when storage is unavailable.
+        }
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

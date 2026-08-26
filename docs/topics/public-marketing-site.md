@@ -12,9 +12,10 @@ remain owned by [`public-desktop-release.md`](public-desktop-release.md).
 
 The Astro site is published at [at-piano.com](https://at-piano.com) from a
 Cloudflare Worker. `www.at-piano.com` redirects permanently to the apex. The
-site uses the intended piano-derived red, ivory, white, and black visual
-language; it is the reference direction for a later application-theme update,
-but does not change the desktop application yet.
+site established the piano-derived red, ivory, white, and black visual
+language now adopted by the shared application's light and dark modes. The
+continuing application contract lives in
+[`application-color-theme.md`](application-color-theme.md).
 
 The social and Graehl Arts feature artwork uses intentionally
 nonrepresentational geometry rather than a stylized keyboard: a cropped

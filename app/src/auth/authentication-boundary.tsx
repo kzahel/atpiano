@@ -4,6 +4,7 @@ import type {
   AuthenticationClient,
   AuthSession,
 } from "./auth-client.js";
+import { ThemeToggle } from "../components/theme-toggle.js";
 
 export function AuthenticationBoundary({
   client,
@@ -79,6 +80,7 @@ export function AuthenticationBoundary({
   return (
     <main className="login-shell">
       <section className="login-card" aria-labelledby="login-title">
+        <ThemeToggle />
         <div className="login-brand" aria-hidden="true">♪</div>
         <p className="eyebrow">Private family workspace</p>
         <h1 id="login-title">Sign in to Atpiano</h1>

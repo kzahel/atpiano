@@ -25,6 +25,7 @@ import type { Session } from "../runtime/atpiano-runtime.js";
 import { usePlaybackControls } from "./playback-provider.js";
 import { usePlaybackStore } from "../state/playback-store.js";
 import { useWorkspaceStore } from "../state/workspace-store.js";
+import { ThemeToggle } from "./theme-toggle.js";
 
 const densityStorageKey = "atpiano.score-reader-density";
 
@@ -286,6 +287,7 @@ export function ScoreReader({
             <option value="compact">Compact</option>
           </select>
         </label>
+        <ThemeToggle compact />
         <button
           className="reader-playback"
           type="button"

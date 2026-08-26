@@ -28,6 +28,7 @@ import { ScoreReader } from "./components/score-reader.js";
 import { SessionRail } from "./components/session-rail.js";
 import { SessionTitleEditor } from "./components/session-title-editor.js";
 import { SessionsHome } from "./components/sessions-home.js";
+import { ThemeToggle } from "./components/theme-toggle.js";
 import { useMicrophone } from "./hooks/use-microphone.js";
 import { updateInstallBlocker } from "./desktop-update/install-blocker.js";
 import { artifactText } from "./lib/artifact-content.js";
@@ -1478,6 +1479,7 @@ export function App({
               </span>
               Sessions
             </button>
+            <ThemeToggle />
           </div>
           <div className="topbar-actions">
             {viewer !== undefined && (
